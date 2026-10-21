@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' stickyfile: data: https: http:; font-src 'self'">
+<title>Sticky Pins</title>
+<link rel="stylesheet" href="../node_modules/@fontsource/caveat/700.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/caveat/400.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/nunito/400.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/nunito/700.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/nunito/800.css">
+<link rel="stylesheet" href="list.css">
+</head>
+<body>
+<header class="titlebar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 32 32"><rect x="5" y="7" width="22" height="21" rx="2.5" fill="#FFE45C" transform="rotate(-6 16 17)"/><path d="M22 26.5l4.4-4.6-4.2.4z" fill="#E6C232" transform="rotate(-6 16 17)"/><circle cx="16" cy="8" r="4" fill="#E5484D"/><circle cx="14.7" cy="6.8" r="1.2" fill="#fff" opacity=".7"/></svg>
+    <span>Sticky Pins</span>
+  </div>
+  <button class="newbtn" id="btnNew" title="New note"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New note</button>
+</header>
+
+<nav class="tabs">
+  <button class="tab on" data-tab="notes">Notes <span class="count" id="cNotes">0</span></button>
+  <button class="tab" data-tab="bin">Bin <span class="count" id="cBin">0</span></button>
+  <button class="tab" data-tab="settings" title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
+</nav>
+
+<section id="viewNotes" class="view">
+  <div class="searchrow">
+    <label class="search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" placeholder="Search your notes" autocomplete="off">
+    </label>
+    <button class="iconbtn" id="btnFront" title="Bring all open notes to the front"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
+  </div>
+  <div class="cards" id="cards"></div>
+</section>
+
+<section id="viewBin" class="view" hidden>
+  <div class="binhead">
+    <p>Deleted notes wait here until you delete them for good.</p>
+    <button class="pill danger" id="btnEmpty">Empty bin</button>
+  </div>
+  <div class="cards" id="binCards"></div>
+</section>
+
+<section id="viewSettings" class="view settings" hidden>
+  <div class="panel">
+    <h3>General</h3>
+    <label class="row toggle">
+      <span><b>Start with Windows</b><small>Your open notes come back when you turn on the laptop.</small></span>
+      <input type="checkbox" id="sStartup"><i></i>
+    </label>
+    <div class="row col">
+      <span><b>Colour for new notes</b></span>
+      <div class="swatches" id="sColors"></div>
+    </div>
+    <div class="row col">
+      <span><b>Font for new notes</b></span>
+      <div class="seg" id="sFont">
+        <button data-font="hand" class="hand">Handwritten</button>
+        <button data-font="round">Rounded</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Backups</h3>
+    <p class="muted">A copy of all your notes is saved automatically once a day. The last 30 days are kept. Restoring never removes anything.</p>
+    <div class="btnrow">
+      <button class="pill" id="btnBackupNow">Back up now</button>
+      <button class="pill ghost" id="btnBackupFolder">Open backups folder</button>
+    </div>
+    <div class="backups" id="backups"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Where your notes live</h3>
+    <p class="muted">Only on this computer, nothing goes to the cloud.</p>
+    <code id="dataPath"></code>
+    <div class="btnrow"><button class="pill ghost" id="btnDataFolder">Open notes folder</button></div>
+  </div>
+  <p class="version" id="version"></p>
+</section>
+
+<script src="list.js"></script>
+</body>
+</html>

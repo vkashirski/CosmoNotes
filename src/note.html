@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' stickyfile: data: blob: https: http:; media-src 'self' stickyfile: blob:; font-src 'self'; connect-src 'self' stickyfile:">
+<title>Sticky note</title>
+<link rel="stylesheet" href="../node_modules/@fontsource/caveat/400.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/caveat/700.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/nunito/400.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/nunito/700.css">
+<link rel="stylesheet" href="../node_modules/@fontsource/nunito/800.css">
+<link rel="stylesheet" href="note.css">
+</head>
+<body data-color="yellow" data-font="hand" data-size="m">
+
+<header id="bar">
+  <button class="hb" id="btnNew" title="New note (Ctrl+N)"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  <div id="title"></div>
+  <button class="hb" id="btnUnroll" title="Unroll note"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+  <button class="hb" id="btnPin" title="Pin on top of other windows" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
+  <button class="hb" id="btnMenu" title="Colour, font, see-through and more"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg></button>
+  <button class="hb" id="btnClose" title="Close note (it stays in your notes list)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+</header>
+
+<main id="scroller">
+  <div id="editor" contenteditable="true" spellcheck="true" data-placeholder="Take a note…"></div>
+</main>
+
+<footer id="tools">
+  <button class="tb b" data-cmd="bold" title="Bold (Ctrl+B)">B</button>
+  <button class="tb i" data-cmd="italic" title="Italic (Ctrl+I)">I</button>
+  <button class="tb u" data-cmd="underline" title="Underline (Ctrl+U)">U</button>
+  <button class="tb s" data-cmd="strikeThrough" title="Strikethrough (Ctrl+T)">S</button>
+  <span class="tsep"></span>
+  <button class="tb" data-cmd="bullets" title="Bullet list (Ctrl+Shift+L)"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.3" class="fill"/><circle cx="4.5" cy="12" r="1.3" class="fill"/><circle cx="4.5" cy="18" r="1.3" class="fill"/></svg></button>
+  <button class="tb" data-cmd="checklist" title="Checklist (Ctrl+Shift+C)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="6" height="6" rx="1.5"/><path d="m4.4 7 1.3 1.3L8 5.8"/><rect x="3" y="14" width="6" height="6" rx="1.5"/><path d="M13 7h8M13 17h8"/></svg></button>
+  <span class="sp"></span>
+  <button id="btnInsert" title="Add a photo, voice note, drawing, link, table and more"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>Add</button>
+</footer>
+
+<!-- ⋯ menu -->
+<div class="pop" id="menu" hidden>
+  <h4>Colour</h4>
+  <div class="swatches" id="colors">
+    <button class="sw" data-color="yellow" title="Lemon"></button>
+    <button class="sw" data-color="pink" title="Bubblegum"></button>
+    <button class="sw" data-color="green" title="Lime"></button>
+    <button class="sw" data-color="blue" title="Sky"></button>
+    <button class="sw" data-color="purple" title="Lilac"></button>
+    <button class="sw" data-color="orange" title="Peach"></button>
+    <button class="sw" data-color="mint" title="Mint"></button>
+    <button class="sw" data-color="charcoal" title="Charcoal"></button>
+  </div>
+  <h4>Font</h4>
+  <div class="seg" id="fontSeg">
+    <button data-font="hand" class="hand">Handwritten</button>
+    <button data-font="round">Rounded</button>
+  </div>
+  <h4>Text size</h4>
+  <div class="seg" id="sizeSeg">
+    <button data-size="s" title="Small"><span style="font-size:11px">A</span></button>
+    <button data-size="m" title="Medium"><span style="font-size:14px">A</span></button>
+    <button data-size="l" title="Large"><span style="font-size:18px">A</span></button>
+  </div>
+  <h4>See-through <span id="opVal" class="val">100%</span></h4>
+  <input type="range" id="opacity" min="25" max="100" step="5" value="100">
+  <label class="check"><input type="checkbox" id="solidHover"> <span>Turn solid when my mouse is over it</span></label>
+  <div class="divider"></div>
+  <button class="mi" id="miRoll"><svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg><span>Roll up to just the top bar</span></button>
+  <button class="mi" id="miList"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>All notes</span></button>
+  <button class="mi danger" id="miDelete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span>Delete note <small>(goes to the bin)</small></span></button>
+</div>
+
+<!-- Add panel -->
+<div class="pop" id="insert" hidden>
+  <div class="grid">
+    <button class="tile" data-act="photo"><span class="ic" style="--tc:#FFD6E6"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg></span>Photo</button>
+    <button class="tile" data-act="voice"><span class="ic" style="--tc:#FFDFBF"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>Voice</button>
+    <button class="tile" data-act="drawing"><span class="ic" style="--tc:#D2ECFF"><svg viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/><path d="m15 5 4 4"/></svg></span>Drawing</button>
+    <button class="tile" data-act="link"><span class="ic" style="--tc:#D8F5C4"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span>Link</button>
+    <button class="tile" data-act="table"><span class="ic" style="--tc:#E8DDFF"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></span>Table</button>
+    <button class="tile" data-act="numbers"><span class="ic" style="--tc:#CDF3E8"><svg viewBox="0 0 24 24"><path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></span>Numbers</button>
+    <button class="tile" data-act="divider"><span class="ic" style="--tc:#FFF4A3"><svg viewBox="0 0 24 24"><path d="M3 12h3M10 12h4M18 12h3"/></svg></span>Divider</button>
+    <button class="tile" data-act="date"><span class="ic" style="--tc:#FFE1DC"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></span>Date</button>
+  </div>
+  <h4>Text colour</h4>
+  <div class="dots">
+    <button class="dot" data-fore="inherit" title="Normal"><span class="none"></span></button>
+    <button class="dot" data-fore="#D93B3B" style="--c:#D93B3B"></button>
+    <button class="dot" data-fore="#E8780C" style="--c:#E8780C"></button>
+    <button class="dot" data-fore="#2E9E4F" style="--c:#2E9E4F"></button>
+    <button class="dot" data-fore="#2F6FE0" style="--c:#2F6FE0"></button>
+    <button class="dot" data-fore="#8A4FD6" style="--c:#8A4FD6"></button>
+    <button class="dot" data-fore="#D2408A" style="--c:#D2408A"></button>
+  </div>
+  <h4>Highlight</h4>
+  <div class="dots">
+    <button class="dot" data-hilite="transparent" title="No highlight"><span class="none"></span></button>
+    <button class="dot" data-hilite="#FFE74C" style="--c:#FFE74C"></button>
+    <button class="dot" data-hilite="#FFB3D1" style="--c:#FFB3D1"></button>
+    <button class="dot" data-hilite="#A8F0A0" style="--c:#A8F0A0"></button>
+    <button class="dot" data-hilite="#A6DCFF" style="--c:#A6DCFF"></button>
+    <button class="dot" data-hilite="#D9C4FF" style="--c:#D9C4FF"></button>
+    <button class="dot" data-hilite="#FFCC99" style="--c:#FFCC99"></button>
+  </div>
+  <h4>Size of selected text</h4>
+  <div class="seg" id="fsizeSeg">
+    <button data-fsize="2">Small</button>
+    <button data-fsize="3">Normal</button>
+    <button data-fsize="5">Big</button>
+    <button data-fsize="6">Huge</button>
+  </div>
+</div>
+
+<!-- link form -->
+<form class="pop" id="linkPop" hidden autocomplete="off">
+  <h4 id="linkTitle">Add a link</h4>
+  <label class="fld"><span>Text to show</span><input id="linkText" placeholder="e.g. Recipe"></label>
+  <label class="fld"><span>Web address</span><input id="linkUrl" placeholder="e.g. example.com"></label>
+  <div class="btns"><button type="button" class="btn ghost" id="linkCancel">Cancel</button><button type="submit" class="btn">Save link</button></div>
+</form>
+
+<!-- recording bar -->
+<div id="recbar" hidden>
+  <span class="rdot"></span>
+  <span class="rtime" id="recTime">0:00</span>
+  <span class="meter" id="meter"></span>
+  <button class="rbtn ghost" id="recCancel" title="Throw away"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  <button class="rbtn stop" id="recStop" title="Stop and save"><span></span>Save</button>
+</div>
+
+<!-- drawing -->
+<div id="draw" hidden>
+  <div class="dbar">
+    <div class="pens" id="pens">
+      <button class="pen on" data-pen="#2B2B2B" style="--c:#2B2B2B"></button>
+      <button class="pen" data-pen="#E5484D" style="--c:#E5484D"></button>
+      <button class="pen" data-pen="#F08C00" style="--c:#F08C00"></button>
+      <button class="pen" data-pen="#2FA35A" style="--c:#2FA35A"></button>
+      <button class="pen" data-pen="#3E7BFA" style="--c:#3E7BFA"></button>
+      <button class="pen" data-pen="#8E4EC6" style="--c:#8E4EC6"></button>
+    </div>
+    <div class="sizes" id="sizes">
+      <button class="size" data-w="2"><i style="width:4px;height:4px"></i></button>
+      <button class="size on" data-w="4"><i style="width:7px;height:7px"></i></button>
+      <button class="size" data-w="8"><i style="width:11px;height:11px"></i></button>
+    </div>
+    <button class="dtool" id="eraser" title="Eraser"><svg viewBox="0 0 24 24"><path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L13 19"/><path d="M22 21H7M5 11l9 9"/></svg></button>
+    <button class="dtool" id="dUndo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+  </div>
+  <div class="cvwrap"><canvas id="cv"></canvas><span class="dhint" id="dHint">Draw here ✏️<small>Make the note bigger for more room</small></span></div>
+  <div class="dfoot">
+    <button class="btn ghost" id="dClear" title="Clear all">Clear</button>
+    <span class="sp"></span>
+    <button class="btn ghost" id="dCancel">Cancel</button>
+    <button class="btn" id="dDone">Done</button>
+  </div>
+</div>
+
+<div class="ctx" id="ctx" hidden></div>
+<div id="toast" hidden></div>
+<div class="corner"></div>
+
+<script src="note.js"></script>
+</body>
+</html>

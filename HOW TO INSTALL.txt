@@ -1,0 +1,54 @@
+STICKY PINS - how to get it on your laptop
+==========================================
+
+You only do this once. Afterwards you have a normal installer file
+that you can copy to any of your Windows laptops.
+
+1. Install Node.js (free, needed only to build the installer)
+   - Go to https://nodejs.org and download the "LTS" version.
+   - Run it and click Next until it's finished. Keep the default options.
+
+2. Build the installer
+   - Unzip this folder somewhere (for example your Desktop).
+   - Double-click  build.bat
+   - Wait until it says "Done!" (the first time takes a few minutes).
+   - A folder opens with "Sticky Pins Setup 1.0.0.exe".
+
+3. Install
+   - Double-click "Sticky Pins Setup 1.0.0.exe".
+   - Windows may show a blue box "Windows protected your PC". That appears
+     for any app that isn't from a big company. Click "More info", then
+     "Run anyway".
+   - Sticky Pins installs and opens by itself. There's a shortcut on your
+     Desktop and in the Start menu.
+
+Other laptops
+   Copy "Sticky Pins Setup 1.0.0.exe" (USB stick, email, etc.) and run it.
+   Nothing else is needed on those laptops.
+
+
+WHERE ARE MY NOTES SAVED?
+   Only on this computer, in:  %APPDATA%\Sticky Pins
+   (paste that into the File Explorer address bar to open it)
+   - notes        one small file per note, saved the moment you type
+   - attachments  your photos, drawings and voice recordings
+   - backups      a full copy of your notes from each of the last 30 days
+
+   To move ALL your notes to another laptop: quit Sticky Pins on both
+   (right-click the yellow note icon near the clock > Quit), then copy the
+   whole "Sticky Pins" folder above to the same place on the other laptop.
+
+   Uninstalling the app does NOT delete your notes.
+
+
+QUICK TIPS
+   - Pin (top bar)       keeps the note above every other window
+   - ... (top bar)       colour, font, text size, see-through, roll up, delete
+   - Add (bottom)        photos, voice notes, drawings, links, tables, colours
+   - X closes a note; it stays in your notes list. Delete puts it in the Bin.
+   - Paste or drag a picture straight into a note.
+   - Right-click a photo, link, voice note or table for more options.
+   - The little note icon near the clock: new note, all notes, quit.
+   - Shortcuts: Ctrl+N new note, Ctrl+B/I/U bold/italic/underline,
+     Ctrl+T strikethrough, Ctrl+Shift+L bullets, Ctrl+Shift+C checklist,
+     Ctrl+K link, Ctrl+W close note.

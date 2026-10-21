@@ -1,0 +1,49 @@
+{
+  "name": "sticky-pins",
+  "productName": "Sticky Pins",
+  "version": "1.0.0",
+  "description": "Cute sticky notes that stay on your computer.",
+  "author": "Vasil",
+  "license": "MIT",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64"
+  },
+  "dependencies": {
+    "@fontsource/caveat": "^5.0.0",
+    "@fontsource/nunito": "^5.0.0"
+  },
+  "devDependencies": {
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.0",
+    "rcedit": "^4.0.1"
+  },
+  "build": {
+    "appId": "com.stickypins.app",
+    "productName": "Sticky Pins",
+    "copyright": "Sticky Pins",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "store.js", "preload.js", "src/**/*", "assets/**/*", "package.json"],
+    "asar": true,
+    "afterPack": "build/afterPack.js",
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Sticky Pins",
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "Sticky Pins Setup ${version}.${ext}"
+    }
+  }
+}
