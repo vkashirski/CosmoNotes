@@ -18,14 +18,14 @@ const PAPER = {
 const ROLLED_H = 34;
 const MIN_W = 200;
 const MIN_H = 120;
-const DEFAULT_W = 320;
+const DEFAULT_W = 340;
 const DEFAULT_H = 300;
 const BIG = 16384;
 const ASSETS = path.join(__dirname, 'assets');
 const WIN_ICON = path.join(ASSETS, process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const PRELOAD = path.join(__dirname, 'preload.js');
-const EDITABLE = ['title', 'html', 'text', 'firstImage', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'pinned', 'rolled', 'spell'];
-const SECRET = ['html', 'text', 'firstImage'];
+const EDITABLE = ['title', 'html', 'text', 'firstImage', 'ink', 'wrapWidth', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'pinned', 'rolled', 'spell'];
+const SECRET = ['html', 'text', 'firstImage', 'ink'];
 const ATT_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'webm', 'ogg', 'mp3', 'm4a', 'wav'];
 
 const WELCOME_HTML =
@@ -366,6 +366,32 @@ function createNote({ near, groupId = null } = {}) {
   return n;
 }
 
+// Duplicate a note: the copy opens next to the original (or where new notes go), in the same
+// group, with the same lock. If the original was already unlocked on screen, so is the copy.
+function duplicateNote(id) {
+  const src = store.get(id);
+  if (!src || src.deletedAt) return null;
+  const srcWin = wins.get(id);
+  const near = srcWin && !srcWin.isDestroyed() ? srcWin : null;
+  let bounds = null;
+  if (near) {
+    const r = near.getBounds();
+    const area = screen.getDisplayMatching(r).workArea;
+    const h = Math.max(src.bounds?.height || r.height, MIN_H);
+    if (r.x + r.width + 14 + r.width <= area.x + area.width) bounds = { x: r.x + r.width + 14, y: r.y, width: r.width, height: h };
+    else if (r.x - 14 - r.width >= area.x) bounds = { x: r.x - 14 - r.width, y: r.y, width: r.width, height: h };
+    else bounds = { x: r.x + 30, y: r.y + 30, width: r.width, height: h };
+  } else if (src.bounds) {
+    bounds = { ...src.bounds, x: src.bounds.x + 30, y: src.bounds.y + 30 };
+  }
+  const n = store.duplicate(id, { open: true, bounds, pinned: false, rolled: false });
+  if (!n) return null;
+  const win = openNoteWindow(n, { focus: true });
+  if (isLocked(n) && ((near && near.revealed) || (!n.locked && groupOpenInList(n.groupId)))) win.revealed = true;
+  notifyList();
+  return n.id;
+}
+
 function bringToFront() {
   for (const win of wins.values()) {
     if (win.isDestroyed()) continue;
@@ -478,7 +504,8 @@ function applyPatch(e, patch) {
   for (const k of EDITABLE) if (k in patch) clean[k] = patch[k];
   // A hidden locked note can never be overwritten from its (empty) window.
   if (isLocked(note) && !win.revealed) for (const k of SECRET) delete clean[k];
-  const contentChanged = ('html' in clean && clean.html !== note.html) || ('title' in clean && (clean.title || '') !== note.title);
+  const contentChanged = ('html' in clean && clean.html !== note.html) || ('title' in clean && (clean.title || '') !== note.title)
+    || ('ink' in clean && JSON.stringify(clean.ink || null) !== JSON.stringify(note.ink || null));
   const rolledChanged = 'rolled' in clean && !!clean.rolled !== note.rolled;
   store.update(note.id, clean, { content: contentChanged });
   const n = store.get(note.id);
@@ -543,6 +570,8 @@ function registerIpc() {
     try { applyPatch(e, patch); const { note } = senderNote(e); if (note) store.writeNow(note.id); } catch (err) { console.error(err); }
     e.returnValue = true;
   });
+  ipcMain.handle('note:duplicate', (e) => { const { note } = senderNote(e); return note ? duplicateNote(note.id) : null; });
+  ipcMain.handle('list:duplicate', (e, id) => duplicateNote(String(id)));
   ipcMain.handle('note:new', (e) => { createNote({ near: BrowserWindow.fromWebContents(e.sender) }); });
   ipcMain.handle('note:close', (e) => {
     const { win, note } = senderNote(e);

@@ -36,12 +36,24 @@ if errorlevel 1 goto :blocked
 
 :done
 
+rem Smart App Control trusts Electron's own program file. Make sure the build left it untouched.
+fc /b "dist\win-unpacked\CosmoNotes.exe" "node_modules\electron\dist\electron.exe" >nul 2>nul
+if errorlevel 1 (
+  echo.
+  echo   NOTE: CosmoNotes.exe is not Electron's original program file this time,
+  echo   so Smart App Control may block it. Please tell Claude.
+) else (
+  echo.
+  echo   Check passed: CosmoNotes.exe is Electron's original program file,
+  echo   which Smart App Control trusts.
+)
+
 echo.
 echo   ==========================================
 echo      Done! Your installer is ready.
 echo   ==========================================
 echo.
-echo   A folder will open with "CosmoNotes Setup 1.0.4.exe".
+echo   A folder will open with "CosmoNotes Setup 1.1.1.exe".
 echo   Double-click it to install. Copy that same file to your
 echo   other laptops to install it there too.
 echo.

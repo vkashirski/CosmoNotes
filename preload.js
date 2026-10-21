@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('sticky', {
   update: (patch) => inv('note:update', patch),
   updateSync: (patch) => ipcRenderer.sendSync('note:update-sync', patch),
   newNote: () => inv('note:new'),
+  duplicate: () => inv('note:duplicate'),
   close: () => inv('note:close'),
   trash: () => inv('note:trash'),
   hover: (over) => ipcRenderer.send('note:hover', !!over),
@@ -30,6 +31,7 @@ contextBridge.exposeInMainWorld('sticky', {
   list: {
     get: () => inv('list:get'),
     newNote: (groupId) => inv('list:new', groupId || null),
+    duplicate: (id) => inv('list:duplicate', id),
     openNote: (id) => inv('list:open-note', id),
     closeNote: (id) => inv('list:close-note', id),
     trash: (id) => inv('list:trash', id),

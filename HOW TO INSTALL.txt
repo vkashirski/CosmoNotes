@@ -4,11 +4,11 @@ COSMONOTES - how to build and install
 1. Build the installer
    - Double-click  build.bat
    - Wait until it says "Done!".
-   - A folder opens with "CosmoNotes Setup 1.0.4.exe".
+   - A folder opens with "CosmoNotes Setup 1.1.1.exe".
    (Node.js must be installed - you already did this for the first version.)
 
 2. Install
-   - Double-click "CosmoNotes Setup 1.0.4.exe".
+   - Double-click "CosmoNotes Setup 1.1.1.exe".
    - If Windows shows "Windows protected your PC": click "More info",
      then "Run anyway".
    - It replaces the old "Sticky Pins" app automatically. Your notes come
@@ -17,7 +17,7 @@ COSMONOTES - how to build and install
      safety copy).
 
 Other laptops
-   Copy "CosmoNotes Setup 1.0.4.exe" over and run it. Nothing else needed.
+   Copy "CosmoNotes Setup 1.1.1.exe" over and run it. Nothing else needed.
 
 
 WHERE ARE MY NOTES SAVED?
@@ -52,9 +52,14 @@ QUICK TIPS
    Top bar:    [grid] all notes   [+] new note   [pin] stay on top
                [^] roll up / unroll   [...] title, colour, lock, dates
    Bottom bar: B I U S, bullets, checklist, [A] text colour/highlight/size,
-               spelling on/off for this note, [Add] photos, voice,
-               drawings, links, tables and more.
+               spelling on/off, text layout lock, draw over, [+] photos,
+               voice, sketches, links, tables and more.
    - Click a photo, then drag the round handle at its corner to resize it.
+   - The squiggle button (next to +) lets you draw on top of the note: pen,
+     highlighter, lines, arrows, squares and circles, over or behind the text.
+     Hold Shift for straight lines and perfect shapes. Esc or Done to stop.
+   - The button next to spelling locks the text layout: text and pictures keep
+     their width and you scroll sideways if the note gets narrower.
    - In the notes list, drag a note onto another note to make a group.
      Drop notes or whole groups onto a group to put them inside (groups
      can sit inside groups, like folders). Click a group to open it; the

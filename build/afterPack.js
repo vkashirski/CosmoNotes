@@ -1,23 +1,7 @@
-// Puts the CosmoNotes icon and name on CosmoNotes.exe (instead of the default Electron ones).
-const path = require('path');
-
-exports.default = async function afterPack(ctx) {
-  if (ctx.electronPlatformName !== 'win32') return;
-  const mod = require('rcedit');
-  const rcedit = mod.rcedit || mod.default || mod;
-  const exe = path.join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.exe`);
-  const version = ctx.packager.appInfo.version;
-  await rcedit(exe, {
-    icon: path.join(__dirname, 'icon.ico'),
-    'file-version': version,
-    'product-version': version,
-    'version-string': {
-      ProductName: 'CosmoNotes',
-      FileDescription: 'CosmoNotes',
-      CompanyName: 'CosmoNotes',
-      LegalCopyright: 'CosmoNotes',
-      OriginalFilename: 'CosmoNotes.exe',
-      InternalName: 'CosmoNotes',
-    },
-  });
-};
+// Not used any more (since 1.1.1).
+//
+// This used to stamp the CosmoNotes icon and name into CosmoNotes.exe. Any change to that file makes it a
+// brand-new, unsigned program that Windows Smart App Control blocks. CosmoNotes.exe is now left
+// byte-identical to Electron's own electron.exe (which Windows trusts). The icon comes from
+// build/installer.nsh, which points the shortcuts at resources\icon.ico, and from the window icon set in main.js.
+// See ai-context/CONTEXT.md, "Smart App Control".

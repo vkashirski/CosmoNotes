@@ -27,7 +27,7 @@ const ev = (w) => ({ sender: w.webContents, returnValue: undefined });
   await H['note:new'](ev(w));
   notes = E.__all.filter(x => x.file.endsWith('note.html') && !x.destroyed);
   assert.equal(notes.length, 2);
-  assert.equal(notes[1].bounds.x, 500 + 320 + 14, 'new note placed beside');
+  assert.equal(notes[1].bounds.x, 500 + 340 + 14, 'new note placed beside');
   const url = await H['att:save'](ev(w), new Uint8Array([1,2,3]), 'png');
   assert.ok(url.startsWith('stickyfile://att/'));
   const resp = await E.__proto({ url });

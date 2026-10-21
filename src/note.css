@@ -157,15 +157,38 @@ body.resizing, body.resizing * { cursor: nwse-resize !important; user-select: no
 #scroller {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: auto; /* sideways too: a locked text layout or a drawing can be wider than the note */
   padding: 8px 14px 10px;
   cursor: text;
 }
-#scroller::-webkit-scrollbar { width: 8px; }
+#scroller::-webkit-scrollbar { width: 8px; height: 8px; }
+#scroller::-webkit-scrollbar-corner { background: transparent; }
+/* the sheet holds the text plus the two drawing layers (behind / over) */
+#sheet { position: relative; min-height: 100%; display: flex; flex-direction: column; }
+#sheet.fixed { flex: none; }
+.ink { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.ink.below { z-index: 0; }
+.ink.above { z-index: 2; }
+.ink .hl { mix-blend-mode: multiply; }
+body[data-color="charcoal"] .ink .hl { mix-blend-mode: screen; }
+#inkCatch { position: absolute; inset: 0; z-index: 3; cursor: crosshair; touch-action: none; }
+#inkCatch[hidden] { display: none; }
+body.erasing-ink #inkCatch { cursor: cell; }
+body.rubbing-ink #inkCatch { cursor: none; }
+/* the circle that shows the size of the rub-out eraser */
+#inkEraser {
+  position: absolute; z-index: 4; left: 0; top: 0;
+  border: 1.5px solid rgba(40,30,20,.7); border-radius: 50%;
+  background: rgba(255,255,255,.35);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.7);
+  pointer-events: none;
+}
+#inkEraser[hidden] { display: none; }
 #scroller::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
 #editor {
   position: relative;
-  min-height: 100%;
+  z-index: 1;
+  flex: 1;
   outline: none;
   user-select: text;
   font-family: var(--hand);
@@ -618,3 +641,101 @@ body.erasing #cv { cursor: cell; }
   animation: popin .15s ease-out;
 }
 #toast[hidden] { display: none; }
+
+
+/* ================================================================ 1.1.0: text layout lock + draw-over */
+#btnWrap .wraplock { display: none; fill: none; }
+#btnWrap.on .wraplock { display: inline; }
+#btnWrap.on .wrapbar { stroke-dasharray: 2 2.5; }
+#btnWrap:not(.on) { opacity: .7; }
+
+#btnInk {
+  flex: none;
+  width: 28px; height: 26px;
+  margin-left: 4px;
+  border: 0; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  display: grid; place-items: center;
+  cursor: pointer;
+  transition: transform .12s, background .12s;
+}
+#btnInk:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent) 26%, transparent); }
+#btnInk svg { width: 17px; height: 17px; stroke-width: 2.3; }
+/* on normal-width notes Add becomes a round "+" (like the draw button) so every button fits */
+@media (max-width: 389px) {
+  #btnInsert { width: 28px; padding: 0; justify-content: center; }
+  #btnInsert span { display: none; }
+  #btnInsert svg { width: 15px; height: 15px; }
+  .tb { width: 26px; }
+}
+
+body.inking #tools, body.inking #stamp, body.inking .corner { display: none; }
+body.inking #scroller { cursor: crosshair; }
+
+#inkBar {
+  position: fixed; right: 8px; bottom: 8px; z-index: 22;
+  width: 250px; max-width: calc(100vw - 16px);
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--pop-bg);
+  color: var(--pop-ink);
+  box-shadow: 0 10px 28px rgba(60,40,10,.28), 0 1px 3px rgba(0,0,0,.12);
+  animation: popin .14s ease-out;
+  user-select: none;
+}
+#inkBar[hidden] { display: none; }
+.irow { display: flex; align-items: center; gap: 3px; }
+.irow + .irow { margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--pop-soft2); }
+.irow.tools { justify-content: space-between; }
+.irow.tools button, .iact {
+  width: 27px; height: 27px; flex: none;
+  padding: 0; border: 0; border-radius: 8px;
+  background: transparent; color: #5C4D35;
+  display: grid; place-items: center;
+  cursor: pointer;
+}
+.irow.tools button:hover, .iact:hover { background: var(--pop-soft); }
+.irow.tools button.on { background: #3B3226; color: #FFF8E6; }
+.irow.tools svg, .iact svg { width: 17px; height: 17px; }
+.irow.tools .hlbar { stroke-width: 4; stroke: #FFD43B; }
+.icolors { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; min-width: 0; }
+.icolors button { width: 16px; height: 16px; flex: none; padding: 0; border-radius: 50%; border: 2px solid #fff; background: var(--c); box-shadow: 0 0 0 1px rgba(0,0,0,.15); cursor: pointer; }
+.icolors button.on { box-shadow: 0 0 0 2px #3B3226; }
+.iwidths { display: flex; gap: 1px; padding-left: 4px; border-left: 1px solid var(--pop-soft2); }
+.iwidths button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 7px; background: transparent; display: grid; place-items: center; cursor: pointer; }
+.iwidths button i { display: block; border-radius: 50%; background: #3B3226; }
+.iwidths button.on { background: var(--pop-soft2); }
+.ilayer { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--pop-soft); flex: 1; min-width: 0; }
+.ilayer button {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: center; gap: 2px;
+  height: 25px; padding: 0 2px;
+  white-space: nowrap; overflow: hidden;
+  border: 0; border-radius: 7px;
+  background: transparent; color: #6A5A40;
+  font: 800 11px var(--ui);
+  cursor: pointer;
+}
+.ilayer button.on { background: #fff; color: #3B3226; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+.ilayer svg { width: 15px; height: 15px; flex: none; }
+.ilayer .soft, .ilayer .txt { stroke: #8A7652; stroke-width: 2; }
+.ilayer .strong { stroke: #E5484D; stroke-width: 2.6; }
+.ilayer .faint { stroke-opacity: .55; stroke-width: 4; }
+.idone { height: 27px; padding: 0 10px; border: 0; border-radius: 999px; background: #3B3226; color: #FFF8E6; font: 800 11.5px var(--ui); cursor: pointer; }
+.emode[hidden], .icolors[hidden], .iwidths[hidden] { display: none; }
+.emode { flex: 1; }
+.emode .ring { stroke: #3B3226; stroke-width: 1.8; }
+.emode .x { stroke: #3B3226; stroke-width: 2.2; }
+.ihint { margin: 5px 2px 0; font: 700 10.5px/1.3 var(--ui); color: var(--pop-mute); }
+.ihint:empty { display: none; }
+
+#askPop { top: 36px; z-index: 30; }
+#editor img.att-img.fixed, #editor img.att-drawing.fixed { max-width: none; }
+/* Text layout locked (#sheet.fixed) and no drawing: the text keeps its width, but pictures without
+   "Keep size" still shrink to the visible note width (--viewW, set in note.js). Photos have 10px of
+   frame padding on top of max-width. With a drawing (.inked) everything keeps its size. */
+#sheet.fixed:not(.inked) #editor img:not(.fixed) { max-width: min(100%, var(--viewW, 100%)); }
+#sheet.fixed:not(.inked) #editor img.att-img:not(.fixed) { max-width: min(100%, calc(var(--viewW, 100%) - 10px)); }
+#sheet.fixed:not(.inked) #editor img.att-img.w-s:not(.fixed) { max-width: min(45%, calc(var(--viewW, 100%) - 10px)); }
+#sheet.fixed:not(.inked) #editor img.att-img.w-m:not(.fixed) { max-width: min(72%, calc(var(--viewW, 100%) - 10px)); }

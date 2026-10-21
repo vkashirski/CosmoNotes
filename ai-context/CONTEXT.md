@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 22 October 2026 · App version 1.0.4**
+**Last updated: 22 October 2026 · App version 1.1.4**
 
 Read this before changing anything. Keep it up to date: when you add or change a feature, update the
 relevant section here, `src/about.js` (the in-app feature list and version history) and `CHANGELOG.md`.
@@ -48,9 +48,11 @@ src/note.html/.css/.js   One sticky-note window (the editor)
 src/list.html/.css/.js   The "All notes" window: Notes / Bin / Settings tabs, groups, sorting
 src/about.js       In-app feature list + version history (window.COSMO_ABOUT) + LAST_UPDATED date
 assets/            icon.ico/png (windows), tray.ico/png
-build/             icon.ico/png for the installer, afterPack.js (stamps icon + name on the .exe via rcedit)
+build/             icon.ico/png for the installer/shortcuts; afterPack.js is an unused stub (see §6 Smart App Control)
 build.bat          One-click: npm install + electron-builder → dist/CosmoNotes Setup <ver>.exe
 HOW TO INSTALL.txt Plain-language guide for the owner (install, data folder, forgot password, tips)
+test-run.bat       Runs CosmoNotes from this folder with Electron's original exe (no build needed)
+build/installer.nsh  Installer addition: shortcuts get the CosmoNotes icon (exe stays untouched, see §6)
 CHANGELOG.md       Version history (mirror of src/about.js VERSIONS)
 tests/             npm test – Node tests using tests/fake-electron (no Electron/Windows needed)
 ai-context/        This file
@@ -115,10 +117,29 @@ save 350ms after typing stops, on blur, and synchronously on unload. Main flushe
 
 **Note fields** (`normalize()` in store.js is the schema; it always fills defaults):
 `id, title, html, text (plain text for list/search), firstImage, color (yellow|pink|green|blue|purple|
-orange|mint|charcoal), font (hand|round), size (s|m|l), opacity (0.25–1), solidOnHover, pinned, open
+orange|mint|charcoal), font (hand|round), size (s|m|l), ink (draw-over, see below), wrapWidth (px or null:
+locked text layout), opacity (0.25–1), solidOnHover, pinned, open
 (window open → reopens at start), rolled, locked, spell (null = follow Settings | true | false),
 groupId, bounds {x,y,width,height} (unrolled height), createdAt, updatedAt, deletedAt (null or in Bin),
 restoredFrom`.
+
+**Draw-over ink** (`note.ink`): `{ s: [ { t: pen|hl|line|arrow|rect|ellipse, c: '#rrggbb', w: 1–40, l: 'a'|'b',
+p: [x,y,...] } ] }`. Coordinates are px relative to `#sheet` (the text area, origin top-left). pen/hl use the
+whole path; shapes use `[x1,y1,x2,y2]`. `l: 'a'` = over the text (SVG `#inkAbove`, z-index 2); `'b'` = behind it
+(`#inkBelow`, z-index 0, under `#editor` z-index 1, so pictures cover it). `normalizeInk` in store.js validates
+and caps it (4000 strokes, 20000 numbers per stroke). Ink is in `SECRET` (main.js): blanked for hidden locked
+notes, and patches can't change it while hidden. It counts as an edit for `updatedAt`.
+
+**Text layout lock** (`note.wrapWidth`): when set, `#sheet` has that fixed width (`applyLayout` in note.js), so text
+and pictures never re-wrap; `#scroller` is `overflow: auto` and shows a sideways scrollbar when the note is
+narrower. The first ink stroke sets it automatically (`saveInk`). Unlocking with ink present asks first.
+Pictures: `img.fixed` = keep size (`max-width: none`); otherwise they shrink with the note. When the layout is
+locked, `#sheet` is wider than the visible note, so note.js sets `--viewW` (visible writing width, `updateViewWidth`,
+also via a `ResizeObserver` on `#scroller`) and note.css caps non-fixed pictures at it under
+`#sheet.fixed:not(.inked)`. With ink (`#sheet.inked`) plus a locked layout, all pictures keep their size so the
+drawing stays lined up; the right-click "Keep size" item then only explains this (fixed in 1.1.2: before, a locked
+layout stopped every picture from shrinking, so "Keep size" did nothing).
+Resizing a picture while the note has ink asks first (`needsResizeWarning` / `resizeWarning`).
 
 **Settings** (changing only `listSort` deliberately does *not* send `notes:changed`, since the list already
 redrew; that was the 1.0.2 double-refresh bug): `startWithWindows, defaultColor, defaultFont, firstRunDone, listBounds, spellCheck (false),
@@ -179,6 +200,7 @@ anything anywhere, used by the back button, the crumbs and the drop strip.
 | Lock groups; open a locked group in the list | main.js `groups:set-locked`, `groups:reveal`/`hide`, `listOpenGroups`, `groupOpenInList` |
 | Lock/unlock notes from the list | main.js `list:set-locked`, `hideNewlyLocked`; list.js `lockNote`/`unlockNote` |
 | Right-click menus (notes, groups, Bin) | list.js `showCtx`, `noteMenu`, `groupMenu` |
+| Duplicate note (list right-click, note ⋯ menu) | main.js `duplicateNote` → store.js `duplicate`; attachments are shared, not copied (safe: `sweepAttachments` keeps anything still referenced) |
 | App-styled pop-ups + toasts | list.js `modal()`, `toast()`; list.html `#modal`, `#toast` |
 | Bin confirmation (Shift+click skips) | list.js `trashNote(n, skipAsk)` |
 | No double redraw; animate only on view change | list.js `load()` (signature check), `render(animate)`; list.css `.cards.anim` |
@@ -188,6 +210,10 @@ anything anywhere, used by the back button, the crumbs and the drop strip.
 | Group panel shows shared colour/font | list.js `panelScope`, `shared`, `paintPanel` |
 | Title vs untitled first line on cards | list.css `.card .t1` (600) / `.t1.tt` (800, bigger); needs `@fontsource/*/600.css` in list.html |
 | Password set/change button (pop-up) | list.js `#pwSave` handler (modal with 2 or 3 inputs) |
+| Draw-over (toolbar, tools, Shift, Over/Behind, eraser, undo, save) | note.html `#inkBar`, `#inkCatch`, `#inkAbove/#inkBelow`; note.js "draw-over" (`inkState`, `strokeEl`, `renderInk`, `eraseAt`, `rubOut`, `tracePieces`, `shapeEnd`, `saveInk`) |
+| Lock text layout, sideways scroll, auto-lock on first stroke | note.js `applyLayout`, `toggleWrap`, `saveInk`; note.css `#sheet`, `#scroller` |
+| Picture keep-size / shrink option, resize warnings | note.js image context menu (`keep`, `guarded`), `needsResizeWarning`, `resizeWarning` |
+| App-styled confirm inside notes | note.js `ask()`; note.html `#askPop` |
 
 ---
 
@@ -212,6 +238,15 @@ anything anywhere, used by the back button, the crumbs and the drop strip.
 - When a note becomes locked from outside (list right-click, locking its group, dragging it into a locked
   group), main sends `note:lock-now`. The window first saves what was typed, then hides. Never hide it
   directly from main, or the last keystrokes would be lost.
+- **Draw-over is SVG** (crisp, cheap, easy to hit-test). Don't switch it to a canvas without keeping the same saved
+  format. Two erasers (`inkState.eraseMode`): "Whole line" removes whole strokes (`eraseAt`, `samplePoints` distance
+  test); "Rub out" (`rubOut`) traces touched strokes into 2 px points along their SVG geometry (`tracePieces`), drops
+  the points under the eraser circle (radius `ew`×3 + half the line width) and saves each remaining run as its own
+  pen/hl stroke, so shapes that are partly rubbed out become pen strokes. While drawing, the editor is
+  `contentEditable=false` and `#inkCatch` gets the pointer. Mouse-wheel scrolling still works because the
+  catcher sits inside the scroller.
+- The bottom bar must fit on a 340 px note: below 390 px, Add becomes a round "+" (note.css media query), and the
+  formatting group (`.tleft`) scrolls sideways if it's still too narrow.
 - The renderer of a hidden locked note must never save: `changed()`/`saveNow()` return early when
   `hidden`, and main strips `html/text/firstImage` from patches. Keep both guards.
 - `collect()` in note.js strips UI-only state (playing voice chips, `.sel-img`) before saving.
@@ -220,17 +255,25 @@ anything anywhere, used by the back button, the crumbs and the drop strip.
 - Minimum note size 200×120, default 320×300. The bottom bar's formatting buttons scroll sideways
   (`.tleft`) on narrow notes so the Add button always stays visible.
 - Electron version is `^39` in package.json, installed on the owner's PC by `build.bat`.
+- **Smart App Control (SAC) – never modify CosmoNotes.exe.** The owner's PC has SAC **On**: it left
+  Evaluation by itself, and switching it off is permanent on that PC until the April 2026 rollout reaches it.
+  SAC blocks unknown, unsigned programs, and we have no code-signing certificate. Electron's own `electron.exe`
+  *is* trusted (proved with `test-run.bat`). So the build must leave `CosmoNotes.exe` byte-identical to
+  `node_modules\electron\dist\electron.exe`:
+  - `build.disableAsarIntegrity: true` stops electron-builder embedding the asar hash (resedit) in the exe.
+  - `win.signAndEditExecutable: false` stops it editing the icon/version (rcedit).
+  - No afterPack / rcedit / resedit / fuses (`electronFuses`) or anything else that touches the exe.
+  - The exe shows Electron's icon, so `build/installer.nsh` re-points the shortcuts to `resources\icon.ico`.
+  - `build.bat` verifies this with `fc /b` after each build. If it ever says the files differ, fix the build.
+  Changing the Electron version gives a new electron.exe. That's fine as long as it's an official release
+  (also widely trusted), but check that it starts. The installer (`CosmoNotes Setup.exe`) and the uninstaller are
+  NSIS exes; so far SAC has allowed them. If SAC ever blocks the installer, an alternative is copying
+  `dist\win-unpacked` into `%LOCALAPPDATA%\Programs\sticky-pins` (the install folder kept its old name).
 - **Build gotcha (`spawn UNKNOWN`)**: near the end, electron-builder runs a small helper exe it just made
-  (`dist\<Setup name>.exe`, ~250 KB) to create the uninstaller. Windows Security can refuse to start a brand-new
-  unsigned file, which shows up as `spawn UNKNOWN` in `WineVmManager.exec`. `build.bat` retries once after 15 s,
-  then explains how to allow it (Protection history → Allow, or a folder exclusion). If **Smart App Control**
-  is the blocker, exclusions don't help. Options then: code-sign, or build elsewhere. It happened on 1.0.3
-  (Windows build 26200).
-
----
-
-## 7. Testing
-
+  (`dist\<Setup name>.exe`) to create the uninstaller. Windows Security or SAC can refuse to start it. `build.bat`
+  retries once, then explains. It happened once (1.0.3), most likely when SAC switched itself on.
+- **Don't look inside `app.asar` from the Claude desktop app's file tools.** That app is Electron too, and keeps the
+  archive open, which breaks the next build (`EBUSY ... app.asar`) until the Claude app is restarted.
 - `npm test` runs `tests/run.js`: each `*.test.js` in a separate process with its own temporary data
   folder. `tests/fake-electron` stands in for Electron (windows, ipcMain, session, dialogs…), so the real
   `main.js` and `store.js` run under plain Node.
@@ -239,6 +282,9 @@ anything anywhere, used by the back button, the crumbs and the drop strip.
     links, permissions, close vs quit, reopening in place.
   - `upgrade.test.js`: Sticky Pins → CosmoNotes migration, titles, dates, locking and passwords,
     spelling languages, groups, sorting, backups with groups.
+  - `duplicate.test.js`: copying content/look/ink/group, "(copy)" title, independence, shared photo survives
+    deleting the original, locked copy stays hidden, binned notes can't be duplicated.
+  - `ink.test.js`: ink cleanup, saving with wrapWidth, counting as an edit, hidden + protected while locked.
   - `groups.test.js`: nested groups and drag rules, no loops, move-up/move-to, looks and colours, mass
     edit (with and without sub-groups) pushed to open windows, locking groups (windows hide, list blanks,
     reveal/hide, open-from-list), lock/unlock notes from the list, ungroup moving things up, bin a group.

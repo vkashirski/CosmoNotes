@@ -89,6 +89,29 @@ function normalizeBounds(b) {
 
 const cleanTitle = (t) => (typeof t === 'string' ? t.replace(/[\r\n\t]+/g, ' ').slice(0, 120) : '');
 
+// Draw-over ink: { s: [stroke, ...] } in the note's own coordinates (px from the top-left of the text area).
+// stroke = { t: pen|hl|line|arrow|rect|ellipse, c: '#rrggbb', w: 1-40, l: 'a' (above text) | 'b' (behind),
+//            p: [x, y, x, y, ...] }  (pen/hl: the path; shapes: start and end corner)
+const INK_TOOLS = ['pen', 'hl', 'line', 'arrow', 'rect', 'ellipse'];
+const MAX_STROKES = 4000;
+function normalizeInk(ink) {
+  if (!ink || !Array.isArray(ink.s)) return null;
+  const out = [];
+  for (const st of ink.s.slice(0, MAX_STROKES)) {
+    if (!st || !INK_TOOLS.includes(st.t) || !Array.isArray(st.p)) continue;
+    const p = st.p.slice(0, 20000).map(Number);
+    if (p.length < 2 || p.length % 2 || !p.every((v) => Number.isFinite(v) && v > -10000 && v < 100000)) continue;
+    out.push({
+      t: st.t,
+      c: /^#[0-9a-fA-F]{6}$/.test(st.c) ? st.c : '#2B2B2B',
+      w: Math.min(40, Math.max(1, Number(st.w) || 3)),
+      l: st.l === 'b' ? 'b' : 'a',
+      p: p.map((v) => Math.round(v * 10) / 10),
+    });
+  }
+  return out.length ? { s: out } : null;
+}
+
 function normalizeGroup(x) {
   return {
     id: String(x.id),
@@ -118,6 +141,9 @@ function normalize(n) {
     open: !!n.open,
     rolled: !!n.rolled,
     locked: !!n.locked,
+    ink: normalizeInk(n.ink),
+    // text layout locked at this width (px) so text and pictures don't re-wrap; null = wraps with the note
+    wrapWidth: Number.isFinite(Number(n.wrapWidth)) && Number(n.wrapWidth) >= 80 ? Math.min(4000, Math.round(Number(n.wrapWidth))) : null,
     spell: n.spell === true || n.spell === false ? n.spell : null,
     groupId: typeof n.groupId === 'string' && n.groupId ? n.groupId : null,
     bounds: normalizeBounds(n.bounds),
@@ -230,6 +256,20 @@ class Store {
     this.notes.set(n.id, n);
     this.writeNow(n.id);
     return n;
+  }
+
+  // A new note with the same content and look as an existing one (title gets "(copy)").
+  // Photos, sketches and voice notes are shared files: the attachment sweep only deletes a
+  // file once no note or backup refers to it, so both notes keep working on their own.
+  duplicate(id, extra = {}) {
+    const src = this.notes.get(id);
+    if (!src || src.deletedAt) return null;
+    const keys = ['html', 'text', 'firstImage', 'ink', 'wrapWidth', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'spell', 'locked', 'groupId'];
+    const copy = {};
+    for (const k of keys) copy[k] = src[k] && typeof src[k] === 'object' ? JSON.parse(JSON.stringify(src[k])) : src[k];
+    copy.title = src.title ? `${src.title} (copy)` : '';
+    if (copy.groupId && !this.groups.has(copy.groupId)) copy.groupId = null;
+    return this.create({ ...copy, ...extra });
   }
 
   update(id, patch, { content = false } = {}) {
@@ -525,4 +565,4 @@ class Store {
   }
 }
 
-module.exports = { Store, COLORS, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };
+module.exports = { normalizeInk, Store, COLORS, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };

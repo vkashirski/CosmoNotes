@@ -44,15 +44,27 @@ window.COSMO_ABOUT = {
         'Bold, italic, underline, strikethrough, bullet lists and tickable checklists.',
         'Text colour, highlight, text size and clear formatting (the A button).',
         'Spelling check that you can turn on or off for each note. Off by default, and Cyrillic words are not underlined.',
+        'Lock the text layout of a note, so the text keeps its width. A narrower note then shows a sideways scrollbar instead of re-wrapping. Pictures still shrink to fit, unless you right-click one and choose “Keep size”.',
         'Links become clickable as you type them.',
+      ],
+    },
+    {
+      title: 'Draw over your notes',
+      items: [
+        'The squiggle button (next to Add) lets you draw right on top of a note: circle words, underline, point arrows at photos.',
+        'Tools: pen, highlighter, straight line, arrow, square, circle and eraser, in 8 colours and 3 thicknesses, with undo.',
+        'Two erasers: “Rub out” erases only what is under the eraser circle (3 sizes), “Whole line” removes a whole line or shape with one touch.',
+        'Hold Shift for straight lines, perfect squares and perfect circles.',
+        'Draw “Over” the text and pictures, or “Behind” them like marker on paper.',
+        'Drawings stay exactly where you put them: drawing locks the text layout, and you get a warning before anything could move away from a drawing.',
       ],
     },
     {
       title: 'The Add button',
       items: [
-        'Photos from a file, pasted, or dragged in, and resizable by dragging their corner.',
+        'Photos from a file, pasted, or dragged in, and resizable by dragging their corner. Right-click for Small, Medium or Full width, and to choose whether a photo keeps its size or shrinks when the note gets narrower.',
         'Voice recordings you can play back inside the note.',
-        'Freehand drawings in 6 colours, with an eraser and undo.',
+        'Sketches: a small drawing pad in 6 colours that becomes a picture in the note.',
         'Links, tables, numbered lists, dividers and today’s date.',
       ],
     },
@@ -70,7 +82,7 @@ window.COSMO_ABOUT = {
         'See every note at a glance, with its colour and the date it was created. Real titles are bold; notes without a title show their first line semi-bold.',
         'Search across titles and text, with a button to clear the search. Inside a group, search only looks in that group.',
         'Three card sizes: small, medium or large.',
-        'Right-click any note or group for quick actions: open, close, lock, move, ungroup and Bin.',
+        'Right-click any note or group for quick actions: open, close, duplicate, lock, move, ungroup and Bin.',
         'Moving a note to the Bin asks first. Shift+click the bin button to skip the question.',
         'All questions and messages use the app’s own cute pop-ups.',
         'Sort by last edited or date created, newest or oldest first, and with groups first, notes first or mixed in.',
@@ -91,6 +103,51 @@ window.COSMO_ABOUT = {
   ],
 
   VERSIONS: [
+    {
+      version: '1.1.4',
+      date: '2026-10-22',
+      changes: [
+        'Duplicate note: right-click a note in the notes list, or use the ⋯ menu in an open note. The copy has the same text, photos, drawing, colour, font and size, stays in the same group, and opens next to the original. A titled note’s copy is called “… (copy)”.',
+        'A copy of a locked note is locked too. Photos and voice notes are shared safely, so deleting either note never breaks the other.',
+      ],
+    },
+    {
+      version: '1.1.3',
+      date: '2026-10-22',
+      changes: [
+        'Two erasers in draw-over: “Rub out” erases only what is under the eraser circle and leaves the rest of a line or shape, and “Whole line” removes a whole line or shape with one touch, like before.',
+        'Pick the eraser and the colour row turns into the choice between the two. For Rub out, the dot buttons set the eraser size (small, medium, big), and a circle shows where it will erase. Undo brings erased parts back.',
+      ],
+    },
+    {
+      version: '1.1.2',
+      date: '2026-10-22',
+      changes: [
+        'Fixed: pictures no longer shrank with the note when the text layout was locked, so “Keep size when the note gets narrower” did nothing. Now, with the layout locked, the text keeps its width but pictures still shrink to fit the note, unless you chose “Keep size”.',
+        'In a note with a drawing and a locked layout, pictures always keep their size so the drawing stays lined up, and the right-click menu says so.',
+      ],
+    },
+    {
+      version: '1.1.1',
+      date: '2026-10-22',
+      changes: [
+        'Fixed: Windows Smart App Control blocked CosmoNotes from starting after installing 1.1.0. CosmoNotes.exe is now Electron’s original program file, which Windows trusts, and nothing is stamped into it any more. The shortcuts still get the CosmoNotes icon.',
+        'build.bat now checks after each build that the program file is untouched.',
+      ],
+    },
+    {
+      version: '1.1.0',
+      date: '2026-10-22',
+      changes: [
+        'Draw over notes: the new squiggle button next to Add opens a toolbar with pen, highlighter, line, arrow, square, circle, eraser, 8 colours, 3 thicknesses, Over/Behind and undo. Hold Shift for straight lines and perfect shapes.',
+        'Drawings are saved with the note, hidden when the note is locked, and kept in backups.',
+        'New “lock text layout” button: text and pictures keep their width, and a narrower note scrolls sideways instead of re-wrapping. Drawing turns it on by itself.',
+        'Warnings before resizing a picture or unlocking the layout when a note has a drawing.',
+        'Photos: right-click lets you choose whether a photo keeps its size or shrinks when the note gets narrower.',
+        'The spelling button moved to the left group. On normal-width notes Add becomes a round + so every button fits. The Add-menu drawing pad is now called “Sketch”.',
+        'New notes are a little wider (340px).',
+      ],
+    },
     {
       version: '1.0.4',
       date: '2026-10-22',
