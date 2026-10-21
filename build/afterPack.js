@@ -1,4 +1,4 @@
-// Puts the Sticky Pins icon and name on Sticky Pins.exe (instead of the default Electron ones).
+// Puts the CosmoNotes icon and name on CosmoNotes.exe (instead of the default Electron ones).
 const path = require('path');
 
 exports.default = async function afterPack(ctx) {
@@ -12,12 +12,12 @@ exports.default = async function afterPack(ctx) {
     'file-version': version,
     'product-version': version,
     'version-string': {
-      ProductName: 'Sticky Pins',
-      FileDescription: 'Sticky Pins',
-      CompanyName: 'Sticky Pins',
-      LegalCopyright: 'Sticky Pins',
-      OriginalFilename: 'Sticky Pins.exe',
-      InternalName: 'Sticky Pins',
+      ProductName: 'CosmoNotes',
+      FileDescription: 'CosmoNotes',
+      CompanyName: 'CosmoNotes',
+      LegalCopyright: 'CosmoNotes',
+      OriginalFilename: 'CosmoNotes.exe',
+      InternalName: 'CosmoNotes',
     },
   });
 };

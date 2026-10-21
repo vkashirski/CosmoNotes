@@ -1,54 +1,72 @@
-STICKY PINS - how to get it on your laptop
-==========================================
+COSMONOTES - how to build and install
+=====================================
 
-You only do this once. Afterwards you have a normal installer file
-that you can copy to any of your Windows laptops.
-
-1. Install Node.js (free, needed only to build the installer)
-   - Go to https://nodejs.org and download the "LTS" version.
-   - Run it and click Next until it's finished. Keep the default options.
-
-2. Build the installer
-   - Unzip this folder somewhere (for example your Desktop).
+1. Build the installer
    - Double-click  build.bat
-   - Wait until it says "Done!" (the first time takes a few minutes).
-   - A folder opens with "Sticky Pins Setup 1.0.0.exe".
+   - Wait until it says "Done!".
+   - A folder opens with "CosmoNotes Setup 1.0.4.exe".
+   (Node.js must be installed - you already did this for the first version.)
 
-3. Install
-   - Double-click "Sticky Pins Setup 1.0.0.exe".
-   - Windows may show a blue box "Windows protected your PC". That appears
-     for any app that isn't from a big company. Click "More info", then
-     "Run anyway".
-   - Sticky Pins installs and opens by itself. There's a shortcut on your
-     Desktop and in the Start menu.
+2. Install
+   - Double-click "CosmoNotes Setup 1.0.4.exe".
+   - If Windows shows "Windows protected your PC": click "More info",
+     then "Run anyway".
+   - It replaces the old "Sticky Pins" app automatically. Your notes come
+     with you: the first time CosmoNotes opens it copies them over from
+     the old Sticky Pins folder (the old folder is left untouched as a
+     safety copy).
 
 Other laptops
-   Copy "Sticky Pins Setup 1.0.0.exe" (USB stick, email, etc.) and run it.
-   Nothing else is needed on those laptops.
+   Copy "CosmoNotes Setup 1.0.4.exe" over and run it. Nothing else needed.
 
 
 WHERE ARE MY NOTES SAVED?
-   Only on this computer, in:  %APPDATA%\Sticky Pins
+   Only on this computer, in:  %APPDATA%\CosmoNotes
    (paste that into the File Explorer address bar to open it)
    - notes        one small file per note, saved the moment you type
    - attachments  your photos, drawings and voice recordings
    - backups      a full copy of your notes from each of the last 30 days
+   - groups.json  your groups and their names
 
-   To move ALL your notes to another laptop: quit Sticky Pins on both
-   (right-click the yellow note icon near the clock > Quit), then copy the
-   whole "Sticky Pins" folder above to the same place on the other laptop.
+   To move ALL your notes to another laptop: quit CosmoNotes on both
+   (right-click the note icon near the clock > Quit), then copy the whole
+   "CosmoNotes" folder above to the same place on the other laptop.
 
    Uninstalling the app does NOT delete your notes.
 
 
+LOCKED NOTES
+   The lock hides a note's contents behind your password or PIN, in the
+   note itself and in the notes list. It's a privacy screen, not
+   encryption: the note is still stored as a normal file on this computer.
+
+   Forgot the password? Quit CosmoNotes, open %APPDATA%\CosmoNotes,
+   open settings.json in Notepad, change the "lock" line to
+       "lock": null,
+   save, and start CosmoNotes again. Your locked notes stay locked; choose a
+   new password the next time you lock a note (or in Settings) and they
+   open with that one.
+
+
 QUICK TIPS
-   - Pin (top bar)       keeps the note above every other window
-   - ... (top bar)       colour, font, text size, see-through, roll up, delete
-   - Add (bottom)        photos, voice notes, drawings, links, tables, colours
-   - X closes a note; it stays in your notes list. Delete puts it in the Bin.
-   - Paste or drag a picture straight into a note.
-   - Right-click a photo, link, voice note or table for more options.
-   - The little note icon near the clock: new note, all notes, quit.
+   Top bar:    [grid] all notes   [+] new note   [pin] stay on top
+               [^] roll up / unroll   [...] title, colour, lock, dates
+   Bottom bar: B I U S, bullets, checklist, [A] text colour/highlight/size,
+               spelling on/off for this note, [Add] photos, voice,
+               drawings, links, tables and more.
+   - Click a photo, then drag the round handle at its corner to resize it.
+   - In the notes list, drag a note onto another note to make a group.
+     Drop notes or whole groups onto a group to put them inside (groups
+     can sit inside groups, like folders). Click a group to open it; the
+     palette button there sets its look (stack, folder, envelope,
+     notebook), its colour, and can recolour every note inside at once.
+   - Right-click a note or group in the list to lock it, move it, ungroup
+     it or put it in the Bin, without opening it.
+   - The bin button asks before deleting. Shift+click it to skip that.
+   - The sort button next to search: last edited / date created,
+     newest or oldest first, groups first or mixed in.
+   - Spelling is ignored by default. Turn it on for all notes in
+     Settings, or per note with its spelling button.
    - Shortcuts: Ctrl+N new note, Ctrl+B/I/U bold/italic/underline,
      Ctrl+T strikethrough, Ctrl+Shift+L bullets, Ctrl+Shift+C checklist,
      Ctrl+K link, Ctrl+W close note.

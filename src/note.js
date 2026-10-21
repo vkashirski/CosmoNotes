@@ -7,6 +7,8 @@
   const body = document.body;
 
   let note = null;
+  let hidden = false; // locked note whose contents are not shown
+  let settings = { spellCheck: false, hasPassword: false };
   let dirty = false;
   let saveTimer = null;
   let savedRange = null;
@@ -36,6 +38,7 @@
   }
 
   function changed() {
+    if (hidden || !note) return;
     dirty = true;
     updateEmpty();
     clearTimeout(saveTimer);
@@ -44,16 +47,16 @@
 
   function saveNow() {
     clearTimeout(saveTimer);
-    if (!dirty || !note) return;
+    if (!dirty || !note || hidden) return Promise.resolve();
     dirty = false;
     const data = collect();
     note.text = data.text;
     $('#title').textContent = titleText();
-    api.update(data);
+    return api.update(data).then(gotDates).catch(() => {});
   }
 
   window.addEventListener('beforeunload', () => {
-    if (dirty && note) { dirty = false; api.updateSync(collect()); }
+    if (dirty && note && !hidden) { dirty = false; api.updateSync(collect()); }
   });
   window.addEventListener('blur', saveNow);
 
@@ -68,9 +71,35 @@
   function updateEmpty() { editor.classList.toggle('empty', isEmpty()); }
 
   function titleText() {
+    if (note && note.title && note.title.trim()) return note.title.trim();
+    if (hidden) return 'Locked note';
     const line = (note && note.text ? note.text : editor.innerText).split('\n').map((s) => s.trim()).find(Boolean);
-    return line || 'Sticky note';
+    return line || 'CosmoNotes';
   }
+
+  // ================================================================ dates
+  function when(ts) {
+    const d = new Date(ts);
+    const now = new Date();
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const diff = Math.round((day(now) - day(d)) / 864e5);
+    if (diff === 0) return `today ${time}`;
+    if (diff === 1) return `yesterday ${time}`;
+    return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' }) + `, ${time}`;
+  }
+  function full(ts) {
+    return new Date(ts).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  function showDates() {
+    if (!note) return;
+    $('#stamp').textContent = note.updatedAt ? `Edited ${when(note.updatedAt)}` : '';
+    $('#dates').innerHTML = `Created <b>${esc(full(note.createdAt))}</b><br>Last edited <b>${esc(full(note.updatedAt))}</b>`;
+  }
+  function gotDates(n) {
+    if (n && n.updatedAt) { note.updatedAt = n.updatedAt; note.createdAt = n.createdAt || note.createdAt; showDates(); }
+  }
+  setInterval(showDates, 60e3);
 
   // ================================================================ look & settings
   function applyLook() {
@@ -78,6 +107,18 @@
     body.dataset.font = note.font;
     body.dataset.size = note.size;
     body.classList.toggle('rolled', !!note.rolled);
+    body.classList.toggle('has-title', !!(note.title && note.title.trim()));
+    body.classList.toggle('locked-hidden', hidden);
+    $('#lockScreen').hidden = !hidden;
+    $('#btnRelock').hidden = !(note.lockedBy && !hidden);
+    $('#btnRoll').title = note.rolled ? 'Unroll note' : 'Roll up to just the top bar';
+    $('#miLock').hidden = hidden;
+    const byGroup = !note.locked && note.lockedBy === 'group';
+    $('#miLock').disabled = byGroup;
+    $('#miLockText').textContent = note.locked ? 'Remove lock' : byGroup ? 'Locked with its group' : 'Lock note';
+    if (document.activeElement !== $('#titleInput')) $('#titleInput').value = note.title || '';
+    applySpell();
+    showDates();
     const pin = $('#btnPin');
     pin.setAttribute('aria-pressed', String(!!note.pinned));
     pin.title = note.pinned ? 'Unpin (let other windows cover it)' : 'Pin on top of other windows';
@@ -94,8 +135,35 @@
   function setProp(patch) {
     Object.assign(note, patch);
     applyLook();
-    return api.update(patch);
+    return api.update(patch).then((n) => { gotDates(n); return n; });
   }
+
+  // ================================================================ spelling
+  // Spelling is ignored unless turned on (for all notes in Settings, or just
+  // this note with the button). Cyrillic words are never underlined.
+  function spellOn() {
+    return note && note.spell !== null && note.spell !== undefined ? !!note.spell : !!settings.spellCheck;
+  }
+  function applySpell() {
+    const on = spellOn();
+    if (editor.spellcheck !== on) editor.spellcheck = on;
+    const b = $('#btnSpell');
+    b.classList.toggle('on', on);
+    b.title = on
+      ? 'Spelling check is ON for this note. Click to ignore spelling.'
+      : 'Spelling is ignored. Click to check spelling in this note.';
+  }
+  $('#btnSpell').addEventListener('mousedown', (e) => e.preventDefault());
+  $('#btnSpell').addEventListener('click', () => {
+    const next = !spellOn();
+    // Matching the Settings choice means "just follow Settings" again.
+    setProp({ spell: next === !!settings.spellCheck ? null : next });
+    toast(next ? 'Checking spelling in this note' : 'Ignoring spelling in this note');
+  });
+  api.onSettings((s) => {
+    settings = { ...settings, ...s };
+    if (note) applySpell();
+  });
 
   // ================================================================ selection helpers
   function anchor() {
@@ -162,10 +230,12 @@
   document.addEventListener('selectionchange', () => {
     saveSel();
     updateToolState();
+    if (resizing) return;
     $$('#editor .sel-img').forEach((i) => {
       const s = getSelection();
       if (!s.rangeCount || !s.getRangeAt(0).intersectsNode(i) || s.isCollapsed) i.classList.remove('sel-img');
     });
+    placeHandle();
   });
 
   // ================================================================ formatting
@@ -244,7 +314,7 @@
     else { saveSel(); openPop(id); }
   }
   document.addEventListener('mousedown', (e) => {
-    if (!e.target.closest('.pop, #btnMenu, #btnInsert')) closePops();
+    if (!e.target.closest('.pop, #btnMenu, #btnInsert, #btnText')) closePops();
     if (!e.target.closest('.ctx')) hideCtx();
   });
   // Buttons inside popovers should not steal the text selection.
@@ -255,9 +325,13 @@
   $('#btnClose').addEventListener('click', () => { saveNow(); api.close(); });
   $('#btnPin').addEventListener('click', () => setProp({ pinned: !note.pinned }));
   $('#btnMenu').addEventListener('click', () => togglePop('#menu'));
-  $('#btnUnroll').addEventListener('click', () => setProp({ rolled: false }));
+  $('#btnList').addEventListener('click', () => { saveNow(); api.showList(); });
+  $('#btnRoll').addEventListener('click', () => { closePops(); saveNow(); setProp({ rolled: !note.rolled }); });
+  $('#btnRelock').addEventListener('click', relock);
   $('#btnInsert').addEventListener('mousedown', (e) => e.preventDefault());
   $('#btnInsert').addEventListener('click', () => togglePop('#insert'));
+  $('#btnText').addEventListener('mousedown', (e) => e.preventDefault());
+  $('#btnText').addEventListener('click', () => togglePop('#textPop'));
 
   // ---------- ⋯ menu
   $$('#colors .sw').forEach((b) => b.addEventListener('click', () => setProp({ color: b.dataset.color })));
@@ -270,8 +344,16 @@
     api.update({ opacity: v });
   });
   $('#solidHover').addEventListener('change', (e) => setProp({ solidOnHover: e.target.checked }));
-  $('#miRoll').addEventListener('click', () => { closePops(); saveNow(); setProp({ rolled: true }); });
-  $('#miList').addEventListener('click', () => { closePops(); api.showList(); });
+  let titleTimer = null;
+  $('#titleInput').addEventListener('input', (e) => {
+    note.title = e.target.value;
+    body.classList.toggle('has-title', !!note.title.trim());
+    $('#title').textContent = titleText();
+    clearTimeout(titleTimer);
+    titleTimer = setTimeout(() => api.update({ title: note.title }).then(gotDates), 300);
+  });
+  $('#titleInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); closePops(); } });
+  $('#miLock').addEventListener('click', toggleLock);
   $('#miDelete').addEventListener('click', () => { closePops(); saveNow(); api.trash(); });
 
   // see-through notes turn solid while the mouse is over them
@@ -280,13 +362,35 @@
 
   // ---------- Add panel
   $$('#insert [data-act]').forEach((b) => b.addEventListener('click', () => doInsert(b.dataset.act)));
-  $$('#insert [data-fore]').forEach((b) => b.addEventListener('click', () => {
+
+  // ---------- text style panel
+  const RESET_COLOR = '#010203';
+  $$('#textPop [data-fore]').forEach((b) => b.addEventListener('click', () => {
     restoreSel();
-    if (b.dataset.fore === 'inherit') document.execCommand('removeFormat');
-    else document.execCommand('foreColor', false, b.dataset.fore);
+    if (b.dataset.fore === 'inherit') {
+      // back to the note's normal ink colour, keeping bold/italic etc.
+      document.execCommand('foreColor', false, RESET_COLOR);
+      editor.querySelectorAll('font[color]').forEach((f) => {
+        if (f.getAttribute('color').toLowerCase() !== RESET_COLOR) return;
+        f.removeAttribute('color');
+        if (!f.attributes.length) f.replaceWith(...f.childNodes);
+      });
+      editor.querySelectorAll('[style*="color"]').forEach((el) => {
+        if (/rgb\(1, 2, 3\)/.test(el.style.color)) el.style.color = '';
+        if (!el.getAttribute('style')) el.removeAttribute('style');
+      });
+    } else {
+      document.execCommand('foreColor', false, b.dataset.fore);
+    }
     changed();
   }));
-  $$('#insert [data-hilite]').forEach((b) => b.addEventListener('click', () => {
+  $('#miClearFmt').addEventListener('click', () => {
+    restoreSel();
+    document.execCommand('removeFormat');
+    closePops();
+    changed();
+  });
+  $$('#textPop [data-hilite]').forEach((b) => b.addEventListener('click', () => {
     restoreSel();
     document.execCommand('hiliteColor', false, b.dataset.hilite);
     changed();
@@ -548,15 +652,7 @@
     const voice = e.target.closest('.voice');
     if (voice) { e.preventDefault(); togglePlay(voice); return; }
     const img = e.target.closest('img');
-    if (img) {
-      const r = document.createRange();
-      r.selectNode(img);
-      const s = getSelection();
-      s.removeAllRanges();
-      s.addRange(r);
-      img.classList.add('sel-img');
-      return;
-    }
+    if (img) { selectImage(img); return; }
     const a = e.target.closest('a[href]');
     if (a && getSelection().isCollapsed && !e.shiftKey) {
       e.preventDefault();
@@ -655,9 +751,9 @@
         : [
           { label: 'Open full size', run: () => openPhoto(img) },
           '-',
-          { label: 'Small', run: () => { img.classList.remove('w-m'); img.classList.add('w-s'); changed(); } },
-          { label: 'Medium', run: () => { img.classList.remove('w-s'); img.classList.add('w-m'); changed(); } },
-          { label: 'Full width', run: () => { img.classList.remove('w-s', 'w-m'); changed(); } },
+          { label: 'Small', run: () => setImgWidth(img, editor.clientWidth * 0.4) },
+          { label: 'Medium', run: () => setImgWidth(img, editor.clientWidth * 0.7) },
+          { label: 'Full width', run: () => { img.classList.remove('w-s', 'w-m'); img.removeAttribute('width'); changed(); placeHandle(); } },
         ];
       items.push('-', { label: drawing ? 'Remove drawing' : 'Remove photo', danger: true, run: () => { img.remove(); changed(); } });
     } else if (voice) {
@@ -979,6 +1075,180 @@
     }
   });
 
+  // ================================================================ photo resizing
+  const handle = $('#imgHandle');
+  let resizing = false;
+  const MIN_IMG = 60;
+  function selectedImage() {
+    const img = editor.querySelector('img.sel-img');
+    return img && editor.contains(img) ? img : null;
+  }
+  function selectImage(img) {
+    $$('#editor .sel-img').forEach((i) => i !== img && i.classList.remove('sel-img'));
+    const r = document.createRange();
+    r.selectNode(img);
+    const s = getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+    img.classList.add('sel-img');
+    placeHandle();
+  }
+  function placeHandle() {
+    const img = selectedImage();
+    if (!img || hidden || note?.rolled) { handle.hidden = true; return; }
+    const r = img.getBoundingClientRect();
+    const box = $('#scroller').getBoundingClientRect();
+    if (r.bottom < box.top + 4 || r.bottom > box.bottom - 2) { handle.hidden = true; return; }
+    handle.hidden = false;
+    handle.style.left = `${Math.min(r.right, box.right - 10)}px`;
+    handle.style.top = `${r.bottom}px`;
+  }
+  function setImgWidth(img, w) {
+    const max = editor.clientWidth;
+    w = Math.round(Math.max(Math.min(MIN_IMG, max), Math.min(max, w)));
+    img.classList.remove('w-s', 'w-m');
+    img.setAttribute('width', String(w));
+    changed();
+    placeHandle();
+  }
+  handle.addEventListener('pointerdown', (e) => {
+    const img = selectedImage();
+    if (!img) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    resizing = true;
+    body.classList.add('resizing');
+    const startX = e.clientX;
+    const startW = img.getBoundingClientRect().width;
+    const max = editor.clientWidth;
+    const min = Math.min(MIN_IMG, max);
+    const move = (ev) => {
+      const w = Math.round(Math.max(min, Math.min(max, startW + ev.clientX - startX)));
+      img.classList.remove('w-s', 'w-m');
+      img.setAttribute('width', String(w));
+      placeHandle();
+    };
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+      resizing = false;
+      body.classList.remove('resizing');
+      changed();
+      placeHandle();
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  });
+  $('#scroller').addEventListener('scroll', placeHandle, { passive: true });
+  window.addEventListener('resize', placeHandle);
+  editor.addEventListener('load', placeHandle, true);
+
+  // ================================================================ locking
+  function showContent(n) {
+    observer.disconnect();
+    hidden = false;
+    note = { ...note, ...n, hidden: false };
+    editor.innerHTML = note.html || '';
+    observer.observe(editor, { childList: true, subtree: true, characterData: true });
+    dirty = false;
+    applyLook();
+    updateEmpty();
+  }
+  function hideContent() {
+    stopPlay();
+    if (!$('#draw').hidden) closeDraw();
+    if (rec.mr) stopRecording(false);
+    observer.disconnect();
+    dirty = false;
+    clearTimeout(saveTimer);
+    hidden = true;
+    editor.innerHTML = '';
+    note.html = '';
+    observer.observe(editor, { childList: true, subtree: true, characterData: true });
+    $('#unlockPw').value = '';
+    $('#unlockErr').textContent = '';
+    closePops();
+    applyLook();
+    handle.hidden = true;
+  }
+  async function relock() {
+    await saveNow();
+    await api.relock();
+    hideContent();
+  }
+  // Locked from the notes list: save what's typed, then hide.
+  api.onLockNow(() => { if (!hidden) relock(); });
+  // Colour/font/lock changed from the notes list.
+  api.onLook((v) => {
+    if (!note || !v) return;
+    for (const k of ['color', 'font', 'size', 'title', 'locked', 'lockedBy', 'pinned', 'opacity']) if (k in v) note[k] = v[k];
+    if (v.hidden && !hidden) { hideContent(); return; }
+    applyLook();
+  });
+  async function toggleLock() {
+    closePops();
+    if (note.locked) {
+      const n = await api.setLocked(false);
+      if (n && !n.error) { note.locked = false; note.lockedBy = n.lockedBy; applyLook(); toast('Lock removed'); }
+      return;
+    }
+    if (note.lockedBy === 'group') return;
+    if (!settings.hasPassword) { openPwPop(); return; }
+    await lockNow();
+  }
+  async function lockNow() {
+    saveNow();
+    const n = await api.setLocked(true);
+    if (!n || n.error) { toast('Could not lock this note'); return; }
+    note.locked = true;
+    note.lockedBy = 'note';
+    hideContent();
+    toast('Note locked 🔒');
+  }
+  function openPwPop() {
+    $('#pwNew').value = '';
+    $('#pwAgain').value = '';
+    $('#pwErr').textContent = '';
+    openPop('#pwPop');
+    setTimeout(() => $('#pwNew').focus(), 20);
+  }
+  $('#pwCancel').addEventListener('click', closePops);
+  $('#pwPop').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const a = $('#pwNew').value;
+    const b = $('#pwAgain').value;
+    if (a.length < 4) { $('#pwErr').textContent = 'Use at least 4 characters or digits.'; return; }
+    if (a !== b) { $('#pwErr').textContent = "The two don't match."; return; }
+    const r = await api.setPassword('', a);
+    if (!r || r.error) { $('#pwErr').textContent = (r && r.error) || 'Could not save it.'; return; }
+    settings.hasPassword = true;
+    closePops();
+    await lockNow();
+  });
+  $('#unlockForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pw = $('#unlockPw').value;
+    if (!pw) { $('#unlockPw').focus(); return; }
+    const n = await api.unlock(pw);
+    if (!n || n.hidden) {
+      $('#unlockErr').textContent = 'Wrong password';
+      const f = $('#unlockForm');
+      f.classList.remove('shake');
+      void f.offsetWidth;
+      f.classList.add('shake');
+      $('#unlockPw').select();
+      return;
+    }
+    $('#unlockPw').value = '';
+    $('#unlockErr').textContent = '';
+    $('#toast').hidden = true;
+    showContent(n);
+    editor.focus();
+    caretAtEnd();
+  });
+
   // ================================================================ toast
   let toastTimer = null;
   function toast(msg) {
@@ -993,11 +1263,15 @@
   (async function init() {
     note = await api.getNote();
     if (!note) return;
-    editor.innerHTML = note.html || '';
+    if (note.settings) settings = { ...settings, ...note.settings };
+    hidden = !!note.hidden;
+    editor.innerHTML = hidden ? '' : (note.html || '');
     applyLook();
     updateEmpty();
     observer.observe(editor, { childList: true, subtree: true, characterData: true });
-    if (note.focusEditor) {
+    if (hidden) {
+      if (note.focusEditor) $('#unlockPw').focus();
+    } else if (note.focusEditor) {
       editor.focus();
       caretAtEnd();
     }

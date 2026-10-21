@@ -1,6 +1,6 @@
 'use strict';
 /*
- * Sticky Pins - local storage.
+ * CosmoNotes - local storage.
  *
  * Every note is its own small JSON file in <data>/notes. Writes are "atomic":
  * the new version is written to a temp file, flushed to disk, and only then
@@ -18,12 +18,19 @@ const path = require('path');
 const crypto = require('crypto');
 
 const COLORS = ['yellow', 'pink', 'green', 'blue', 'purple', 'orange', 'mint', 'charcoal'];
+const GROUP_STYLES = ['stack', 'folder', 'envelope', 'notebook'];
+const GROUP_COLORS = ['kraft', 'sun', 'rose', 'coral', 'lilac', 'sky', 'mint', 'graphite'];
 const DEFAULT_SETTINGS = {
   startWithWindows: true,
   defaultColor: 'yellow',
   defaultFont: 'hand',
   firstRunDone: false,
   listBounds: null,
+  spellCheck: false, // spelling is ignored unless turned on
+  spellCyrillic: false, // Cyrillic words are never underlined unless turned on
+  listSort: { by: 'updated', dir: 'desc', groups: 'mixed' },
+  listSize: 'm', // card size in the notes list: s | m | l
+  lock: null, // "salt:hash" of the one password/PIN for locked notes
 };
 const KEEP_BACKUPS = 30;
 const ATT_PREFIX = 'stickyfile://att/';
@@ -80,10 +87,25 @@ function normalizeBounds(b) {
   return { x, y, width: Math.max(180, width), height: Math.max(120, height) };
 }
 
+const cleanTitle = (t) => (typeof t === 'string' ? t.replace(/[\r\n\t]+/g, ' ').slice(0, 120) : '');
+
+function normalizeGroup(x) {
+  return {
+    id: String(x.id),
+    name: cleanTitle(x.name),
+    createdAt: Number(x.createdAt) || Date.now(),
+    parentId: typeof x.parentId === 'string' && x.parentId ? x.parentId : null,
+    style: GROUP_STYLES.includes(x.style) ? x.style : 'stack',
+    color: GROUP_COLORS.includes(x.color) ? x.color : 'kraft',
+    locked: !!x.locked,
+  };
+}
+
 function normalize(n) {
   const now = Date.now();
   return {
     id: String(n.id),
+    title: cleanTitle(n.title),
     html: typeof n.html === 'string' ? n.html : '',
     text: typeof n.text === 'string' ? n.text : '',
     firstImage: typeof n.firstImage === 'string' ? n.firstImage : null,
@@ -95,6 +117,9 @@ function normalize(n) {
     pinned: !!n.pinned,
     open: !!n.open,
     rolled: !!n.rolled,
+    locked: !!n.locked,
+    spell: n.spell === true || n.spell === false ? n.spell : null,
+    groupId: typeof n.groupId === 'string' && n.groupId ? n.groupId : null,
     bounds: normalizeBounds(n.bounds),
     createdAt: Number(n.createdAt) || now,
     updatedAt: Number(n.updatedAt) || now,
@@ -115,10 +140,21 @@ class Store {
     this.attDir = path.join(root, 'attachments');
     this.backupDir = path.join(root, 'backups');
     this.settingsFile = path.join(root, 'settings.json');
+    this.groupsFile = path.join(root, 'groups.json');
     for (const d of [root, this.notesDir, this.attDir, this.backupDir]) fs.mkdirSync(d, { recursive: true });
     this.notes = new Map();
     this.timers = new Map();
     this.settings = { ...DEFAULT_SETTINGS, ...(readJson(this.settingsFile) || readJson(this.settingsFile + '.bak') || {}) };
+    this.settings.listSort = { ...DEFAULT_SETTINGS.listSort, ...(this.settings.listSort || {}) };
+    this.groups = new Map();
+    const g = readJson(this.groupsFile) || readJson(this.groupsFile + '.bak') || {};
+    for (const x of Array.isArray(g.groups) ? g.groups : []) {
+      if (x && x.id) this.groups.set(String(x.id), normalizeGroup(x));
+    }
+    // A broken parent link (missing group or a loop) puts the group back at the top level.
+    for (const grp of this.groups.values()) {
+      if (grp.parentId && (!this.groups.has(grp.parentId) || this.isInside(grp.parentId, grp.id))) grp.parentId = null;
+    }
     this.load();
   }
 
@@ -183,7 +219,8 @@ class Store {
 
   create(partial = {}) {
     const n = normalize({
-      color: this.settings.defaultColor,
+      // "random" picks one of the pastel papers (not the dark one)
+      color: this.settings.defaultColor === 'random' ? COLORS[Math.floor(Math.random() * (COLORS.length - 1))] : this.settings.defaultColor,
       font: this.settings.defaultFont,
       ...partial,
       id: crypto.randomUUID(),
@@ -227,12 +264,123 @@ class Store {
     for (const ext of ['', '.bak', '.tmp']) {
       try { fs.unlinkSync(this.fileOf(id) + ext); } catch { /* not there */ }
     }
+    this.cleanupGroups();
     // Attachments still used by another note or a backup are kept.
     this.sweepAttachments(0);
   }
 
   saveSettings() {
     writeFileSafe(this.settingsFile, JSON.stringify(this.settings, null, 1));
+  }
+
+  // ---------- groups (a folder tree: a note has groupId, a group has parentId) ----------
+  saveGroups() {
+    writeFileSafe(this.groupsFile, JSON.stringify({ groups: [...this.groups.values()] }, null, 1));
+  }
+
+  // true when group `id` is `ancestorId` itself or somewhere inside it
+  isInside(id, ancestorId) {
+    const seen = new Set();
+    for (let cur = id; cur && !seen.has(cur); cur = this.groups.get(cur)?.parentId) {
+      if (cur === ancestorId) return true;
+      seen.add(cur);
+    }
+    return false;
+  }
+
+  // the group and all the groups above it, innermost first
+  chain(groupId) {
+    const out = [];
+    const seen = new Set();
+    for (let cur = groupId; cur && this.groups.has(cur) && !seen.has(cur); cur = this.groups.get(cur).parentId) {
+      seen.add(cur);
+      out.push(this.groups.get(cur));
+    }
+    return out;
+  }
+
+  // ids of the group and every group inside it
+  subtree(groupId) {
+    const ids = new Set([groupId]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const g of this.groups.values()) {
+        if (g.parentId && ids.has(g.parentId) && !ids.has(g.id)) { ids.add(g.id); grew = true; }
+      }
+    }
+    return ids;
+  }
+
+  notesInTree(groupId, { includeBin = false } = {}) {
+    const ids = this.subtree(groupId);
+    return this.all().filter((n) => n.groupId && ids.has(n.groupId) && (includeBin || !n.deletedAt));
+  }
+
+  // the locked groups a note sits inside (innermost first)
+  lockedGroupsOf(note) {
+    return this.chain(note.groupId).filter((g) => g.locked);
+  }
+
+  setGroup(noteId, groupId) {
+    const n = this.notes.get(noteId);
+    if (!n) return;
+    n.groupId = groupId && this.groups.has(groupId) ? groupId : null;
+    this.writeNow(noteId);
+  }
+
+  setParent(groupId, parentId) {
+    const g = this.groups.get(groupId);
+    if (!g) return false;
+    parentId = parentId && this.groups.has(parentId) ? parentId : null;
+    if (parentId && this.isInside(parentId, groupId)) return false; // can't put a group inside itself
+    g.parentId = parentId;
+    this.saveGroups();
+    return true;
+  }
+
+  createGroup(noteIds, { name = '', parentId = null } = {}) {
+    const g = normalizeGroup({ id: crypto.randomUUID(), name, createdAt: Date.now(), parentId: parentId && this.groups.has(parentId) ? parentId : null });
+    this.groups.set(g.id, g);
+    this.saveGroups();
+    for (const id of noteIds) this.setGroup(id, g.id);
+    return g;
+  }
+
+  updateGroup(id, patch = {}) {
+    const g = this.groups.get(id);
+    if (!g) return null;
+    Object.assign(g, normalizeGroup({ ...g, ...patch, id: g.id, parentId: g.parentId, createdAt: g.createdAt }));
+    this.saveGroups();
+    return g;
+  }
+
+  renameGroup(id, name) {
+    return this.updateGroup(id, { name });
+  }
+
+  // Ungroup: everything inside moves up one level, then the group is removed.
+  dissolveGroup(id) {
+    const g = this.groups.get(id);
+    if (!g) return;
+    for (const n of this.notes.values()) if (n.groupId === id) this.setGroup(n.id, g.parentId);
+    for (const c of this.groups.values()) if (c.parentId === id) c.parentId = g.parentId;
+    this.groups.delete(id);
+    this.saveGroups();
+    this.cleanupGroups();
+  }
+
+  // A group disappears once nothing inside it (not even a note in the bin) is left.
+  cleanupGroups() {
+    const used = new Set();
+    for (const n of this.notes.values()) {
+      for (const g of this.chain(n.groupId)) used.add(g.id);
+    }
+    let changed = false;
+    for (const id of [...this.groups.keys()]) {
+      if (!used.has(id)) { this.groups.delete(id); changed = true; }
+    }
+    if (changed) this.saveGroups();
   }
 
   // ---------- attachments ----------
@@ -277,7 +425,7 @@ class Store {
     for (const b of this.listBackups()) {
       const dir = path.join(this.backupDir, b.name);
       for (const f of fs.readdirSync(dir)) {
-        if (f.endsWith('.json') && f !== 'meta.json') scan((readJson(path.join(dir, f)) || {}).html);
+        if (f.endsWith('.json') && f !== 'meta.json' && f !== 'groups.json') scan((readJson(path.join(dir, f)) || {}).html);
       }
     }
     return used;
@@ -323,6 +471,7 @@ class Store {
       fs.writeFileSync(path.join(tmpDir, n.id + '.json'), JSON.stringify(n));
       count++;
     }
+    fs.writeFileSync(path.join(tmpDir, 'groups.json'), JSON.stringify({ groups: [...this.groups.values()] }));
     fs.writeFileSync(path.join(tmpDir, 'meta.json'), JSON.stringify({ created: Date.now(), count }));
     fs.renameSync(tmpDir, path.join(this.backupDir, dirName));
     this.pruneBackups();
@@ -357,7 +506,7 @@ class Store {
     if (!fs.existsSync(dir)) return 0;
     let restored = 0;
     for (const f of fs.readdirSync(dir)) {
-      if (!f.endsWith('.json') || f === 'meta.json') continue;
+      if (!f.endsWith('.json') || f === 'meta.json' || f === 'groups.json') continue;
       const b = readJson(path.join(dir, f));
       if (!b || !b.id) continue;
       const cur = this.notes.get(String(b.id));
@@ -367,6 +516,7 @@ class Store {
       }
       if (b.deletedAt) continue;
       const copy = normalize({ ...b, id: crypto.randomUUID(), open: false, restoredFrom: name, deletedAt: null });
+      if (copy.groupId && !this.groups.has(copy.groupId)) copy.groupId = null;
       this.notes.set(copy.id, copy);
       this.writeNow(copy.id);
       restored++;
@@ -375,4 +525,4 @@ class Store {
   }
 }
 
-module.exports = { Store, COLORS, normalize, localDate, ATT_PREFIX };
+module.exports = { Store, COLORS, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };

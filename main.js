@@ -4,40 +4,48 @@ const {
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { pathToFileURL } = require('url');
 const { Store } = require('./store');
+
+const APP_NAME = 'CosmoNotes';
+const OLD_DATA_DIR = 'Sticky Pins'; // where notes lived before the rename
 
 const PAPER = {
   yellow: '#FFF4A3', pink: '#FFD6E6', green: '#D8F5C4', blue: '#D2ECFF',
   purple: '#E8DDFF', orange: '#FFDFBF', mint: '#CDF3E8', charcoal: '#3A3940',
 };
 const ROLLED_H = 34;
-const MIN_W = 180;
+const MIN_W = 200;
 const MIN_H = 120;
-const DEFAULT_W = 300;
+const DEFAULT_W = 320;
 const DEFAULT_H = 300;
 const BIG = 16384;
 const ASSETS = path.join(__dirname, 'assets');
 const WIN_ICON = path.join(ASSETS, process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const PRELOAD = path.join(__dirname, 'preload.js');
-const EDITABLE = ['html', 'text', 'firstImage', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'pinned', 'rolled'];
+const EDITABLE = ['title', 'html', 'text', 'firstImage', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'pinned', 'rolled', 'spell'];
+const SECRET = ['html', 'text', 'firstImage'];
 const ATT_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'webm', 'ogg', 'mp3', 'm4a', 'wav'];
 
 const WELCOME_HTML =
-  '<div><b>Hi there! 👋</b></div>' +
-  '<div>Welcome to your sticky notes.</div>' +
+  '<div>Welcome to CosmoNotes ✨</div>' +
   '<ul class="checklist">' +
   '<li class="done">Open the app</li>' +
   '<li>Click the pin at the top to keep a note above other windows</li>' +
-  '<li>Click ⋯ for colours, fonts and see-through</li>' +
+  '<li>Click ⋯ for a title, colours, see-through and the lock</li>' +
   '<li>Click <b>Add</b> at the bottom for photos, voice, drawings and more</li>' +
   '</ul>' +
-  '<div>Everything saves on this computer, instantly. ✨</div>';
+  '<div>Everything saves on this computer, instantly.</div>';
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'stickyfile', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
 ]);
+// Kept from the "Sticky Pins" days so Windows treats CosmoNotes as the same app
+// (the installer replaces the old one and "Start with Windows" keeps working).
 app.setAppUserModelId('com.stickypins.app');
+// Use the built-in spell checker so Cyrillic words can be left alone.
+app.commandLine.appendSwitch('disable-features', 'WinUseBrowserSpellChecker');
 
 let store = null;
 let tray = null;
@@ -47,9 +55,106 @@ const wins = new Map(); // note id -> BrowserWindow
 
 // ------------------------------------------------------------------ helpers
 const titleOf = (n) => {
+  if (n.title && n.title.trim()) return n.title.trim().slice(0, 80);
+  if (isLocked(n)) return 'Locked note';
   const line = (n.text || '').split('\n').map((s) => s.trim()).find(Boolean);
-  return line ? line.slice(0, 60) : 'Sticky note';
+  return line ? line.slice(0, 60) : APP_NAME;
 };
+
+// What a window is allowed to see: a locked note's contents stay in this
+// process until the right password is typed in that window.
+// A note is locked by its own lock or by any locked group it sits in.
+function isLocked(n) {
+  return !!n.locked || store.lockedGroupsOf(n).length > 0;
+}
+function lockedBy(n) {
+  if (n.locked) return 'note';
+  return store.lockedGroupsOf(n).length ? 'group' : null;
+}
+function viewOf(n, win) {
+  const hidden = isLocked(n) && !(win && win.revealed);
+  const v = { ...n, hidden, lockedBy: lockedBy(n) };
+  if (hidden) for (const k of SECRET) v[k] = k === 'html' || k === 'text' ? '' : null;
+  return v;
+}
+
+// ---------- password for locked notes (one for all notes)
+function hashPassword(pw, salt = crypto.randomBytes(16).toString('hex')) {
+  const hash = crypto.scryptSync(String(pw), salt, 32, { N: 16384, r: 8, p: 1 }).toString('hex');
+  return { salt, hash };
+}
+// Stored on one line in settings.json as "salt:hash" (never the password itself).
+const packLock = ({ salt, hash }) => `${salt}:${hash}`;
+function checkPassword(pw) {
+  const [salt, hash] = String(store.settings.lock || '').split(':');
+  if (!salt || !hash) return false;
+  const a = Buffer.from(hashPassword(pw, salt).hash, 'hex');
+  const b = Buffer.from(hash, 'hex');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ---------- copy notes over from the old "Sticky Pins" folder (first run after the rename)
+function migrateOldData() {
+  try {
+    const dir = app.getPath('userData');
+    const oldDir = path.join(app.getPath('appData'), OLD_DATA_DIR);
+    if (path.resolve(dir) === path.resolve(oldDir)) return;
+    const has = (d) => fs.existsSync(path.join(d, 'notes')) || fs.existsSync(path.join(d, 'settings.json'));
+    if (has(dir) || !has(oldDir)) return;
+    fs.mkdirSync(dir, { recursive: true });
+    for (const name of ['notes', 'attachments', 'backups', 'settings.json', 'groups.json']) {
+      const src = path.join(oldDir, name);
+      if (fs.existsSync(src)) fs.cpSync(src, path.join(dir, name), { recursive: true, force: false, errorOnExist: false });
+    }
+    fs.writeFileSync(path.join(oldDir, 'Notes were copied to CosmoNotes.txt'),
+      `Your notes were copied to:\r\n${dir}\r\n\r\nThis old folder was left untouched as a safety copy. You can delete it once you're happy everything is in CosmoNotes.\r\n`);
+  } catch (e) {
+    console.error('migration failed', e);
+  }
+}
+
+function spellLanguages() {
+  const ses = session.defaultSession;
+  const avail = ses.availableSpellCheckerLanguages || [];
+  const ok = (l) => !avail.length || avail.includes(l);
+  const langs = ['en-US'].filter(ok);
+  // Macedonian has no dictionary in the spell checker; these are the closest.
+  if (store.settings.spellCyrillic) for (const l of ['mk', 'sr', 'bg', 'ru', 'uk']) if (avail.includes(l)) langs.push(l);
+  try { ses.setSpellCheckerLanguages(langs.length ? langs : ['en-US']); } catch (e) { console.error(e); }
+}
+
+// Locked groups opened with the password in the list window (forgotten when the list closes).
+const listOpenGroups = new Set();
+function groupOpenInList(groupId) {
+  return store.chain(groupId).every((g) => !g.locked || listOpenGroups.has(g.id));
+}
+// Any open note window showing a note that just became locked hides itself
+// (it saves first, then asks to be hidden: see 'note:lock-now' in note.js).
+function hideNewlyLocked() {
+  for (const [id, win] of wins) {
+    const n = store.get(id);
+    if (!n || win.isDestroyed()) continue;
+    applyState(win, n);
+    if (isLocked(n) && win.revealed) win.webContents.send('note:lock-now');
+    else win.webContents.send('note:look', viewOf(n, win));
+  }
+}
+function pushLook(id) {
+  const win = wins.get(id);
+  const n = store.get(id);
+  if (!win || win.isDestroyed() || !n) return;
+  applyState(win, n);
+  win.webContents.send('note:look', viewOf(n, win));
+}
+
+function noteSettings() {
+  return { spellCheck: !!store.settings.spellCheck, hasPassword: !!store.settings.lock };
+}
+function broadcastSettings() {
+  const s = noteSettings();
+  for (const win of wins.values()) if (!win.isDestroyed()) win.webContents.send('settings:changed', s);
+}
 
 function visibleOnSomeDisplay(b) {
   return screen.getAllDisplays().some(({ workArea: a }) =>
@@ -184,6 +289,8 @@ function openNoteWindow(n, { focus = false } = {}) {
   if (n.rolled) win.setMaximumSize(BIG, ROLLED_H);
   win.noteId = n.id;
   win.focusOnLoad = focus;
+  // true while the window may show the note's contents (unlocked note, or password typed in it)
+  win.revealed = !isLocked(n);
   wins.set(n.id, win);
   hardenContents(win.webContents);
 
@@ -240,7 +347,7 @@ function openNoteWindow(n, { focus = false } = {}) {
   return win;
 }
 
-function createNote({ near } = {}) {
+function createNote({ near, groupId = null } = {}) {
   let bounds = null;
   if (near && !near.isDestroyed()) {
     const r = near.getBounds();
@@ -251,8 +358,10 @@ function createNote({ near } = {}) {
     else if (r.x - 14 - w >= area.x) bounds = { x: r.x - 14 - w, y: r.y, width: w, height: h };
     else bounds = { x: r.x + 30, y: r.y + 30, width: w, height: h };
   }
-  const n = store.create({ open: true, bounds });
-  openNoteWindow(n, { focus: true });
+  const n = store.create({ open: true, bounds, groupId: groupId && store.groups.has(groupId) ? groupId : null });
+  const win = openNoteWindow(n, { focus: true });
+  // made inside a locked group that is open in the list: no need to type the password again
+  if (isLocked(n) && !n.locked && groupOpenInList(n.groupId)) win.revealed = true;
   notifyList();
   return n;
 }
@@ -302,7 +411,7 @@ function showList() {
     ...b,
     minWidth: 340,
     minHeight: 420,
-    title: 'Sticky Pins',
+    title: APP_NAME,
     icon: WIN_ICON,
     show: false,
     backgroundColor: '#FBF6EC',
@@ -319,7 +428,7 @@ function showList() {
   listWin.on('move', remember);
   listWin.on('resize', remember);
   listWin.on('close', () => { remember(); try { store.saveSettings(); } catch { /* ignore */ } });
-  listWin.on('closed', () => { listWin = null; });
+  listWin.on('closed', () => { listWin = null; listOpenGroups.clear(); });
   listWin.loadFile(path.join(__dirname, 'src', 'list.html'));
 }
 
@@ -341,7 +450,7 @@ function buildTray() {
   if (!tray) {
     const img = nativeImage.createFromPath(path.join(ASSETS, process.platform === 'win32' ? 'tray.ico' : 'tray.png'));
     tray = new Tray(img);
-    tray.setToolTip('Sticky Pins');
+    tray.setToolTip(APP_NAME);
     tray.on('click', showList);
   }
   tray.setContextMenu(Menu.buildFromTemplate([
@@ -351,7 +460,7 @@ function buildTray() {
     { type: 'separator' },
     { label: 'Start with Windows', type: 'checkbox', checked: !!store.settings.startWithWindows, click: (mi) => setStartup(mi.checked) },
     { type: 'separator' },
-    { label: 'Quit Sticky Pins', click: () => { quitting = true; app.quit(); } },
+    { label: `Quit ${APP_NAME}`, click: () => { quitting = true; app.quit(); } },
   ]));
 }
 
@@ -367,23 +476,69 @@ function applyPatch(e, patch) {
   if (!note || !patch || typeof patch !== 'object') return null;
   const clean = {};
   for (const k of EDITABLE) if (k in patch) clean[k] = patch[k];
-  const contentChanged = 'html' in clean && clean.html !== note.html;
+  // A hidden locked note can never be overwritten from its (empty) window.
+  if (isLocked(note) && !win.revealed) for (const k of SECRET) delete clean[k];
+  const contentChanged = ('html' in clean && clean.html !== note.html) || ('title' in clean && (clean.title || '') !== note.title);
   const rolledChanged = 'rolled' in clean && !!clean.rolled !== note.rolled;
   store.update(note.id, clean, { content: contentChanged });
   const n = store.get(note.id);
-  if ('opacity' in clean || 'pinned' in clean || 'color' in clean || 'text' in clean) applyState(win, n);
+  if ('opacity' in clean || 'pinned' in clean || 'color' in clean || 'text' in clean || 'title' in clean) applyState(win, n);
   if (rolledChanged) setRolled(win, n);
   notifyList();
-  return n;
+  return viewOf(n, win);
 }
 
 function registerIpc() {
   ipcMain.handle('note:get', (e) => {
     const { win, note } = senderNote(e);
     if (!note) return null;
-    return { ...note, focusEditor: !!win.focusOnLoad };
+    return { ...viewOf(note, win), focusEditor: !!win.focusOnLoad, settings: noteSettings() };
+  });
+  ipcMain.handle('note:unlock', async (e, pw) => {
+    const { win, note } = senderNote(e);
+    if (!note) return null;
+    if (!isLocked(note)) return viewOf(note, win);
+    if (!checkPassword(pw)) { await wait(450); return null; }
+    win.revealed = true;
+    return viewOf(note, win);
+  });
+  ipcMain.handle('note:relock', (e) => {
+    const { win, note } = senderNote(e);
+    if (!note) return null;
+    win.revealed = false;
+    return viewOf(note, win);
+  });
+  ipcMain.handle('note:set-locked', (e, locked) => {
+    const { win, note } = senderNote(e);
+    if (!note) return null;
+    if (locked) {
+      if (!store.settings.lock) return { error: 'no-password' };
+      note.locked = true;
+      win.revealed = false;
+    } else {
+      if (isLocked(note) && !win.revealed) return { error: 'hidden' };
+      note.locked = false;
+    }
+    store.writeNow(note.id);
+    applyState(win, note);
+    notifyList();
+    return viewOf(note, win);
+  });
+  ipcMain.handle('lock:set', (e, { current, next } = {}) => {
+    next = String(next || '');
+    if (next.length < 4) return { error: 'Use at least 4 characters or digits.' };
+    if (store.settings.lock && !checkPassword(current)) return { error: 'The current password is not right.' };
+    store.settings.lock = packLock(hashPassword(next));
+    store.saveSettings();
+    broadcastSettings();
+    notifyList();
+    return { ok: true };
   });
   ipcMain.handle('note:update', (e, patch) => applyPatch(e, patch));
+  ipcMain.handle('note:dates', (e) => {
+    const { note } = senderNote(e);
+    return note ? { createdAt: note.createdAt, updatedAt: note.updatedAt } : null;
+  });
   ipcMain.on('note:update-sync', (e, patch) => {
     try { applyPatch(e, patch); const { note } = senderNote(e); if (note) store.writeNow(note.id); } catch (err) { console.error(err); }
     e.returnValue = true;
@@ -438,29 +593,172 @@ function registerIpc() {
 
   // list window
   ipcMain.handle('list:show', () => showList());
-  ipcMain.handle('list:get', () => ({
-    notes: store.all().map((n) => ({
-      id: n.id,
-      text: n.text.slice(0, 600),
-      firstImage: n.firstImage,
-      color: n.color,
-      font: n.font,
-      pinned: n.pinned,
-      open: wins.has(n.id),
-      createdAt: n.createdAt,
-      updatedAt: n.updatedAt,
-      deletedAt: n.deletedAt,
-      restoredFrom: n.restoredFrom,
-    })),
-    settings: { ...store.settings, dataPath: store.root, version: app.getVersion() },
-  }));
-  ipcMain.handle('list:new', () => { createNote(); });
+  ipcMain.handle('list:get', () => {
+    const { lock, ...settings } = store.settings;
+    const hiddenInList = (n) => n.locked || !groupOpenInList(n.groupId);
+    return {
+      notes: store.all().map((n) => ({
+        id: n.id,
+        title: n.title,
+        text: hiddenInList(n) ? '' : n.text.slice(0, 600),
+        firstImage: hiddenInList(n) ? null : n.firstImage,
+        locked: hiddenInList(n), // shown as a locked card
+        ownLock: n.locked, // the note's own lock (vs. a locked group)
+        color: n.color,
+        font: n.font,
+        pinned: n.pinned,
+        groupId: n.groupId,
+        open: wins.has(n.id),
+        createdAt: n.createdAt,
+        updatedAt: n.updatedAt,
+        deletedAt: n.deletedAt,
+        restoredFrom: n.restoredFrom,
+      })),
+      groups: [...store.groups.values()].map((g) => ({ ...g, open: groupOpenInList(g.id) })),
+      settings: { ...settings, hasPassword: !!lock, dataPath: store.root, version: app.getVersion() },
+    };
+  });
+
+  // ---------- groups: a folder tree made by dragging in the list
+  ipcMain.handle('groups:make', (e, dragId, targetId) => {
+    if (!dragId || dragId === targetId) return null;
+    const dragGroup = store.groups.get(dragId);
+    const target = store.get(targetId);
+    const targetGroup = store.groups.get(targetId);
+    if (dragGroup) {
+      // a group can be dropped into another group (never into itself or its own sub-groups)
+      if (!targetGroup || !store.setParent(dragId, targetId)) return null;
+    } else {
+      const note = store.get(dragId);
+      if (!note) return null;
+      if (targetGroup) store.setGroup(dragId, targetId);
+      else if (target) {
+        if (target.groupId && target.groupId !== note.groupId) store.setGroup(dragId, target.groupId);
+        else store.createGroup([targetId, dragId], { parentId: target.groupId }); // new group, inside the current one
+      } else return null;
+    }
+    store.cleanupGroups();
+    hideNewlyLocked();
+    notifyList();
+    // where the dragged note/group ended up
+    return dragGroup ? store.groups.get(dragId)?.parentId || null : store.get(dragId)?.groupId || null;
+  });
+  // one level up: a note leaves its group, a group leaves its parent
+  const moveUp = (id) => {
+    const g = store.groups.get(id);
+    if (g) store.setParent(id, g.parentId ? store.groups.get(g.parentId)?.parentId : null);
+    else {
+      const n = store.get(id);
+      if (n && n.groupId) store.setGroup(id, store.groups.get(n.groupId)?.parentId || null);
+    }
+    store.cleanupGroups();
+    notifyList();
+  };
+  ipcMain.handle('groups:move-up', (e, id) => moveUp(id));
+  // move a note or group straight into a group (or to the top level with null)
+  ipcMain.handle('groups:move-to', (e, id, groupId) => {
+    groupId = groupId && store.groups.has(groupId) ? groupId : null;
+    if (store.groups.has(id)) { if (!store.setParent(id, groupId)) return false; } else if (store.get(id)) store.setGroup(id, groupId);
+    else return false;
+    store.cleanupGroups();
+    hideNewlyLocked();
+    notifyList();
+    return true;
+  });
+  ipcMain.handle('groups:ungroup', (e, noteId) => moveUp(noteId));
+  ipcMain.handle('groups:dissolve', (e, groupId) => { store.dissolveGroup(groupId); notifyList(); });
+  ipcMain.handle('groups:rename', (e, groupId, name) => { store.renameGroup(groupId, name); notifyList(); });
+  ipcMain.handle('groups:update', (e, groupId, patch = {}) => {
+    const clean = {};
+    for (const k of ['name', 'style', 'color']) if (k in patch) clean[k] = patch[k];
+    store.updateGroup(groupId, clean);
+    notifyList();
+  });
+  // change colour / font of every note in a group (and the groups inside it)
+  ipcMain.handle('groups:apply', (e, groupId, patch = {}, includeInner = true) => {
+    const clean = {};
+    if (PAPER[patch.color]) clean.color = patch.color;
+    if (patch.font === 'hand' || patch.font === 'round') clean.font = patch.font;
+    if (!Object.keys(clean).length || !store.groups.has(groupId)) return 0;
+    const notes = includeInner ? store.notesInTree(groupId) : store.all().filter((n) => n.groupId === groupId && !n.deletedAt);
+    for (const n of notes) {
+      store.update(n.id, clean);
+      const win = wins.get(n.id);
+      if (win && !win.isDestroyed()) {
+        applyState(win, n);
+        win.webContents.send('note:look', viewOf(n, win));
+      }
+    }
+    notifyList();
+    return notes.length;
+  });
+  ipcMain.handle('groups:trash', (e, groupId) => {
+    const notes = store.notesInTree(groupId);
+    for (const n of notes) {
+      const win = wins.get(n.id);
+      store.trash(n.id);
+      if (win && !win.isDestroyed()) win.close();
+    }
+    notifyList();
+    return notes.length;
+  });
+
+  // ---------- locking from the list (right-click / group settings)
+  ipcMain.handle('list:set-locked', async (e, noteId, locked, pw) => {
+    const n = store.get(noteId);
+    if (!n) return { error: 'missing' };
+    if (locked) {
+      if (!store.settings.lock) return { error: 'no-password' };
+      n.locked = true;
+      store.writeNow(n.id);
+      hideNewlyLocked();
+    } else {
+      if (!checkPassword(pw)) { await wait(450); return { error: 'wrong' }; }
+      n.locked = false;
+      store.writeNow(n.id);
+      pushLook(n.id);
+    }
+    notifyList();
+    return { ok: true };
+  });
+  ipcMain.handle('groups:set-locked', async (e, groupId, locked, pw) => {
+    const g = store.groups.get(groupId);
+    if (!g) return { error: 'missing' };
+    if (locked) {
+      if (!store.settings.lock) return { error: 'no-password' };
+      store.updateGroup(groupId, { locked: true });
+      for (const id of store.subtree(groupId)) listOpenGroups.delete(id);
+      hideNewlyLocked();
+    } else {
+      if (!checkPassword(pw)) { await wait(450); return { error: 'wrong' }; }
+      store.updateGroup(groupId, { locked: false });
+      for (const n of store.notesInTree(groupId)) pushLook(n.id);
+    }
+    notifyList();
+    return { ok: true };
+  });
+  // open a locked group in the list (until the list is closed or "Lock again")
+  ipcMain.handle('groups:reveal', async (e, groupId, pw) => {
+    if (!store.groups.has(groupId)) return { error: 'missing' };
+    if (!checkPassword(pw)) { await wait(450); return { error: 'wrong' }; }
+    listOpenGroups.add(groupId);
+    notifyList();
+    return { ok: true };
+  });
+  ipcMain.handle('groups:hide', (e, groupId) => {
+    for (const id of store.subtree(groupId)) listOpenGroups.delete(id);
+    notifyList();
+  });
+  ipcMain.handle('list:new', (e, groupId) => { createNote({ groupId }); });
   ipcMain.handle('list:open-note', (e, id) => {
     const n = store.get(id);
     if (!n || n.deletedAt) return;
     n.open = true;
     store.save(n.id);
-    openNoteWindow(n, { focus: true });
+    const fresh = !wins.has(n.id);
+    const win = openNoteWindow(n, { focus: true });
+    // Its locked group was just opened with the password in the list, so don't ask again.
+    if (fresh && !n.locked && isLocked(n) && groupOpenInList(n.groupId)) win.revealed = true;
     notifyList();
   });
   ipcMain.handle('list:close-note', (e, id) => {
@@ -479,12 +777,8 @@ function registerIpc() {
     notifyList();
   });
   ipcMain.handle('list:restore', (e, id) => { store.restore(id); notifyList(); });
+  // (the list window asks "are you sure?" in its own style before calling these)
   ipcMain.handle('list:destroy', async (e, id) => {
-    const r = await dialog.showMessageBox(listWin, {
-      type: 'warning', buttons: ['Delete forever', 'Cancel'], defaultId: 1, cancelId: 1,
-      message: 'Delete this note forever?', detail: 'You won\'t be able to get it back from the bin.',
-    });
-    if (r.response !== 0) return false;
     store.destroy(id);
     notifyList();
     return true;
@@ -492,12 +786,6 @@ function registerIpc() {
   ipcMain.handle('list:empty-bin', async () => {
     const binned = store.all().filter((n) => n.deletedAt);
     if (!binned.length) return false;
-    const r = await dialog.showMessageBox(listWin, {
-      type: 'warning', buttons: ['Empty bin', 'Cancel'], defaultId: 1, cancelId: 1,
-      message: `Delete ${binned.length} note${binned.length > 1 ? 's' : ''} forever?`,
-      detail: 'Your daily backups still keep a copy for up to 30 days.',
-    });
-    if (r.response !== 0) return false;
     for (const n of binned) store.destroy(n.id);
     notifyList();
     return true;
@@ -507,29 +795,31 @@ function registerIpc() {
   ipcMain.handle('settings:set', (e, patch) => {
     patch = patch || {};
     if ('startWithWindows' in patch) setStartup(patch.startWithWindows);
-    if (typeof patch.defaultColor === 'string' && PAPER[patch.defaultColor]) store.settings.defaultColor = patch.defaultColor;
+    if (typeof patch.defaultColor === 'string' && (PAPER[patch.defaultColor] || patch.defaultColor === 'random')) store.settings.defaultColor = patch.defaultColor;
+    if (['s', 'm', 'l'].includes(patch.listSize)) store.settings.listSize = patch.listSize;
     if (patch.defaultFont === 'hand' || patch.defaultFont === 'round') store.settings.defaultFont = patch.defaultFont;
+    if ('spellCheck' in patch) store.settings.spellCheck = !!patch.spellCheck;
+    if ('spellCyrillic' in patch) { store.settings.spellCyrillic = !!patch.spellCyrillic; spellLanguages(); }
+    if (patch.listSort && typeof patch.listSort === 'object') {
+      const ls = { ...store.settings.listSort };
+      if (['updated', 'created'].includes(patch.listSort.by)) ls.by = patch.listSort.by;
+      if (['desc', 'asc'].includes(patch.listSort.dir)) ls.dir = patch.listSort.dir;
+      if (['mixed', 'first', 'last'].includes(patch.listSort.groups)) ls.groups = patch.listSort.groups;
+      store.settings.listSort = ls;
+    }
     store.saveSettings();
-    notifyList();
-    return store.settings;
+    if ('spellCheck' in patch || 'spellCyrillic' in patch) broadcastSettings();
+    // The list already shows a new sort order itself; telling it again made it redraw twice.
+    const onlySort = Object.keys(patch).every((k) => k === 'listSort' || k === 'listSize');
+    if (!onlySort) notifyList();
+    return true;
   });
 
   ipcMain.handle('backups:list', () => store.listBackups());
   ipcMain.handle('backups:now', () => { store.backupNow(); return store.listBackups(); });
   ipcMain.handle('backups:restore', async (e, name) => {
-    const r = await dialog.showMessageBox(listWin, {
-      type: 'question', buttons: ['Restore', 'Cancel'], defaultId: 0, cancelId: 1,
-      message: 'Bring back notes from this backup?',
-      detail: 'Nothing you have now is changed or removed. Notes from the backup that are different from your current ones are added to your list as extra notes.',
-    });
-    if (r.response !== 0) return null;
     const count = store.restoreBackup(name);
     notifyList();
-    await dialog.showMessageBox(listWin, {
-      type: 'info', buttons: ['OK'],
-      message: count ? `Brought back ${count} note${count > 1 ? 's' : ''}.` : 'Nothing to bring back.',
-      detail: count ? 'They are in your notes list, marked "restored".' : 'Every note in that backup matches what you already have.',
-    });
     return count;
   });
   ipcMain.handle('backups:open-folder', () => shell.openPath(store.backupDir));
@@ -539,6 +829,7 @@ function registerIpc() {
 // ------------------------------------------------------------------ app lifecycle
 function start() {
   Menu.setApplicationMenu(null);
+  migrateOldData();
   store = new Store(app.getPath('userData'));
 
   protocol.handle('stickyfile', (req) => {
@@ -556,6 +847,7 @@ function start() {
   };
   ses.setPermissionRequestHandler((wc, perm, cb, details) => cb(allowed(perm, details)));
   ses.setPermissionCheckHandler((wc, perm) => perm === 'media' || perm === 'clipboard-sanitized-write');
+  spellLanguages();
 
   registerIpc();
 
@@ -563,7 +855,7 @@ function start() {
     store.settings.firstRunDone = true;
     store.saveSettings();
     if (store.all().length === 0) {
-      store.create({ html: WELCOME_HTML, text: 'Hi there! 👋\nWelcome to your sticky notes.', open: true, color: 'yellow', font: 'hand' });
+      store.create({ title: 'Hi there! 👋', html: WELCOME_HTML, text: 'Welcome to CosmoNotes ✨', open: true, color: 'yellow', font: 'hand' });
     }
   }
   syncLoginItem();

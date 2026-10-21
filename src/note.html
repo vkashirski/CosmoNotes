@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' stickyfile: data: blob: https: http:; media-src 'self' stickyfile: blob:; font-src 'self'; connect-src 'self' stickyfile:">
-<title>Sticky note</title>
+<title>CosmoNotes</title>
 <link rel="stylesheet" href="../node_modules/@fontsource/caveat/400.css">
 <link rel="stylesheet" href="../node_modules/@fontsource/caveat/700.css">
 <link rel="stylesheet" href="../node_modules/@fontsource/nunito/400.css">
@@ -14,19 +14,35 @@
 <body data-color="yellow" data-font="hand" data-size="m">
 
 <header id="bar">
+  <button class="hb" id="btnList" title="All notes"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
   <button class="hb" id="btnNew" title="New note (Ctrl+N)"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
   <div id="title"></div>
-  <button class="hb" id="btnUnroll" title="Unroll note"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+  <button class="hb" id="btnRelock" title="Unlocked for now. Click to lock it again" hidden><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></svg></button>
   <button class="hb" id="btnPin" title="Pin on top of other windows" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
-  <button class="hb" id="btnMenu" title="Colour, font, see-through and more"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg></button>
+  <button class="hb" id="btnRoll" title="Roll up to just the top bar"><svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></button>
+  <button class="hb" id="btnMenu" title="Title, colour, see-through, lock and more"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg></button>
   <button class="hb" id="btnClose" title="Close note (it stays in your notes list)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
 </header>
 
 <main id="scroller">
-  <div id="editor" contenteditable="true" spellcheck="true" data-placeholder="Take a note…"></div>
+  <div id="editor" contenteditable="true" spellcheck="false" data-placeholder="Take a note…"></div>
 </main>
 
+<!-- shown instead of the note when it is locked -->
+<div id="lockScreen" hidden>
+  <form id="unlockForm" autocomplete="off">
+    <div class="lockicon"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="16" r="1.2" class="fill"/></svg></div>
+    <div class="lt">This note is locked</div>
+    <div class="lrow"><input type="password" id="unlockPw" placeholder="Password or PIN"><button class="lbtn" type="submit" title="Unlock"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
+    <div class="lerr" id="unlockErr"></div>
+  </form>
+</div>
+
+<span id="stamp"></span>
+<div id="imgHandle" hidden title="Drag to resize"></div>
+
 <footer id="tools">
+  <div class="tleft">
   <button class="tb b" data-cmd="bold" title="Bold (Ctrl+B)">B</button>
   <button class="tb i" data-cmd="italic" title="Italic (Ctrl+I)">I</button>
   <button class="tb u" data-cmd="underline" title="Underline (Ctrl+U)">U</button>
@@ -34,12 +50,16 @@
   <span class="tsep"></span>
   <button class="tb" data-cmd="bullets" title="Bullet list (Ctrl+Shift+L)"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.3" class="fill"/><circle cx="4.5" cy="12" r="1.3" class="fill"/><circle cx="4.5" cy="18" r="1.3" class="fill"/></svg></button>
   <button class="tb" data-cmd="checklist" title="Checklist (Ctrl+Shift+C)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="6" height="6" rx="1.5"/><path d="m4.4 7 1.3 1.3L8 5.8"/><rect x="3" y="14" width="6" height="6" rx="1.5"/><path d="M13 7h8M13 17h8"/></svg></button>
-  <span class="sp"></span>
-  <button id="btnInsert" title="Add a photo, voice note, drawing, link, table and more"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>Add</button>
+  <button class="tb" id="btnText" title="Text colour, highlight and size"><span class="aa">A</span></button>
+  </div>
+  <button class="tb" id="btnSpell" title="Spelling"><svg viewBox="0 0 24 24"><path d="m4 15 4.5-11L13 15"/><path d="M5.6 11h5.8"/><path d="m14 17 2.5 2.5L21 15"/><path class="slash" d="M3 21 21 3"/></svg></button>
+  <button id="btnInsert" title="Add a photo, voice note, drawing, link, table and more"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg><span>Add</span></button>
 </footer>
 
 <!-- ⋯ menu -->
 <div class="pop" id="menu" hidden>
+  <h4>Title <span class="val soft">optional</span></h4>
+  <input class="titlefld" id="titleInput" maxlength="120" placeholder="Shows on the top bar" autocomplete="off" spellcheck="false">
   <h4>Colour</h4>
   <div class="swatches" id="colors">
     <button class="sw" data-color="yellow" title="Lemon"></button>
@@ -66,10 +86,20 @@
   <input type="range" id="opacity" min="25" max="100" step="5" value="100">
   <label class="check"><input type="checkbox" id="solidHover"> <span>Turn solid when my mouse is over it</span></label>
   <div class="divider"></div>
-  <button class="mi" id="miRoll"><svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg><span>Roll up to just the top bar</span></button>
-  <button class="mi" id="miList"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>All notes</span></button>
+  <button class="mi" id="miLock"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="miLockText">Lock note</span></button>
   <button class="mi danger" id="miDelete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span>Delete note <small>(goes to the bin)</small></span></button>
+  <div class="dates" id="dates"></div>
 </div>
+
+<!-- create the one password for locked notes -->
+<form class="pop" id="pwPop" hidden autocomplete="off">
+  <h4>Choose a password or PIN</h4>
+  <p class="hint">One password for all your locked notes. You can change it later in the notes list → Settings.</p>
+  <label class="fld"><span>Password or PIN</span><input type="password" id="pwNew"></label>
+  <label class="fld"><span>Type it again</span><input type="password" id="pwAgain"></label>
+  <div class="ferr" id="pwErr"></div>
+  <div class="btns"><button type="button" class="btn ghost" id="pwCancel">Cancel</button><button type="submit" class="btn">Lock note</button></div>
+</form>
 
 <!-- Add panel -->
 <div class="pop" id="insert" hidden>
@@ -83,6 +113,10 @@
     <button class="tile" data-act="divider"><span class="ic" style="--tc:#FFF4A3"><svg viewBox="0 0 24 24"><path d="M3 12h3M10 12h4M18 12h3"/></svg></span>Divider</button>
     <button class="tile" data-act="date"><span class="ic" style="--tc:#FFE1DC"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></span>Date</button>
   </div>
+</div>
+
+<!-- text style panel -->
+<div class="pop" id="textPop" hidden>
   <h4>Text colour</h4>
   <div class="dots">
     <button class="dot" data-fore="inherit" title="Normal"><span class="none"></span></button>
@@ -103,13 +137,15 @@
     <button class="dot" data-hilite="#D9C4FF" style="--c:#D9C4FF"></button>
     <button class="dot" data-hilite="#FFCC99" style="--c:#FFCC99"></button>
   </div>
-  <h4>Size of selected text</h4>
+  <h4>Text size</h4>
   <div class="seg" id="fsizeSeg">
     <button data-fsize="2">Small</button>
     <button data-fsize="3">Normal</button>
     <button data-fsize="5">Big</button>
     <button data-fsize="6">Huge</button>
   </div>
+  <div class="divider"></div>
+  <button class="mi" id="miClearFmt"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/><path d="m16 16 5 5M21 16l-5 5"/></svg><span>Clear formatting</span></button>
 </div>
 
 <!-- link form -->

@@ -6,6 +6,14 @@ const inv = (ch, ...args) => ipcRenderer.invoke(ch, ...args);
 contextBridge.exposeInMainWorld('sticky', {
   // note window
   getNote: () => inv('note:get'),
+  getDates: () => inv('note:dates'),
+  unlock: (pw) => inv('note:unlock', pw),
+  relock: () => inv('note:relock'),
+  setLocked: (locked) => inv('note:set-locked', !!locked),
+  setPassword: (current, next) => inv('lock:set', { current, next }),
+  onSettings: (cb) => ipcRenderer.on('settings:changed', (e, s) => cb(s)),
+  onLook: (cb) => ipcRenderer.on('note:look', (e, v) => cb(v)),
+  onLockNow: (cb) => ipcRenderer.on('note:lock-now', () => cb()),
   update: (patch) => inv('note:update', patch),
   updateSync: (patch) => ipcRenderer.sendSync('note:update-sync', patch),
   newNote: () => inv('note:new'),
@@ -21,7 +29,7 @@ contextBridge.exposeInMainWorld('sticky', {
   // list window
   list: {
     get: () => inv('list:get'),
-    newNote: () => inv('list:new'),
+    newNote: (groupId) => inv('list:new', groupId || null),
     openNote: (id) => inv('list:open-note', id),
     closeNote: (id) => inv('list:close-note', id),
     trash: (id) => inv('list:trash', id),
@@ -30,6 +38,21 @@ contextBridge.exposeInMainWorld('sticky', {
     emptyBin: () => inv('list:empty-bin'),
     bringToFront: () => inv('list:bring-front'),
     onChanged: (cb) => ipcRenderer.on('notes:changed', () => cb()),
+    setLocked: (id, locked, pw) => inv('list:set-locked', id, !!locked, pw),
+  },
+  groups: {
+    make: (dragId, targetId) => inv('groups:make', dragId, targetId),
+    ungroup: (noteId) => inv('groups:ungroup', noteId),
+    dissolve: (groupId) => inv('groups:dissolve', groupId),
+    rename: (groupId, name) => inv('groups:rename', groupId, name),
+    update: (groupId, patch) => inv('groups:update', groupId, patch),
+    apply: (groupId, patch, includeInner) => inv('groups:apply', groupId, patch, !!includeInner),
+    moveUp: (id) => inv('groups:move-up', id),
+    moveTo: (id, groupId) => inv('groups:move-to', id, groupId),
+    trash: (groupId) => inv('groups:trash', groupId),
+    setLocked: (groupId, locked, pw) => inv('groups:set-locked', groupId, !!locked, pw),
+    reveal: (groupId, pw) => inv('groups:reveal', groupId, pw),
+    hide: (groupId) => inv('groups:hide', groupId),
   },
   settings: { set: (patch) => inv('settings:set', patch) },
   backups: {
