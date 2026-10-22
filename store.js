@@ -29,8 +29,12 @@ const DEFAULT_SETTINGS = {
   spellCheck: false, // spelling is ignored unless turned on
   spellCyrillic: false, // Cyrillic words are never underlined unless turned on
   listSort: { by: 'updated', dir: 'desc', groups: 'mixed' },
-  listSize: 'm', // card size in the notes list: s | m | l
+  listSize: 'm', // card size in the notes list: s | m | l | xl | xxl
   lock: null, // "salt:hash" of the one password/PIN for locked notes
+  lockKind: null, // 'pin' (digits only, opens as soon as it's typed) | 'password' (null = password, set before 1.1.6)
+  lockLen: 0, // length of the PIN, so a note opens by itself once that many digits are typed
+  listTheme: 'cream', // colours of the notes list window (see THEMES in list.js; night, midnight, forest, plum are dark)
+  madeGroup: false, // true once a group was ever made: the "drag to make a group" tip stops for good
 };
 const KEEP_BACKUPS = 30;
 const ATT_PREFIX = 'stickyfile://att/';
@@ -181,6 +185,8 @@ class Store {
     for (const grp of this.groups.values()) {
       if (grp.parentId && (!this.groups.has(grp.parentId) || this.isInside(grp.parentId, grp.id))) grp.parentId = null;
     }
+    // groups made before 1.1.6 count too
+    if (this.groups.size) this.settings.madeGroup = true;
     this.load();
   }
 
@@ -275,7 +281,11 @@ class Store {
   update(id, patch, { content = false } = {}) {
     const n = this.notes.get(id);
     if (!n) return null;
-    const merged = normalize({ ...n, ...patch, bounds: patch.bounds || n.bounds });
+    // The drawing is checked (normalizeInk) only when it's part of the change: it can be tens of
+    // thousands of numbers, and it is already clean otherwise. Typing saves stay quick that way.
+    const inkChanged = 'ink' in patch;
+    const merged = normalize({ ...n, ...patch, bounds: patch.bounds || n.bounds, ...(inkChanged ? {} : { ink: null }) });
+    if (!inkChanged) merged.ink = n.ink;
     if (content) merged.updatedAt = Date.now();
     Object.assign(n, merged);
     this.save(id);
@@ -383,6 +393,7 @@ class Store {
     const g = normalizeGroup({ id: crypto.randomUUID(), name, createdAt: Date.now(), parentId: parentId && this.groups.has(parentId) ? parentId : null });
     this.groups.set(g.id, g);
     this.saveGroups();
+    if (!this.settings.madeGroup) { this.settings.madeGroup = true; this.saveSettings(); }
     for (const id of noteIds) this.setGroup(id, g.id);
     return g;
   }
@@ -541,17 +552,20 @@ class Store {
 
   // Never overwrites anything: notes from the backup that differ from what you
   // have now come back as extra (closed) notes.
+  // Brings back the notes of one backup, never overwriting anything. Everything that comes back
+  // goes into a new group "Restored Notes from Thursday, 22 Oct 2026" at the top level.
   restoreBackup(name) {
     const dir = path.join(this.backupDir, path.basename(name));
     if (!fs.existsSync(dir)) return 0;
     let restored = 0;
+    const ids = [];
     for (const f of fs.readdirSync(dir)) {
       if (!f.endsWith('.json') || f === 'meta.json' || f === 'groups.json') continue;
       const b = readJson(path.join(dir, f));
       if (!b || !b.id) continue;
       const cur = this.notes.get(String(b.id));
       if (cur && cur.html === b.html) {
-        if (cur.deletedAt && !b.deletedAt) { this.restore(cur.id); restored++; }
+        if (cur.deletedAt && !b.deletedAt) { this.restore(cur.id); ids.push(cur.id); restored++; }
         continue;
       }
       if (b.deletedAt) continue;
@@ -559,10 +573,25 @@ class Store {
       if (copy.groupId && !this.groups.has(copy.groupId)) copy.groupId = null;
       this.notes.set(copy.id, copy);
       this.writeNow(copy.id);
+      ids.push(copy.id);
       restored++;
+    }
+    if (ids.length) {
+      this.createGroup(ids, { name: `Restored Notes from ${backupDayName(name)}` });
+      this.cleanupGroups();
     }
     return restored;
   }
 }
 
-module.exports = { normalizeInk, Store, COLORS, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };
+// "2026-10-22" or "2026-10-22_14-30-00" → "Thursday, 22 Oct 2026"
+function backupDayName(name) {
+  const m = String(name).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(name);
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+module.exports = { backupDayName, normalizeInk, Store, COLORS, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };

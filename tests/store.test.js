@@ -32,6 +32,11 @@ s.update(a.id, { html: 'v4' }, { content: true }); s.flush();
 const restored = s.restoreBackup(s.listBackups()[0].name);
 assert.equal(restored, 1, 'changed note comes back as an extra copy');
 assert.equal(s.all().length, 3);
+// 1.1.10: what comes back sits in a group named after the backup's day
+const rg = [...s.groups.values()].find((g) => /^Restored Notes from \w+day, \d{1,2} [A-Z][a-z]{2} \d{4}$/.test(g.name));
+assert.ok(rg, 'restored notes are grouped: ' + [...s.groups.values()].map((g) => g.name).join(' | '));
+assert.equal(s.all().filter((n) => n.groupId === rg.id).length, 1);
+assert.equal(require('../store.js').backupDayName('2026-10-22_14-30-00'), 'Thursday, 22 Oct 2026');
 // trash / destroy keeps attachment that a backup still references
 s.trash(b.id); assert.ok(s.get(b.id).deletedAt);
 s.destroy(b.id);

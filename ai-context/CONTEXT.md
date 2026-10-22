@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 22 October 2026 · App version 1.1.4**
+**Last updated: 22 October 2026 · App version 1.1.11**
 
 Read this before changing anything. Keep it up to date: when you add or change a feature, update the
 relevant section here, `src/about.js` (the in-app feature list and version history) and `CHANGELOG.md`.
@@ -49,13 +49,14 @@ src/list.html/.css/.js   The "All notes" window: Notes / Bin / Settings tabs, gr
 src/about.js       In-app feature list + version history (window.COSMO_ABOUT) + LAST_UPDATED date
 assets/            icon.ico/png (windows), tray.ico/png
 build/             icon.ico/png for the installer/shortcuts; afterPack.js is an unused stub (see §6 Smart App Control)
-build.bat          One-click: npm install + electron-builder → dist/CosmoNotes Setup <ver>.exe
+build.bat          One-click: (private Node if needed) + npm install + electron-builder → dist/CosmoNotes Setup <ver>.exe
 HOW TO INSTALL.txt Plain-language guide for the owner (install, data folder, forgot password, tips)
 test-run.bat       Runs CosmoNotes from this folder with Electron's original exe (no build needed)
 build/installer.nsh  Installer addition: shortcuts get the CosmoNotes icon (exe stays untouched, see §6)
 CHANGELOG.md       Version history (mirror of src/about.js VERSIONS)
 tests/             npm test – Node tests using tests/fake-electron (no Electron/Windows needed)
 ai-context/        This file
+tools/node/        Private Node.js 22 that build.bat downloads when the computer's Node is missing/too old (git-ignored)
 ```
 
 Fonts come from npm (`@fontsource/caveat` = handwritten, `@fontsource/nunito` = rounded/UI) and are
@@ -89,6 +90,10 @@ referenced from HTML as `../node_modules/@fontsource/...`, so they work offline 
     themselves). The only native dialog left is the photo file picker (`att:pick-images`).
 - `note:update` only accepts keys in `EDITABLE` (main.js). Changing `html` or `title` bumps `updatedAt`.
   Other changes (colour, position…) don't count as edits.
+- Speed rules: `store.update` only runs `normalizeInk` when `ink` is in the patch (the stored drawing is already
+  clean). `applyPatch` re-applies window state (`applyState`) only for opacity/pinned/colour; text/title only call
+  `setWinTitle`. The list reuses unchanged cards: anything a card shows or its buttons use must come from the data
+  that's JSON-compared in `noteEl`/`groupEl`, or the card would go stale.
 
 ### Security model
 - `contextIsolation`, `sandbox`, no `nodeIntegration`, a CSP in each HTML file, and the app menu removed.
@@ -144,12 +149,18 @@ Resizing a picture while the note has ink asks first (`needsResizeWarning` / `re
 **Settings** (changing only `listSort` deliberately does *not* send `notes:changed`, since the list already
 redrew; that was the 1.0.2 double-refresh bug): `startWithWindows, defaultColor, defaultFont, firstRunDone, listBounds, spellCheck (false),
 spellCyrillic (false), listSort {by: updated|created, dir: desc|asc, groups: mixed|first|last},
-listSize (s|m|l, card size in the list; like listSort it doesn't trigger a reload), defaultColor may be
+listSize (s|m|l|xl|xxl, card size in the list, also Ctrl + mouse wheel; like listSort it doesn't trigger a reload), defaultColor may be
 "random" (store.create picks one of the 7 pastel papers),
-lock ("salt:hash" scrypt, or null)`.
+listTheme (cream|rose|mint|sky|lilac, dark: night|midnight|forest|plum: colours of the list window; doesn't trigger a reload either),
+madeGroup (true once any group was ever made; hides the "drag to make a group" tip for good),
+lock ("salt:hash" scrypt, or null), lockKind ('pin'|'password', null = password from before 1.1.6),
+lockLen (PIN length, so a PIN can open by itself)`.
 
 **Backups**: made at most once per day (on start and every 3 hours). The newest 30 are kept. Restoring a
-backup **never overwrites**: notes that differ come back as extra closed notes marked `restoredFrom`.
+backup **never overwrites**: notes that differ come back as extra closed notes marked `restoredFrom`, all of them
+(plus notes un-binned by it) in a new group "Restored Notes from Thursday, 22 Oct 2026" (`backupDayName`). The list
+shows their own dates, not "Restored". Settings shows only the newest backup; days are picked in a pop-up (`pickBackup`).
+Settings sections fold (`foldPanels`, all closed at first).
 Attachments are only deleted when no note *and no backup* references them, and only once they're over 2
 days old (`sweepAttachments`).
 
@@ -181,7 +192,7 @@ anything anywhere, used by the back button, the crumbs and the drop strip.
 | Window closed via X → `open=false`. Closed by Windows shutdown → stays open | main.js `note:close`, `closed` handler with 2.5s grace |
 | Title (⋯ menu `#titleInput`) → top bar `#title` + window title | note.js, main.js `titleOf` |
 | Formatting, bullets, checklists (`ul.checklist`, `li.done`; click the box to tick) | note.js `runCmd`, `toggleChecklist`; uses `document.execCommand` |
-| Text style panel (colour/highlight/size/clear) `#textPop` | note.js. "Normal colour" = apply sentinel `#010203` then strip it |
+| Text panel `#textPop`: font, colour, highlight, size, clear, undo; selection or whole note (`onText`, `paintTextPanel`) | note.js. "Normal colour" = apply sentinel `#010203` then strip it |
 | Spelling: per-note `spell`, global `spellCheck`; Cyrillic ignored | note.js `applySpell`; main.js `spellLanguages` |
 | Add panel: photo, voice, drawing, link, table, numbers, divider, date | note.js `doInsert`, `insertNodes` (direct DOM insert, keeps voice chips intact) |
 | Photo resize handle `#imgHandle` (60px → editor width, stored as `width` attr) | note.js "photo resizing" section |
@@ -204,14 +215,18 @@ anything anywhere, used by the back button, the crumbs and the drop strip.
 | App-styled pop-ups + toasts | list.js `modal()`, `toast()`; list.html `#modal`, `#toast` |
 | Bin confirmation (Shift+click skips) | list.js `trashNote(n, skipAsk)` |
 | No double redraw; animate only on view change | list.js `load()` (signature check), `render(animate)`; list.css `.cards.anim` |
+| Fast list refresh: unchanged cards are reused | list.js `cardCache`, `cached()`, `noteEl`/`groupEl`, `placeCards`; `FMT` date formatters (don't build `toLocale…String` per card) |
 | Search (clear button; only inside the open group) | list.js `renderNotes` (pool = `notesInTree(openGroup)`), `#qClear`, `clearSearch` |
 | New note inside the open group | list.js `newNote()` → `list:new(groupId)` → main.js `createNote({groupId})` |
-| Card sizes s/m/l | list.html `#btnSize`/`#sizePop`; list.js `paintSize`; list.css `.cards.size-*` |
+| Card sizes s/m/l/xl/xxl (fixed: never stretch with the window; Ctrl + wheel, list.js `SIZES`, `setSize`) | list.html `#btnSize`/`#sizePop`; list.js `paintSize`; list.css `.cards` `--cw`/`--ch`, `.cards.size-*` |
+| List themes | list.js `THEMES`, `themeNow`, Settings `#sTheme`; list.css `body[data-theme]` variables; main.js `LIST_THEMES`, `paintListFrame` (window buttons) |
+| Bin search, Shift+click Delete | list.html `#bq`/`#bqClear`; list.js `binQuery`, `renderBin`, `destroyNote(n, skipAsk)` |
+| Password or PIN (auto-open PIN) | main.js `lock:set` (kind), `lockInfo`; list.js `modal()` `kindPick`/`pin`/`pinLen`, `askPassword`, `NEW_INPUTS`; note.js `paintUnlock`, `#pwKind` |
 | Group panel shows shared colour/font | list.js `panelScope`, `shared`, `paintPanel` |
 | Title vs untitled first line on cards | list.css `.card .t1` (600) / `.t1.tt` (800, bigger); needs `@fontsource/*/600.css` in list.html |
 | Password set/change button (pop-up) | list.js `#pwSave` handler (modal with 2 or 3 inputs) |
 | Draw-over (toolbar, tools, Shift, Over/Behind, eraser, undo, save) | note.html `#inkBar`, `#inkCatch`, `#inkAbove/#inkBelow`; note.js "draw-over" (`inkState`, `strokeEl`, `renderInk`, `eraseAt`, `rubOut`, `tracePieces`, `shapeEnd`, `saveInk`) |
-| Lock text layout, sideways scroll, auto-lock on first stroke | note.js `applyLayout`, `toggleWrap`, `saveInk`; note.css `#sheet`, `#scroller` |
+| Word wrap on/off (= lock text layout), sideways scroll, turned off by the first stroke | note.js `applyLayout`, `toggleWrap`, `saveInk`; note.css `#sheet`, `#scroller`; `#btnWrap.on` = word wrap on |
 | Picture keep-size / shrink option, resize warnings | note.js image context menu (`keep`, `guarded`), `needsResizeWarning`, `resizeWarning` |
 | App-styled confirm inside notes | note.js `ask()`; note.html `#askPop` |
 
@@ -240,12 +255,35 @@ anything anywhere, used by the back button, the crumbs and the drop strip.
   directly from main, or the last keystrokes would be lost.
 - **Draw-over is SVG** (crisp, cheap, easy to hit-test). Don't switch it to a canvas without keeping the same saved
   format. Two erasers (`inkState.eraseMode`): "Whole line" removes whole strokes (`eraseAt`, `samplePoints` distance
-  test); "Rub out" (`rubOut`) traces touched strokes into 2 px points along their SVG geometry (`tracePieces`), drops
-  the points under the eraser circle (radius `ew`×3 + half the line width) and saves each remaining run as its own
-  pen/hl stroke, so shapes that are partly rubbed out become pen strokes. While drawing, the editor is
+  test); "Partial" (`rubOut`, called "Rub out" before 1.1.6) traces touched strokes into 2 px points along the same
+  curves strokeEl draws (`tracePieces`, plain maths: keep it in step with `smoothPath`/`strokeEl`), drops the points
+  under the eraser circle (radius `ew`×3 + half the line width) and saves each remaining run as its own pen/hl
+  stroke, so shapes that are partly erased become pen strokes. **Never thin out or re-smooth those points**: a line
+  whose points are ≤ ~3 px apart (`isDense`) is split as it is. Re-tracing/simplifying made drawings drift ("dance")
+  a little more on every pass (1.1.6, fixed in 1.1.8). For speed: `boxOf` caches each
+  stroke's bounding box, `queueRub` erases at most once per frame, and `paintInk` reuses each stroke's SVG element
+  (`elCache`); `applyLayout` runs once when the drag ends. Toolbar tips are one short line (the bar must not change size); the eraser's size buttons stay visible and are
+  only greyed out (`.iwidths.off`) for "Whole line". The undo list (`inkState.undo`) survives Done, up to 50 steps,
+  and is cleared when the note gets locked (`hideContent`). Pen/highlighter pointers: `CURSOR_SVG`, `toolCursor()`.
+  Both floating toolbars (`#inkBar`, `#textPop`) use `movable()`: drag by any non-button spot (grip, the `.iside` tab on
+  the drawing toolbar's left, gaps); saved in `localStorage.inkBarPos` / `textBarPos`; each has an X (`#inkX`,
+  `#textX`), and the drawing toolbar a pause/play button `#inkPz` (top left). Drawing ⇄ typing: `#inkPz`, the bottom bar or
+  the text toolbar call `pauseInk()`; clicking a drawing tool
+  or Draw calls `resumeInk()` (`inkState.paused`, `body.ink-paused`). Nothing ever disappears: the bar not in use is
+  faded. `#textPop` (opens bottom-left) is NOT closed by `closePops()`: only A, its X, rolling up or locking close it
+  (`openText`/`closeText`, `body.text-open`). It fades while drawing or while the editor has focus. Its buttons act on
+  the selection, or the whole note when nothing is selected (`onText`, `#tScope` says which). The only Undo button is
+  `#btnUndo` in the bottom bar (outside `.tleft`, so it never scrolls away; always full opacity: the bar fades its
+  children `#tools > *`, never `#tools` itself): `undoAny()` = drawing undo while drawing,
+  else note-font undo (`textUndo`) or the editor's own undo. `note.size` (s/m/l) has no button any more (kept for old notes).
+  The note's scrollbar thumb only shows on hover/focus. Shift snaps lines/arrows to 12 directions (`shapeEnd`).
+  While drawing, the editor is
   `contentEditable=false` and `#inkCatch` gets the pointer. Mouse-wheel scrolling still works because the
   catcher sits inside the scroller.
-- The bottom bar must fit on a 340 px note: below 390 px, Add becomes a round "+" (note.css media query), and the
+- Rolling a note up while drawing ends drawing first (`exitInk`), so the toolbar never covers the top bar.
+- `#scroller` has the arrow cursor (scrollbars), `#sheet` the text cursor.
+- The bottom bar must fit on a 340 px note (with the "Draw" label it fits exactly at 340 px: below 440 px the `.tb`
+  buttons are 24 px wide; check with a screenshot after adding a button): below 390 px, Add becomes a round "+" (note.css media query), and the
   formatting group (`.tleft`) scrolls sideways if it's still too narrow.
 - The renderer of a hidden locked note must never save: `changed()`/`saveNow()` return early when
   `hidden`, and main strips `html/text/firstImage` from patches. Keep both guards.
@@ -255,6 +293,11 @@ anything anywhere, used by the back button, the crumbs and the drop strip.
 - Minimum note size 200×120, default 320×300. The bottom bar's formatting buttons scroll sideways
   (`.tleft`) on narrow notes so the Add button always stays visible.
 - Electron version is `^39` in package.json, installed on the owner's PC by `build.bat`.
+- **Node.js for building: 22.12 or newer.** `@electron/rebuild` 4.2.1 (pulled in by electron-builder 26) requires
+  `>=22.12.0`; older Node fails (on Node 14: `stream/promises` missing). `build.bat` checks major.minor; if Node is
+  missing or older, it downloads Node 22.14.0 into `tools\node` and prepends it to `PATH` for that run only, never
+  changing the system Node. If electron-builder ever needs a newer Node, raise the version in both the check and
+  the download URL in `build.bat`.
 - **Smart App Control (SAC) – never modify CosmoNotes.exe.** The owner's PC has SAC **On**: it left
   Evaluation by itself, and switching it off is permanent on that PC until the April 2026 rollout reaches it.
   SAC blocks unknown, unsigned programs, and we have no code-signing certificate. Electron's own `electron.exe`
@@ -285,6 +328,10 @@ anything anywhere, used by the back button, the crumbs and the drop strip.
   - `duplicate.test.js`: copying content/look/ink/group, "(copy)" title, independence, shared photo survives
     deleting the original, locked copy stays hidden, binned notes can't be duplicated.
   - `ink.test.js`: ink cleanup, saving with wrapWidth, counting as an edit, hidden + protected while locked.
+  - `speed.test.js`: typing saves keep the drawing untouched and don't re-apply always-on-top/opacity/colour; the
+    window title follows the text; page title can't rename a note window; group recolour keeps drawings.
+  - `pin-theme.test.js`: PIN rules (digits, 4–12, length kept), PIN↔password change, list theme kept/validated,
+    `madeGroup` stays true after the last group is gone.
   - `groups.test.js`: nested groups and drag rules, no loops, move-up/move-to, looks and colours, mass
     edit (with and without sub-groups) pushed to open windows, locking groups (windows hide, list blanks,
     reveal/hide, open-from-list), lock/unlock notes from the list, ungroup moving things up, bin a group.
@@ -302,7 +349,8 @@ anything anywhere, used by the back button, the crumbs and the drop strip.
 2. Add the version at the top of `VERSIONS` in `src/about.js`, and set `LAST_UPDATED`.
 3. Add the same entry to `CHANGELOG.md`.
 4. Update this file: the "Last updated" line at the top and any sections that changed.
-5. Update `HOW TO INSTALL.txt` and `build.bat` if they mention the version or file name.
+5. Update `HOW TO INSTALL.txt` and `build.bat` if they mention the version or file name (since 1.1.5 neither
+   hard-codes it: build.bat reads it from package.json).
 6. Run `npm test`. The owner runs `build.bat` → `dist/CosmoNotes Setup <version>.exe`.
 
 ---

@@ -128,10 +128,10 @@ body[data-color="charcoal"] .lerr { color: #FF9A92; }
 /* ---------- last-edited stamp (shown while the toolbar is hidden) ---------- */
 #stamp {
   position: fixed; left: 14px; bottom: 11px;
-  max-width: calc(100% - 60px);
+  max-width: calc(100% - 150px); /* clear of the Undo button */
   font: 700 10.5px var(--ui);
   color: var(--accent);
-  opacity: .5;
+  opacity: .35; /* 30% dimmer than before 1.1.8 */
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   pointer-events: none;
   transition: opacity .16s;
@@ -159,8 +159,9 @@ body.resizing, body.resizing * { cursor: nwse-resize !important; user-select: no
   min-height: 0;
   overflow: auto; /* sideways too: a locked text layout or a drawing can be wider than the note */
   padding: 8px 14px 10px;
-  cursor: text;
+  cursor: default; /* the arrow over the scrollbars; the text itself shows the text cursor (#sheet) */
 }
+#sheet { cursor: text; }
 #scroller::-webkit-scrollbar { width: 8px; height: 8px; }
 #scroller::-webkit-scrollbar-corner { background: transparent; }
 /* the sheet holds the text plus the two drawing layers (behind / over) */
@@ -184,7 +185,9 @@ body.rubbing-ink #inkCatch { cursor: none; }
   pointer-events: none;
 }
 #inkEraser[hidden] { display: none; }
-#scroller::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+#scroller::-webkit-scrollbar-thumb { background: transparent; border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+/* the scrollbars only show while you're using the note (like the bottom bar) */
+body:hover #scroller::-webkit-scrollbar-thumb, body:focus-within #scroller::-webkit-scrollbar-thumb, body.pop-open #scroller::-webkit-scrollbar-thumb, body.text-open #scroller::-webkit-scrollbar-thumb { background-color: var(--line); }
 #editor {
   position: relative;
   z-index: 1;
@@ -324,9 +327,11 @@ body[data-color="charcoal"] #editor .voice { background: rgba(255,255,255,.08); 
   align-items: center;
   gap: 1px;
   padding: 0 6px;
-  opacity: 0;
-  transition: opacity .16s;
 }
+/* the bottom bar's buttons show while you use the note (and fade while drawing), except Undo:
+   that one is always there at full strength */
+#tools > * { opacity: 0; transition: opacity .16s; }
+#tools > #btnUndo { opacity: 1 !important; }
 /* formatting buttons scroll sideways on a very narrow note; Add always stays visible */
 .tleft {
   flex: 1; min-width: 0;
@@ -335,7 +340,7 @@ body[data-color="charcoal"] #editor .voice { background: rgba(255,255,255,.08); 
   scrollbar-width: none;
 }
 .tleft::-webkit-scrollbar { display: none; }
-body:hover #tools, body:focus-within #tools, body.pop-open #tools { opacity: 1; }
+body:hover #tools > *, body:focus-within #tools > *, body.pop-open #tools > * { opacity: 1; }
 .tb {
   width: 27px; height: 28px; flex: none;
   border: 0; border-radius: 8px;
@@ -644,9 +649,9 @@ body.erasing #cv { cursor: cell; }
 
 
 /* ================================================================ 1.1.0: text layout lock + draw-over */
-#btnWrap .wraplock { display: none; fill: none; }
-#btnWrap.on .wraplock { display: inline; }
-#btnWrap.on .wrapbar { stroke-dasharray: 2 2.5; }
+/* word wrap button: like spelling, a slash and a little faded when it's off */
+#btnWrap .slash { stroke-width: 2.2; }
+#btnWrap.on .slash { display: none; }
 #btnWrap:not(.on) { opacity: .7; }
 
 #btnInk {
@@ -670,11 +675,15 @@ body.erasing #cv { cursor: cell; }
   .tb { width: 26px; }
 }
 
-body.inking #tools, body.inking #stamp, body.inking .corner { display: none; }
-body.inking #scroller { cursor: crosshair; }
+body.inking #stamp, body.inking .corner { display: none; }
+/* while drawing, the bottom bar stays (faded); using it switches to typing */
+body.inking:not(.ink-paused) #tools > * { opacity: .35; }
+body.inking:not(.ink-paused) #tools:hover > * { opacity: .7; }
+body.inking:not(.ink-paused) #scroller, body.inking:not(.ink-paused) #sheet { cursor: crosshair; }
 
 #inkBar {
-  position: fixed; right: 8px; bottom: 8px; z-index: 22;
+  position: fixed; right: 8px; bottom: 42px; z-index: 22; /* just above the bottom bar */
+  /* it can be dragged by any empty spot, but only the grip at the top shows the hand */
   width: 250px; max-width: calc(100vw - 16px);
   padding: 6px;
   border-radius: 14px;
@@ -720,15 +729,29 @@ body.inking #scroller { cursor: crosshair; }
 .ilayer button.on { background: #fff; color: #3B3226; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
 .ilayer svg { width: 15px; height: 15px; flex: none; }
 .ilayer .soft, .ilayer .txt { stroke: #8A7652; stroke-width: 2; }
+/* Over / Behind: which square is in front: the red one (your drawing) or the paper one (the note) */
+.ilayer .pg { fill: #FFFDF6; stroke: #6A5A40; stroke-width: 1.8; }
+.ilayer .ik { fill: #E5484D; stroke: #B42D32; stroke-width: 1.4; }
+.ilayer button:not(.on) svg { opacity: .8; }
 .ilayer .strong { stroke: #E5484D; stroke-width: 2.6; }
 .ilayer .faint { stroke-opacity: .55; stroke-width: 4; }
 .idone { height: 27px; padding: 0 10px; border: 0; border-radius: 999px; background: #3B3226; color: #FFF8E6; font: 800 11.5px var(--ui); cursor: pointer; }
 .emode[hidden], .icolors[hidden], .iwidths[hidden] { display: none; }
+/* "Whole line" has no size: the size buttons stay where they are, greyed out */
+.iwidths.off { opacity: .32; pointer-events: none; }
 .emode { flex: 1; }
 .emode .ring { stroke: #3B3226; stroke-width: 1.8; }
 .emode .x { stroke: #3B3226; stroke-width: 2.2; }
-.ihint { margin: 5px 2px 0; font: 700 10.5px/1.3 var(--ui); color: var(--pop-mute); }
-.ihint:empty { display: none; }
+.ihint {
+  margin: 5px 2px 0; height: 14px;
+  font: 700 10.5px/14px var(--ui); color: var(--pop-mute);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* every row keeps the same height, whichever tool is picked, so the toolbar never jumps:
+   the colour dots take as much room as the eraser choice that replaces them */
+.irow.tools { height: 27px; }
+.icolors { height: 29px; align-items: center; align-content: center; }
+body.rolled #inkBar { display: none !important; }
 
 #askPop { top: 36px; z-index: 30; }
 #editor img.att-img.fixed, #editor img.att-drawing.fixed { max-width: none; }
@@ -739,3 +762,138 @@ body.inking #scroller { cursor: crosshair; }
 #sheet.fixed:not(.inked) #editor img.att-img:not(.fixed) { max-width: min(100%, calc(var(--viewW, 100%) - 10px)); }
 #sheet.fixed:not(.inked) #editor img.att-img.w-s:not(.fixed) { max-width: min(45%, calc(var(--viewW, 100%) - 10px)); }
 #sheet.fixed:not(.inked) #editor img.att-img.w-m:not(.fixed) { max-width: min(72%, calc(var(--viewW, 100%) - 10px)); }
+
+/* ================================================================ 1.1.6 */
+/* password / PIN switch when choosing one */
+.pwkind { margin: 0 2px 10px; }
+
+/* ================================================================ 1.1.8 */
+/* the draw button says "Draw" */
+#btnInk { width: auto; padding: 0 8px 0 5px; gap: 2px; display: flex; align-items: center; font: 800 11.5px var(--ui); }
+#btnInk svg { width: 15px; height: 15px; }
+/* with "Draw" written out, the formatting buttons sit a little closer on normal-width notes so all of them fit */
+@media (max-width: 439px) {
+  .tb { width: 24px; }
+  .tsep { margin: 0 2px; }
+  #tools { padding: 0 4px; }
+  #btnInk { margin-left: 2px; }
+  #btnInsert { margin-left: 2px; }
+}
+/* drawing toolbar: a grip at the top to drag it anywhere */
+.igrip {
+  height: 12px; margin: -3px -2px 3px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  cursor: grab; touch-action: none;
+}
+.igrip:hover { background: var(--pop-soft); }
+.igrip i { width: 34px; height: 4px; border-radius: 4px; background: var(--pop-soft2); box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.igrip:hover i { background: #CDBF9E; }
+body.moving-inkbar, body.moving-inkbar * { cursor: grabbing !important; user-select: none; }
+@media (max-width: 279px) { #btnInk span { display: none; } #btnInk { padding: 0 6px; } }
+/* typing for a moment: the drawing toolbar stays, faded; clicking any tool goes back to drawing */
+body.ink-paused #inkBar { background: color-mix(in srgb, var(--pop-bg) 55%, transparent); box-shadow: 0 4px 14px rgba(60,40,10,.14); animation: none; }
+body.ink-paused #btnInk { background: var(--accent); color: var(--paper); } /* drawing is on hold: Draw brings it back */
+
+/* ================================================================ 1.1.9 */
+  position: absolute; right: -4px; bottom: -4px;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: #8E7BEF; color: #fff;
+  display: grid; place-items: center;
+  box-shadow: 0 0 0 2px var(--pop-bg), 0 1px 2px rgba(0,0,0,.25);
+}
+
+/* the text panel (A): a small toolbar like the drawing one, stays open, can be dragged */
+#textPop.tbar {
+  left: 8px; right: auto; bottom: 42px; /* opens on the left (the drawing toolbar opens on the right) */
+  width: 250px; max-width: calc(100vw - 16px);
+  max-height: none; overflow: visible;
+  padding: 6px;
+  font: 700 12px var(--ui);
+  user-select: none;
+}
+body.rolled #textPop { display: none !important; }
+.tsec { margin: 0 3px 4px; font: 800 9.5px/1 var(--ui); letter-spacing: .07em; text-transform: uppercase; color: var(--pop-mute); text-align: left; }
+.tbar .irow { gap: 4px; }
+.tbar .irow + .irow { margin-top: 4px; padding-top: 0; border-top: 0; }
+.tbar .irow + .tsec { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--pop-soft2); }
+.tbar .seg { padding: 2px; gap: 2px; border-radius: 9px; }
+.tbar .seg button { padding: 3px 2px; min-height: 23px; font-size: 11px; border-radius: 7px; }
+.tbar .seg button.hand { font-size: 15px; padding: 0 2px; }
+#fontSeg, #fsizeSeg { flex: 1; min-width: 0; }
+.tbar .thead { justify-content: space-between; margin-bottom: 2px; }
+.tscope { padding-left: 3px; font: 700 11px var(--ui); color: var(--pop-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tscope b { font-weight: 800; color: var(--pop-ink); }
+.tbar .iact { width: 27px; height: 25px; flex: none; }
+.tbar .iact:disabled { opacity: .35; cursor: default; }
+/* a different font on part of the text keeps about the same size as the note's own font */
+body[data-font="round"] #editor font[face="Caveat"] { font-size: 1.45em; line-height: 1.1; }
+body[data-font="hand"] #editor font[face="Nunito"] { font-size: .68em; }
+.tlab { flex: none; width: 20px; display: grid; place-items: center; color: var(--pop-mute); }
+.tlab svg { width: 16px; height: 16px; }
+.tlab .cbar { stroke: #E5484D; stroke-width: 3; }
+.tlab .hbar { stroke: #FFD43B; stroke-width: 4; }
+.tbar .dots { gap: 4px; padding: 0; flex-wrap: nowrap; }
+.tbar .dot { width: 25px; height: 25px; flex: none; }
+.tbar .dot .none { width: 12px; }
+
+/* ================================================================ 1.1.10 */
+/* both floating toolbars: an X at the top right, next to the grip */
+#inkBar .igrip, #textPop .igrip { height: 18px; margin: -4px 24px 2px; }
+.ix {
+  position: absolute; top: 3px; right: 4px;
+  width: 20px; height: 20px; padding: 0;
+  border: 0; border-radius: 7px;
+  background: transparent; color: var(--pop-mute);
+  display: grid; place-items: center; cursor: pointer;
+}
+.ix:hover { background: var(--pop-soft); color: var(--pop-ink); }
+.ix svg { width: 13px; height: 13px; stroke-width: 2.6; }
+/* the little tab on the drawing toolbar's left: just something easy to grab and drag */
+.iside {
+  position: absolute; left: -15px; top: 50%; transform: translateY(-50%);
+  width: 15px; height: 46px;
+  border-radius: 9px 0 0 9px;
+  background: var(--pop-bg);
+  box-shadow: -4px 4px 10px rgba(60,40,10,.14);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  cursor: grab;
+}
+.iside i { width: 3px; height: 3px; border-radius: 50%; background: #B8A88A; }
+.iside:hover i { background: #8A7652; }
+/* typing while drawing: the whole drawing toolbar fades (clicking a tool goes back to drawing) */
+body.ink-paused #inkBar > * { opacity: .38; transition: opacity .15s; }
+body.ink-paused #inkBar:hover > * { opacity: .75; }
+/* the text toolbar fades while you're drawing or working in the note; full again on hover */
+#textPop { transition: opacity .18s; }
+body.inking:not(.ink-paused) #textPop, body:has(#editor:focus) #textPop { opacity: .4; }
+#textPop:hover { opacity: 1 !important; }
+body.text-open #tools > * { opacity: 1; }
+body.text-open #stamp { opacity: 0; }
+/* the one undo button, always in the bottom bar (outside the part that scrolls) */
+#btnUndo { flex: none; margin-left: 2px; }
+#btnUndo svg { width: 16px; height: 16px; }
+
+/* with the undo button too, normal-width notes (340 px) need the formatting buttons a little closer */
+@media (max-width: 429px) {
+  .tb { width: 22px; }
+  .tsep { margin: 0 1px; }
+  #tools { padding: 0 3px; }
+  #btnInk { padding: 0 6px 0 4px; }
+  #btnUndo { margin-left: 1px; }
+}
+/* pause button: top left of the drawing toolbar (the X is top right). Paused, it turns into a
+   play button and stays at full strength while the rest of the toolbar fades */
+.ipz {
+  position: absolute; top: 3px; left: 4px;
+  width: 20px; height: 20px; padding: 0;
+  border: 0; border-radius: 7px;
+  background: transparent; color: var(--pop-mute);
+  display: grid; place-items: center; cursor: pointer;
+}
+.ipz:hover { background: var(--pop-soft); color: var(--pop-ink); }
+.ipz svg { width: 12px; height: 12px; fill: currentColor; stroke: none; }
+.ipz .i-play { display: none; }
+body.ink-paused #inkBar > #inkPz { opacity: 1; background: #3B3226; color: #FFF8E6; }
+body.ink-paused .ipz .i-pause { display: none; }
+body.ink-paused .ipz .i-play { display: block; width: 11px; height: 11px; margin-left: 1px; }

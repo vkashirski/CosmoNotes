@@ -4,11 +4,14 @@ COSMONOTES - how to build and install
 1. Build the installer
    - Double-click  build.bat
    - Wait until it says "Done!".
-   - A folder opens with "CosmoNotes Setup 1.1.1.exe".
-   (Node.js must be installed - you already did this for the first version.)
+   - A folder opens with the installer, "CosmoNotes Setup X.Y.Z.exe"
+     (X.Y.Z is the version number, shown in the "Done!" message).
+   (This needs Node.js. If the computer has none, or an old one, build.bat
+   downloads its own copy into a "tools" folder here the first time.
+   Nothing else on the computer is changed.)
 
 2. Install
-   - Double-click "CosmoNotes Setup 1.1.1.exe".
+   - Double-click "CosmoNotes Setup X.Y.Z.exe".
    - If Windows shows "Windows protected your PC": click "More info",
      then "Run anyway".
    - It replaces the old "Sticky Pins" app automatically. Your notes come
@@ -17,7 +20,7 @@ COSMONOTES - how to build and install
      safety copy).
 
 Other laptops
-   Copy "CosmoNotes Setup 1.1.1.exe" over and run it. Nothing else needed.
+   Copy "CosmoNotes Setup X.Y.Z.exe" over and run it. Nothing else needed.
 
 
 WHERE ARE MY NOTES SAVED?
@@ -40,7 +43,10 @@ LOCKED NOTES
    note itself and in the notes list. It's a privacy screen, not
    encryption: the note is still stored as a normal file on this computer.
 
-   Forgot the password? Quit CosmoNotes, open %APPDATA%\CosmoNotes,
+   You can choose a PIN (numbers only: the note opens as soon as you type
+   it) or a password.
+
+   Forgot the password or PIN? Quit CosmoNotes, open %APPDATA%\CosmoNotes,
    open settings.json in Notepad, change the "lock" line to
        "lock": null,
    save, and start CosmoNotes again. Your locked notes stay locked; choose a
@@ -51,14 +57,21 @@ LOCKED NOTES
 QUICK TIPS
    Top bar:    [grid] all notes   [+] new note   [pin] stay on top
                [^] roll up / unroll   [...] title, colour, lock, dates
-   Bottom bar: B I U S, bullets, checklist, [A] text colour/highlight/size,
-               spelling on/off, text layout lock, draw over, [+] photos,
+   Bottom bar: B I U S, [A] font, text size, colour, highlight, bullets,
+               checklist, spelling on/off, word wrap on/off, Draw, [+] photos,
                voice, sketches, links, tables and more.
+   - The A button opens a small text toolbar that stays open while you
+     select text; press A again to close it. Drag it by any empty spot.
+   - While drawing, using the bottom bar or the text toolbar switches to
+     typing; clicking a drawing tool switches back. Drag either toolbar by
+     any empty spot, close it with its X. The Undo button sits left of Draw.
+   - Restoring a backup (Settings > Backups) puts its notes in a group
+     called "Restored Notes from ..." and never replaces anything.
    - Click a photo, then drag the round handle at its corner to resize it.
    - The squiggle button (next to +) lets you draw on top of the note: pen,
      highlighter, lines, arrows, squares and circles, over or behind the text.
      Hold Shift for straight lines and perfect shapes. Esc or Done to stop.
-   - The button next to spelling locks the text layout: text and pictures keep
+   - The button next to spelling turns word wrap off: text and pictures keep
      their width and you scroll sideways if the note gets narrower.
    - In the notes list, drag a note onto another note to make a group.
      Drop notes or whole groups onto a group to put them inside (groups
@@ -68,6 +81,8 @@ QUICK TIPS
    - Right-click a note or group in the list to lock it, move it, ungroup
      it or put it in the Bin, without opening it.
    - The bin button asks before deleting. Shift+click it to skip that.
+   - Ctrl + mouse wheel in the notes list makes the cards bigger or smaller
+     (five sizes; the card size button next to sort does the same).
    - The sort button next to search: last edited / date created,
      newest or oldest first, groups first or mixed in.
    - Spelling is ignored by default. Turn it on for all notes in

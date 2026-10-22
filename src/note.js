@@ -165,6 +165,7 @@
   api.onSettings((s) => {
     settings = { ...settings, ...s };
     if (note) applySpell();
+    paintUnlock();
   });
 
   // ================================================================ selection helpers
@@ -231,6 +232,7 @@
 
   document.addEventListener('selectionchange', () => {
     saveSel();
+    if (!$('#textPop').hidden) paintTextPanel();
     updateToolState();
     if (resizing) return;
     $$('#editor .sel-img').forEach((i) => {
@@ -301,7 +303,7 @@
   let openPopId = null;
   function closePops() {
     if (askResolve) { const r = askResolve; askResolve = null; r(false); }
-    $$('.pop').forEach((p) => { p.hidden = true; });
+    $$('.pop:not(#textPop)').forEach((p) => { p.hidden = true; }); // the text toolbar only closes by A or its X
     body.classList.remove('pop-open');
     openPopId = null;
   }
@@ -317,6 +319,7 @@
     else { saveSel(); openPop(id); }
   }
   document.addEventListener('mousedown', (e) => {
+    // the text panel stays open while you click around the note; the A button (or Esc) closes it
     if (!e.target.closest('.pop, #btnMenu, #btnInsert, #btnText')) closePops();
     if (!e.target.closest('.ctx')) hideCtx();
   });
@@ -329,17 +332,37 @@
   $('#btnPin').addEventListener('click', () => setProp({ pinned: !note.pinned }));
   $('#btnMenu').addEventListener('click', () => togglePop('#menu'));
   $('#btnList').addEventListener('click', () => { saveNow(); api.showList(); });
-  $('#btnRoll').addEventListener('click', () => { closePops(); saveNow(); setProp({ rolled: !note.rolled }); });
+  $('#btnRoll').addEventListener('click', () => {
+    closePops();
+    if (!note.rolled) closeText();
+    // rolling up while drawing: finish drawing first, so the drawing toolbar never sits on the top bar
+    if (!note.rolled && inkState.on) exitInk();
+    saveNow();
+    setProp({ rolled: !note.rolled });
+  });
   $('#btnRelock').addEventListener('click', relock);
   $('#btnInsert').addEventListener('mousedown', (e) => e.preventDefault());
   $('#btnInsert').addEventListener('click', () => togglePop('#insert'));
   $('#btnText').addEventListener('mousedown', (e) => e.preventDefault());
-  $('#btnText').addEventListener('click', () => togglePop('#textPop'));
+  // The text toolbar (A) stays open until A or its X is clicked: clicking the note, other pop-ups,
+  // Esc or the drawing toolbar don't close it (rolling the note up or locking it does).
+  function openText() {
+    saveSel();
+    $('#textPop').hidden = false;
+    body.classList.add('text-open');
+    textMove.place();
+    paintTextPanel();
+  }
+  function closeText() {
+    $('#textPop').hidden = true;
+    body.classList.remove('text-open');
+  }
+  $('#btnText').addEventListener('click', () => ($('#textPop').hidden ? openText() : closeText()));
+  $('#textX').addEventListener('click', closeText);
 
   // ---------- ⋯ menu
   $$('#colors .sw').forEach((b) => b.addEventListener('click', () => setProp({ color: b.dataset.color })));
-  $$('#fontSeg button').forEach((b) => b.addEventListener('click', () => setProp({ font: b.dataset.font })));
-  $$('#sizeSeg button').forEach((b) => b.addEventListener('click', () => setProp({ size: b.dataset.size })));
+
   $('#opacity').addEventListener('input', (e) => {
     const v = Number(e.target.value) / 100;
     note.opacity = v;
@@ -372,10 +395,53 @@
   // ---------- Add panel
   $$('#insert [data-act]').forEach((b) => b.addEventListener('click', () => doInsert(b.dataset.act)));
 
-  // ---------- text style panel
+  // ---------- text panel (A)
+  // Every button changes the selected text, or the whole note when nothing is selected (the top
+  // line says which). Changes go through the editor's own undo, so the panel's undo button (and
+  // Ctrl+Z) can take them back. The font is the note's setting when nothing is selected; with a
+  // selection, only that text gets the other font (<font face>, sized to match in note.css).
   const RESET_COLOR = '#010203';
-  $$('#textPop [data-fore]').forEach((b) => b.addEventListener('click', () => {
-    restoreSel();
+  const FACE = { hand: 'Caveat', round: 'Nunito' };
+  // The note's font isn't part of the text, so the editor's own undo can't take it back: those
+  // changes are kept here (cleared as soon as the text changes again, so undo stays in order).
+  const textUndo = []; // { font } = the note's font before
+  const hasTextSel = () => !!(savedRange && !savedRange.collapsed && editor.contains(savedRange.commonAncestorContainer));
+  function paintTextPanel() {
+    if (!note) return;
+    const sel = hasTextSel();
+    const scope = `Changes: <b>${sel ? 'selected text' : 'whole note'}</b>`;
+    if ($('#tScope').innerHTML !== scope) $('#tScope').innerHTML = scope; // runs on every cursor move: only touch it when it changes
+    let f = note.font;
+    if (sel) {
+      const v = String(document.queryCommandValue('fontName') || '').toLowerCase();
+      f = v.includes('caveat') ? 'hand' : v.includes('nunito') ? 'round' : note.font;
+    }
+    $$('#fontSeg button').forEach((b) => b.classList.toggle('on', b.dataset.font === f));
+  }
+  function onText(fn) {
+    const sel = hasTextSel();
+    const caret = savedRange ? savedRange.cloneRange() : null;
+    const before = editor.innerHTML;
+    editor.focus({ preventScroll: true });
+    const s = getSelection();
+    if (sel) restoreSel();
+    else { const r = document.createRange(); r.selectNodeContents(editor); s.removeAllRanges(); s.addRange(r); }
+    fn();
+    if (!sel) { // back to where the caret was
+      s.removeAllRanges();
+      if (caret && editor.contains(caret.startContainer)) s.addRange(caret); else caretAtEnd();
+    }
+    if (editor.innerHTML !== before) changed();
+    paintTextPanel();
+  }
+  $$('#fontSeg button').forEach((b) => b.addEventListener('click', () => {
+    if (hasTextSel()) { onText(() => document.execCommand('fontName', false, FACE[b.dataset.font])); return; }
+    if (note.font === b.dataset.font) return;
+    textUndo.push({ font: note.font });
+    setProp({ font: b.dataset.font });
+    paintTextPanel();
+  }));
+  $$('#textPop [data-fore]').forEach((b) => b.addEventListener('click', () => onText(() => {
     if (b.dataset.fore === 'inherit') {
       // back to the note's normal ink colour, keeping bold/italic etc.
       document.execCommand('foreColor', false, RESET_COLOR);
@@ -391,24 +457,31 @@
     } else {
       document.execCommand('foreColor', false, b.dataset.fore);
     }
+  })));
+  $$('#textPop [data-hilite]').forEach((b) => b.addEventListener('click', () => onText(() => document.execCommand('hiliteColor', false, b.dataset.hilite))));
+  $$('#fsizeSeg button').forEach((b) => b.addEventListener('click', () => onText(() => document.execCommand('fontSize', false, b.dataset.fsize))));
+  $('#miClearFmt').addEventListener('click', () => onText(() => document.execCommand('removeFormat')));
+  editor.addEventListener('input', (e) => { if (!/^history/.test(e.inputType || '')) textUndo.length = 0; });
+  // ---- the one Undo button (bottom bar, left of Draw): drawing while drawing, otherwise the text
+  function undoText() {
+    if (textUndo.length) { setProp({ font: textUndo.pop().font }); paintTextPanel(); return; }
+    editor.focus({ preventScroll: true });
+    document.execCommand('undo');
+    // undo selects what it brought back (for a whole-note change: everything); keep just the cursor
+    const sel = getSelection();
+    if (sel.rangeCount && !sel.isCollapsed) sel.collapseToEnd();
     changed();
-  }));
-  $('#miClearFmt').addEventListener('click', () => {
-    restoreSel();
-    document.execCommand('removeFormat');
-    closePops();
-    changed();
-  });
-  $$('#textPop [data-hilite]').forEach((b) => b.addEventListener('click', () => {
-    restoreSel();
-    document.execCommand('hiliteColor', false, b.dataset.hilite);
-    changed();
-  }));
-  $$('#fsizeSeg button').forEach((b) => b.addEventListener('click', () => {
-    restoreSel();
-    document.execCommand('fontSize', false, b.dataset.fsize);
-    changed();
-  }));
+    if (!$('#textPop').hidden) paintTextPanel();
+  }
+  function undoAny() {
+    if (inkState.on && !inkState.paused) inkUndo(); else undoText();
+  }
+  function paintUndo() {
+    const drawing = inkState.on && !inkState.paused;
+    $('#btnUndo').title = drawing ? 'Undo drawing (Ctrl+Z)' : 'Undo (Ctrl+Z)';
+  }
+  $('#btnUndo').addEventListener('mousedown', (e) => e.preventDefault());
+  $('#btnUndo').addEventListener('click', undoAny);
 
   async function doInsert(act) {
     closePops();
@@ -726,7 +799,10 @@
     if (mod && e.key.toLowerCase() === 'n') { e.preventDefault(); saveNow(); api.newNote(); }
     if (mod && e.key.toLowerCase() === 'w') { e.preventDefault(); saveNow(); api.close(); }
     if (mod && e.key.toLowerCase() === 'z' && !$('#draw').hidden) { e.preventDefault(); drawUndo(); }
-    if (mod && e.key.toLowerCase() === 'z' && inkState.on) { e.preventDefault(); inkUndo(); }
+    if (mod && !e.shiftKey && e.key.toLowerCase() === 'z' && $('#draw').hidden) {
+      if (inkState.on && !inkState.paused) { e.preventDefault(); inkUndo(); }
+      else if (textUndo.length) { e.preventDefault(); undoText(); } // a font change; text undo is the editor's own
+    }
   });
 
   // ================================================================ right-click menus
@@ -763,8 +839,8 @@
       // what it marked. The option would do nothing there, so the menu says why instead.
       const pinnedByInk = hasInk() && !!note.wrapWidth;
       const keep = pinnedByInk ? {
-        label: '✓ Keep size (always on while this note has a drawing)',
-        run: () => toast('Pictures keep their size so your drawing stays lined up. To let them shrink, unlock the text layout (button next to spelling).'),
+        label: '✓ Keep size (on while there’s a drawing)',
+        run: () => toast('Pictures keep their size so your drawing lines up. Turn word wrap on to let them shrink.'),
       } : {
         label: (fixed ? '✓ ' : '') + 'Keep size when the note gets narrower',
         run: () => {
@@ -1194,6 +1270,7 @@
   }
   function hideContent() {
     if (inkState.on) exitInk();
+    inkState.undo = []; // a locked note keeps no copies of its drawing in the undo list
     inkState.dirty = false;
     clearTimeout(inkState.timer);
     note.ink = null;
@@ -1211,6 +1288,7 @@
     $('#unlockPw').value = '';
     $('#unlockErr').textContent = '';
     closePops();
+    closeText();
     applyLook();
     handle.hidden = true;
   }
@@ -1248,10 +1326,35 @@
     hideContent();
     toast('Note locked 🔒');
   }
+  // ---- password or PIN. A PIN is digits only, and opens the note as soon as all its digits are typed.
+  const isPinLock = () => settings.lockKind === 'pin';
+  const digitsOnly = (el) => { const v = el.value.replace(/\D/g, ''); if (v !== el.value) el.value = v; };
+  function paintUnlock() {
+    const pin = isPinLock();
+    const inp = $('#unlockPw');
+    inp.placeholder = pin ? 'PIN' : 'Password';
+    inp.inputMode = pin ? 'numeric' : 'text';
+    inp.maxLength = pin ? settings.lockLen || 12 : 200;
+  }
+  let pwKind = 'pin';
+  function paintPwKind() {
+    $$('#pwKind button').forEach((b) => b.classList.toggle('on', b.dataset.k === pwKind));
+    $('#pwNewLabel').textContent = pwKind === 'pin' ? 'PIN (4 to 12 digits)' : 'Password (at least 4 characters)';
+    for (const id of ['#pwNew', '#pwAgain']) {
+      const el = $(id);
+      el.inputMode = pwKind === 'pin' ? 'numeric' : 'text';
+      el.maxLength = pwKind === 'pin' ? 12 : 200;
+      if (pwKind === 'pin') digitsOnly(el);
+    }
+  }
+  $$('#pwKind button').forEach((b) => b.addEventListener('click', () => { pwKind = b.dataset.k; $('#pwErr').textContent = ''; paintPwKind(); $('#pwNew').focus(); }));
+  for (const id of ['#pwNew', '#pwAgain']) $(id).addEventListener('input', (e) => { if (pwKind === 'pin') digitsOnly(e.target); });
   function openPwPop() {
     $('#pwNew').value = '';
     $('#pwAgain').value = '';
     $('#pwErr').textContent = '';
+    pwKind = 'pin';
+    paintPwKind();
     openPop('#pwPop');
     setTimeout(() => $('#pwNew').focus(), 20);
   }
@@ -1260,26 +1363,41 @@
     e.preventDefault();
     const a = $('#pwNew').value;
     const b = $('#pwAgain').value;
-    if (a.length < 4) { $('#pwErr').textContent = 'Use at least 4 characters or digits.'; return; }
+    if (pwKind === 'pin' && (a.length < 4 || a.length > 12)) { $('#pwErr').textContent = 'A PIN is 4 to 12 digits.'; return; }
+    if (a.length < 4) { $('#pwErr').textContent = 'Use at least 4 characters.'; return; }
     if (a !== b) { $('#pwErr').textContent = "The two don't match."; return; }
-    const r = await api.setPassword('', a);
+    const r = await api.setPassword('', a, pwKind);
     if (!r || r.error) { $('#pwErr').textContent = (r && r.error) || 'Could not save it.'; return; }
     settings.hasPassword = true;
+    settings.lockKind = pwKind;
+    settings.lockLen = pwKind === 'pin' ? a.length : 0;
+    paintUnlock();
     closePops();
     await lockNow();
   });
+  let unlocking = false;
+  $('#unlockPw').addEventListener('input', (e) => {
+    if (!isPinLock()) return;
+    digitsOnly(e.target);
+    $('#unlockErr').textContent = '';
+    // the right number of digits: try it straight away, no Enter needed
+    if (settings.lockLen && e.target.value.length === settings.lockLen && !unlocking) $('#unlockForm').requestSubmit();
+  });
   $('#unlockForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (unlocking) return;
     const pw = $('#unlockPw').value;
     if (!pw) { $('#unlockPw').focus(); return; }
-    const n = await api.unlock(pw);
+    unlocking = true;
+    const n = await api.unlock(pw).finally(() => { unlocking = false; });
     if (!n || n.hidden) {
-      $('#unlockErr').textContent = 'Wrong password';
+      $('#unlockErr').textContent = isPinLock() ? 'Wrong PIN' : 'Wrong password';
       const f = $('#unlockForm');
       f.classList.remove('shake');
       void f.offsetWidth;
       f.classList.add('shake');
-      $('#unlockPw').select();
+      if (isPinLock()) $('#unlockPw').value = ''; else $('#unlockPw').select();
+      $('#unlockPw').focus();
       return;
     }
     $('#unlockPw').value = '';
@@ -1303,10 +1421,11 @@
   $('#askYes').addEventListener('click', () => answerAsk(true));
   $('#askNo').addEventListener('click', () => answerAsk(false));
 
-  // ================================================================ text layout lock
-  // When locked, the text area keeps a fixed width (note.wrapWidth) so text and pictures never
-  // re-wrap; a narrower note shows a sideways scrollbar instead. Drawing turns it on by itself,
-  // so circles and arrows stay on what they marked.
+  // ================================================================ word wrap (text layout lock)
+  // Word wrap on = normal: text wraps with the note. Word wrap off = the text area keeps a fixed
+  // width (note.wrapWidth) so text and pictures never re-wrap; a narrower note shows a sideways
+  // scrollbar instead. Drawing turns word wrap off by itself, so circles and arrows stay on what
+  // they marked.
   const sheet = $('#sheet');
   const hasInk = () => !!(note && note.ink && note.ink.s && note.ink.s.length);
   // How wide the visible writing area is. With the layout locked, pictures without "Keep size"
@@ -1328,19 +1447,17 @@
     sheet.style.minWidth = b ? `${Math.ceil(b.x2 + 6)}px` : '';
     sheet.style.minHeight = b ? `max(100%, ${Math.ceil(b.y2 + 6)}px)` : '';
     const w = $('#btnWrap');
-    w.classList.toggle('on', !!note.wrapWidth);
-    w.title = note.wrapWidth
-      ? 'Text layout is locked: text and pictures keep their width, and a sideways scrollbar appears when the note is narrower. Click to let the text wrap with the note again.'
-      : 'Text wraps with the note. Click to lock the layout, so text and pictures keep their width (drawing does this by itself).';
+    w.classList.toggle('on', !note.wrapWidth);
+    w.title = note.wrapWidth ? 'Word wrap: off (lines keep their width)' : 'Word wrap: on';
   }
   async function toggleWrap() {
     if (note.wrapWidth) {
-      if (hasInk() && !(await ask('Unlock the text layout?', 'Your drawing stays where it is, but the text and pictures may move away from it when the note is resized.', 'Unlock'))) return;
+      if (hasInk() && !(await ask('Turn word wrap on?', 'Text may move away from your drawing.', 'Turn on'))) return;
       setProp({ wrapWidth: null });
-      toast('Text wraps with the note again');
+      toast('Word wrap on');
     } else {
       setProp({ wrapWidth: Math.round(editor.clientWidth) });
-      toast('Text layout locked 🔒');
+      toast('Word wrap off');
     }
   }
   $('#btnWrap').addEventListener('mousedown', (e) => e.preventDefault());
@@ -1359,18 +1476,19 @@
   // ================================================================ draw-over
   const SVGNS = 'http://www.w3.org/2000/svg';
   const INK_COLORS = ['#2B2B2B', '#E5484D', '#F08C00', '#FFC800', '#2FA35A', '#3E7BFA', '#8E4EC6', '#E64980'];
+  // one short line each, so the toolbar keeps the same size whichever tool is picked
   const HINTS = {
     pen: 'Tip: hold Shift to draw a straight line.',
     hl: 'Tip: hold Shift for a straight highlight.',
-    line: 'Tip: hold Shift to snap to straight angles.',
-    arrow: 'Tip: hold Shift to snap to straight angles.',
+    line: 'Tip: hold Shift to snap to angles.',
+    arrow: 'Tip: hold Shift to snap to angles.',
     rect: 'Tip: hold Shift for a perfect square.',
     ellipse: 'Tip: hold Shift for a perfect circle.',
-    eraser: 'Whole line: click or drag over a line or shape to remove all of it.',
-    rub: 'Rub out: drag over a drawing to erase only what is under the circle. Pick its size on the right.',
+    eraser: 'Tip: touch a line to remove all of it.',
+    rub: 'Tip: erases only what’s under the circle.',
   };
-  // eraseMode: 'part' = rub out only what's under the eraser, 'stroke' = remove whole lines.
-  // ew = rub-out eraser size (same 2/4/8 steps as the thickness buttons; radius = ew * 3 px).
+  // eraseMode: 'part' = "Partial" eraser (only what's under the circle), 'stroke' = "Whole line".
+  // ew = partial eraser size (same 2/4/8 steps as the thickness buttons; radius = ew * 3 px).
   const inkState = { on: false, tool: 'pen', color: '#E5484D', w: 4, layer: 'a', eraseMode: 'part', ew: 4, cur: null, el: null, undo: [], dirty: false, timer: null, erasing: false, erased: false, last: null };
   const PREF_KEYS = ['tool', 'color', 'w', 'layer', 'eraseMode', 'ew'];
   try {
@@ -1381,6 +1499,26 @@
   if (![2, 4, 8].includes(inkState.ew)) inkState.ew = 4;
   const savePrefs = () => { try { localStorage.setItem('inkPrefs', JSON.stringify(Object.fromEntries(PREF_KEYS.map((k) => [k, inkState[k]])))); } catch { /* fine */ } };
   const rubbing = () => inkState.tool === 'eraser' && inkState.eraseMode === 'part';
+  // Mouse pointers that look like the tool: a pencil for the pen, a marker for the highlighter,
+  // with the tip in the colour you picked. 24 px, the tip of the drawing is where the line starts.
+  const svgCursor = (svg, x, y) => `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${x} ${y}, crosshair`;
+  const CURSOR_SVG = {
+    pen: (c) => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g stroke-linejoin="round">`
+      + `<path d="M2.5 21.5 4 16.2 16.3 3.9a2.3 2.3 0 0 1 3.3 0l.5.5a2.3 2.3 0 0 1 0 3.3L7.8 20z" fill="#fff" stroke="#fff" stroke-width="3"/>`
+      + `<path d="M4 16.2 16.3 3.9a2.3 2.3 0 0 1 3.3 0l.5.5a2.3 2.3 0 0 1 0 3.3L7.8 20z" fill="#FFF6D6" stroke="#2B2B2B" stroke-width="1.3"/>`
+      + `<path d="M14.6 5.6l3.8 3.8" stroke="#2B2B2B" stroke-width="1.1"/>`
+      + `<path d="M2.5 21.5 4 16.2 7.8 20z" fill="${c}" stroke="#2B2B2B" stroke-width="1.3"/></g></svg>`,
+    hl: (c) => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g stroke-linejoin="round">`
+      + `<path d="M2 19.6 5 14.6 15 4.6l4.4 4.4-10 10-4.9 3z" fill="#fff" stroke="#fff" stroke-width="3"/>`
+      + `<path d="M5 14.6 15 4.6l4.4 4.4-10 10z" fill="#fff" stroke="#2B2B2B" stroke-width="1.3"/>`
+      + `<path d="M15 4.6l1.6-1.6 4.4 4.4L19.4 9z" fill="${c}" stroke="#2B2B2B" stroke-width="1.3"/>`
+      + `<path d="M2 19.6 5 14.6l4.4 4.4-4.9 3z" fill="${c}" stroke="#2B2B2B" stroke-width="1.3"/></g></svg>`,
+  };
+  function toolCursor() {
+    if (inkState.tool === 'pen') return svgCursor(CURSOR_SVG.pen(inkState.color), 3, 21);
+    if (inkState.tool === 'hl') return svgCursor(CURSOR_SVG.hl(inkState.color), 3, 21);
+    return ''; // shapes keep the cross; the erasers have their own (see note.css)
+  }
   const eraserR = () => inkState.ew * 3;
 
   const r1 = (v) => Math.round(v * 10) / 10;
@@ -1434,10 +1572,22 @@
     return el;
   }
   const layerOf = (st) => (st.l === 'b' ? $('#inkBelow') : $('#inkAbove'));
+  // Each stroke keeps its SVG element, so redrawing after erasing only builds the new pieces.
+  const elCache = new WeakMap();
+  function elFor(st) {
+    let el = elCache.get(st);
+    if (!el) { el = strokeEl(st); elCache.set(st, el); }
+    return el;
+  }
+  function paintInk() {
+    const above = [];
+    const below = [];
+    if (hasInk()) for (const st of note.ink.s) (st.l === 'b' ? below : above).push(elFor(st));
+    $('#inkBelow').replaceChildren(...below);
+    $('#inkAbove').replaceChildren(...above);
+  }
   function renderInk() {
-    $('#inkBelow').innerHTML = '';
-    $('#inkAbove').innerHTML = '';
-    if (hasInk()) for (const st of note.ink.s) layerOf(st).append(strokeEl(st));
+    paintInk();
     applyLayout();
   }
   function inkBounds() {
@@ -1459,7 +1609,11 @@
     // thickness buttons set the rub-out eraser's size (not needed for "whole line")
     $('#inkColors').hidden = erasing;
     $('#eraseMode').hidden = !erasing;
-    $('#inkWidths').hidden = erasing && !rubbing();
+    // the size buttons always stay in place (no jumping); "Whole line" just greys them out
+    const noSize = erasing && !rubbing();
+    $('#inkWidths').classList.toggle('off', noSize);
+    $$('#inkWidths button').forEach((b) => { b.disabled = noSize; });
+    $('#inkCatch').style.cursor = toolCursor();
     $$('#eraseMode button').forEach((b) => b.classList.toggle('on', b.dataset.m === inkState.eraseMode));
     const wNow = erasing ? inkState.ew : inkState.w;
     $$('#inkWidths button').forEach((b) => {
@@ -1471,7 +1625,7 @@
     body.classList.toggle('erasing-ink', erasing && !rubbing());
     body.classList.toggle('rubbing-ink', rubbing());
     if (!rubbing()) $('#inkEraser').hidden = true;
-    $('#inkUndo').disabled = !inkState.undo.length;
+    paintUndo();
   }
   (function buildInkBar() {
     for (const c of INK_COLORS) $('#inkColors').append(Object.assign(document.createElement('button'), { title: 'Colour' }));
@@ -1495,27 +1649,142 @@
     hideCtx();
     saveNow();
     inkState.on = true;
-    inkState.undo = [];
+    inkState.paused = false;
+    body.classList.remove('ink-paused');
+    // the undo list is kept after Done (last 50 steps), so a drawing can still be undone later
     body.classList.add('inking');
     editor.contentEditable = 'false';
     $('#inkCatch').hidden = false;
     $('#inkBar').hidden = false;
     handle.hidden = true;
     paintInkBar();
+    placeInkBar();
   }
   function exitInk() {
     inkState.on = false;
+    inkState.paused = false;
     inkState.cur = null;
-    body.classList.remove('inking', 'erasing-ink', 'rubbing-ink');
+    body.classList.remove('inking', 'erasing-ink', 'rubbing-ink', 'ink-paused');
+    $('#inkPz').title = 'Pause drawing, to type for a moment';
     $('#inkEraser').hidden = true;
     editor.contentEditable = 'true';
     $('#inkCatch').hidden = true;
     $('#inkBar').hidden = true;
     saveInk();
+    paintUndo();
   }
+  // ---- floating toolbars (drawing toolbar, text panel): drag them anywhere in the note.
+  // They move when dragged by any empty spot (the grip, the little tab on the drawing toolbar's
+  // left, gaps, labels), or by `dragBtn` if given. Other buttons are clicked, never dragged.
+  // dragBtn only starts moving after 4 px, so a normal click on it still works. The place is kept as the
+  // distance from the bottom-right corner (remembered for next time); double-click the grip
+  // to put it back. It always stays inside the note and below the top bar.
+  function movable(el, { key, roomLeft = 0, dragBtn = null }) {
+    let pos = null;
+    try { const v = JSON.parse(localStorage.getItem(key) || 'null'); if (v && Number.isFinite(v.r) && Number.isFinite(v.b)) pos = v; } catch { /* fine */ }
+    const m = { dragged: false };
+    m.place = () => {
+      if (el.hidden) return;
+      if (!pos) { el.style.left = ''; el.style.right = ''; el.style.bottom = ''; return; }
+      el.style.left = 'auto'; // the text panel opens on the left by default; a saved spot counts from the right
+      const w = el.offsetWidth; const hgt = el.offsetHeight;
+      const r = Math.max(4, Math.min(pos.r, innerWidth - w - 4 - roomLeft));
+      const b = Math.max(4, Math.min(pos.b, innerHeight - hgt - 36)); // never over the top bar
+      el.style.right = `${r}px`;
+      el.style.bottom = `${b}px`;
+    };
+    window.addEventListener('resize', m.place);
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      const btn = e.target.closest('button');
+      if (btn && btn !== dragBtn) return;
+      if (!btn) e.preventDefault(); // also keeps the text selection
+      const rect = el.getBoundingClientRect();
+      const start = { x: e.clientX, y: e.clientY, r: innerWidth - rect.right, b: innerHeight - rect.bottom };
+      let moving = false;
+      const move = (ev) => {
+        if (!moving) {
+          if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 4) return;
+          moving = true;
+          body.classList.add('moving-inkbar');
+          try { e.target.setPointerCapture(e.pointerId); } catch { /* fine */ }
+        }
+        pos = { r: start.r - (ev.clientX - start.x), b: start.b - (ev.clientY - start.y) };
+        m.place();
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        if (!moving) return;
+        body.classList.remove('moving-inkbar');
+        if (btn) { m.dragged = true; setTimeout(() => { m.dragged = false; }, 0); } // a drag is not a click
+        const r2 = el.getBoundingClientRect();
+        pos = { r: Math.round(innerWidth - r2.right), b: Math.round(innerHeight - r2.bottom) };
+        try { localStorage.setItem(key, JSON.stringify(pos)); } catch { /* fine */ }
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    });
+    const grip = el.querySelector('.igrip');
+    if (grip) grip.addEventListener('dblclick', () => {
+      pos = null;
+      try { localStorage.removeItem(key); } catch { /* fine */ }
+      m.place();
+    });
+    return m;
+  }
+  const inkBar = $('#inkBar');
+  const inkMove = movable(inkBar, { key: 'inkBarPos', roomLeft: 16 }); // 16 px: the little drag tab on its left
+  const placeInkBar = () => inkMove.place();
+  const textMove = movable($('#textPop'), { key: 'textBarPos' });
+
   $('#btnInk').addEventListener('mousedown', (e) => e.preventDefault());
-  $('#btnInk').addEventListener('click', () => (inkState.on ? exitInk() : enterInk()));
-  $('#inkDone').addEventListener('click', exitInk);
+  // Drawing ⇄ typing: using the bottom bar or the text toolbar puts drawing on hold so you can
+  // write (the drawing toolbar fades); clicking a drawing tool (or Draw) brings drawing back.
+  function pauseInk() {
+    if (!inkState.on || inkState.paused) return;
+    finishStroke();
+    inkState.paused = true;
+    body.classList.add('ink-paused');
+    $('#inkEraser').hidden = true;
+    $('#inkCatch').hidden = true;
+    editor.contentEditable = 'true';
+    saveInk();
+    paintUndo();
+    $('#inkPz').title = 'Carry on drawing';
+    editor.focus();
+  }
+  function resumeInk() {
+    if (!inkState.on || !inkState.paused) return;
+    saveNow();
+    inkState.paused = false;
+    body.classList.remove('ink-paused');
+    editor.contentEditable = 'false';
+    $('#inkCatch').hidden = false;
+    $('#inkPz').title = 'Pause drawing, to type for a moment';
+    closePops();
+    paintInkBar();
+  }
+  // typing for a moment: clicking any tool in the (faded) drawing toolbar goes back to drawing
+  inkBar.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (inkState.paused && b && b.id !== 'inkX' && b.id !== 'inkPz') resumeInk();
+  }, true);
+  // drawing: using the (faded) bottom bar switches to typing first, so the button works on the text
+  $('#tools').addEventListener('click', (e) => {
+    if (inkState.on && !inkState.paused && e.target.closest('button') && !e.target.closest('#btnInk, #btnUndo')) pauseInk();
+  }, true);
+  // the Draw button in the bottom bar also brings drawing back while it's on hold
+  $('#btnInk').addEventListener('click', () => (inkState.paused ? resumeInk() : inkState.on ? exitInk() : enterInk()));
+  $('#inkX').addEventListener('click', exitInk);
+  // pause button (top left of the drawing toolbar): drawing on hold to type, then carry on
+  $('#inkPz').addEventListener('click', () => (inkState.paused ? resumeInk() : pauseInk()));
+  // drawing: using the (faded) text toolbar switches to typing too
+  $('#textPop').addEventListener('click', (e) => {
+    if (inkState.on && !inkState.paused && e.target.closest('button') && !e.target.closest('#textX')) pauseInk();
+  }, true);
 
   function scheduleInkSave() {
     inkState.dirty = true;
@@ -1527,18 +1796,18 @@
     if (!inkState.dirty || hidden || !note) return;
     inkState.dirty = false;
     const patch = { ink: note.ink };
-    // the first drawing locks the text layout so it stays lined up with what was drawn
+    // the first drawing turns word wrap off (locks the layout) so it stays lined up with what was drawn
     if (hasInk() && !note.wrapWidth) {
       note.wrapWidth = Math.round(editor.clientWidth);
       patch.wrapWidth = note.wrapWidth;
       applyLayout();
-      toast('Text layout locked, so your drawing stays in place');
+      toast('Word wrap off, so your drawing stays in place');
     }
     api.update(patch).then(gotDates).catch(() => {});
   }
   function snapshot() {
     inkState.undo.push(JSON.stringify(note.ink || null));
-    if (inkState.undo.length > 100) inkState.undo.shift();
+    if (inkState.undo.length > 50) inkState.undo.shift(); // remember the last 50 steps
   }
   function inkUndo() {
     if (!inkState.undo.length) return;
@@ -1547,7 +1816,7 @@
     scheduleInkSave();
     paintInkBar();
   }
-  $('#inkUndo').addEventListener('click', inkUndo);
+
   $('#inkClear').addEventListener('click', () => {
     if (!hasInk()) return;
     snapshot();
@@ -1568,7 +1837,7 @@
       const d = Math.max(Math.abs(dx), Math.abs(dy));
       return [r1(x1 + Math.sign(dx || 1) * d), r1(y1 + Math.sign(dy || 1) * d)];
     }
-    const step = Math.PI / 4;
+    const step = Math.PI / 6; // 12 directions, like the hours on a clock
     const a = Math.round(Math.atan2(dy, dx) / step) * step;
     const len = Math.hypot(dx, dy);
     return [r1(x1 + Math.cos(a) * len), r1(y1 + Math.sin(a) * len)];
@@ -1616,37 +1885,99 @@
     }
   }
 
-  // ---- rub-out eraser: erase only what's under the circle
+  // ---- "Partial" eraser: erase only what's under the circle
   // A touched line or shape is traced into closely spaced points along what's actually drawn
-  // (via the SVG geometry), the points under the eraser are dropped, and each piece that's left
-  // becomes its own pen stroke (or highlighter stroke) with the same colour, thickness and layer.
+  // (the same curves strokeEl draws, worked out here in plain maths, which is much faster than
+  // asking the SVG), the points under the eraser are dropped, and each piece that's left becomes
+  // its own pen (or highlighter) stroke with the same colour, thickness and layer. While dragging,
+  // erasing runs at most once per screen refresh, and only strokes near the eraser are looked at.
   const STEP = 2;
-  let measureSvg = null;
+  const boxCache = new WeakMap();
+  function boxOf(st) {
+    let b = boxCache.get(st);
+    if (b) return b;
+    let x1 = Infinity; let y1 = Infinity; let x2 = -Infinity; let y2 = -Infinity;
+    for (let i = 0; i < st.p.length; i += 2) {
+      const x = st.p[i]; const y = st.p[i + 1];
+      if (x < x1) x1 = x; if (x > x2) x2 = x; if (y < y1) y1 = y; if (y > y2) y2 = y;
+    }
+    // an arrow's head reaches past its two points
+    const extra = (st.t === 'hl' ? st.w * 2 : st.w / 2) + (st.t === 'arrow' ? 30 + st.w * 2 : 0);
+    b = [x1 - extra, y1 - extra, x2 + extra, y2 + extra];
+    boxCache.set(st, b);
+    return b;
+  }
   function tracePieces(st) {
-    if (!measureSvg) {
-      measureSvg = document.createElementNS(SVGNS, 'svg');
-      measureSvg.setAttribute('style', 'position:absolute;left:-9999px;top:0;width:1px;height:1px;visibility:hidden');
-      document.body.append(measureSvg);
-    }
-    const el = strokeEl(st);
-    measureSvg.append(el);
-    const total = el.getTotalLength();
-    const pieces = [];
+    const out = [];
     let cur = [];
-    const n = Math.max(1, Math.ceil(total / STEP));
-    let px = null;
-    let py = null;
-    for (let i = 0; i <= n; i++) {
-      const pt = el.getPointAtLength((total * i) / n);
-      // an arrow's head is a separate part of the path: a jump means a new piece
-      if (px != null && Math.hypot(pt.x - px, pt.y - py) > STEP * 3) { pieces.push(cur); cur = []; }
-      cur.push(r1(pt.x), r1(pt.y));
-      px = pt.x;
-      py = pt.y;
+    const add = (x, y) => cur.push(r1(x), r1(y));
+    const line = (ax, ay, bx, by, first) => {
+      const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / STEP));
+      for (let i = first ? 0 : 1; i <= n; i++) add(ax + ((bx - ax) * i) / n, ay + ((by - ay) * i) / n);
+    };
+    const quad = (ax, ay, cx, cy, bx, by) => {
+      const n = Math.max(1, Math.ceil((Math.hypot(cx - ax, cy - ay) + Math.hypot(bx - cx, by - cy)) / STEP));
+      for (let i = 1; i <= n; i++) {
+        const t = i / n; const u = 1 - t;
+        add(u * u * ax + 2 * u * t * cx + t * t * bx, u * u * ay + 2 * u * t * cy + t * t * by);
+      }
+    };
+    const p = st.p;
+    if (st.t === 'pen' || st.t === 'hl') {
+      // same shape as smoothPath(): quadratic curves through the midpoints, then a line to the end
+      if (p.length <= 4) line(p[0], p[1], p[p.length - 2], p[p.length - 1], true);
+      else {
+        let x = p[0]; let y = p[1];
+        add(x, y);
+        for (let i = 2; i < p.length - 2; i += 2) {
+          const mx = r1((p[i] + p[i + 2]) / 2); const my = r1((p[i + 1] + p[i + 3]) / 2);
+          quad(x, y, p[i], p[i + 1], mx, my);
+          x = mx; y = my;
+        }
+        line(x, y, p[p.length - 2], p[p.length - 1], false);
+      }
+    } else {
+      const [x1, y1, x2, y2] = p;
+      if (st.t === 'line' || st.t === 'arrow') {
+        line(x1, y1, x2, y2, true);
+        if (st.t === 'arrow') {
+          // the head is its own piece (same maths as strokeEl)
+          out.push(cur); cur = [];
+          const a = Math.atan2(y2 - y1, x2 - x1);
+          const len = Math.min(18 + st.w * 1.5, Math.hypot(x2 - x1, y2 - y1) * 0.6);
+          const h1 = [r1(x2 - len * Math.cos(a - 0.5)), r1(y2 - len * Math.sin(a - 0.5))];
+          const h2 = [r1(x2 - len * Math.cos(a + 0.5)), r1(y2 - len * Math.sin(a + 0.5))];
+          line(h1[0], h1[1], x2, y2, true);
+          line(x2, y2, h2[0], h2[1], false);
+        }
+      } else if (st.t === 'rect') {
+        const l = Math.min(x1, x2); const r = Math.max(x1, x2); const t = Math.min(y1, y2); const b = Math.max(y1, y2);
+        line(l, t, r, t, true); line(r, t, r, b, false); line(r, b, l, b, false); line(l, b, l, t, false);
+      } else {
+        const cx = (x1 + x2) / 2; const cy = (y1 + y2) / 2; const rx = Math.abs(x2 - x1) / 2; const ry = Math.abs(y2 - y1) / 2;
+        const h = ((rx - ry) / (rx + ry || 1)) ** 2;
+        const per = Math.PI * (rx + ry) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
+        const n = Math.max(8, Math.ceil(per / STEP));
+        for (let i = 0; i <= n; i++) { const a = (i / n) * Math.PI * 2; add(cx + rx * Math.cos(a), cy + ry * Math.sin(a)); }
+      }
     }
-    pieces.push(cur);
-    el.remove();
-    return pieces;
+    out.push(cur);
+    return out.filter((pc) => pc.length >= 2);
+  }
+  // A line that has been through the eraser before is already a row of points 2 px apart. Those
+  // points are split as they are, never traced (smoothed) again, so what's left can't move.
+  // (1.1.6 thinned the points out to save space, and each redraw smoothed them a bit more:
+  // drawings "danced" while erasing.)
+  const denseCache = new WeakMap();
+  function isDense(st) {
+    let d = denseCache.get(st);
+    if (d !== undefined) return d;
+    d = true;
+    for (let i = 2; i < st.p.length; i += 2) {
+      if (Math.hypot(st.p[i] - st.p[i - 2], st.p[i + 1] - st.p[i - 1]) > STEP * 1.6) { d = false; break; }
+    }
+    denseCache.set(st, d);
+    return d;
   }
   function distToSeg(x, y, ax, ay, bx, by) {
     const dx = bx - ax;
@@ -1676,23 +2007,29 @@
     const out = [];
     let changedAny = false;
     for (const st of note.ink.s) {
+      const box = boxOf(st);
+      if (box[2] < minX || box[0] > maxX || box[3] < minY || box[1] > maxY) { out.push(st); continue; }
       const half = st.t === 'hl' ? st.w * 2 : st.w / 2;
       const reach = R + half; // the gap matches the circle, round line ends included
-      const margin = reach + (st.t === 'arrow' ? 30 + st.w * 2 : 0);
-      let x1 = Infinity; let y1 = Infinity; let x2 = -Infinity; let y2 = -Infinity;
-      for (let i = 0; i < st.p.length; i += 2) { x1 = Math.min(x1, st.p[i]); x2 = Math.max(x2, st.p[i]); y1 = Math.min(y1, st.p[i + 1]); y2 = Math.max(y2, st.p[i + 1]); }
-      if (x2 + margin < minX - R || x1 - margin > maxX + R || y2 + margin < minY - R || y1 - margin > maxY + R) { out.push(st); continue; }
-      const hit = (x, y) => distToSeg(x, y, a[0], a[1], b[0], b[1]) <= reach;
-      // shapes are traced first; pen lines are checked segment by segment before tracing
+      const lo = [minX - half, minY - half]; const hi = [maxX + half, maxY + half];
+      const hit = (x, y) => x >= lo[0] && x <= hi[0] && y >= lo[1] && y <= hi[1] && distToSeg(x, y, a[0], a[1], b[0], b[1]) <= reach;
+      // pen lines are checked segment by segment before tracing; shapes are traced (cheap) first
       const pieces = st.t === 'pen' || st.t === 'hl' ? null : tracePieces(st);
       let touched = false;
       if (pieces) touched = pieces.some((pc) => { for (let i = 0; i < pc.length; i += 2) if (hit(pc[i], pc[i + 1])) return true; return false; });
       else if (st.p.length === 2) touched = hit(st.p[0], st.p[1]);
-      else for (let i = 0; i + 3 < st.p.length && !touched; i += 2) touched = segDist(a, b, st.p[i], st.p[i + 1], st.p[i + 2], st.p[i + 3]) <= reach;
+      else {
+        for (let i = 0; i + 3 < st.p.length && !touched; i += 2) {
+          const cx = st.p[i]; const cy = st.p[i + 1]; const dx = st.p[i + 2]; const dy = st.p[i + 3];
+          if (Math.max(cx, dx) < lo[0] - R || Math.min(cx, dx) > hi[0] + R || Math.max(cy, dy) < lo[1] - R || Math.min(cy, dy) > hi[1] + R) continue;
+          touched = segDist(a, b, cx, cy, dx, dy) <= reach + 1.5; // + a little for the curve between points
+        }
+      }
       if (!touched) { out.push(st); continue; }
-      const traced = pieces || (st.p.length === 2 ? [st.p.slice()] : tracePieces(st));
+      const traced = pieces || (st.p.length === 2 || isDense(st) ? [st.p] : tracePieces(st));
       const closed = st.t === 'rect' || st.t === 'ellipse';
       let any = false;
+      const made = [];
       for (let pc of traced) {
         if (closed) {
           // start the loop at an erased spot, so the piece that's left stays in one piece
@@ -1702,7 +2039,7 @@
         }
         let run = [];
         const flush = () => {
-          if (run.length >= 4) out.push({ t: st.t === 'hl' ? 'hl' : 'pen', c: st.c, w: st.w, l: st.l, p: run });
+          if (run.length >= 4) made.push({ t: st.t === 'hl' ? 'hl' : 'pen', c: st.c, w: st.w, l: st.l, p: run });
           run = [];
         };
         for (let i = 0; i < pc.length; i += 2) {
@@ -1711,12 +2048,26 @@
         flush();
       }
       if (!any) { out.push(st); continue; }
+      out.push(...made);
       changedAny = true;
     }
     if (!changedAny) return;
     note.ink = out.length ? { s: out.slice(-4000) } : null;
     inkState.erased = true;
-    renderInk();
+    paintInk(); // the sheet size is updated once the drag ends
+  }
+  // erase at most once per screen refresh while dragging
+  let rubQ = null;
+  function queueRub(from, to) {
+    if (rubQ) { rubQ[1] = to; return; }
+    rubQ = [from, to];
+    requestAnimationFrame(flushRub);
+  }
+  function flushRub() {
+    if (!rubQ) return;
+    const [from, to] = rubQ;
+    rubQ = null;
+    rubOut(from, to);
   }
   function moveEraserRing(e) {
     const ring = $('#inkEraser');
@@ -1753,7 +2104,7 @@
     moveEraserRing(e);
     if (inkState.erasing) {
       const pt = inkPt(e);
-      if (rubbing()) rubOut(inkState.last || pt, pt); else eraseAt(pt);
+      if (rubbing()) queueRub(inkState.last || pt, pt); else eraseAt(pt);
       inkState.last = pt;
       return;
     }
@@ -1780,9 +2131,10 @@
   });
   const finishStroke = () => {
     if (inkState.erasing) {
+      flushRub();
       inkState.erasing = false;
       inkState.last = null;
-      if (inkState.erased) scheduleInkSave(); else inkState.undo.pop();
+      if (inkState.erased) { applyLayout(); scheduleInkSave(); } else inkState.undo.pop();
       paintInkBar();
       return;
     }
@@ -1794,6 +2146,7 @@
     snapshot();
     if (!note.ink) note.ink = { s: [] };
     note.ink.s.push(st);
+    elCache.set(st, inkState.el);
     applyLayout();
     scheduleInkSave();
     paintInkBar();
@@ -1816,6 +2169,7 @@
     note = await api.getNote();
     if (!note) return;
     if (note.settings) settings = { ...settings, ...note.settings };
+    paintUnlock();
     hidden = !!note.hidden;
     editor.innerHTML = hidden ? '' : (note.html || '');
     applyLook();

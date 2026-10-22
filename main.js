@@ -149,7 +149,12 @@ function pushLook(id) {
 }
 
 function noteSettings() {
-  return { spellCheck: !!store.settings.spellCheck, hasPassword: !!store.settings.lock };
+  return { spellCheck: !!store.settings.spellCheck, hasPassword: !!store.settings.lock, ...lockInfo() };
+}
+// PIN or password: a PIN only takes digits and opens as soon as all of them are typed.
+function lockInfo() {
+  const pin = store.settings.lockKind === 'pin';
+  return { lockKind: pin ? 'pin' : 'password', lockLen: pin ? Number(store.settings.lockLen) || 0 : 0 };
 }
 function broadcastSettings() {
   const s = noteSettings();
@@ -232,7 +237,14 @@ function applyState(win, n) {
   win.setOpacity(n.opacity);
   win.setAlwaysOnTop(n.pinned, 'screen-saver');
   win.setBackgroundColor(PAPER[n.color] || PAPER.yellow);
-  win.setTitle(titleOf(n));
+  setWinTitle(win, n);
+}
+// the window title follows the note's title or first line; only touch it when it really changes
+function setWinTitle(win, n) {
+  const t = titleOf(n);
+  if (win.cosmoTitle === t) return;
+  win.cosmoTitle = t;
+  win.setTitle(t);
 }
 
 function setRolled(win, n) {
@@ -286,6 +298,8 @@ function openNoteWindow(n, { focus = false } = {}) {
       spellcheck: true,
     },
   });
+  // the window title is the note's title (setWinTitle); the page's own <title> must not replace it
+  win.on('page-title-updated', (e) => e.preventDefault());
   if (n.rolled) win.setMaximumSize(BIG, ROLLED_H);
   win.noteId = n.id;
   win.focusOnLoad = focus;
@@ -424,6 +438,27 @@ function refitAll() {
 }
 
 // ------------------------------------------------------------------ list window
+// colours of the list window's own title strip (window buttons) for each list theme (list.css)
+const LIST_THEMES = {
+  cream: ['#FBF6EC', '#6B5A3E'],
+  rose: ['#FFF0F3', '#7A4A58'],
+  mint: ['#EDF8F2', '#3F6B57'],
+  sky: ['#EDF5FD', '#3F5D7A'],
+  lilac: ['#F4F0FD', '#5A4B7E'],
+  night: ['#25232A', '#D8D0C2'],
+  midnight: ['#1D2232', '#C3C9D8'],
+  forest: ['#1C2520', '#C2D0C5'],
+  plum: ['#251D29', '#D2C3D5'],
+};
+const listTheme = () => LIST_THEMES[store.settings.listTheme] || LIST_THEMES.cream;
+function paintListFrame() {
+  if (!listWin || listWin.isDestroyed()) return;
+  const [bg, fg] = listTheme();
+  try {
+    if (listWin.setBackgroundColor) listWin.setBackgroundColor(bg);
+    if (listWin.setTitleBarOverlay) listWin.setTitleBarOverlay({ color: bg, symbolColor: fg, height: 44 });
+  } catch { /* older Windows: the buttons just keep their colour */ }
+}
 function showList() {
   if (listWin && !listWin.isDestroyed()) {
     if (listWin.isMinimized()) listWin.restore();
@@ -440,9 +475,9 @@ function showList() {
     title: APP_NAME,
     icon: WIN_ICON,
     show: false,
-    backgroundColor: '#FBF6EC',
+    backgroundColor: listTheme()[0],
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#FBF6EC', symbolColor: '#6B5A3E', height: 44 },
+    titleBarOverlay: { color: listTheme()[0], symbolColor: listTheme()[1], height: 44 },
     webPreferences: { preload: PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false },
   });
   hardenContents(listWin.webContents);
@@ -509,7 +544,10 @@ function applyPatch(e, patch) {
   const rolledChanged = 'rolled' in clean && !!clean.rolled !== note.rolled;
   store.update(note.id, clean, { content: contentChanged });
   const n = store.get(note.id);
-  if ('opacity' in clean || 'pinned' in clean || 'color' in clean || 'text' in clean || 'title' in clean) applyState(win, n);
+  // Typing only changes the window title; opacity/pin/colour need the rest of applyState (doing all of
+  // it on every save also re-asserted "always on top" while typing).
+  if ('opacity' in clean || 'pinned' in clean || 'color' in clean) applyState(win, n);
+  else if ('text' in clean || 'title' in clean) setWinTitle(win, n);
   if (rolledChanged) setRolled(win, n);
   notifyList();
   return viewOf(n, win);
@@ -551,11 +589,15 @@ function registerIpc() {
     notifyList();
     return viewOf(note, win);
   });
-  ipcMain.handle('lock:set', (e, { current, next } = {}) => {
+  ipcMain.handle('lock:set', (e, { current, next, kind } = {}) => {
     next = String(next || '');
+    const pin = kind === 'pin';
+    if (pin && !/^\d{4,12}$/.test(next)) return { error: 'A PIN is 4 to 12 digits.' };
     if (next.length < 4) return { error: 'Use at least 4 characters or digits.' };
-    if (store.settings.lock && !checkPassword(current)) return { error: 'The current password is not right.' };
+    if (store.settings.lock && !checkPassword(current)) return { error: `The current ${lockInfo().lockKind === 'pin' ? 'PIN' : 'password'} is not right.` };
     store.settings.lock = packLock(hashPassword(next));
+    store.settings.lockKind = pin ? 'pin' : 'password';
+    store.settings.lockLen = pin ? next.length : 0;
     store.saveSettings();
     broadcastSettings();
     notifyList();
@@ -644,7 +686,7 @@ function registerIpc() {
         restoredFrom: n.restoredFrom,
       })),
       groups: [...store.groups.values()].map((g) => ({ ...g, open: groupOpenInList(g.id) })),
-      settings: { ...settings, hasPassword: !!lock, dataPath: store.root, version: app.getVersion() },
+      settings: { ...settings, ...lockInfo(), hasPassword: !!lock, dataPath: store.root, version: app.getVersion() },
     };
   });
 
@@ -825,7 +867,8 @@ function registerIpc() {
     patch = patch || {};
     if ('startWithWindows' in patch) setStartup(patch.startWithWindows);
     if (typeof patch.defaultColor === 'string' && (PAPER[patch.defaultColor] || patch.defaultColor === 'random')) store.settings.defaultColor = patch.defaultColor;
-    if (['s', 'm', 'l'].includes(patch.listSize)) store.settings.listSize = patch.listSize;
+    if (['s', 'm', 'l', 'xl', 'xxl'].includes(patch.listSize)) store.settings.listSize = patch.listSize;
+    if (LIST_THEMES[patch.listTheme]) { store.settings.listTheme = patch.listTheme; paintListFrame(); }
     if (patch.defaultFont === 'hand' || patch.defaultFont === 'round') store.settings.defaultFont = patch.defaultFont;
     if ('spellCheck' in patch) store.settings.spellCheck = !!patch.spellCheck;
     if ('spellCyrillic' in patch) { store.settings.spellCyrillic = !!patch.spellCyrillic; spellLanguages(); }
@@ -839,7 +882,7 @@ function registerIpc() {
     store.saveSettings();
     if ('spellCheck' in patch || 'spellCyrillic' in patch) broadcastSettings();
     // The list already shows a new sort order itself; telling it again made it redraw twice.
-    const onlySort = Object.keys(patch).every((k) => k === 'listSort' || k === 'listSize');
+    const onlySort = Object.keys(patch).every((k) => k === 'listSort' || k === 'listSize' || k === 'listTheme');
     if (!onlySort) notifyList();
     return true;
   });

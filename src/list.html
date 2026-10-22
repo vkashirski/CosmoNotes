@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="../node_modules/@fontsource/nunito/800.css">
 <link rel="stylesheet" href="list.css">
 </head>
-<body>
+<body data-theme="cream">
 <header class="titlebar">
   <div class="brand">
     <svg class="logo" viewBox="0 0 32 32"><rect x="5" y="7" width="22" height="21" rx="2.5" fill="#FFE45C" transform="rotate(-6 16 17)"/><path d="M22 26.5l4.4-4.6-4.2.4z" fill="#E6C232" transform="rotate(-6 16 17)"/><circle cx="16" cy="8" r="4" fill="#E5484D"/><circle cx="14.7" cy="6.8" r="1.2" fill="#fff" opacity=".7"/><path d="M27 3.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="#8E7BEF"/></svg>
@@ -26,7 +26,7 @@
 <nav class="tabs">
   <button class="tab on" data-tab="notes">Notes <span class="count" id="cNotes">0</span></button>
   <button class="tab" data-tab="bin">Bin <span class="count" id="cBin">0</span></button>
-  <button class="tab" data-tab="settings" title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
+  <button class="tab" data-tab="settings" title="Settings (click again to go back)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
 </nav>
 
 <section id="viewNotes" class="view">
@@ -43,10 +43,13 @@
   <div class="sortpop" id="sizePop" hidden>
     <h4>Card size</h4>
     <div class="seg sizes" id="sizeSeg">
-      <button data-v="s"><i class="sz s"></i>Small</button>
-      <button data-v="m"><i class="sz m"></i>Medium</button>
-      <button data-v="l"><i class="sz l"></i>Large</button>
+      <button data-v="s" title="Small"><i class="sz s"></i>S</button>
+      <button data-v="m" title="Medium"><i class="sz m"></i>M</button>
+      <button data-v="l" title="Large"><i class="sz l"></i>L</button>
+      <button data-v="xl" title="Extra large"><i class="sz xl"></i>XL</button>
+      <button data-v="xxl" title="Biggest"><i class="sz xxl"></i>XXL</button>
     </div>
+    <p class="poptip">Tip: Ctrl + mouse wheel changes the size too.</p>
   </div>
   <div class="sortpop" id="sortPop" hidden>
     <h4>Sort by</h4>
@@ -59,7 +62,7 @@
   <div class="groupview" id="groupHead" hidden>
     <nav class="crumbs" id="crumbs"></nav>
     <div class="grouphead">
-      <button class="backbtn" id="btnBack" title="Up one level (or drop a note/group here to move it up)"><svg viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg><span id="backLabel">All notes</span></button>
+      <button class="backbtn" id="btnBack" title="Up one level. Drag a note or group here to move it up."><svg viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg><span id="backLabel">All notes</span></button>
       <span class="gicon" id="gIcon"></span>
       <input class="gname" id="groupName" maxlength="120" placeholder="Name this group" autocomplete="off" spellcheck="false">
       <button class="iconbtn sm" id="btnRelockGroup" title="Lock this group again" hidden><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></svg></button>
@@ -87,16 +90,20 @@
       </div>
     </div>
   </div>
-  <div class="dropout" id="dropOut">Drop here to move it up one level</div>
   <div class="cards" id="cards"></div>
   <p class="tip" id="tip"></p>
 </section>
 
 <section id="viewBin" class="view" hidden>
-  <div class="binhead">
-    <p>Deleted notes wait here until you delete them for good.</p>
+  <div class="searchrow">
+    <label class="search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="bq" placeholder="Search your deleted notes" autocomplete="off">
+      <button type="button" class="qclear" id="bqClear" title="Clear search" hidden><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </label>
     <button class="pill danger" id="btnEmpty">Empty bin</button>
   </div>
+  <p class="bintip">Deleted notes wait here until you delete them for good.</p>
   <div class="cards" id="binCards"></div>
 </section>
 
@@ -117,6 +124,10 @@
         <button data-font="hand" class="hand">Handwritten</button>
         <button data-font="round">Rounded</button>
       </div>
+    </div>
+    <div class="row col">
+      <span><b>Colours of this window</b><small>Only changes this notes list, not your notes.</small></span>
+      <div class="themes" id="sTheme"></div>
     </div>
   </div>
 
@@ -140,12 +151,13 @@
 
   <div class="panel">
     <h3>Backups</h3>
-    <p class="muted">A copy of all your notes is saved automatically once a day. The last 30 days are kept. Restoring never removes anything.</p>
+    <p class="muted">A copy of all your notes is saved automatically once a day. The last 30 days are kept. Restoring never removes anything: the notes come back in a new group.</p>
+    <p class="bklast" id="backups"></p>
     <div class="btnrow">
-      <button class="pill" id="btnBackupNow">Back up now</button>
+      <button class="pill" id="btnRestorePick">Restore from a backup…</button>
+      <button class="pill ghost" id="btnBackupNow">Back up now</button>
       <button class="pill ghost" id="btnBackupFolder">Open backups folder</button>
     </div>
-    <div class="backups" id="backups"></div>
   </div>
 
   <div class="panel">

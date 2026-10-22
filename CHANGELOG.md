@@ -3,6 +3,86 @@
 The same list is shown in the app: notes list → Settings → About CosmoNotes → Version history
 (source: `src/about.js`). Keep both in sync.
 
+## 1.1.11 – 22 October 2026
+
+- **Undo always visible:** the bottom bar's fading moved from `#tools` to its children (`#tools > *`), and `#btnUndo` is excluded (`opacity: 1 !important`). It is never disabled either. `#stamp` is kept clear of it (max-width −150 px).
+- **Pause button** `#inkPz` at the top left of `#inkBar` (the X is top right): `pauseInk()` / `resumeInk()`; it shows a play icon and stays at full opacity while paused. The capture listener that resumes drawing on any toolbar click skips it.
+- **Speed-ups (behaviour unchanged):**
+  - Notes list: date formats are made once (`FMT`, `Intl.DateTimeFormat`) instead of a new formatter for every card — that was most of a redraw. A background refresh reuses every card whose data didn't change (`cardCache`, keyed by note/group, compared by JSON of what the card shows) and only moves/replaces what changed (`placeCards`); view changes still rebuild everything with the animation, and the cache resets at midnight ("Today"/"Yesterday"). 400 notes: a refresh went from ~280 ms to ~17 ms. A check confirmed the reused list is identical to a freshly built one after edits, opening, pinning, renaming, moving, binning, adding and locking.
+  - `store.update` re-checks the drawing (`normalizeInk`) only when the drawing itself changed; otherwise it keeps the already-clean one. 50 typing saves on a note with a 60 000-number drawing: ~357 ms → ~1.3 ms in the main process.
+  - `applyPatch`: a text/title save only updates the window title (`setWinTitle`, only when it really changes) instead of re-applying always-on-top, opacity and colour on every save. Note windows ignore `page-title-updated`, so the page's own `<title>` can't rename them.
+  - The text toolbar's "Changes:" line is only rewritten when it changes (it ran on every cursor move).
+  - Looked at and left alone on purpose: backups and attachment clean-up (rare, and they keep notes safe), drawing a long pen line (~1 ms per mouse move even at 1 500 points), the 2.5 s pinned-note check (by design).
+  - Tests: `tests/speed.test.js`.
+- Settings section titles (1.1.10): hover tint `color-mix(#FFE45C 16%, card)` (dark themes: `--card2`), rounded corners kept when open, room before the text, no focus ring after a mouse click (`mousedown` preventDefault on `.phead`).
+
+## 1.1.10 – 22 October 2026
+
+- **Settings sections fold:** list.js `foldPanels()` wraps everything below each panel's title (`h3`, or `.abouthead` for About) in `.pbody > .pinner`; the title gets `.phead` (clickable, keyboard too, chevron). Opening animates `grid-template-rows: 0fr → 1fr` plus a fade. All start closed.
+- **Backups:** the list in Settings is replaced by the newest backup's line (`#backups`) and a "Restore from a backup…" button (`pickBackup`): a `modal()` with a pickable list of days (`content` option, `.bkpick`), then a result message naming the group.
+- **Restored notes go into a group:** `store.restoreBackup` puts every note it brings back (new copies and notes un-binned from it) into a new top-level group "Restored Notes from <Weekday>, <d> <Mon> <yyyy>" (`backupDayName`). Nothing is overwritten, as before. Cards no longer say "Restored": they show the note's own created date (kept from the backup).
+- **Toolbars:** an X (`#inkX`, `#textX`) on each; `#inkDone`, `#inkUndo`, `#tUndo` and the switch button `#inkPause` are gone. A small drag tab (`.iside`) sits where the switch button was (`movable(..., roomLeft: 16)`).
+- **Independent:** `#textPop` is no longer closed by `closePops()` (other pop-ups, outside clicks, Esc, entering drawing); `openText()`/`closeText()`, `body.text-open`. Only A or its X closes it (and rolling up / locking). Drawing likewise only closes by Draw, its X or Esc.
+- **Fading:** `#textPop` is at 40 % while drawing or while the editor has focus (`body:has(#editor:focus)`), 100 % on hover. Using the text toolbar while drawing switches to typing (capture listener), like the bottom bar.
+- **One Undo button** `#btnUndo` in the bottom bar, outside `.tleft` so it never scrolls away: drawing → `inkUndo`, otherwise the note font (`textUndo`, cleared on any typing) or the editor's own undo (then the selection is collapsed so the panel goes back to "whole note"). Ctrl+Z does the same. Below 430 px the formatting buttons are 22 px so everything still fits on a 340 px note.
+- Tests: store.test.js checks the restore group and its name.
+
+## 1.1.9 – 22 October 2026
+
+- **Text panel as a toolbar:** `#textPop` (class `tbar`) is 250 px wide like `#inkBar`, opens bottom-left, with a grip, a "Changes: whole note / selected text" line with an undo button (`#tScope`, `#tUndo`), the font (`#fontSeg`), colour and highlight dots, size (`#fsizeSeg`) and clear formatting (`#miClearFmt`). Every button goes through `onText()`: the selection, or the whole note when nothing is selected (select all, apply, put the caret back). Font with a selection = `fontName` (Caveat/Nunito, size-matched in note.css); without = the note's font. Undo = `textUndo` (editor undo steps + note-font changes). The note-wide 3-size buttons (`note.size`) are gone from the UI; existing notes keep their size.
+- **It stays open:** the outside-click handler skips closing when `openPopId === '#textPop'`; only the A button (toggle), Esc, opening another pop-up, or rolling up closes it. Clear formatting no longer closes it. The selection it acts on is the current one (`selectionchange` → `saveSel` already tracked it).
+- **Shared drag code:** `movable(el, { key, roomLeft, dragBtn })` now handles both the drawing toolbar (`inkBarPos`, 40 px room for the switch button, `dragBtn` = `#inkPause`) and the text toolbar (`textBarPos`). Drag from any non-button spot; double-click the grip to reset.
+- **Cursor:** `#inkBar` no longer has `cursor: grab`; only `.igrip` shows the hand.
+- **Switch badge:** `#inkPause .swap`, a small purple ⇄ circle on the button.
+- **Scrollbars:** `#scroller` thumb is transparent unless `body:hover`, `:focus-within` or `.pop-open`. (Checked with scrollbars switched on in the test browser: Playwright hides them by default.)
+
+## 1.1.8 – 22 October 2026
+
+- **Fixed: Partial eraser made drawings "dance".** 1.1.6 thinned out the points of every leftover piece (`simplify`), and each later pass traced the smoothed curve again and smoothed it once more, so lines crept by a few px per pass (measured: up to 4.2 px after 25 passes). `simplify` is gone; leftover pieces keep their 2 px points, and a line whose points are already that close (`isDense`, cached) is split as it is, never retraced. Drift is now a one-time ≤ 0.5 px when a line is first erased, and doesn't grow. Speed stays the same (busy-drawing scrub ≈ 3.8 s, slowest step < 0.1 s).
+- **Three more dark list themes:** midnight, forest, plum (`THEMES` entries with `dark: true`; list.js puts `.dark` on the body so the dark-only fixes in list.css apply to all of them; main.js `LIST_THEMES` for the window buttons).
+- **Settings toggles back:** clicking the Settings tab while it's open returns to the last of Notes/Bin (`setTab`, `lastTab`).
+- **Movable drawing toolbar:** a grip (`#inkGrip`) at the top of `#inkBar`; dragging sets `right`/`bottom` (kept inside the note and below the top bar, also when the note is resized: `placeInkBar`). Saved in `localStorage.inkBarPos` (distance from the bottom-right corner); double-click resets it.
+- **Drawing ⇄ typing switch:** `#inkPause`, a round button stuck to the left of `#inkBar` (moves with it; `placeInkBar` keeps 40 px for it), showing a T (typing) or a pen (back to drawing). `pauseInk()` finishes the current stroke, saves the ink, hides `#inkCatch` and makes the editor editable (`body.ink-paused`); `resumeInk()` undoes that. The Draw button (highlighted while typing) also resumes. Ctrl+Z is text undo while typing. Esc/Done end drawing as usual.
+- **Nothing disappears:** while drawing, the bottom bar stays at 35 % opacity (70 % on hover) and clicking any of its buttons switches to typing first (capture listener on `#tools`). While typing, the drawing toolbar stays, faded (38 %), and clicking any tool in it switches back to drawing (capture listener on `#inkBar`). The toolbar now starts just above the bottom bar (`bottom: 42px`).
+- **Drag the toolbar from anywhere:** pointerdown on any non-button spot of `#inkBar` (grip, gaps, tip line), or on the switch button, moves the whole toolbar; the switch button only starts dragging after 4 px, and a drag doesn't count as a click (`draggedSwitch`). Tool buttons are never dragged.
+- **Font and note text size moved** from the ⋯ menu into the A (text) pop-up (`#fontSeg`, `#sizeSeg` now in `#textPop`, labelled "whole note"; colour/highlight/size are labelled "selected text").
+- **12 directions** for Shift + line/arrow (`shapeEnd` step π/6 instead of π/4).
+- **"Draw" label** on `#btnInk`; `#btnText` moved right after strikethrough. Below 440 px the formatting buttons are 24 px wide with tighter gaps so everything still fits on a 340 px note; below 280 px the Draw label hides.
+- `#stamp` opacity .5 → .35.
+
+## 1.1.7 – 22 October 2026
+
+- **Five card sizes** in the notes list and Bin: s 124×128, m 156×168, l 208×222, **xl 260×278**, **xxl 320×340** (`SIZES` in list.js; main.js accepts `listSize` s|m|l|xl|xxl). The size menu shows S/M/L/XL/XXL with a tip. A card never gets wider than the window (`min(var(--cw), 100%)`), so XXL fits a 340 px window.
+- **Ctrl + mouse wheel** changes the card size one step per notch (wheel up = bigger), with a toast. Wheel deltas are added up and steps are at least 140 ms apart, so a touchpad doesn't jump straight to the end. `preventDefault` stops page zoom. Not in Settings or while a pop-up is open.
+- **Undo after Done:** `enterInk` no longer clears `inkState.undo`; the list keeps the last 50 snapshots (was 100, per drawing session). `hideContent` clears it, so a locked note keeps no copies of its drawing.
+- **Eraser sizes stay put:** `#inkWidths` is always shown with the eraser; for "Whole line" it gets `.off` (faded, buttons disabled) instead of `hidden`.
+- **Over / Behind icons:** two overlapping squares (`.pg` = the note, `.ik` = the drawing, red); the one in front shows the layer.
+- **Tool pointers:** pen = pencil, highlighter = marker, 24 px SVG data-URL cursors with the tip in the chosen colour and a white outline (`CURSOR_SVG`, `toolCursor()`, set on `#inkCatch` in `paintInkBar`). Hotspot at the tip (3, 21). Shapes keep the cross; the erasers keep theirs.
+
+## 1.1.6 – 22 October 2026
+
+- **List themes.** `settings.listTheme` (cream | rose | mint | sky | lilac | night), picked in Settings → General ("Colours of this window", `#sTheme`, `THEMES` in list.js). list.css now uses variables for every surface (`--card`, `--card2`, `--ink2`, `--ink3`, `--pillfg`, `--dot`, `--danger…`), and `body[data-theme]` overrides them. main.js `LIST_THEMES` / `paintListFrame()` recolours the window background and the title-bar overlay (window buttons) to match.
+- **Fixed card size.** `.cards` uses `repeat(auto-fill, var(--cw))` and `.card { height: var(--ch) }` (s 124×128, m 156×168, l 208×222; Bin cards +30 px for their buttons). Resizing only changes the number of columns. Line clamps were set to fit; with a picture the text clamps to 1–2 lines (`.body:has(.thumb)`).
+- **Bin search** (`#bq`, `#bqClear`, `binQuery`), same as the notes search; Esc clears it, Ctrl+F focuses the search of the open tab. The Bin text sits under the search row; "Empty bin" moved into that row.
+- **Shift+click Delete** in the Bin skips the question (`destroyNote(n, skipAsk)`); the question has the tip.
+- **Password or PIN.** `lock:set` takes `kind` ('pin' | 'password'); a PIN must be 4–12 digits. Stored as `settings.lockKind` and `settings.lockLen` (PIN length). `lockInfo()` sends both to the list (`list:get`) and to notes (`noteSettings`). The list `modal()` got `kindPick` (Password | PIN switch), `pin` inputs (digits only) and `pinLen` (submits by itself at that length). The note lock screen does the same (`paintUnlock`, auto-submit at `lockLen`), and the note's own "choose a password" pop-up has the switch (`#pwKind`). A wrong PIN clears the box and says "Wrong PIN"; a wrong password says "Wrong password". Old passwords (no `lockKind`) count as passwords.
+- **Move up inside a group:** the `#dropOut` strip is gone (it pushed the cards down). The back button (`#btnBack`, left of the group name) glows while dragging and is the drop target; the path above still works too.
+- **Group tip** ("drag a note onto another…") only shows while `settings.madeGroup` is false. store.js sets it in `createGroup` and on load if any group exists.
+- **Envelope seal** is gold (`.e-seal`, `.seal` in the look picker) instead of red, so it isn't confused with the pinned-note pin.
+- **Word wrap** replaces "lock text layout" in the UI (same `note.wrapWidth`): `#btnWrap.on` = word wrap on (no wrapWidth); off shows a slash like spelling. Short tooltip, toasts and question.
+- **Draw-over:** "Rub out" → "Partial". Tips are one short line (`.ihint` single line, fixed height) and every toolbar row has a fixed height, so the toolbar doesn't jump between tools. Rolling up while drawing calls `exitInk()` first (`body.rolled #inkBar` hidden as well).
+- **Faster Partial eraser:** `tracePieces` now works out the curves in plain JS (same maths as `smoothPath`/`strokeEl`) instead of `getPointAtLength` on a hidden SVG; bounding boxes are cached (`boxOf`); erasing runs once per animation frame (`queueRub`/`flushRub`); leftover pieces are thinned with `simplify` (0.35 px); and redraws reuse each stroke's SVG element (`elCache`, `paintInk`), with the sheet size updated when the drag ends. On a busy test drawing (250 strokes) a scrub went from 42 s to 3.6 s, slowest step 2.4 s → 0.13 s.
+- **Cursor:** `#scroller` has the normal arrow (so scrollbars show it); the text cursor is on `#sheet`.
+- Tests: `tests/pin-theme.test.js`.
+
+## 1.1.5 – 22 October 2026
+
+- **Build fix for computers with an old Node.js.** On the work laptop the global Node was 14, and the build failed (`stream/promises` missing). The installed `@electron/rebuild` 4.2.1 needs Node ≥ 22.12.0. `build.bat` now checks the version (major.minor, not just the major). If Node is missing or too old, it downloads Node 22.14.0 (win-x64 zip from nodejs.org, via PowerShell) into `tools\node` and puts it first on `PATH` for that window only. A later run reuses `tools\node`. The system Node and other apps are untouched. If the download fails, it opens nodejs.org with instructions.
+- `tools` added to `.gitignore`.
+- The final message reads the version from package.json (`node -p`) instead of the hard-coded “Setup 1.1.1.exe”. `HOW TO INSTALL.txt` no longer names a version.
+- Kept from before: the `fc /b` Smart App Control check, the 15 s retry and the Windows Security explanation (now also mentioning that IT may have locked those settings on a work laptop).
+- No app changes.
+
 ## 1.1.4 – 22 October 2026
 
 - **Duplicate note**: list right-click (`noteMenu` → `S.list.duplicate` → `list:duplicate`) and the note's ⋯ menu (`#miDuplicate`: `saveNow()` + `saveInk()` first, then `note:duplicate`). Both call `duplicateNote(id)` in main.js → `store.duplicate(id, extra)`.

@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('sticky', {
   unlock: (pw) => inv('note:unlock', pw),
   relock: () => inv('note:relock'),
   setLocked: (locked) => inv('note:set-locked', !!locked),
-  setPassword: (current, next) => inv('lock:set', { current, next }),
+  setPassword: (current, next, kind) => inv('lock:set', { current, next, kind }),
   onSettings: (cb) => ipcRenderer.on('settings:changed', (e, s) => cb(s)),
   onLook: (cb) => ipcRenderer.on('note:look', (e, v) => cb(v)),
   onLockNow: (cb) => ipcRenderer.on('note:lock-now', () => cb()),
