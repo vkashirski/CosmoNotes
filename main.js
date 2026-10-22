@@ -406,10 +406,18 @@ function duplicateNote(id) {
   return n.id;
 }
 
-function bringToFront() {
-  for (const win of wins.values()) {
+// "Bring notes to front" (notes list button, tray menu) also unrolls rolled-up notes (unroll: true).
+// Starting CosmoNotes a second time only brings them up.
+function bringToFront({ unroll = false } = {}) {
+  for (const [id, win] of wins) {
     if (win.isDestroyed()) continue;
     if (win.isMinimized()) win.restore();
+    const n = unroll && store.get(id);
+    if (n && n.rolled) {
+      store.update(id, { rolled: false });
+      setRolled(win, n);
+      win.webContents.send('note:look', viewOf(n, win)); // the note shows its text and bars again
+    }
     win.showInactive();
     win.moveTop();
   }
@@ -490,6 +498,11 @@ function showList() {
   listWin.on('resize', remember);
   listWin.on('close', () => { remember(); try { store.saveSettings(); } catch { /* ignore */ } });
   listWin.on('closed', () => { listWin = null; listOpenGroups.clear(); });
+  // the mouse's back / forward buttons (some mice send these as Windows commands): move between group levels
+  listWin.on('app-command', (e, cmd) => {
+    if (cmd !== 'browser-backward' && cmd !== 'browser-forward') return;
+    if (listWin && !listWin.isDestroyed()) listWin.webContents.send('list:nav', cmd === 'browser-backward' ? 'back' : 'forward');
+  });
   listWin.loadFile(path.join(__dirname, 'src', 'list.html'));
 }
 
@@ -517,7 +530,7 @@ function buildTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'New note', click: () => createNote() },
     { label: 'All notes', click: showList },
-    { label: 'Bring notes to front', click: bringToFront },
+    { label: 'Bring notes to front', click: () => bringToFront({ unroll: true }) },
     { type: 'separator' },
     { label: 'Start with Windows', type: 'checkbox', checked: !!store.settings.startWithWindows, click: (mi) => setStartup(mi.checked) },
     { type: 'separator' },
@@ -861,7 +874,7 @@ function registerIpc() {
     notifyList();
     return true;
   });
-  ipcMain.handle('list:bring-front', () => bringToFront());
+  ipcMain.handle('list:bring-front', () => bringToFront({ unroll: true }));
 
   ipcMain.handle('settings:set', (e, patch) => {
     patch = patch || {};
@@ -870,6 +883,9 @@ function registerIpc() {
     if (['s', 'm', 'l', 'xl', 'xxl'].includes(patch.listSize)) store.settings.listSize = patch.listSize;
     if (LIST_THEMES[patch.listTheme]) { store.settings.listTheme = patch.listTheme; paintListFrame(); }
     if (patch.defaultFont === 'hand' || patch.defaultFont === 'round') store.settings.defaultFont = patch.defaultFont;
+    if (Number.isFinite(Number(patch.defaultOpacity)) && patch.defaultOpacity !== null && patch.defaultOpacity !== '') {
+      store.settings.defaultOpacity = Math.min(1, Math.max(0.25, Math.round(Number(patch.defaultOpacity) * 20) / 20));
+    }
     if ('spellCheck' in patch) store.settings.spellCheck = !!patch.spellCheck;
     if ('spellCyrillic' in patch) { store.settings.spellCyrillic = !!patch.spellCyrillic; spellLanguages(); }
     if (patch.listSort && typeof patch.listSort === 'object') {

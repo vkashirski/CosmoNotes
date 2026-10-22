@@ -328,10 +328,10 @@ body[data-color="charcoal"] #editor .voice { background: rgba(255,255,255,.08); 
   gap: 1px;
   padding: 0 6px;
 }
-/* the bottom bar's buttons show while you use the note (and fade while drawing), except Undo:
-   that one is always there at full strength */
+/* the bottom bar's buttons show while you use the note (and fade while drawing). Undo follows the
+   same rules, except that while the mouse is on the note it's always at full strength */
 #tools > * { opacity: 0; transition: opacity .16s; }
-#tools > #btnUndo { opacity: 1 !important; }
+body:hover #tools > #btnUndo { opacity: 1 !important; }
 /* formatting buttons scroll sideways on a very narrow note; Add always stays visible */
 .tleft {
   flex: 1; min-width: 0;
@@ -849,18 +849,6 @@ body[data-font="hand"] #editor font[face="Nunito"] { font-size: .68em; }
 }
 .ix:hover { background: var(--pop-soft); color: var(--pop-ink); }
 .ix svg { width: 13px; height: 13px; stroke-width: 2.6; }
-/* the little tab on the drawing toolbar's left: just something easy to grab and drag */
-.iside {
-  position: absolute; left: -15px; top: 50%; transform: translateY(-50%);
-  width: 15px; height: 46px;
-  border-radius: 9px 0 0 9px;
-  background: var(--pop-bg);
-  box-shadow: -4px 4px 10px rgba(60,40,10,.14);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  cursor: grab;
-}
-.iside i { width: 3px; height: 3px; border-radius: 50%; background: #B8A88A; }
-.iside:hover i { background: #8A7652; }
 /* typing while drawing: the whole drawing toolbar fades (clicking a tool goes back to drawing) */
 body.ink-paused #inkBar > * { opacity: .38; transition: opacity .15s; }
 body.ink-paused #inkBar:hover > * { opacity: .75; }
@@ -882,18 +870,19 @@ body.text-open #stamp { opacity: 0; }
   #btnInk { padding: 0 6px 0 4px; }
   #btnUndo { margin-left: 1px; }
 }
-/* pause button: top left of the drawing toolbar (the X is top right). Paused, it turns into a
+/* pause button: at the top of the drawing toolbar, just left of the grip line (the X is top right). Paused, it turns into a
    play button and stays at full strength while the rest of the toolbar fades */
 .ipz {
-  position: absolute; top: 3px; left: 4px;
-  width: 20px; height: 20px; padding: 0;
-  border: 0; border-radius: 7px;
-  background: transparent; color: var(--pop-mute);
+  position: absolute; top: 4px; left: -40px; /* outside the toolbar, on its left; moves with it */
+  width: 32px; height: 32px; padding: 0;
+  border: 0; border-radius: 50%;
+  background: var(--pop-bg); color: var(--pop-ink);
+  box-shadow: 0 6px 16px rgba(60,40,10,.25), 0 1px 3px rgba(0,0,0,.12);
   display: grid; place-items: center; cursor: pointer;
 }
-.ipz:hover { background: var(--pop-soft); color: var(--pop-ink); }
-.ipz svg { width: 12px; height: 12px; fill: currentColor; stroke: none; }
+.ipz:hover { background: #fff; }
+.ipz svg { width: 13px; height: 13px; fill: currentColor; stroke: none; }
 .ipz .i-play { display: none; }
 body.ink-paused #inkBar > #inkPz { opacity: 1; background: #3B3226; color: #FFF8E6; }
 body.ink-paused .ipz .i-pause { display: none; }
-body.ink-paused .ipz .i-play { display: block; width: 11px; height: 11px; margin-left: 1px; }
+body.ink-paused .ipz .i-play { display: block; width: 12px; height: 12px; margin-left: 2px; }

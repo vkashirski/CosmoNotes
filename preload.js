@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('sticky', {
     emptyBin: () => inv('list:empty-bin'),
     bringToFront: () => inv('list:bring-front'),
     onChanged: (cb) => ipcRenderer.on('notes:changed', () => cb()),
+    onNav: (cb) => ipcRenderer.on('list:nav', (e, dir) => cb(dir)), // mouse back / forward buttons
     setLocked: (id, locked, pw) => inv('list:set-locked', id, !!locked, pw),
   },
   groups: {

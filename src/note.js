@@ -334,10 +334,11 @@
   $('#btnList').addEventListener('click', () => { saveNow(); api.showList(); });
   $('#btnRoll').addEventListener('click', () => {
     closePops();
-    if (!note.rolled) closeText();
-    // rolling up while drawing: finish drawing first, so the drawing toolbar never sits on the top bar
-    if (!note.rolled && inkState.on) exitInk();
+    // Rolling up keeps the drawing and text toolbars as they are: they're only hidden while the note is
+    // rolled up (note.css body.rolled), so they never sit on the top bar, and come back when it unrolls.
+    if (!note.rolled) finishStroke();
     saveNow();
+    saveInk();
     setProp({ rolled: !note.rolled });
   });
   $('#btnRelock').addEventListener('click', relock);
@@ -1302,7 +1303,7 @@
   // Colour/font/lock changed from the notes list.
   api.onLook((v) => {
     if (!note || !v) return;
-    for (const k of ['color', 'font', 'size', 'title', 'locked', 'lockedBy', 'pinned', 'opacity']) if (k in v) note[k] = v[k];
+    for (const k of ['color', 'font', 'size', 'title', 'locked', 'lockedBy', 'pinned', 'opacity', 'rolled']) if (k in v) note[k] = v[k];
     if (v.hidden && !hidden) { hideContent(); return; }
     applyLook();
   });
@@ -1674,8 +1675,7 @@
     paintUndo();
   }
   // ---- floating toolbars (drawing toolbar, text panel): drag them anywhere in the note.
-  // They move when dragged by any empty spot (the grip, the little tab on the drawing toolbar's
-  // left, gaps, labels), or by `dragBtn` if given. Other buttons are clicked, never dragged.
+  // They move when dragged by any empty spot (the grip, gaps, labels), or by `dragBtn` if given. Other buttons are clicked, never dragged.
   // dragBtn only starts moving after 4 px, so a normal click on it still works. The place is kept as the
   // distance from the bottom-right corner (remembered for next time); double-click the grip
   // to put it back. It always stays inside the note and below the top bar.
@@ -1736,7 +1736,7 @@
     return m;
   }
   const inkBar = $('#inkBar');
-  const inkMove = movable(inkBar, { key: 'inkBarPos', roomLeft: 16 }); // 16 px: the little drag tab on its left
+  const inkMove = movable(inkBar, { key: 'inkBarPos', roomLeft: 40, dragBtn: $('#inkPz') }); // 40 px: the pause button on its left (it can drag the toolbar too)
   const placeInkBar = () => inkMove.place();
   const textMove = movable($('#textPop'), { key: 'textBarPos' });
 
@@ -1780,7 +1780,10 @@
   $('#btnInk').addEventListener('click', () => (inkState.paused ? resumeInk() : inkState.on ? exitInk() : enterInk()));
   $('#inkX').addEventListener('click', exitInk);
   // pause button (top left of the drawing toolbar): drawing on hold to type, then carry on
-  $('#inkPz').addEventListener('click', () => (inkState.paused ? resumeInk() : pauseInk()));
+  $('#inkPz').addEventListener('click', () => {
+    if (inkMove.dragged) return; // it was used to move the toolbar, not clicked
+    if (inkState.paused) resumeInk(); else pauseInk();
+  });
   // drawing: using the (faded) text toolbar switches to typing too
   $('#textPop').addEventListener('click', (e) => {
     if (inkState.on && !inkState.paused && e.target.closest('button') && !e.target.closest('#textX')) pauseInk();

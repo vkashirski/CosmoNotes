@@ -865,6 +865,12 @@ body.dark .phead:hover { background: var(--card2); }
 .panel.open .pinner { opacity: 1; transform: none; padding-top: 6px; padding-bottom: 14px; }
 .abouthead.phead { padding: 10px 16px; }
 /* backups: the newest one, and the picker pop-up */
+/* General: "For new notes" heading, said once for colour, font and see-through */
+.subhead { margin: 6px 0 0; padding: 12px 0 2px; border-top: 1px solid var(--soft); font: 800 10.5px var(--ui); letter-spacing: .07em; text-transform: uppercase; color: var(--mute); }
+.subhead + .row { border-top: 0; }
+.oprow { display: flex; align-items: baseline; justify-content: space-between; }
+.oprow em { font: 800 12px var(--ui); font-style: normal; color: var(--ink2); }
+.srange { width: 100%; accent-color: #8E7BEF; cursor: pointer; }
 .bklast { margin: 0 0 10px; font: 700 12px var(--ui); color: var(--ink2); }
 .bklist { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; margin: 2px 0 8px; padding: 2px; text-align: left; }
 .bkpick {

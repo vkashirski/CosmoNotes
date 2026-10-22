@@ -12,7 +12,7 @@
  *   4. "Last updated" + version in ai-context/CONTEXT.md
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-10-22',
+  LAST_UPDATED: '2026-10-23',
 
   FEATURES: [
     {
@@ -55,12 +55,13 @@ window.COSMO_ABOUT = {
         'Tools: pen, highlighter, straight line, arrow, square, circle and eraser, in 8 colours and 3 thicknesses, with undo.',
         'Two erasers: “Partial” erases only what is under the eraser circle (3 sizes), “Whole line” removes a whole line or shape with one touch.',
         'Hold Shift for straight lines, perfect squares and perfect circles. Lines and arrows snap to 12 directions, like a clock.',
-        'Drag the drawing toolbar by any empty spot, or by the little tab on its left, to anywhere in the note (double-click the grip at the top to put it back). Close it with its X.',
+        'Drag the drawing toolbar by any empty spot to anywhere in the note (double-click the grip at the top to put it back). Close it with its X.',
         'Scrollbars only show while you’re using the note, like the bottom bar.',
         'Switch between drawing and typing just by using them: the bottom bar or the text toolbar switches to typing, a drawing tool switches back. The one you’re not using fades, so nothing disappears.',
         'The mouse pointer looks like a pencil or a marker in the colour you picked.',
-        'One Undo button in the bottom bar, left of Draw, always visible: it undoes your drawing while you draw (last 50 steps, also after closing drawing) and your text otherwise.',
-        'The pause button at the top left of the drawing toolbar puts drawing on hold so you can type; press play to carry on.',
+        'One Undo button in the bottom bar, left of Draw, at full strength while your mouse is on the note: it undoes your drawing while you draw (last 50 steps, also after closing drawing) and your text otherwise.',
+        'The round pause button just left of the drawing toolbar puts drawing on hold so you can type; press play to carry on. You can also drag the toolbar by it.',
+        'Rolling a note up only hides the drawing and text toolbars; they come back as they were when you unroll it.',
         'Draw “Over” the text and pictures, or “Behind” them like marker on paper.',
         'Drawings stay exactly where you put them: drawing turns word wrap off, and you get a warning before anything could move away from a drawing.',
       ],
@@ -102,12 +103,12 @@ window.COSMO_ABOUT = {
       title: 'Groups',
       items: [
         'Drag a note onto another note to make a group. Drop notes (or whole groups) onto a group to put them inside.',
-        'Groups can sit inside groups, like folders. A path at the top shows where you are, and you can drop things on it to move them up.',
+        'Groups can sit inside groups, like folders. A path at the top shows where you are, and you can drop things on it to move them up. The mouse’s back and forward buttons move between the levels you visited.',
         'Four looks for each group (paper stack, folder, envelope or notebook) in 8 colours.',
         'Name groups, lock them, ungroup them (it asks first), or move all their notes to the Bin.',
         'While a group is open, “New note” makes the note right inside it.',
         'Change the paper colour or font of every note in a group at once, optionally including the groups inside it.',
-        'Settings for start-up, default colour and font, spelling, the password, backups and where notes are stored.',
+        'Settings for start-up, the window colours, colour, font and see-through for new notes, spelling, the password, backups and where notes are stored.',
       ],
     },
   ],
@@ -115,10 +116,14 @@ window.COSMO_ABOUT = {
   VERSIONS: [
     {
       version: '1.1.11',
-      date: '2026-10-22',
+      date: '2026-10-23',
       changes: [
-        'The Undo button is always shown at full strength, also when the rest of the bottom bar is hidden or faded.',
-        'A pause button is back on the drawing toolbar (top left, across from the X): it puts drawing on hold so you can type, and turns into a play button to carry on.',
+        'The Undo button is at full strength whenever your mouse is on the note, also while drawing fades the rest of the bottom bar. Away from the note it hides or fades like the other buttons.',
+        'A pause button is back: a round button just left of the drawing toolbar (it moves with it). It puts drawing on hold so you can type, and turns into a play button to carry on. The little tab on the toolbar’s left side is gone.',
+        'Rolling a note up no longer closes the drawing or text toolbar: they’re just hidden while it’s rolled up and come back when you unroll it.',
+        'Notes list: the back and forward buttons on your mouse move between group levels, like in a web browser.',
+        '“Bring all open notes to the front” (notes list button and tray menu) also unrolls rolled-up notes.',
+        'Settings → General: Start with Windows and the window colours come first, then one “For new notes” part with colour, font and a new see-through setting.',
         'Settings: a section title you point at gets its own soft tint and keeps its rounded corners.',
         'Faster: the notes list updates about 15× quicker when a note changes (it only redraws the cards that changed), and saving while you type no longer slows down in notes with big drawings.',
       ],

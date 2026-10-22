@@ -33,6 +33,7 @@ const DEFAULT_SETTINGS = {
   lock: null, // "salt:hash" of the one password/PIN for locked notes
   lockKind: null, // 'pin' (digits only, opens as soon as it's typed) | 'password' (null = password, set before 1.1.6)
   lockLen: 0, // length of the PIN, so a note opens by itself once that many digits are typed
+  defaultOpacity: 1, // see-through for new notes (0.25 – 1)
   listTheme: 'cream', // colours of the notes list window (see THEMES in list.js; night, midnight, forest, plum are dark)
   madeGroup: false, // true once a group was ever made: the "drag to make a group" tip stops for good
 };
@@ -254,6 +255,7 @@ class Store {
       // "random" picks one of the pastel papers (not the dark one)
       color: this.settings.defaultColor === 'random' ? COLORS[Math.floor(Math.random() * (COLORS.length - 1))] : this.settings.defaultColor,
       font: this.settings.defaultFont,
+      opacity: Math.min(1, Math.max(0.25, Number(this.settings.defaultOpacity) || 1)),
       ...partial,
       id: crypto.randomUUID(),
       createdAt: Date.now(),

@@ -47,6 +47,11 @@
   let lastSig = '';
   let tab = 'notes';
   let lastTab = 'notes'; // notes or bin: where clicking Settings again goes back to
+  // group levels visited, for the mouse's back / forward buttons (null = all notes)
+  let navBack = [];
+  let navFwd = [];
+  let shownGroup = null;
+  let navigating = false;
   let query = '';
   let binQuery = '';
   let openGroup = null; // id of the group being looked at (null = top level)
@@ -161,6 +166,12 @@
       // the group went away (emptied, ungrouped or locked again): go to the nearest level that still exists
       const up = chainOf(openGroup).find((g) => g.id !== openGroup && g.open && notesInTree(g.id).length);
       openGroup = up ? up.id : null;
+    }
+    // every move between group levels (opening a group, the back button, the path, Esc…) is remembered
+    // for the mouse's back and forward buttons, like in a web browser
+    if (openGroup !== shownGroup) {
+      if (!navigating) { navBack.push(shownGroup); if (navBack.length > 100) navBack.shift(); navFwd = []; }
+      shownGroup = openGroup;
     }
     document.body.dataset.theme = themeNow();
     document.body.classList.toggle('dark', !!THEMES.find((t) => t.id === themeNow()).dark);
@@ -504,6 +515,9 @@
       }));
     }
     $$('#sFont button').forEach((b) => b.classList.toggle('on', b.dataset.font === s.defaultFont));
+    const op = Math.round((Number(s.defaultOpacity) || 1) * 100);
+    if (document.activeElement !== $('#sOpacity')) $('#sOpacity').value = op; // not while it's being dragged
+    $('#sOpVal').textContent = `${$('#sOpacity').value}%`;
     const th = $('#sTheme');
     th.innerHTML = '';
     for (const t of THEMES) {
@@ -525,7 +539,7 @@
       : 'No password or PIN yet. Choose one here, or the first time you lock a note or group.';
     $('#pwSave').innerHTML = ICON.lock + (s.hasPassword ? `Change ${pinNow ? 'PIN' : 'password'}` : 'Set password or PIN');
     $('#dataPath').textContent = s.dataPath || '';
-    $('#version').textContent = `CosmoNotes ${s.version || ''}`;
+    $('#version').textContent = `CosmoNotes ${s.version || ''} - Made with love.`;
     renderAbout(s.version);
     renderBackups(await S.backups.list());
   }
@@ -977,6 +991,36 @@
     });
   })();
 
+  // ---- mouse back / forward buttons: back to the group level you were on before, and forward again.
+  // Levels that no longer exist (ungrouped, emptied, locked again) are skipped.
+  const canShow = (gid) => gid === null || (groupById(gid) && groupById(gid).open && notesInTree(gid).length > 0);
+  let navAt = 0;
+  function navigate(dir) {
+    if (!$('#modal').hidden || drag) return;
+    const now = Date.now();
+    if (now - navAt < 250) return; // one click can arrive twice (as a mouse button and as a Windows command)
+    navAt = now;
+    const from = dir === 'back' ? navBack : navFwd;
+    const to = dir === 'back' ? navFwd : navBack;
+    let target;
+    do { target = from.pop(); } while (target !== undefined && (target === openGroup || !canShow(target)));
+    if (target === undefined) return;
+    to.push(openGroup);
+    if (tab !== 'notes') { tab = 'notes'; lastTab = 'notes'; }
+    openGroup = target;
+    clearSearch();
+    closePanel();
+    navigating = true;
+    try { render(true); } finally { navigating = false; }
+    $('#viewNotes').scrollTop = 0;
+  }
+  window.addEventListener('mouseup', (e) => {
+    if (e.button === 3) { e.preventDefault(); navigate('back'); }
+    if (e.button === 4) { e.preventDefault(); navigate('forward'); }
+  });
+  window.addEventListener('mousedown', (e) => { if (e.button === 3 || e.button === 4) e.preventDefault(); });
+  if (S.list.onNav) S.list.onNav((dir) => navigate(dir === 'forward' ? 'forward' : 'back'));
+
   // ================================================================ events
   // Settings is a toggle: clicking it while it's open goes back to Notes or Bin, whichever was open before
   function setTab(v) {
@@ -1088,6 +1132,9 @@
   $('#sSpell').addEventListener('change', (e) => S.settings.set({ spellCheck: e.target.checked }));
   $('#sCyr').addEventListener('change', (e) => S.settings.set({ spellCyrillic: e.target.checked }));
   $$('#sFont button').forEach((b) => b.addEventListener('click', () => S.settings.set({ defaultFont: b.dataset.font })));
+  // see-through for new notes: shown while dragging, saved when let go
+  $('#sOpacity').addEventListener('input', (e) => { $('#sOpVal').textContent = `${e.target.value}%`; });
+  $('#sOpacity').addEventListener('change', (e) => { state.settings.defaultOpacity = Number(e.target.value) / 100; S.settings.set({ defaultOpacity: Number(e.target.value) / 100 }); });
   // password or PIN: set / change in an app-styled pop-up
   $('#pwSave').addEventListener('click', async () => {
     const has = !!state.settings.hasPassword;

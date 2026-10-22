@@ -57,6 +57,23 @@ const ev = (w) => ({ sender: w.webContents, returnValue: undefined });
   assert.equal(withInk.color, 'blue');
   n = await H['note:get'](ev(w));
   assert.equal(n.ink.s.length, 300, 'drawing kept after a group recolour');
+  // "Bring notes to front" unrolls rolled-up notes; launching CosmoNotes again doesn't
+  await H['note:update'](ev(w), { rolled: true });
+  assert.equal((await H['note:get'](ev(w))).rolled, true);
+  assert.equal(w.getBounds().height, 34, 'rolled up');
+  E.app.emit('second-instance');
+  assert.equal((await H['note:get'](ev(w))).rolled, true, 'starting again only brings notes up');
+  w.webContents.sent.length = 0;
+  await H['list:bring-front']();
+  assert.equal((await H['note:get'](ev(w))).rolled, false, 'unrolled');
+  assert.ok(w.getBounds().height > 100, 'back to its full height');
+  assert.ok(w.webContents.sent.includes('note:look'), 'the note window is told');
+  // mouse back/forward buttons sent by Windows as commands reach the notes list
+  await H['list:show']();
+  const lw = E.__all.find((x) => x.file.endsWith('list.html') && !x.destroyed);
+  lw.emit('app-command', {}, 'browser-backward');
+  lw.emit('app-command', {}, 'media-play-pause');
+  assert.deepEqual(lw.webContents.sent.filter((c) => c === 'list:nav'), ['list:nav'], 'back button → list:nav; other commands ignored');
   console.log(`speed test passed (50 typing saves on a note with a 60 000-number drawing: ${ms.toFixed(1)} ms)`);
   process.exit(0);
 })().catch((err) => { console.error(err); process.exit(1); });

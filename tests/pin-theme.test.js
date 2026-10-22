@@ -53,6 +53,20 @@ const settingsFile = () => JSON.parse(fs.readFileSync(path.join(process.env.FAKE
   assert.equal((await H['list:get']()).settings.listTheme, 'night');
   assert.equal(settingsFile().listTheme, 'night', 'saved to disk');
 
+  // ---- see-through for new notes
+  assert.equal((await H['list:get']()).settings.defaultOpacity, 1);
+  await H['settings:set'](null, { defaultOpacity: 0.62 });
+  assert.equal((await H['list:get']()).settings.defaultOpacity, 0.6, 'rounded to 5% steps');
+  await H['settings:set'](null, { defaultOpacity: 0.05 });
+  assert.equal((await H['list:get']()).settings.defaultOpacity, 0.25, 'never less than 25%');
+  await H['settings:set'](null, { defaultOpacity: 0.7 });
+  await H['list:new']();
+  const fresh = (await H['list:get']()).notes.sort((a, b) => b.createdAt - a.createdAt)[0];
+  const fw = E.__all.filter((x) => x.file.endsWith('note.html') && !x.destroyed).pop();
+  assert.equal((await H['note:get'](ev(fw))).opacity, 0.7, 'a new note starts see-through as set');
+  assert.ok(fresh);
+  await H['settings:set'](null, { defaultOpacity: 1 });
+
   // ---- making a group switches the tip off for good, even after the group is gone
   await H['list:new']();
   const ids = (await H['list:get']()).notes.map((x) => x.id);

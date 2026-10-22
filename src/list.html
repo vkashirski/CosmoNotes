@@ -38,7 +38,7 @@
     </label>
     <button class="iconbtn" id="btnSort" title="Sort"><svg viewBox="0 0 24 24"><path d="M3 6h13M3 12h9M3 18h5"/><path d="M18 8v12M15 17l3 3 3-3"/></svg></button>
     <button class="iconbtn" id="btnSize" title="Card size"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5" opacity=".55"/><rect x="3" y="14" width="5" height="5" rx="1.2" opacity=".55"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg></button>
-    <button class="iconbtn" id="btnFront" title="Bring all open notes to the front"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
+    <button class="iconbtn" id="btnFront" title="Bring all open notes to the front (and unroll rolled-up ones)"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
   </div>
   <div class="sortpop" id="sizePop" hidden>
     <h4>Card size</h4>
@@ -115,19 +115,24 @@
       <input type="checkbox" id="sStartup"><i></i>
     </label>
     <div class="row col">
-      <span><b>Colour for new notes</b></span>
+      <span><b>Colours of this window</b><small>Only changes this notes list, not your notes.</small></span>
+      <div class="themes" id="sTheme"></div>
+    </div>
+    <div class="subhead">For new notes</div>
+    <div class="row col">
+      <span><b>Colour</b></span>
       <div class="swatches" id="sColors"></div>
     </div>
     <div class="row col">
-      <span><b>Font for new notes</b></span>
+      <span><b>Font</b></span>
       <div class="seg" id="sFont">
         <button data-font="hand" class="hand">Handwritten</button>
         <button data-font="round">Rounded</button>
       </div>
     </div>
     <div class="row col">
-      <span><b>Colours of this window</b><small>Only changes this notes list, not your notes.</small></span>
-      <div class="themes" id="sTheme"></div>
+      <span class="oprow"><b>See-through</b><em id="sOpVal">100%</em></span>
+      <input type="range" class="srange" id="sOpacity" min="25" max="100" step="5" value="100">
     </div>
   </div>
 
