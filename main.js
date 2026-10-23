@@ -24,7 +24,7 @@ const BIG = 16384;
 const ASSETS = path.join(__dirname, 'assets');
 const WIN_ICON = path.join(ASSETS, process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const PRELOAD = path.join(__dirname, 'preload.js');
-const EDITABLE = ['title', 'html', 'text', 'firstImage', 'ink', 'wrapWidth', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'pinned', 'rolled', 'spell'];
+const EDITABLE = ['title', 'html', 'text', 'firstImage', 'ink', 'wrapWidth', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'pinned', 'rolled', 'spell', 'zoom'];
 const SECRET = ['html', 'text', 'firstImage', 'ink'];
 const ATT_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'webm', 'ogg', 'mp3', 'm4a', 'wav'];
 
@@ -136,7 +136,8 @@ function hideNewlyLocked() {
     const n = store.get(id);
     if (!n || win.isDestroyed()) continue;
     applyState(win, n);
-    if (isLocked(n) && win.revealed) win.webContents.send('note:lock-now');
+    // the window saves, then hides itself; the list treats it as hidden straight away (lockPending)
+    if (isLocked(n) && win.revealed) { win.lockPending = true; win.webContents.send('note:lock-now'); }
     else win.webContents.send('note:look', viewOf(n, win));
   }
 }
@@ -144,6 +145,8 @@ function pushLook(id) {
   const win = wins.get(id);
   const n = store.get(id);
   if (!win || win.isDestroyed() || !n) return;
+  // its lock was removed (from the list): the open window may show the note again without a password
+  if (!isLocked(n)) win.revealed = true;
   applyState(win, n);
   win.webContents.send('note:look', viewOf(n, win));
 }
@@ -286,8 +289,8 @@ function openNoteWindow(n, { focus = false } = {}) {
     title: titleOf(n),
     icon: WIN_ICON,
     backgroundColor: PAPER[n.color] || PAPER.yellow,
-    minimizable: false,
-    maximizable: false,
+    minimizable: false, // only the note's own minimise button minimises it (see 'note:minimize')
+    maximizable: true, // 1.1.13: maximise button, and double-clicking the top bar
     fullscreenable: false,
     skipTaskbar: false,
     webPreferences: {
@@ -325,6 +328,8 @@ function openNoteWindow(n, { focus = false } = {}) {
       if (win.isDestroyed()) return;
       const cur = store.get(win.noteId);
       if (!cur) return;
+      // a maximised or minimised note keeps its normal size and place for next time
+      if (win.isMaximized() || win.isMinimized()) return;
       const r = win.getBounds();
       cur.bounds = { x: r.x, y: r.y, width: r.width, height: cur.rolled ? (cur.bounds?.height || DEFAULT_H) : r.height };
       store.save(cur.id, 300);
@@ -333,10 +338,32 @@ function openNoteWindow(n, { focus = false } = {}) {
   win.on('move', rememberBounds);
   win.on('resize', rememberBounds);
 
+  // A pinned note never minimises by itself (e.g. "Show desktop"), only with its own minimise button (win.userMin).
   win.on('minimize', () => {
     const cur = store.get(win.noteId);
-    if (cur && cur.pinned) setTimeout(() => { if (!win.isDestroyed()) win.restore(); }, 30);
+    if (cur && cur.pinned && !win.userMin) setTimeout(() => { if (!win.isDestroyed()) win.restore(); }, 30);
   });
+  win.on('restore', () => {
+    if (!win.userMin) return;
+    win.userMin = false;
+    win.setMinimizable(false);
+  });
+  // 1.1.13: maximise (button or double-click on the top bar). A rolled-up note unrolls first.
+  const sendWinState = () => { if (!win.isDestroyed()) win.webContents.send('note:win-state', { maximized: win.isMaximized() }); };
+  win.on('maximize', () => {
+    const cur = store.get(win.noteId);
+    if (cur && cur.rolled) {
+      setTimeout(() => {
+        if (win.isDestroyed()) return;
+        win.unmaximize();
+        unrollWin(win, cur);
+        win.maximize();
+      }, 0);
+      return;
+    }
+    sendWinState();
+  });
+  win.on('unmaximize', sendWinState);
 
   // Windows is shutting down / logging off: keep notes marked open so they come back.
   win.on('session-end', () => { quitting = true; store.flush(); });
@@ -406,6 +433,12 @@ function duplicateNote(id) {
   return n.id;
 }
 
+// unroll a rolled-up note's window (the note shows its text and bars again)
+function unrollWin(win, n) {
+  store.update(n.id, { rolled: false });
+  setRolled(win, n);
+  win.webContents.send('note:look', viewOf(n, win));
+}
 // "Bring notes to front" (notes list button, tray menu) also unrolls rolled-up notes (unroll: true).
 // Starting CosmoNotes a second time only brings them up.
 function bringToFront({ unroll = false } = {}) {
@@ -413,11 +446,7 @@ function bringToFront({ unroll = false } = {}) {
     if (win.isDestroyed()) continue;
     if (win.isMinimized()) win.restore();
     const n = unroll && store.get(id);
-    if (n && n.rolled) {
-      store.update(id, { rolled: false });
-      setRolled(win, n);
-      win.webContents.send('note:look', viewOf(n, win)); // the note shows its text and bars again
-    }
+    if (n && n.rolled) unrollWin(win, n);
     win.showInactive();
     win.moveTop();
   }
@@ -427,7 +456,7 @@ function enforcePinned() {
   for (const [id, win] of wins) {
     if (win.isDestroyed()) continue;
     const n = store.get(id);
-    if (!n || !n.pinned) continue;
+    if (!n || !n.pinned || win.userMin) continue; // minimised with its own button: leave it
     if (win.isMinimized()) win.restore();
     if (!win.isVisible()) win.showInactive();
     if (!win.isFocused()) win.setAlwaysOnTop(true, 'screen-saver');
@@ -561,6 +590,7 @@ function applyPatch(e, patch) {
   // it on every save also re-asserted "always on top" while typing).
   if ('opacity' in clean || 'pinned' in clean || 'color' in clean) applyState(win, n);
   else if ('text' in clean || 'title' in clean) setWinTitle(win, n);
+  if (rolledChanged && n.rolled && win.isMaximized()) win.unmaximize(); // rolling up a maximised note
   if (rolledChanged) setRolled(win, n);
   notifyList();
   return viewOf(n, win);
@@ -578,12 +608,16 @@ function registerIpc() {
     if (!isLocked(note)) return viewOf(note, win);
     if (!checkPassword(pw)) { await wait(450); return null; }
     win.revealed = true;
+    win.lockPending = false;
+    notifyList(); // the list shows it unlocked too, while it's open
     return viewOf(note, win);
   });
   ipcMain.handle('note:relock', (e) => {
     const { win, note } = senderNote(e);
     if (!note) return null;
     win.revealed = false;
+    win.lockPending = false;
+    notifyList();
     return viewOf(note, win);
   });
   ipcMain.handle('note:set-locked', (e, locked) => {
@@ -635,9 +669,26 @@ function registerIpc() {
     store.writeNow(note.id);
     win.close();
   });
+  // 1.1.13: the note's own minimise and maximise buttons
+  ipcMain.handle('note:minimize', (e) => {
+    const { win } = senderNote(e);
+    if (!win || win.isDestroyed()) return;
+    win.userMin = true; // even a pinned note stays minimised until you bring it back
+    win.setMinimizable(true);
+    win.minimize();
+  });
+  ipcMain.handle('note:maximize', (e) => {
+    const { win, note } = senderNote(e);
+    if (!win || win.isDestroyed() || !note) return false;
+    if (win.isMaximized()) { win.unmaximize(); return false; }
+    if (note.rolled) unrollWin(win, note);
+    win.maximize();
+    return true;
+  });
   ipcMain.handle('note:trash', (e) => {
     const { win, note } = senderNote(e);
     if (!note) return;
+    if (isLocked(note)) return { error: 'locked' };
     store.trash(note.id);
     win.close();
     notifyList();
@@ -679,7 +730,10 @@ function registerIpc() {
   ipcMain.handle('list:show', () => showList());
   ipcMain.handle('list:get', () => {
     const { lock, ...settings } = store.settings;
-    const hiddenInList = (n) => n.locked || !groupOpenInList(n.groupId);
+    // 1.1.14: a locked note that's unlocked in its own window shows in the list too, until that window is
+    // closed or locked again
+    const revealedNow = (n) => { const w = wins.get(n.id); return !!(w && !w.isDestroyed() && w.revealed && !w.lockPending); };
+    const hiddenInList = (n) => (n.locked || !groupOpenInList(n.groupId)) && !revealedNow(n);
     return {
       notes: store.all().map((n) => ({
         id: n.id,
@@ -688,9 +742,11 @@ function registerIpc() {
         firstImage: hiddenInList(n) ? null : n.firstImage,
         locked: hiddenInList(n), // shown as a locked card
         ownLock: n.locked, // the note's own lock (vs. a locked group)
+        openUnlocked: isLocked(n) && revealedNow(n), // locked, but unlocked for now in its open window
         color: n.color,
         font: n.font,
         pinned: n.pinned,
+        favorite: n.favorite,
         groupId: n.groupId,
         open: wins.has(n.id),
         createdAt: n.createdAt,
@@ -778,6 +834,8 @@ function registerIpc() {
   });
   ipcMain.handle('groups:trash', (e, groupId) => {
     const notes = store.notesInTree(groupId);
+    // the group or something in it is locked: nothing is moved (remove the lock first)
+    if (notes.some((n) => isLocked(n))) return { error: 'locked' };
     for (const n of notes) {
       const win = wins.get(n.id);
       store.trash(n.id);
@@ -854,15 +912,73 @@ function registerIpc() {
     if (win && !win.isDestroyed()) win.close();
     notifyList();
   });
+  // 1.1.13: a locked note (its own lock or a locked group around it) can't be deleted: remove the lock first
   ipcMain.handle('list:trash', (e, id) => {
+    const n = store.get(id);
+    if (n && isLocked(n)) return { error: 'locked' };
     const win = wins.get(id);
     store.trash(id);
     if (win && !win.isDestroyed()) win.close();
     notifyList();
   });
   ipcMain.handle('list:restore', (e, id) => { store.restore(id); notifyList(); });
+  // ---------- favourites and things done to several selected cards at once (1.1.13)
+  // star or un-star notes and groups (not an edit: "last edited" stays the same)
+  ipcMain.handle('list:favorite', (e, ids = [], on = true) => {
+    let count = 0;
+    for (const id of [].concat(ids)) {
+      if (store.groups.has(id)) { store.updateGroup(id, { favorite: !!on }); count++; }
+      else if (store.get(id)) { store.update(id, { favorite: !!on }); count++; }
+    }
+    notifyList();
+    return count;
+  });
+  // paper colour / font for several notes
+  ipcMain.handle('list:apply', (e, ids = [], patch = {}) => {
+    const clean = {};
+    if (PAPER[patch.color]) clean.color = patch.color;
+    if (patch.font === 'hand' || patch.font === 'round') clean.font = patch.font;
+    if (!Object.keys(clean).length) return 0;
+    let count = 0;
+    for (const id of [].concat(ids)) {
+      const n = store.get(id);
+      if (!n || n.deletedAt) continue;
+      store.update(n.id, clean);
+      pushLook(n.id);
+      count++;
+    }
+    notifyList();
+    return count;
+  });
+  // put several notes and groups together in a new group, made inside `parentId` (null = top level).
+  // Things hidden by a locked group that isn't open in the list are left where they are.
+  ipcMain.handle('groups:make-from', (e, ids = [], parentId = null) => {
+    parentId = parentId && store.groups.has(parentId) ? parentId : null;
+    const noteIds = [];
+    const groupIds = [];
+    for (const id of [].concat(ids)) {
+      if (store.groups.has(id)) {
+        const g = store.groups.get(id);
+        if (!groupOpenInList(g.parentId)) continue;
+        if (parentId && (parentId === id || store.isInside(parentId, id))) continue; // never inside itself
+        groupIds.push(id);
+      } else {
+        const n = store.get(id);
+        if (n && !n.deletedAt && groupOpenInList(n.groupId)) noteIds.push(id);
+      }
+    }
+    if (noteIds.length + groupIds.length < 1) return null;
+    const g = store.createGroup(noteIds, { parentId });
+    for (const id of groupIds) store.setParent(id, g.id);
+    store.cleanupGroups();
+    hideNewlyLocked();
+    notifyList();
+    return g.id;
+  });
   // (the list window asks "are you sure?" in its own style before calling these)
   ipcMain.handle('list:destroy', async (e, id) => {
+    const n = store.get(id);
+    if (n && isLocked(n)) return { error: 'locked' };
     store.destroy(id);
     notifyList();
     return true;
@@ -870,9 +986,11 @@ function registerIpc() {
   ipcMain.handle('list:empty-bin', async () => {
     const binned = store.all().filter((n) => n.deletedAt);
     if (!binned.length) return false;
-    for (const n of binned) store.destroy(n.id);
+    // locked notes stay in the Bin (they can't be deleted while locked)
+    const kept = binned.filter((n) => isLocked(n)).length;
+    for (const n of binned) if (!isLocked(n)) store.destroy(n.id);
     notifyList();
-    return true;
+    return { removed: binned.length - kept, kept };
   });
   ipcMain.handle('list:bring-front', () => bringToFront({ unroll: true }));
 

@@ -46,9 +46,14 @@ const ev = (w) => ({ sender: w.webContents, returnValue: undefined });
   L['note:update-sync'](ev(w), { html: '', text: '' });
   r = await H['note:unlock'](ev(w), 'nope'); assert.equal(r, null);
   r = await H['note:unlock'](ev(w), '1234'); assert.equal(r.hidden, false); assert.ok(r.html.includes('my old note'), 'contents survive locking');
+  // 1.1.14: unlocked in its own window = shown in the list too, until it's locked again or closed
   let list = await H['list:get']();
+  assert.equal(list.notes.find(x => x.id === 'old1').locked, false, 'unlocked in its window: shown in the list');
+  await H['note:relock'](ev(w));
+  list = await H['list:get']();
   const lk = list.notes.find(x => x.id === 'old1');
   assert.equal(lk.locked, true); assert.equal(lk.text, ''); assert.equal(lk.firstImage, null, 'list never sees locked content');
+  r = await H['note:unlock'](ev(w), '1234'); assert.equal(r.hidden, false);
   assert.equal(list.settings.lock, undefined); assert.equal(list.settings.hasPassword, true);
   // change password needs the current one
   r = await H['lock:set'](null, { current: 'bad', next: '5678' }); assert.ok(r.error);

@@ -40,13 +40,19 @@
     copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2.5"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>',
     restore: '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
     info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
+    // 1.1.14: the padlock that animates ("snap shut"): its shackle's long side reaches down inside the body (hidden by
+    // the clip path #lockClip in list.html), so it never comes loose when the shackle opens
+    lockA: '<svg viewBox="0 0 24 24"><g clip-path="url(#lockClip)"><path class="shackle" d="M8 16.5V7a4 4 0 0 1 8 0v4"/></g><rect x="4" y="11" width="16" height="10" rx="2.5"/></svg>',
+    star: '<svg viewBox="0 0 24 24"><path d="M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9L3.4 9.4l6-.7z"/></svg>',
+    check: '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+    x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
     warn: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
   };
 
   let state = { notes: [], groups: [], settings: {} };
   let lastSig = '';
   let tab = 'notes';
-  let lastTab = 'notes'; // notes or bin: where clicking Settings again goes back to
+  let lastTab = 'notes'; // notes, favourites or bin: where clicking Settings again goes back to
   // group levels visited, for the mouse's back / forward buttons (null = all notes)
   let navBack = [];
   let navFwd = [];
@@ -57,6 +63,11 @@
   let openGroup = null; // id of the group being looked at (null = top level)
   let drag = null; // { id, kind: 'note' | 'group', at } while dragging
   let renderLater = false;
+  // 1.1.13: cards picked with Ctrl+click (keys "n:<id>" / "g:<id>"), the last one clicked (for Shift+click),
+  // and how locked each card looked last time (for the lock / unlock animation)
+  const sel = new Set();
+  let selAnchor = null;
+  let lockSeen = new Map();
 
   // ---------- tiny DOM helper
   function h(tag, attrs = {}, ...kids) {
@@ -136,6 +147,24 @@
   }
   const notesInTree = (id) => { const ids = subtreeIds(id); return live().filter((n) => n.groupId && ids.has(n.groupId)); };
   const isInside = (id, ancestorId) => chainOf(id).some((g) => g.id === ancestorId);
+  // 1.1.13: locked = its own lock or a locked group around it. Locked notes and groups can't be deleted.
+  const noteIsLocked = (n) => !!(n.ownLock || n.locked || chainOf(n.groupId).some((g) => g.locked));
+  function groupIsLocked(g) {
+    if (chainOf(g.id).some((x) => x.locked)) return true;
+    const ids = subtreeIds(g.id);
+    return state.groups.some((x) => ids.has(x.id) && x.locked) || notesInTree(g.id).some((n) => n.ownLock);
+  }
+  const LOCKED_NO_DELETE = 'Locked notes and groups can’t be deleted. Remove the lock first.';
+  // shown in the list, i.e. not inside a locked group that hasn't been opened with the password
+  const noteShown = (n) => !n.groupId || !groupById(n.groupId) || groupById(n.groupId).open;
+  const groupShown = (g) => !g.parentId || !groupById(g.parentId) || groupById(g.parentId).open;
+  function favourites() {
+    const notes = live().filter((n) => n.favorite);
+    const groups = state.groups.filter((g) => g.favorite && notesInTree(g.id).length);
+    const sn = notes.filter(noteShown);
+    const sg = groups.filter(groupShown);
+    return { notes: sn, groups: sg, hidden: notes.length + groups.length - sn.length - sg.length };
+  }
 
   function sortPrefs() {
     return { by: 'updated', dir: 'desc', groups: 'mixed', ...(state.settings.listSort || {}) };
@@ -177,8 +206,11 @@
     document.body.classList.toggle('dark', !!THEMES.find((t) => t.id === themeNow()).dark);
     $('#cNotes').textContent = liveNotes.length;
     $('#cBin').textContent = binned.length;
+    const favNow = favourites();
+    $('#cFavs').textContent = favNow.notes.length + favNow.groups.length;
     $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tab));
-    $('#viewNotes').hidden = tab !== 'notes';
+    $('#viewNotes').hidden = tab !== 'notes' && tab !== 'favs';
+    $('#viewNotes').classList.toggle('favs', tab === 'favs');
     $('#viewBin').hidden = tab !== 'bin';
     $('#viewSettings').hidden = tab !== 'settings';
     $('#cards').classList.toggle('anim', animate);
@@ -189,11 +221,12 @@
       box.classList.add(`size-${size}`);
     }
     const inGroup = openGroup ? groupById(openGroup) : null;
-    $('#q').placeholder = inGroup ? 'Search your notes inside this group' : 'Search your notes';
+    $('#q').placeholder = tab === 'favs' ? 'Search your favourites' : inGroup ? 'Search your notes inside this group' : 'Search your notes';
     $('#qClear').hidden = !query;
     $('#bqClear').hidden = !binQuery;
     $('#btnNew').title = inGroup ? `New note inside “${inGroup.name || 'this group'}”` : 'New note';
-    if (tab === 'notes') renderNotes(liveNotes, animate);
+    if (tab === 'notes' || tab === 'favs') renderNotes(liveNotes, animate);
+    else paintBulk();
     if (tab === 'bin') renderBin(binned);
     if (tab === 'settings') renderSettings();
   }
@@ -204,7 +237,7 @@
     const title = (n.title || '').trim();
     if (n.locked) {
       body.append(h('div', { class: 'txt' }, h('span', { class: 't1' }, title || 'Locked note')));
-      body.append(h('div', { class: 'lockmark', html: ICON.lock }));
+      body.append(h('div', { class: 'lockmark', html: ICON.lockA }));
       return body;
     }
     const lines = (n.text || '').split('\n').map((s) => s.trim()).filter(Boolean);
@@ -229,9 +262,22 @@
     e.stopPropagation();
     drag = item;
     hideCtx();
+    // dragging one of several selected cards moves all of them
+    const key = (item.kind === 'group' ? 'g:' : 'n:') + item.id;
+    if (sel.size > 1 && sel.has(key)) {
+      drag.many = selItems().map((it) => ({ id: it.id, kind: it.kind }));
+      const chip = h('div', { class: 'dragchip' }, `${drag.many.length} selected`);
+      document.body.append(chip);
+      e.dataTransfer.setDragImage(chip, 20, 16);
+      setTimeout(() => chip.remove(), 0);
+    }
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', item.id);
-    requestAnimationFrame(() => { card.classList.add('dragging'); document.body.classList.add('is-dragging'); });
+    requestAnimationFrame(() => {
+      card.classList.add('dragging');
+      if (drag && drag.many) $$('#cards .card.sel').forEach((c) => c.classList.add('dragging'));
+      document.body.classList.add('is-dragging');
+    });
   }
   function endDrag() {
     drag = null;
@@ -260,7 +306,17 @@
     if (d.kind === 'group' && gid && (gid === d.id || isInside(gid, d.id))) return false;
     return true;
   }
-  const moveInto = (d, gid) => S.groups.moveTo(d.id, gid || null);
+  // the same for everything being dragged (one card, or all the selected ones)
+  const dragList = (d) => d.many || [d];
+  function canMove(d, gid) {
+    const list = dragList(d);
+    if (list.some((x) => x.kind === 'group' && gid && (gid === x.id || isInside(gid, x.id)))) return false;
+    return list.some((x) => canMoveInto(x, gid));
+  }
+  async function moveInto(d, gid) {
+    for (const x of dragList(d)) if (canMoveInto(x, gid)) await S.groups.moveTo(x.id, gid || null);
+    if (d.many) clearSel();
+  }
 
   function noteCard(n, i, { inGroup = false } = {}) {
     const acts = h('div', { class: 'acts' },
@@ -268,28 +324,36 @@
         ? h('button', { class: 'act', title: 'Close this note (keeps it here)', html: ICON.hide, onclick: (e) => { e.stopPropagation(); S.list.closeNote(n.id); } })
         : h('button', { class: 'act', title: 'Open on desktop', html: ICON.open, onclick: (e) => { e.stopPropagation(); S.list.openNote(n.id); } }),
       inGroup ? h('button', { class: 'act', title: 'Take out of the group (up one level)', html: ICON.out, onclick: (e) => { e.stopPropagation(); S.groups.moveUp(n.id); } }) : null,
-      h('button', { class: 'act', title: 'Move to Bin (Shift+click: no question)', html: ICON.trash, onclick: (e) => { e.stopPropagation(); trashNote(n, e.shiftKey); } }));
+      noteIsLocked(n) ? null : h('button', { class: 'act', title: 'Move to Bin (Shift+click: no question)', html: ICON.trash, onclick: (e) => { e.stopPropagation(); trashNote(n, e.shiftKey); } }));
+    const key = `n:${n.id}`;
     const foot = h('div', { class: 'foot' },
       h('span', { class: 'when', title: `Created ${full(n.createdAt)}\nLast edited ${full(n.updatedAt)}` },
         h('span', { class: 'cal', html: ICON.cal }), when(n.createdAt)),
       n.open ? h('span', { class: 'badge', title: 'Open on your desktop' }, h('i'), 'open') : null,
+      n.openUnlocked ? h('span', { class: 'ulk', title: 'Locked, but unlocked for now: it locks again when you close the note or lock it', html: ICON.unlock }) : null,
       acts);
     const card = h('div', {
       class: 'card',
       'data-color': n.color,
       'data-font': n.font,
+      'data-key': key,
       draggable: 'true',
       style: `--r:${tilt(n.id)}deg; animation-delay:${Math.min(i, 12) * 18}ms`,
-      title: n.open ? 'Click to bring to front · right-click for more' : 'Click to open · right-click for more',
-      onclick: () => S.list.openNote(n.id),
-      oncontextmenu: (e) => { e.preventDefault(); noteMenu(n, e); },
-    }, h('div', { class: 'strip' }), n.pinned ? h('span', { class: 'pin', title: 'Pinned on top' }) : null, cardBody(n), foot);
+      title: n.open ? 'Click to bring to front · Ctrl+click to select · right-click for more' : 'Click to open · Ctrl+click to select · right-click for more',
+      onclick: (e) => { if (pickCard(e, key)) return; S.list.openNote(n.id); },
+      oncontextmenu: (e) => { e.preventDefault(); if (bulkMenu(e, key)) return; noteMenu(n, e); },
+    }, h('div', { class: 'strip' }), n.pinned ? h('span', { class: 'pin', title: 'Pinned on top' }) : null, cardBody(n), foot, lockBtn('note', n), starBtn(key));
     card.addEventListener('dragstart', (e) => startDrag(e, { id: n.id, kind: 'note' }, card));
     card.addEventListener('dragend', endDrag);
     dropTarget(card,
-      () => drag.kind === 'note' && drag.id !== n.id,
-      (d) => S.groups.make(d.id, n.id),
+      () => (drag.many ? !drag.many.some((x) => x.id === n.id) : drag.kind === 'note' && drag.id !== n.id),
+      async (d) => {
+        if (!d.many) return S.groups.make(d.id, n.id);
+        await S.groups.makeFrom([n.id, ...d.many.map((x) => x.id)], n.groupId || null);
+        clearSel();
+      },
       () => {
+        if (drag.many) return 'Make a group';
         const from = state.notes.find((x) => x.id === drag.id);
         return n.groupId && from && from.groupId !== n.groupId ? 'Add to its group' : 'Make a group';
       });
@@ -303,7 +367,7 @@
     const paper = (n, cls) => h('div', { class: `paper ${cls}`, 'data-color': n ? n.color : 'yellow' });
     const top = sorted[0];
     const peek = [sorted[0], sorted[1], sorted[2]].filter(Boolean);
-    const lockBadge = g.locked ? h('span', { class: 'glock', html: g.open ? ICON.unlock : ICON.lock }) : null;
+    const lockBadge = g.locked ? h('span', { class: 'glock', html: g.open ? ICON.unlock : ICON.lockA }) : null;
     const style = g.style || 'stack';
     if (style === 'folder') {
       return h('div', { class: 'art folder' },
@@ -336,7 +400,7 @@
       back[1] ? h('div', { class: 'sheet s3', 'data-color': back[1].color }) : null,
       back[0] ? h('div', { class: 'sheet s2', 'data-color': back[0].color }) : null,
       h('div', { class: 'sheet s1', 'data-color': top ? top.color : 'yellow', 'data-font': top ? top.font : 'hand' },
-        front || h('div', { class: 'body' }, h('div', { class: 'lockmark', html: ICON.lock }))),
+        front || h('div', { class: 'body' }, h('div', { class: 'lockmark', html: ICON.lockA }))),
       h('span', { class: 'clip' }),
       g.locked && g.open ? lockBadge : null);
   }
@@ -344,14 +408,16 @@
   function groupCard(g, i) {
     const notes = notesInTree(g.id);
     const subs = [...subtreeIds(g.id)].length - 1;
+    const key = `g:${g.id}`;
     const card = h('div', {
       class: `card group look-${g.style || 'stack'}${g.open ? '' : ' locked'}`,
+      'data-key': key,
       draggable: 'true',
       style: `--r:${tilt(g.id) * 0.5}deg; --gc:${GCOLORS[g.color] || GCOLORS.kraft}; animation-delay:${Math.min(i, 12) * 18}ms`,
-      title: `${g.name || 'Group'} · ${plural(notes.length, 'note')}${subs ? ` · ${plural(subs, 'group')} inside` : ''}${g.locked ? ' · locked' : ''}\nClick to open · drop a note here to add it · right-click for more`,
-      onclick: () => openGroupView(g),
-      oncontextmenu: (e) => { e.preventDefault(); groupMenu(g, e); },
-    }, groupArt(g, notes),
+      title: `${g.name || 'Group'} · ${plural(notes.length, 'note')}${subs ? ` · ${plural(subs, 'group')} inside` : ''}${g.locked ? ' · locked' : ''}\nClick to open · Ctrl+click to select · drop a note here to add it · right-click for more`,
+      onclick: (e) => { if (pickCard(e, key)) return; openGroupView(g); },
+      oncontextmenu: (e) => { e.preventDefault(); if (bulkMenu(e, key)) return; groupMenu(g, e); },
+    }, lockBtn('group', g), starBtn(key), groupArt(g, notes),
       h('div', { class: 'gfoot' },
         g.locked ? h('span', { class: 'gl', html: g.open ? ICON.unlock : ICON.lock }) : null,
         h('span', { class: 'gname-l' + (g.name ? '' : ' unnamed') }, g.name || 'Group'),
@@ -359,7 +425,7 @@
         h('span', { class: 'gcount' }, String(notes.length))));
     card.addEventListener('dragstart', (e) => startDrag(e, { id: g.id, kind: 'group' }, card));
     card.addEventListener('dragend', endDrag);
-    dropTarget(card, () => canMoveInto(drag, g.id), (d) => S.groups.make(d.id, g.id), () => 'Put inside');
+    dropTarget(card, () => canMove(drag, g.id), (d) => (d.many ? moveInto(d, g.id) : S.groups.make(d.id, g.id)), () => 'Put inside');
     return card;
   }
 
@@ -368,7 +434,7 @@
       withButton ? h('div', { class: 'stack' }, h('i'), h('i'), h('i')) : null,
       h('h2', {}, title),
       h('p', {}, text),
-      withButton ? h('button', { class: 'pill', onclick: () => S.list.newNote(openGroup || null) }, '+ New note') : null);
+      withButton ? h('button', { class: 'pill', onclick: () => newNote() }, '+ New note') : null);
   }
 
   function renderGroupHeader(g) {
@@ -377,7 +443,7 @@
     crumbs.innerHTML = '';
     const crumb = (label, gid, current) => {
       const el = h(current ? 'span' : 'button', { class: 'crumb' + (current ? ' cur' : ''), onclick: current ? null : () => { openGroup = gid; clearSearch(); closePanel(); render(true); } }, label);
-      if (!current) dropTarget(el, () => canMoveInto(drag, gid), (d) => moveInto(d, gid), () => 'Move here');
+      if (!current) dropTarget(el, () => canMove(drag, gid), (d) => moveInto(d, gid), () => 'Move here');
       return el;
     };
     crumbs.append(crumb('All notes', null, false));
@@ -415,9 +481,9 @@
     if (animate || cacheDay !== today) { cardCache = new Map(); cacheDay = today; }
     const used = new Map();
     const els = [];
-    const done = () => { placeCards(box, els); cardCache = used; };
+    const done = () => { placeCards(box, els); cardCache = used; paintCards(); };
     const q = query.trim().toLowerCase();
-    const g = openGroup ? groupById(openGroup) : null;
+    const g = tab === 'notes' && openGroup ? groupById(openGroup) : null;
     $('#groupHead').hidden = !g;
     $('#tip').textContent = '';
     if (g) renderGroupHeader(g); else closePanel();
@@ -425,6 +491,27 @@
     if (!liveNotes.length) {
       els.push(emptyState('No notes yet', 'Your first sticky note is one click away.', true));
       done();
+      return;
+    }
+
+    // Favourites (1.1.13): every starred note and group, wherever it lives. Ones inside a locked group
+    // that isn't open stay hidden; a line under the cards says how many.
+    if (tab === 'favs') {
+      const f = favourites();
+      let items = [
+        ...f.groups.map((fg) => ({ kind: 'group', group: fg, notes: notesInTree(fg.id) })),
+        ...f.notes.map((n) => ({ kind: 'note', note: n })),
+      ];
+      if (q) items = items.filter((it) => (it.kind === 'group' ? (it.group.name || '') : `${it.note.title || ''}\n${it.note.text || ''}`).toLowerCase().includes(q));
+      if (!items.length) {
+        els.push(q
+          ? emptyState('Nothing found', `No favourite contains “${query.trim()}”.`)
+          : emptyState('No favourites yet', 'Point at a note or group and click the star in its top-right corner to keep it here.'));
+      }
+      sortItems(items).forEach((it, i) => els.push(it.kind === 'group' ? groupEl(it.group, it.notes, i, used) : noteEl(it.note, i, !!it.note.groupId, used)));
+      done();
+      if (f.hidden) $('#tip').textContent = `${plural(f.hidden, 'more favourite')} ${f.hidden === 1 ? 'is' : 'are'} inside a locked group. Open that group to see ${f.hidden === 1 ? 'it' : 'them'} here.`;
+      if ($('#viewNotes').scrollTop !== scroll) $('#viewNotes').scrollTop = scroll;
       return;
     }
 
@@ -457,13 +544,291 @@
     if ($('#viewNotes').scrollTop !== scroll) $('#viewNotes').scrollTop = scroll;
   }
   // a card is reused when everything it shows (and its buttons use) is the same as last time
+  // (the star and the selection outline are painted afterwards by paintCards, so starring doesn't rebuild a card)
+  const sigOf = (x) => JSON.stringify(x, (k, v) => (k === 'favorite' ? undefined : v));
   function noteEl(n, i, inGroup, used) {
-    return cached(`n:${n.id}:${inGroup ? 1 : 0}`, JSON.stringify(n), () => noteCard(n, i, { inGroup }), used);
+    return cached(`n:${n.id}:${inGroup ? 1 : 0}`, sigOf([n, noteIsLocked(n)]), () => noteCard(n, i, { inGroup }), used);
   }
   function groupEl(g, notes, i, used) {
     const subs = subtreeIds(g.id).size - 1;
-    return cached(`g:${g.id}`, JSON.stringify([g, notes, subs]), () => groupCard(g, i), used);
+    return cached(`g:${g.id}`, sigOf([g, notes, subs, groupIsLocked(g)]), () => groupCard(g, i), used);
   }
+
+  // ================================================================ favourites, selecting, the lock animation (1.1.13)
+  function itemOfKey(k) {
+    const id = k.slice(2);
+    return k[0] === 'g' ? { kind: 'group', id, group: groupById(id) } : { kind: 'note', id, note: state.notes.find((x) => x.id === id && !x.deletedAt) };
+  }
+  const thingOf = (k) => { const it = itemOfKey(k); return it.group || it.note || null; };
+  const isFav = (k) => !!(thingOf(k) || {}).favorite;
+  const selItems = () => [...sel].map(itemOfKey).filter((it) => it.group || it.note);
+
+  // the star in a card's top-right corner: an outline while you point at the card, filled once it's a favourite
+  function starBtn(key) {
+    return h('button', {
+      class: 'fav',
+      html: ICON.star,
+      onmousedown: (e) => e.stopPropagation(),
+      onclick: (e) => { e.stopPropagation(); setFav([key], !isFav(key), e.currentTarget); },
+    });
+  }
+  // 1.1.14: a lock / unlock button left of the star (shows while you point at the card), so locking doesn't
+  // need the right-click menu. A note locked only by its group has none (its group's lock is removed instead).
+  function lockBtn(kind, t) {
+    if (kind === 'note' && t.locked && !t.ownLock) return null;
+    const locked = kind === 'note' ? !!t.ownLock : !!t.locked;
+    const what = kind === 'note' ? 'note' : 'group';
+    return h('button', {
+      class: 'lockb' + (locked ? ' on' : ''),
+      title: locked ? `Remove the lock from this ${what}…` : `Lock this ${what}`,
+      html: locked ? ICON.unlock : ICON.lock,
+      onmousedown: (e) => e.stopPropagation(),
+      onclick: (e) => {
+        e.stopPropagation();
+        if (kind === 'note') (locked ? unlockNote(t) : lockNote(t));
+        else (locked ? unlockGroup(t) : lockGroup(t));
+      },
+    });
+  }
+  async function setFav(keys, on, btn) {
+    const ids = [];
+    for (const k of keys) { const t = thingOf(k); if (t) { t.favorite = on; ids.push(t.id); } }
+    if (!ids.length) return;
+    paintCards();
+    const btns = btn ? [btn] : keys.map((k) => $(`#cards [data-key="${k}"] > .fav`)).filter(Boolean);
+    if (on) btns.forEach((b) => {
+      b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); setTimeout(() => b.classList.remove('pop'), 700);
+      starDust(b);
+    });
+    if (tab !== 'favs' || on) $('#cFavs').textContent = favourites().notes.length + favourites().groups.length;
+    await S.list.favorite(ids, on);
+    if (keys.length > 1) toast(on ? `${plural(ids.length, 'favourite')} added ⭐` : 'Removed from favourites');
+  }
+
+  // Ctrl+click picks a card (again: un-picks it); Shift+click picks everything between the last pick and this one.
+  // A plain click opens the card as before and forgets the picks.
+  const visibleKeys = () => [...$('#cards').children].map((c) => c.dataset.key).filter(Boolean);
+  function pickCard(e, key) {
+    if (e.ctrlKey || e.metaKey) {
+      if (sel.has(key)) sel.delete(key); else sel.add(key);
+      selAnchor = key;
+      paintCards();
+      return true;
+    }
+    if (e.shiftKey && selAnchor) {
+      const keys = visibleKeys();
+      const a = keys.indexOf(selAnchor);
+      const b = keys.indexOf(key);
+      if (a < 0 || b < 0) sel.add(key);
+      else for (let i = Math.min(a, b); i <= Math.max(a, b); i++) sel.add(keys[i]);
+      paintCards();
+      return true;
+    }
+    if (sel.size) clearSel();
+    return false;
+  }
+  function clearSel() {
+    sel.clear();
+    selAnchor = null;
+    paintCards();
+  }
+  // star, selection outline and lock animation for the cards on screen; forgets picks that aren't shown any more
+  function lockStateOf(k) {
+    const t = thingOf(k);
+    if (!t) return 0;
+    if (k[0] === 'g') return !t.open ? 2 : t.locked ? 1 : 0; // 2 = shut, 1 = locked but opened in the list
+    return t.locked ? 2 : 0;
+  }
+  function paintCards() {
+    const box = $('#cards');
+    const shown = new Set();
+    const seen = new Map();
+    for (const c of box.children) {
+      const k = c.dataset.key;
+      if (!k) continue;
+      shown.add(k);
+      const fav = isFav(k);
+      c.classList.toggle('is-fav', fav);
+      const b = c.querySelector(':scope > .fav');
+      if (b) {
+        b.classList.toggle('on', fav);
+        b.title = fav ? 'Remove from favourites' : 'Add to favourites';
+      }
+      c.classList.toggle('sel', sel.has(k));
+      const ls = lockStateOf(k);
+      seen.set(k, ls);
+      const before = lockSeen.get(k);
+      if (before !== undefined && before !== ls) snapLock(c, ls > before ? 'lock' : 'unlock', lockPos.get(k));
+      const at = ls ? lockCentre(c) : null;
+      if (at) lockPos.set(k, at); else if (!ls) lockPos.delete(k);
+    }
+    lockSeen = seen;
+    for (const k of [...sel]) if (!shown.has(k)) sel.delete(k);
+    paintBulk();
+  }
+  // "Snap shut" (1.1.14; 1.1.13 had "stardust"): locking drops the padlock in with a little bounce and its shackle
+  // snaps shut; unlocking pops the shackle open and the padlock floats up as the card's contents fade in.
+  const calm = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const lockPos = new Map(); // card key → where its padlock was last time { x, y, size } (for the unlock animation)
+  // the middle of a card's padlock, measured in the card's own layout (so the card's little tilt doesn't matter)
+  function lockCentre(card) {
+    const mark = card.querySelector('.lockmark, .glock');
+    const svg = mark && mark.querySelector('svg');
+    if (!svg) return null;
+    const cs = getComputedStyle(mark); // the padlock sits in the middle of the box without its padding
+    const pt = parseFloat(cs.paddingTop) || 0;
+    const pb = parseFloat(cs.paddingBottom) || 0;
+    let x = mark.offsetWidth / 2;
+    let y = pt + (mark.offsetHeight - pt - pb) / 2;
+    for (let el = mark; el && el !== card; el = el.offsetParent) { x += el.offsetLeft; y += el.offsetTop; }
+    return { x, y, size: parseFloat(getComputedStyle(svg).width) || 30 };
+  }
+  function snapLock(card, kind, was) {
+    if (calm()) return;
+    card.classList.remove('lock-anim', 'unlock-anim');
+    void card.offsetWidth;
+    card.classList.add(kind === 'lock' ? 'lock-anim' : 'unlock-anim');
+    let fly = null;
+    if (kind === 'unlock' && was) {
+      // a copy of the padlock, where it was, opens and floats away
+      fly = h('div', { class: 'lockfly', html: ICON.lockA, style: `left:${was.x - was.size / 2}px; top:${was.y - was.size / 2}px; width:${was.size}px; height:${was.size}px` });
+      card.append(fly);
+    }
+    setTimeout(() => { if (fly) fly.remove(); card.classList.remove('lock-anim', 'unlock-anim'); }, 900);
+  }
+
+  // the stardust burst from a star that was just switched on (1.1.14, a little quicker than the lock's)
+  function starDust(btn) {
+    if (calm()) return;
+    const r = btn.getBoundingClientRect();
+    const dust = h('div', { class: 'stardust fixed fast', style: `left:${r.left + r.width / 2}px; top:${r.top + r.height / 2}px` }, ...Array.from({ length: 8 }, () => h('i')));
+    document.body.append(dust);
+    setTimeout(() => dust.remove(), 850);
+  }
+
+  // ---- the bar for the selected cards (bottom of the window)
+  const bulk = h('div', { class: 'bulkbar', id: 'bulk', hidden: true });
+  const bb = (id, icon, label, title, cls = '') => h('button', { class: `bb ${cls}`, id, title, html: `${icon}<span>${label}</span>` });
+  bulk.append(
+    h('span', { class: 'bcount', id: 'bulkCount' }),
+    bb('bOpen', ICON.open, 'Open', 'Open the selected notes on the desktop'),
+    bb('bClose', ICON.hide, 'Close', 'Close the selected notes (they stay here)'),
+    bb('bFav', ICON.star, 'Favourite', ''),
+    bb('bColor', ICON.palette, 'Colour', 'Paper colour and font of the selected notes'),
+    bb('bGroup', ICON.folder, 'Group', 'Put the selected notes and groups together in a new group'),
+    bb('bLock', ICON.lock, 'Lock', 'Lock the selected notes and groups'),
+    bb('bBin', ICON.trash, 'Bin', 'Move the selected notes to the Bin (Delete key)', 'danger'),
+    h('button', { class: 'bb x', id: 'bX', title: 'Clear the selection (Esc)', html: ICON.x }),
+    h('div', { class: 'bulkpop', id: 'bulkColors', hidden: true },
+      h('div', { class: 'sws' }, ...COLORS.map((c) => h('button', { class: 'bsw', title: c[0].toUpperCase() + c.slice(1), style: `background:${SWATCH[c]}`, onclick: () => bulkApply({ color: c }) }))),
+      h('div', { class: 'bfonts' },
+        h('button', { class: 'hand', onclick: () => bulkApply({ font: 'hand' }) }, 'Handwritten'),
+        h('button', { onclick: () => bulkApply({ font: 'round' }) }, 'Rounded'))));
+  document.body.append(bulk);
+  function bulkParts() {
+    const items = selItems();
+    const notes = items.filter((it) => it.note).map((it) => it.note);
+    const groups = items.filter((it) => it.group).map((it) => it.group);
+    return { items, notes, groups };
+  }
+  function paintBulk() {
+    const { items, notes, groups } = bulkParts();
+    const show = items.length > 0 && (tab === 'notes' || tab === 'favs');
+    bulk.hidden = !show;
+    document.body.classList.toggle('selecting', show);
+    if (!show) { $('#bulkColors').hidden = true; return; }
+    $('#bulkCount').textContent = `${items.length} selected`;
+    $('#bOpen').hidden = !notes.some((n) => !n.open);
+    $('#bClose').hidden = !notes.some((n) => n.open);
+    const allFav = items.every((it) => (it.note || it.group).favorite);
+    $('#bFav').classList.toggle('on', allFav);
+    $('#bFav').querySelector('span').textContent = allFav ? 'Unfavourite' : 'Favourite';
+    $('#bFav').title = allFav ? 'Remove the selected ones from your favourites' : 'Add the selected ones to your favourites';
+    $('#bColor').hidden = !notes.length && !groups.some((g) => g.open);
+    $('#bGroup').hidden = items.length < 2;
+    $('#bLock').hidden = !notes.some((n) => !n.ownLock) && !groups.some((g) => !g.locked);
+    const canBin = notes.some((n) => !noteIsLocked(n)) || groups.some((g) => !groupIsLocked(g));
+    $('#bBin').disabled = !canBin;
+    $('#bBin').title = canBin ? 'Move the selected notes to the Bin (Delete key)' : LOCKED_NO_DELETE;
+  }
+  // right-click on one of several selected cards: the same actions as the bar
+  function bulkMenu(e, key) {
+    if (sel.size > 1 && sel.has(key)) {
+      const { items, notes, groups } = bulkParts();
+      const allFav = items.every((it) => (it.note || it.group).favorite);
+      showCtx(e, [
+        notes.some((n) => !n.open) ? { label: 'Open on desktop', icon: ICON.open, run: bulkOpen } : null,
+        notes.some((n) => n.open) ? { label: 'Close notes', icon: ICON.hide, run: bulkClose } : null,
+        { label: allFav ? 'Remove from favourites' : 'Add to favourites', icon: ICON.star, run: () => setFav([...sel], !allFav) },
+        '-',
+        { label: 'Put together in a new group', icon: ICON.folder, run: bulkGroup },
+        notes.some((n) => !n.ownLock) || groups.some((g) => !g.locked) ? { label: 'Lock', icon: ICON.lock, run: bulkLock } : null,
+        '-',
+        { label: `Move to Bin (${items.length})`, icon: ICON.trash, danger: true, run: () => bulkTrash(false), disabled: $('#bBin').disabled },
+        { label: 'Clear selection', icon: ICON.x, run: clearSel },
+      ]);
+      return true;
+    }
+    if (sel.size && !sel.has(key)) clearSel();
+    return false;
+  }
+  async function bulkOpen() { for (const n of bulkParts().notes) if (!n.open) await S.list.openNote(n.id); }
+  async function bulkClose() { for (const n of bulkParts().notes) if (n.open) await S.list.closeNote(n.id); }
+  async function bulkApply(patch) {
+    const { notes, groups } = bulkParts();
+    if (notes.length) await S.list.apply(notes.map((n) => n.id), patch);
+    for (const g of groups) if (g.open) await S.groups.apply(g.id, patch, true);
+    $('#bulkColors').hidden = true;
+    toast(patch.color ? 'Colour changed' : 'Font changed');
+  }
+  async function bulkGroup() {
+    const { items } = bulkParts();
+    if (items.length < 2) return;
+    const id = await S.groups.makeFrom(items.map((it) => it.id), tab === 'notes' ? openGroup || null : null);
+    clearSel();
+    toast(id ? 'Put together in a new group' : 'Could not make a group');
+  }
+  async function bulkLock() {
+    const { notes, groups } = bulkParts();
+    if (!(await ensurePassword())) return;
+    for (const n of notes) if (!n.ownLock) await S.list.setLocked(n.id, true);
+    for (const g of groups) if (!g.locked) await S.groups.setLocked(g.id, true);
+    if (openGroup && groups.some((g) => openGroup === g.id || isInside(openGroup, g.id))) openGroup = null;
+    clearSel();
+    toast('Locked 🔒');
+  }
+  async function bulkTrash(skipAsk) {
+    const { notes, groups } = bulkParts();
+    const okNotes = notes.filter((n) => !noteIsLocked(n));
+    const okGroups = groups.filter((g) => !groupIsLocked(g));
+    const kept = notes.length + groups.length - okNotes.length - okGroups.length;
+    if (!okNotes.length && !okGroups.length) { toast(LOCKED_NO_DELETE); return; }
+    const inGroups = new Set();
+    for (const g of okGroups) for (const n of notesInTree(g.id)) inGroups.add(n.id);
+    const count = new Set([...okNotes.map((n) => n.id), ...inGroups]).size;
+    if (!skipAsk) {
+      const ok = await modal({
+        title: `Move ${plural(count, 'note')} to the Bin?`,
+        text: `They can be restored from the Bin any time.${kept ? ` ${plural(kept, 'locked one')} ${kept === 1 ? 'stays' : 'stay'} where ${kept === 1 ? 'it is' : 'they are'}.` : ''}`,
+        tip: 'Tip: Shift+Delete skips this question.',
+        okLabel: 'Move to Bin',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    for (const g of okGroups) await S.groups.trash(g.id);
+    for (const n of okNotes) if (!inGroups.has(n.id)) await S.list.trash(n.id);
+    clearSel();
+    toast(kept ? `Moved to the Bin · ${plural(kept, 'locked one')} kept` : 'Moved to the Bin');
+  }
+  $('#bOpen').addEventListener('click', bulkOpen);
+  $('#bClose').addEventListener('click', bulkClose);
+  $('#bFav').addEventListener('click', () => setFav([...sel], !$('#bFav').classList.contains('on')));
+  $('#bColor').addEventListener('click', () => { $('#bulkColors').hidden = !$('#bulkColors').hidden; });
+  $('#bGroup').addEventListener('click', bulkGroup);
+  $('#bLock').addEventListener('click', bulkLock);
+  $('#bBin').addEventListener('click', (e) => bulkTrash(e.shiftKey));
+  $('#bX').addEventListener('click', clearSel);
 
 
   function renderBin(binned) {
@@ -485,13 +850,15 @@
         h('span', { class: 'when' }, 'Deleted ' + when(n.deletedAt).replace(/^(Today|Yesterday)/, (m) => m.toLowerCase())));
       const acts = h('div', { class: 'foot', style: 'padding-top:0' },
         h('button', { class: 'pill', onclick: () => S.list.restore(n.id) }, 'Restore'),
-        h('button', { class: 'pill danger', title: 'Delete forever (Shift+click: no question)', onclick: (e) => destroyNote(n, e.shiftKey) }, 'Delete'));
+        h('button', { class: 'pill danger', disabled: noteIsLocked(n) || null, title: noteIsLocked(n) ? LOCKED_NO_DELETE : 'Delete forever (Shift+click: no question)', onclick: (e) => destroyNote(n, e.shiftKey) }, 'Delete'));
       box.append(h('div', {
         class: 'card binned', 'data-color': n.color, 'data-font': n.font, style: `--r:${tilt(n.id)}deg`,
         oncontextmenu: (e) => { e.preventDefault(); showCtx(e, [
           { label: 'Restore', icon: ICON.restore, run: () => S.list.restore(n.id) },
           '-',
-          { label: 'Delete forever…', icon: ICON.trash, danger: true, run: () => destroyNote(n) },
+          noteIsLocked(n)
+            ? { label: 'Locked: can’t be deleted', icon: ICON.trash, disabled: true, run: () => {} }
+            : { label: 'Delete forever…', icon: ICON.trash, danger: true, run: () => destroyNote(n) },
         ]); },
       }, h('div', { class: 'strip' }), cardBody(n), foot, acts));
     });
@@ -753,19 +1120,29 @@
       { label: n.open ? 'Bring to front' : 'Open on desktop', icon: ICON.open, run: () => S.list.openNote(n.id) },
       n.open ? { label: 'Close note', icon: ICON.hide, run: () => S.list.closeNote(n.id) } : null,
       { label: 'Duplicate note', icon: ICON.copy, run: async () => { await S.list.duplicate(n.id); toast('Note duplicated'); } },
+      n.favorite
+        ? { label: 'Remove from favourites', icon: ICON.star, run: () => setFav([`n:${n.id}`], false) }
+        : { label: 'Add to favourites', icon: ICON.star, run: () => setFav([`n:${n.id}`], true) },
+      { label: 'Select (Ctrl+click)', icon: ICON.check, run: () => { sel.add(`n:${n.id}`); selAnchor = `n:${n.id}`; paintCards(); } },
       '-',
       n.ownLock
         ? { label: 'Remove lock…', icon: ICON.unlock, run: () => unlockNote(n) }
         : { label: 'Lock note', icon: ICON.lock, run: () => lockNote(n), disabled: false },
       n.groupId ? { label: 'Take out of group', icon: ICON.out, run: () => S.groups.moveUp(n.id) } : null,
       '-',
-      { label: 'Move to Bin', icon: ICON.trash, danger: true, run: () => trashNote(n, false) },
+      noteIsLocked(n)
+        ? { label: 'Locked: can’t be deleted', icon: ICON.trash, disabled: true, run: () => {} }
+        : { label: 'Move to Bin', icon: ICON.trash, danger: true, run: () => trashNote(n, false) },
     ]);
   }
   function groupMenu(g, e) {
     showCtx(e, [
       { label: 'Open group', icon: ICON.folder, run: () => openGroupView(g) },
       g.open ? { label: 'Group settings…', icon: ICON.palette, run: async () => { await openGroupView(g); openPanel(); } } : null,
+      g.favorite
+        ? { label: 'Remove from favourites', icon: ICON.star, run: () => setFav([`g:${g.id}`], false) }
+        : { label: 'Add to favourites', icon: ICON.star, run: () => setFav([`g:${g.id}`], true) },
+      { label: 'Select (Ctrl+click)', icon: ICON.check, run: () => { sel.add(`g:${g.id}`); selAnchor = `g:${g.id}`; paintCards(); } },
       '-',
       g.locked
         ? { label: 'Remove lock…', icon: ICON.unlock, run: () => unlockGroup(g) }
@@ -773,12 +1150,15 @@
       g.parentId ? { label: 'Move up one level', icon: ICON.out, run: () => S.groups.moveUp(g.id) } : null,
       { label: 'Ungroup…', icon: ICON.ungroup, run: () => dissolveGroup(g) },
       '-',
-      { label: 'Move its notes to Bin…', icon: ICON.trash, danger: true, run: () => trashGroup(g) },
+      groupIsLocked(g)
+        ? { label: 'Locked: can’t be deleted', icon: ICON.trash, disabled: true, run: () => {} }
+        : { label: 'Move its notes to Bin…', icon: ICON.trash, danger: true, run: () => trashGroup(g) },
     ]);
   }
 
   // ================================================================ actions (with confirmations)
   async function trashNote(n, skipAsk) {
+    if (noteIsLocked(n)) { toast(LOCKED_NO_DELETE); return; }
     if (!skipAsk) {
       const ok = await modal({
         title: 'Move this note to the Bin?',
@@ -789,10 +1169,11 @@
       });
       if (!ok) return;
     }
-    await S.list.trash(n.id);
-    toast('Moved to the Bin');
+    const r = await S.list.trash(n.id);
+    toast(r && r.error === 'locked' ? LOCKED_NO_DELETE : 'Moved to the Bin');
   }
   async function destroyNote(n, skipAsk) {
+    if (noteIsLocked(n)) { toast(LOCKED_NO_DELETE); return; }
     if (!skipAsk) {
       const ok = await modal({
         title: 'Delete this note forever?',
@@ -803,13 +1184,21 @@
       });
       if (!ok) return;
     }
-    await S.list.destroy(n.id);
-    if (skipAsk) toast('Deleted forever');
+    const r = await S.list.destroy(n.id);
+    if (r && r.error === 'locked') toast(LOCKED_NO_DELETE);
+    else if (skipAsk) toast('Deleted forever');
   }
   async function emptyBin() {
-    const count = state.notes.filter((n) => n.deletedAt).length;
-    if (!count) return;
-    const ok = await modal({ title: `Delete ${plural(count, 'note')} forever?`, text: 'Your daily backups still keep a copy for up to 30 days.', okLabel: 'Empty bin', danger: true });
+    const binned = state.notes.filter((n) => n.deletedAt);
+    const locked = binned.filter(noteIsLocked).length;
+    const count = binned.length - locked;
+    if (!count) { if (locked) toast(LOCKED_NO_DELETE); return; }
+    const ok = await modal({
+      title: `Delete ${plural(count, 'note')} forever?`,
+      text: `Your daily backups still keep a copy for up to 30 days.${locked ? ` ${plural(locked, 'locked note')} ${locked === 1 ? 'stays' : 'stay'} in the Bin.` : ''}`,
+      okLabel: 'Empty bin',
+      danger: true,
+    });
     if (ok) await S.list.emptyBin();
   }
   async function dissolveGroup(g) {
@@ -826,6 +1215,7 @@
     toast('Ungrouped');
   }
   async function trashGroup(g) {
+    if (groupIsLocked(g)) { toast(LOCKED_NO_DELETE); return; }
     const count = notesInTree(g.id).length;
     const ok = await modal({
       title: `Move all ${plural(count, 'note')} in “${g.name || 'Group'}” to the Bin?`,
@@ -836,8 +1226,8 @@
     if (!ok) return;
     if (openGroup && (openGroup === g.id || isInside(openGroup, g.id))) openGroup = g.parentId || null;
     closePanel();
-    await S.groups.trash(g.id);
-    toast('Moved to the Bin');
+    const r = await S.groups.trash(g.id);
+    toast(r && r.error === 'locked' ? LOCKED_NO_DELETE : 'Moved to the Bin');
   }
 
   // ---------- passwords & locking
@@ -916,6 +1306,7 @@
       if (!r) return;
       await load();
     }
+    if (tab !== 'notes') { tab = 'notes'; lastTab = 'notes'; } // from Favourites: the group opens in Notes
     openGroup = g.id;
     closePanel();
     query = '';
@@ -1036,7 +1427,7 @@
   }
   $$('.tab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
   // inside a group, a new note is made right there
-  const newNote = () => S.list.newNote(openGroup || null);
+  const newNote = () => S.list.newNote(tab === 'notes' ? openGroup || null : null);
   $('#btnNew').addEventListener('click', newNote);
   $('#btnFront').addEventListener('click', () => S.list.bringToFront());
   $('#q').addEventListener('input', (e) => { query = e.target.value; render(); });
@@ -1052,7 +1443,7 @@
   const upLevel = () => (openGroup ? (groupById(openGroup)?.parentId || null) : null);
   $('#btnBack').addEventListener('click', () => { openGroup = upLevel(); clearSearch(); closePanel(); render(true); });
   // the back button (left of the group's name) is where to drop a note or group to move it up a level
-  dropTarget($('#btnBack'), () => !!openGroup && canMoveInto(drag, upLevel()), (d) => moveInto(d, upLevel()), () => 'Move up');
+  dropTarget($('#btnBack'), () => !!openGroup && canMove(drag, upLevel()), (d) => moveInto(d, upLevel()), () => 'Move up');
   let nameTimer = null;
   $('#groupName').addEventListener('input', (e) => {
     const id = openGroup;
@@ -1181,20 +1572,36 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); newNote(); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
       e.preventDefault();
-      if (tab !== 'bin') setTab('notes');
+      if (tab === 'settings') setTab('notes');
       $(tab === 'bin' ? '#bq' : '#q').focus();
     }
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+    const cardsTab = tab === 'notes' || tab === 'favs';
+    // Ctrl+A picks every card shown; Delete moves the picked ones to the Bin (Shift+Delete: no question)
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && cardsTab && !typing) {
+      e.preventDefault();
+      visibleKeys().forEach((k) => sel.add(k));
+      paintCards();
+    }
+    if (e.key === 'Delete' && sel.size && cardsTab && !typing) { e.preventDefault(); bulkTrash(e.shiftKey); }
     if (e.key === 'Escape') {
       if (!$('#ctx').hidden) hideCtx();
+      else if (!$('#bulkColors').hidden) $('#bulkColors').hidden = true;
+      else if (sel.size && cardsTab) clearSel();
       else if (!$('#sortPop').hidden) { $('#sortPop').hidden = true; $('#btnSort').classList.remove('on'); }
       else if (!$('#sizePop').hidden) { $('#sizePop').hidden = true; $('#btnSize').classList.remove('on'); }
       else if (tab === 'bin' && binQuery) { clearBinSearch(); render(); }
-      else if (tab === 'notes' && query) { clearSearch(); render(); }
+      else if (cardsTab && query) { clearSearch(); render(); }
       else if (!$('#groupPanel').hidden) closePanel();
-      else if (openGroup && document.activeElement !== $('#groupName')) { openGroup = upLevel(); render(true); }
+      else if (tab === 'notes' && openGroup && document.activeElement !== $('#groupName')) { openGroup = upLevel(); render(true); }
     }
   });
   window.addEventListener('focus', load);
+  // clicking empty space between the cards forgets the picked cards
+  $('#viewNotes').addEventListener('mousedown', (e) => {
+    if (sel.size && e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.target.closest('.card, .searchrow, .sortpop, #groupHead, #groupPanel')) clearSel();
+  });
+  document.addEventListener('mousedown', (e) => { if (!$('#bulkColors').hidden && !e.target.closest('#bColor, #bulkColors')) $('#bulkColors').hidden = true; });
 
   (async () => { state = await S.list.get(); lastSig = JSON.stringify(state); render(true); })();
 })();

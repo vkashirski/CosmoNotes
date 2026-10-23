@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld('sticky', {
   duplicate: () => inv('note:duplicate'),
   close: () => inv('note:close'),
   trash: () => inv('note:trash'),
+  minimize: () => inv('note:minimize'),
+  maximize: () => inv('note:maximize'),
+  onWinState: (cb) => ipcRenderer.on('note:win-state', (e, s) => cb(s)),
   hover: (over) => ipcRenderer.send('note:hover', !!over),
   saveAttachment: (bytes, ext) => inv('att:save', bytes, ext),
   pickImages: () => inv('att:pick-images'),
@@ -42,6 +45,8 @@ contextBridge.exposeInMainWorld('sticky', {
     onChanged: (cb) => ipcRenderer.on('notes:changed', () => cb()),
     onNav: (cb) => ipcRenderer.on('list:nav', (e, dir) => cb(dir)), // mouse back / forward buttons
     setLocked: (id, locked, pw) => inv('list:set-locked', id, !!locked, pw),
+    favorite: (ids, on) => inv('list:favorite', ids, !!on),
+    apply: (ids, patch) => inv('list:apply', ids, patch),
   },
   groups: {
     make: (dragId, targetId) => inv('groups:make', dragId, targetId),
@@ -56,6 +61,7 @@ contextBridge.exposeInMainWorld('sticky', {
     setLocked: (groupId, locked, pw) => inv('groups:set-locked', groupId, !!locked, pw),
     reveal: (groupId, pw) => inv('groups:reveal', groupId, pw),
     hide: (groupId) => inv('groups:hide', groupId),
+    makeFrom: (ids, parentId) => inv('groups:make-from', ids, parentId || null),
   },
   settings: { set: (patch) => inv('settings:set', patch) },
   backups: {

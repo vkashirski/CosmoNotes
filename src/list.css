@@ -381,7 +381,12 @@ body.is-dragging .backbtn { background: #F1EDFF; color: #5B3AA8; box-shadow: 0 0
 .card .t1 { font-weight: 600; }
 .card .t1.tt { font-weight: 800; font-size: 1.07em; }
 .card .lockmark { display: grid; place-items: center; padding: 12px 0 4px; color: var(--accent); opacity: .55; }
-.card .lockmark svg { width: 30px; height: 30px; stroke-width: 1.8; }
+.card .lockmark svg { width: 38px; height: 38px; stroke-width: 1.8; } /* 1.1.13: 25% bigger */
+/* 1.1.13: the lock sits in the middle of the card (below the title), not near the top */
+.card .body:has(> .lockmark) { display: flex; flex-direction: column; }
+.card .body > .lockmark { flex: 1; padding: 0 0 12px; }
+.sheet .body:has(> .lockmark) { height: 100%; box-sizing: border-box; }
+.sheet .body > .lockmark { padding: 0; }
 .card .cal { display: inline-grid; vertical-align: -2px; margin-right: 3px; opacity: .8; }
 .card .cal svg { width: 12px; height: 12px; stroke-width: 2.4; }
 .card .txt {
@@ -620,7 +625,10 @@ code { display: block; padding: 8px 10px; margin-bottom: 10px; border-radius: 9p
 .nb-label small { font: 800 10px var(--ui); color: var(--mute); }
 .nb-rings { position: absolute; left: 12px; right: 18px; top: 0; display: flex; justify-content: space-between; }
 .nb-rings i { width: 8px; height: 13px; border-radius: 5px; border: 2px solid #8C8496; background: #fff; }
-.nb-band { position: absolute; right: 18px; top: 6px; bottom: 0; width: 6px; background: rgba(0,0,0,.28); border-radius: 2px; }
+/* 1.1.13: the elastic band is drawn on the cover itself, so it tilts with the cover when you point at the notebook
+   (before, it stayed put and stuck out on the right) */
+.nb-band { display: none; }
+.notebook .nb-cover::after { content: ""; position: absolute; right: 12px; top: 0; bottom: 0; width: 6px; background: rgba(0,0,0,.28); border-radius: 2px; }
 .card.group.look-notebook .gname-l { visibility: hidden; }
 
 /* locked groups */
@@ -742,7 +750,7 @@ code { display: block; padding: 8px 10px; margin-bottom: 10px; border-radius: 9p
 .cards.size-s .card .foot { font-size: 10px; padding: 2px 5px 5px 9px; }
 .cards.size-s .card .thumb { height: 48px; }
 .cards.size-s .card .thumb.only { height: 62px; }
-.cards.size-s .card .lockmark svg { width: 22px; height: 22px; }
+.cards.size-s .card .lockmark svg { width: 28px; height: 28px; }
 .cards.size-s .card.group .art, .cards.size-s .sheets { min-height: 80px; }
 .cards.size-s .gname-l { font-size: 17px; }
 .cards.size-s .gfoot { padding-top: 12px; }
@@ -772,7 +780,7 @@ code { display: block; padding: 8px 10px; margin-bottom: 10px; border-radius: 9p
 .cards.size-xl .card .foot { font-size: 12.5px; padding: 4px 8px 8px 16px; }
 .cards.size-xl .card .thumb { height: 150px; }
 .cards.size-xl .card .thumb.only { height: 190px; }
-.cards.size-xl .card .lockmark svg { width: 40px; height: 40px; }
+.cards.size-xl .card .lockmark svg { width: 50px; height: 50px; }
 .cards.size-xl .card.group .art, .cards.size-xl .sheets { min-height: 210px; }
 .cards.size-xl .sheet[data-font="hand"] .txt { font-size: 23px; -webkit-line-clamp: 7; }
 .cards.size-xl .gname-l { font-size: 25px; }
@@ -787,7 +795,7 @@ code { display: block; padding: 8px 10px; margin-bottom: 10px; border-radius: 9p
 .cards.size-xxl .card .foot { font-size: 13px; padding: 4px 10px 10px 18px; }
 .cards.size-xxl .card .thumb { height: 200px; }
 .cards.size-xxl .card .thumb.only { height: 250px; }
-.cards.size-xxl .card .lockmark svg { width: 48px; height: 48px; }
+.cards.size-xxl .card .lockmark svg { width: 60px; height: 60px; }
 .cards.size-xxl .card.group .art, .cards.size-xxl .sheets { min-height: 268px; }
 .cards.size-xxl .sheet[data-font="hand"] .txt { font-size: 26px; -webkit-line-clamp: 8; }
 .cards.size-xxl .gname-l { font-size: 27px; }
@@ -866,8 +874,6 @@ body.dark .phead:hover { background: var(--card2); }
 .abouthead.phead { padding: 10px 16px; }
 /* backups: the newest one, and the picker pop-up */
 /* General: "For new notes" heading, said once for colour, font and see-through */
-.subhead { margin: 6px 0 0; padding: 12px 0 2px; border-top: 1px solid var(--soft); font: 800 10.5px var(--ui); letter-spacing: .07em; text-transform: uppercase; color: var(--mute); }
-.subhead + .row { border-top: 0; }
 .oprow { display: flex; align-items: baseline; justify-content: space-between; }
 .oprow em { font: 800 12px var(--ui); font-style: normal; color: var(--ink2); }
 .srange { width: 100%; accent-color: #8E7BEF; cursor: pointer; }
@@ -885,3 +891,155 @@ body.dark .phead:hover { background: var(--card2); }
 .bkpick.on i { border: 5px solid var(--ink); }
 .bkpick b { display: block; font-weight: 800; }
 .bkpick small { display: block; color: var(--mute); font-weight: 700; font-size: 11.5px; }
+/* ================= 1.1.13: favourites, picking several cards, the "Stardust" lock animation ================= */
+.tab .tstar { width: 14px; height: 14px; color: #E0A800; }
+.tab.on .tstar { fill: #FFD54A; }
+/* the star in a card's top-right corner: an outline while you point at the card, filled (soft yellow) once starred */
+.card > .fav {
+  position: absolute; top: 10px; right: 2px; z-index: 4;
+  width: 33px; height: 33px; padding: 0;
+  border: 0; border-radius: 50%;
+  display: grid; place-items: center;
+  background: transparent; color: var(--accent);
+  cursor: pointer;
+  opacity: 0; transition: opacity .12s, transform .12s, background .12s;
+}
+.card:hover > .fav, .card > .fav:focus-visible, .card > .fav.on { opacity: 1; }
+.card > .fav:hover { transform: scale(1.15); background: rgba(255,255,255,.45); }
+/* bigger than at first (+15 %, then +10 % in 1.1.14), and tilted a little to the left */
+.card > .fav svg { width: 21.5px; height: 21.5px; stroke-width: 2; rotate: -9deg; transition: fill .2s, stroke .2s; }
+.card > .fav.on { color: #D9A10A; }
+.card > .fav.on svg { fill: #FFD54A; stroke: #D9A10A; }
+.card[data-color="charcoal"] > .fav.on svg { stroke: #FFD54A; }
+/* (1.1.14: the star only sits on top of the card; it no longer makes room for itself, which squeezed pictures) */
+/* stars bursting from the favourite star: a fixed layer, so the card's edge doesn't cut them off; 15 % quicker */
+.stardust.fixed { position: fixed; z-index: 60; }
+.stardust.fast i { animation-duration: .68s; animation-delay: .085s; }
+/* the star pops in, with a soft ring */
+.card > .fav.pop svg { animation: starPop .55s cubic-bezier(.3,1.6,.5,1); }
+.card > .fav.pop::after { content: ""; position: absolute; inset: 1px; border-radius: 50%; border: 2px solid #FFD54A; animation: starRing .55s ease-out forwards; }
+@keyframes starPop { 0% { transform: scale(.3) rotate(-40deg); } 60% { transform: scale(1.35) rotate(12deg); } 100% { transform: none; } }
+@keyframes starRing { 0% { transform: scale(.6); opacity: 1; } 100% { transform: scale(1.9); opacity: 0; } }
+/* groups: the star sits on a little round badge so it shows on every look */
+.card.group > .fav { top: -4px; right: -2px; z-index: 6; background: var(--card); box-shadow: 0 2px 6px rgba(0,0,0,.18); color: var(--ink3); }
+.card.group > .fav:hover { background: var(--card); }
+.card.group > .fav.on { color: #D9A10A; }
+/* 1.1.14: lock / unlock button, left of the star, only while you point at the card */
+.card > .lockb {
+  position: absolute; top: 12px; right: 35px; z-index: 4;
+  width: 29px; height: 29px; padding: 0;
+  border: 0; border-radius: 50%;
+  display: grid; place-items: center;
+  background: transparent; color: var(--accent);
+  cursor: pointer;
+  opacity: 0; transition: opacity .12s, transform .12s, background .12s;
+}
+.card:hover > .lockb, .card > .lockb:focus-visible { opacity: 1; }
+.card > .lockb:hover { transform: scale(1.12); background: rgba(255,255,255,.45); }
+.card > .lockb svg { width: 17px; height: 17px; stroke-width: 2.2; }
+.card.group > .lockb { top: -2px; right: 31px; z-index: 6; background: var(--card); box-shadow: 0 2px 6px rgba(0,0,0,.18); color: var(--ink3); }
+.card.group > .lockb:hover { background: var(--card); }
+
+/* picked cards (Ctrl+click): a violet outline and a tick */
+.card.sel { outline: 3px solid #8E7BEF; outline-offset: 3px; transform: rotate(0deg); }
+.card.group.sel { outline-offset: 1px; border-radius: 10px; }
+.card.sel::before {
+  content: ""; position: absolute; left: 1px; top: 1px; z-index: 5;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: #8E7BEF url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 11px no-repeat;
+  box-shadow: 0 2px 5px rgba(80,50,180,.35);
+}
+.card.group.sel::before { top: -4px; left: -2px; }
+.dragchip { position: fixed; left: -500px; top: 0; padding: 7px 13px; border-radius: 999px; background: #8E7BEF; color: #fff; font: 800 12px var(--ui); }
+
+/* the bar for the picked cards */
+.bulkbar {
+  position: fixed; left: 50%; bottom: 14px; z-index: 40;
+  transform: translateX(-50%);
+  display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 1px;
+  max-width: calc(100vw - 24px);
+  padding: 5px 5px 5px 14px;
+  border-radius: 22px;
+  background: #3B3226; color: #FFF8E6;
+  box-shadow: 0 10px 28px rgba(40,30,10,.35);
+  animation: bulkIn .2s ease-out;
+}
+.bulkbar[hidden] { display: none; }
+@keyframes bulkIn { from { opacity: 0; transform: translate(-50%, 10px); } }
+.bcount { margin-right: 6px; font: 800 12.5px var(--ui); white-space: nowrap; }
+.bb {
+  height: 32px; padding: 0 8px;
+  border: 0; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; color: inherit;
+  font: 800 11.5px var(--ui); white-space: nowrap;
+  cursor: pointer;
+}
+.bb[hidden] { display: none; }
+.bb:hover { background: rgba(255,255,255,.13); }
+.bb:disabled { opacity: .4; cursor: default; background: transparent; }
+.bb svg { width: 15px; height: 15px; }
+.bb#bFav.on svg { fill: #FFD54A; stroke: #FFD54A; }
+.bb.danger { color: #FFB4AE; }
+.bb.danger:not(:disabled):hover { background: rgba(229,72,77,.28); }
+.bb.x { width: 32px; padding: 0; justify-content: center; }
+@media (max-width: 700px) { .bb:not(.x) span { display: none; } .bb { padding: 0 9px; } }
+.bulkpop {
+  position: absolute; left: 50%; bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  background: #FFFDF7; color: #3B3226;
+  box-shadow: 0 10px 26px rgba(40,30,10,.3);
+}
+.bulkpop[hidden] { display: none; }
+.bulkpop .sws { display: flex; gap: 6px; }
+.bsw { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); cursor: pointer; transition: transform .1s; }
+.bsw:hover { transform: scale(1.15); }
+.bfonts { display: flex; gap: 4px; }
+.bfonts button { flex: 1; height: 28px; border: 0; border-radius: 999px; background: #F2EAD7; color: #3B3226; font: 800 12px var(--ui); cursor: pointer; }
+.bfonts button.hand { font: 700 17px var(--hand); }
+.bfonts button:hover { background: #E8DCC0; }
+body.selecting #viewNotes { padding-bottom: 76px; }
+
+/* "Stardust": locking shrinks the writing into little stars and the lock glows in; unlocking reverses it */
+.stardust { position: absolute; left: 50%; top: 50%; z-index: 7; width: 0; height: 0; pointer-events: none; }
+.stardust i {
+  position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; opacity: 0;
+  background: #8E7BEF;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  animation: star .8s .1s ease-out both;
+}
+.stardust i:nth-child(even) { left: -4.5px; top: -4.5px; width: 9px; height: 9px; background: #F0B800; }
+.stardust i:nth-child(1) { --dx: -46px; --dy: -34px; } .stardust i:nth-child(2) { --dx: 44px; --dy: -38px; }
+.stardust i:nth-child(3) { --dx: 52px; --dy: 10px; }   .stardust i:nth-child(4) { --dx: -54px; --dy: 14px; }
+.stardust i:nth-child(5) { --dx: -20px; --dy: 46px; }  .stardust i:nth-child(6) { --dx: 26px; --dy: 44px; }
+.stardust i:nth-child(7) { --dx: 4px; --dy: -52px; }   .stardust i:nth-child(8) { --dx: -34px; --dy: -6px; }
+@keyframes star {
+  0% { transform: translate(0, 0) scale(0) rotate(0); opacity: 0; }
+  30% { opacity: 1; transform: translate(calc(var(--dx) * .55), calc(var(--dy) * .55)) scale(1.1) rotate(60deg); }
+  100% { transform: translate(var(--dx), var(--dy)) scale(.2) rotate(160deg); opacity: 0; }
+}
+/* "Snap shut" lock / unlock (1.1.14): the padlock drops in with a bounce and its shackle snaps shut; unlocking pops
+   the shackle open (its long side stays in the lock body) and the padlock floats away while the card fades in */
+.shackle { transform-box: fill-box; transform-origin: 0% 100%; }
+.lockmark svg, .glock svg, .lockfly svg { overflow: visible; }
+@keyframes lkDrop { 0% { translate: 0 -34px; opacity: 0; } 55% { translate: 0 2px; opacity: 1; } 78% { translate: 0 -1px; } 100% { translate: 0 0; opacity: 1; } }
+@keyframes lkSquash { 0%, 60% { scale: 1; } 70% { scale: 1.12 .9; } 100% { scale: 1; } }
+@keyframes lkSnap { 0%, 55% { transform: translateY(-4.5px) rotate(-16deg); } 66% { transform: translateY(.6px); } 100% { transform: none; } }
+@keyframes lkOpen { 0% { transform: none; } 35%, 100% { transform: translateY(-4.5px) rotate(-16deg); } }
+@keyframes lkAway { 0%, 40% { translate: 0 0; opacity: 1; } 100% { translate: 0 -26px; opacity: 0; } }
+@keyframes fadeInSoft { from { opacity: 0; } to { opacity: 1; } }
+.card.lock-anim .lockmark svg, .card.lock-anim .glock svg { animation: lkDrop .6s cubic-bezier(.3,1.3,.5,1) both, lkSquash .6s both; }
+.card.lock-anim .shackle { animation: lkSnap .6s both; }
+.card.lock-anim:not(.group) .txt { animation: fadeInSoft .4s both; }
+.card.unlock-anim:not(.group) .body, .card.group.unlock-anim .art { animation: fadeInSoft .5s .1s ease-out both; }
+/* 1.1.14: a locked note that's unlocked for now in its open window */
+.card .ulk { display: inline-grid; place-items: center; flex: none; margin-left: 4px; color: var(--accent); opacity: .8; }
+.card .ulk svg { width: 13px; height: 13px; stroke-width: 2.4; }
+.lockfly { position: absolute; z-index: 7; pointer-events: none; color: var(--accent); opacity: .55; }
+.card.group .lockfly { color: var(--ink2); opacity: .8; }
+.lockfly svg { width: 100%; height: 100%; stroke-width: 1.8; animation: lkAway .7s ease-in both; }
+.lockfly .shackle { animation: lkOpen .7s both; }
+@media (prefers-reduced-motion: reduce) { .stardust { display: none; } .card > .fav.pop svg, .card > .fav.pop::after { animation: none; } }

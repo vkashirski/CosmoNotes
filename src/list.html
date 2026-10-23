@@ -25,6 +25,7 @@
 
 <nav class="tabs">
   <button class="tab on" data-tab="notes">Notes <span class="count" id="cNotes">0</span></button>
+  <button class="tab" data-tab="favs" title="Your starred notes and groups"><svg class="tstar" viewBox="0 0 24 24"><path d="M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9L3.4 9.4l6-.7z"/></svg>Favourites <span class="count" id="cFavs">0</span></button>
   <button class="tab" data-tab="bin">Bin <span class="count" id="cBin">0</span></button>
   <button class="tab" data-tab="settings" title="Settings (click again to go back)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
 </nav>
@@ -118,7 +119,11 @@
       <span><b>Colours of this window</b><small>Only changes this notes list, not your notes.</small></span>
       <div class="themes" id="sTheme"></div>
     </div>
-    <div class="subhead">For new notes</div>
+  </div>
+
+  <div class="panel">
+    <h3>For new notes</h3>
+    <p class="muted">Notes you make from now on start like this. Notes you already have keep their own look.</p>
     <div class="row col">
       <span><b>Colour</b></span>
       <div class="swatches" id="sColors"></div>
@@ -194,6 +199,8 @@
 </section>
 
 <!-- app-styled right-click menu and pop-ups -->
+<!-- 1.1.14: the inside of a padlock's body, where the long side of its shackle is hidden -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><clipPath id="lockClip"><path d="M-4-4H28V28H-4ZM5 12H19V20H5Z" clip-rule="evenodd"/></clipPath></defs></svg>
 <div class="ctx" id="ctx" hidden></div>
 <div class="modal" id="modal" hidden>
   <form class="mbox" id="mbox" autocomplete="off">

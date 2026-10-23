@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lock animation options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Nunito:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F7F1E3; --card: #FFFDF7; --ink: #3B3220; --mute: #8A7652; --line: #E6DCC4;
+  --paper: #FFF4A3; --paper2: #FFEC85; --bar: #FBE278; --accent: #7A5C00;
+  --hand: "Caveat", "Segoe Print", cursive; --ui: "Nunito", "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--ui); }
+main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 40px; }
+h1 { margin: 0 0 4px; font-size: 24px; }
+.sub { margin: 0 0 18px; color: var(--mute); font-weight: 700; font-size: 13.5px; line-height: 1.45; }
+.top { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+.demo { background: var(--card); border-radius: 18px; padding: 16px; box-shadow: 0 1px 3px rgba(80,60,20,.12); display: flex; flex-direction: column; gap: 12px; }
+.demo h2 { margin: 0; font-size: 17px; }
+.demo p { margin: 0; color: var(--mute); font-size: 12.5px; font-weight: 700; line-height: 1.45; }
+.demo p b { color: var(--ink); }
+.stage { display: flex; gap: 14px; justify-content: center; align-items: flex-end; padding: 14px 0 6px; background: #EFE6D2; border-radius: 14px; }
+.btn { align-self: flex-start; border: 0; border-radius: 999px; padding: 9px 18px; font: 800 13.5px var(--ui); background: var(--accent); color: #FFF8E6; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.btn.ghost { background: #E9DEC4; color: var(--ink); }
+.btn svg { width: 15px; height: 15px; }
+svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.fill { fill: currentColor; stroke: none; }
+.cap { text-align: center; font-size: 10.5px; font-weight: 800; color: var(--mute); text-transform: uppercase; letter-spacing: .06em; margin-top: 6px; }
+
+/* ---------- the note ---------- */
+.note, .group { position: relative; overflow: hidden; }
+.note { width: 168px; height: 176px; border-radius: 3px 3px 16px 3px; background: linear-gradient(180deg, var(--paper) 0%, var(--paper) 55%, var(--paper2) 100%); box-shadow: 0 6px 14px rgba(80,60,20,.18); }
+.note .bar { height: 22px; background: var(--bar); display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 0 7px; position: relative; z-index: 4; }
+.note .bar i { width: 7px; height: 7px; border-radius: 50%; background: rgba(122,92,0,.35); }
+.note .content { padding: 8px 12px; font: 500 19px/1.15 var(--hand); color: #3B3220; }
+.note .content b { font-weight: 700; font-size: 22px; display: block; margin-bottom: 2px; }
+/* ---------- the group (paper stack) ---------- */
+.group { width: 128px; height: 142px; overflow: visible; }
+.group .sheet { position: absolute; inset: 14px 6px 22px 6px; border-radius: 4px; background: #FFD6E6; box-shadow: 0 3px 8px rgba(80,60,20,.15); }
+.group .sheet.s2 { transform: rotate(-6deg); background: #D2ECFF; }
+.group .sheet.s3 { transform: rotate(5deg); background: #D8F5C4; }
+.group .gcontent { position: absolute; inset: 14px 6px 22px 6px; padding: 10px 10px; font: 500 16px/1.1 var(--hand); color: #3B3220; border-radius: 4px; background: var(--paper); box-shadow: 0 3px 8px rgba(80,60,20,.18); }
+.group .gname { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font: 800 12px var(--ui); color: var(--ink); }
+.content, .gcontent { transition: opacity .35s ease, filter .35s ease, transform .4s ease; }
+
+/* ---------- what shows while locked ---------- */
+.lockui { position: absolute; left: 0; right: 0; top: 22px; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; opacity: 0; z-index: 5; }
+.group .lockui { top: 14px; bottom: 22px; }
+.locked .lockui, .unlocking .lockui { opacity: 1; }
+.ico { position: relative; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.6); color: var(--accent); }
+.group .ico { width: 40px; height: 40px; background: #FFFDF7; color: var(--ink); box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.ico svg { width: 23px; height: 23px; overflow: visible; }
+.group .ico svg { width: 20px; height: 20px; }
+.shackle { transform-box: fill-box; transform-origin: 50% 100%; }
+.lt { margin-top: 6px; font: 700 18px var(--hand); color: var(--accent); }
+.pin { margin-top: 5px; width: 118px; height: 24px; border-radius: 999px; border: 1.5px solid rgba(122,92,0,.28); background: rgba(255,255,255,.7); font: 700 10.5px/21px var(--ui); color: #A08B5B; padding-left: 10px; }
+.locked .content, .locked .gcontent { opacity: 0; filter: blur(6px); }
+.flap, .stars, .key, .ring { display: none; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fadeOut { to { opacity: 0; transform: translateY(-4px); } }
+.locking .lt, .locking .pin { animation: fadeUp .35s .4s both; }
+.unlocking .lt, .unlocking .pin { animation: fadeOut .2s both; }
+.unlocking .content, .unlocking .gcontent { transition-delay: .35s; }
+
+/* ===== 1 · Snap shut ===== */
+@keyframes a1drop { 0% { transform: translateY(-46px) scale(.6); opacity: 0; } 55% { transform: translateY(2px) scale(1.06); opacity: 1; } 75% { transform: translateY(0) scale(.97); } 100% { transform: none; } }
+@keyframes a1snap { 0%, 55% { transform: translateY(-4.5px); } 68% { transform: translateY(.8px); } 100% { transform: none; } }
+@keyframes a1squash { 0%, 64% { transform: none; } 72% { transform: scale(1.12, .9); } 100% { transform: none; } }
+@keyframes a1open { 0% { transform: none; } 35%, 100% { transform: translateY(-5px); } }
+@keyframes a1lift { 0%, 40% { transform: none; opacity: 1; } 100% { transform: translateY(-34px) scale(.8); opacity: 0; } }
+.a1.locking .ico { animation: a1drop .6s cubic-bezier(.3,1.3,.5,1) both; }
+.a1.locking .ico svg { animation: a1squash .6s both; }
+.a1.locking .shackle { animation: a1snap .6s both; }
+.a1.unlocking .shackle { animation: a1open .7s both; }
+.a1.unlocking .ico { animation: a1lift .7s ease-in both; }
+
+/* ===== 2 · Paper cover ===== */
+.a2 .flap { display: block; position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 3; transform: translateY(-101%); transition: transform .55s cubic-bezier(.65,0,.3,1); background: linear-gradient(180deg, #FBE278, #F3D25A); box-shadow: 0 5px 10px rgba(80,60,20,.25); }
+.a2 .flap::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 14px; background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.45)); border-radius: 0 0 50% 50% / 0 0 100% 100%; }
+.a2 .group .flap { top: 14px; bottom: 22px; left: 6px; right: 6px; border-radius: 4px; transform: scaleY(0); transform-origin: top; }
+.a2.locked .flap { transform: none; }
+.a2.locked .content, .a2.locked .gcontent { opacity: 0; filter: none; transition-delay: .55s; }
+@keyframes pop { 0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: none; } }
+@keyframes popOut { to { transform: scale(0); opacity: 0; } }
+.a2.locking .ico { animation: pop .35s .5s both; }
+.a2.unlocking .ico { animation: popOut .22s both; }
+.a2.unlocking .flap { transition-delay: .2s; }
+.a2.unlocking .content, .a2.unlocking .gcontent { transition: none; }
+
+/* ===== 3 · Stardust ===== */
+.a3 .stars { display: block; position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.a3 .stars i { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; opacity: 0; background: #8E7BEF; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.a3 .stars i:nth-child(even) { background: #F0B800; width: 9px; height: 9px; left: -4.5px; top: -4.5px; }
+.a3 .stars i:nth-child(1) { --dx: -46px; --dy: -34px; } .a3 .stars i:nth-child(2) { --dx: 44px; --dy: -38px; }
+.a3 .stars i:nth-child(3) { --dx: 52px; --dy: 10px; } .a3 .stars i:nth-child(4) { --dx: -54px; --dy: 14px; }
+.a3 .stars i:nth-child(5) { --dx: -20px; --dy: 46px; } .a3 .stars i:nth-child(6) { --dx: 26px; --dy: 44px; }
+.a3 .stars i:nth-child(7) { --dx: 4px; --dy: -52px; } .a3 .stars i:nth-child(8) { --dx: -34px; --dy: -6px; }
+@keyframes star { 0% { transform: translate(0,0) scale(0) rotate(0); opacity: 0; } 30% { opacity: 1; transform: translate(calc(var(--dx) * .55), calc(var(--dy) * .55)) scale(1.1) rotate(60deg); } 100% { transform: translate(var(--dx), var(--dy)) scale(.2) rotate(160deg); opacity: 0; } }
+.a3.locking .stars i { animation: star .8s .15s ease-out both; }
+.a3.unlocking .stars i { animation: star .7s ease-out both; }
+.a3.locked .content, .a3.locked .gcontent { transform: scale(.55); filter: blur(8px); }
+@keyframes glowIn { 0% { transform: scale(.3); opacity: 0; box-shadow: 0 0 0 0 rgba(142,123,239,.7); } 55% { transform: scale(1.12); opacity: 1; } 100% { transform: none; box-shadow: 0 0 0 16px rgba(142,123,239,0); } }
+@keyframes glowOut { 0% { transform: none; box-shadow: 0 0 0 0 rgba(142,123,239,.7); } 100% { transform: scale(.2); opacity: 0; box-shadow: 0 0 0 16px rgba(142,123,239,0); } }
+.a3.locking .ico { animation: glowIn .7s .2s both; }
+.a3.unlocking .ico { animation: glowOut .35s ease-in both; }
+.a3.unlocking .content, .a3.unlocking .gcontent { transition-delay: .2s; transition-duration: .5s; }
+
+/* ===== 4 · Wax seal ===== */
+.a4 .ico { background: radial-gradient(circle at 38% 34%, #F0686C, #C42A2F 62%, #9E1E22); color: #FFE2DF; border-radius: 48% 52% 46% 54% / 52% 46% 54% 48%; box-shadow: 0 2px 5px rgba(120,20,20,.35), inset 0 0 0 3px rgba(255,255,255,.12); }
+.a4 .group .ico { background: radial-gradient(circle at 38% 34%, #F0686C, #C42A2F 62%, #9E1E22); color: #FFE2DF; }
+.a4 .ring { display: block; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid rgba(196,42,47,.55); opacity: 0; }
+@keyframes stamp { 0% { transform: scale(2.4) rotate(-25deg); opacity: 0; } 50% { transform: scale(.88) rotate(0); opacity: 1; } 68% { transform: scale(1.07); } 100% { transform: none; } }
+@keyframes ripple { 0% { transform: scale(.8); opacity: .9; } 100% { transform: scale(2.1); opacity: 0; } }
+@keyframes peel { 0% { transform: none; opacity: 1; } 30% { transform: translateY(-5px) rotate(-10deg) scale(1.05); } 100% { transform: translate(18px, 70px) rotate(70deg) scale(.8); opacity: 0; } }
+.a4.locking .ico { animation: stamp .55s cubic-bezier(.4,0,.3,1) both; }
+.a4.locking .ring { animation: ripple .6s .28s ease-out both; }
+.a4.unlocking .ico { animation: peel .65s ease-in both; }
+
+/* ===== 5 · Key turn ===== */
+.a5 .key { display: block; position: absolute; left: 50%; top: 58%; width: 26px; height: 12px; margin: -6px 0 0 -2px; color: var(--accent); opacity: 0; transform-origin: 2px 6px; }
+.a5 .group .key { color: var(--ink); }
+.a5 .key svg { width: 26px; height: 12px; display: block; stroke-width: 2.2; }
+@keyframes keyIn { 0% { transform: translateX(34px); opacity: 0; } 30% { transform: translateX(0); opacity: 1; } 55%, 80% { transform: rotate(90deg); opacity: 1; } 100% { transform: rotate(90deg); opacity: 0; } }
+@keyframes keyBack { 0% { transform: translateX(34px) rotate(90deg); opacity: 0; } 25% { transform: rotate(90deg); opacity: 1; } 50%, 70% { transform: rotate(0); opacity: 1; } 100% { transform: translateX(30px); opacity: 0; } }
+@keyframes a5close { 0%, 55% { transform: translateY(-4.5px); } 66% { transform: translateY(.8px); } 100% { transform: none; } }
+@keyframes a5open { 0%, 48% { transform: none; } 60%, 100% { transform: translateY(-5px); } }
+@keyframes a5in { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
+@keyframes a5away { 0%, 70% { transform: none; opacity: 1; } 100% { transform: translateY(-26px); opacity: 0; } }
+.a5.locking .ico { animation: a5in .2s both; }
+.a5.locking .key { animation: keyIn 1s ease-in-out both; }
+.a5.locking .shackle { animation: a5close 1s both; }
+.a5.locking .lt, .a5.locking .pin { animation-delay: .7s; }
+.a5.unlocking .key { animation: keyBack 1s ease-in-out both; }
+.a5.unlocking .shackle { animation: a5open 1s both; }
+.a5.unlocking .ico { animation: a5away 1s both; }
+.a5.unlocking .lt, .a5.unlocking .pin { animation: fadeOut .2s .1s both; }
+.a5.unlocking .content, .a5.unlocking .gcontent { transition-delay: .7s; }
+
+@media (max-width: 400px) { .grid { grid-template-columns: 1fr; } .note { width: 150px; } .group { width: 112px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Lock &amp; unlock animations</h1>
+  <p class="sub">Click <b>Lock</b> and <b>Unlock</b> on each one. Every idea is shown on a note (left) and a group (right). Today a locked note shows its lock and PIN box straight away, with no animation.</p>
+  <div class="top">
+    <button class="btn" id="allLock">Lock all</button>
+    <button class="btn ghost" id="allUnlock">Unlock all</button>
+  </div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<template id="tpl">
+  <section class="demo">
+    <h2></h2>
+    <p class="d"></p>
+    <div class="stage">
+      <div>
+        <div class="note">
+          <div class="bar"><i></i><i></i></div>
+          <div class="content"><b>Birthday ideas</b>• cake from Mila's<br>• balloons (gold)<br>• surprise at 7pm</div>
+          <div class="flap"></div>
+          <div class="lockui">
+            <div class="ico"><span class="ring"></span><svg viewBox="0 0 24 24"><path class="shackle" d="M8 11V7a4 4 0 0 1 8 0v4"/><rect x="4" y="11" width="16" height="10" rx="2.5"/><circle cx="12" cy="16" r="1.2" class="fill"/></svg><span class="key"><svg viewBox="0 0 26 12"><circle cx="20" cy="6" r="4.2"/><path d="M15.8 6H2M5 6v3.5M8.5 6v2.5"/></svg></span></div>
+            <div class="lt">This note is locked</div>
+            <div class="pin">PIN</div>
+          </div>
+          <div class="stars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <div class="cap">Note</div>
+      </div>
+      <div>
+        <div class="group">
+          <div class="sheet s2"></div><div class="sheet s3"></div>
+          <div class="gcontent">Flights<br>Hotel list<br>Packing</div>
+          <div class="flap"></div>
+          <div class="lockui">
+            <div class="ico"><span class="ring"></span><svg viewBox="0 0 24 24"><path class="shackle" d="M8 11V7a4 4 0 0 1 8 0v4"/><rect x="4" y="11" width="16" height="10" rx="2.5"/><circle cx="12" cy="16" r="1.2" class="fill"/></svg><span class="key"><svg viewBox="0 0 26 12"><circle cx="20" cy="6" r="4.2"/><path d="M15.8 6H2M5 6v3.5M8.5 6v2.5"/></svg></span></div>
+          </div>
+          <div class="stars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="gname">Trip</div>
+        </div>
+        <div class="cap">Group</div>
+      </div>
+    </div>
+    <button class="btn go"></button>
+  </section>
+</template>
+
+<script>
+const IDEAS = [
+  { cls: 'a1', name: '1 · Snap shut', d: '<b>Lock:</b> the padlock drops in, bounces, and its loop snaps closed as the note blurs away. <b>Unlock:</b> the loop pops open and the lock floats up out of sight.' },
+  { cls: 'a2', name: '2 · Paper cover', d: '<b>Lock:</b> a sheet of the note’s own paper slides down over it like a blind, then the lock pops on. <b>Unlock:</b> the lock pops off and the sheet rolls back up.' },
+  { cls: 'a3', name: '3 · Stardust', d: '<b>Lock:</b> the writing shrinks and blurs into a little burst of stars, and the lock glows in. <b>Unlock:</b> the lock bursts into stars and the writing grows back. (Fits the “Cosmo” name.)' },
+  { cls: 'a4', name: '4 · Wax seal', d: '<b>Lock:</b> a red wax seal stamps down on the note with a little ripple. <b>Unlock:</b> the seal peels off and drops away.' },
+  { cls: 'a5', name: '5 · Key turn', d: '<b>Lock:</b> a key slides in, turns, and the padlock clicks shut. <b>Unlock:</b> the key turns back, the lock opens and floats away. (The slowest: about 1 second.)' },
+];
+const LOCK = '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+const OPEN = '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>';
+const grid = document.getElementById('grid');
+const tpl = document.getElementById('tpl');
+const demos = IDEAS.map((idea) => {
+  const el = tpl.content.firstElementChild.cloneNode(true);
+  el.classList.add(idea.cls);
+  el.querySelector('h2').textContent = idea.name;
+  el.querySelector('.d').innerHTML = idea.d;
+  const btn = el.querySelector('.go');
+  const paint = () => { btn.innerHTML = el.classList.contains('locked') ? OPEN + 'Unlock' : LOCK + 'Lock'; };
+  let timer = 0;
+  el.set = (lock) => {
+    if (lock === el.classList.contains('locked')) return;
+    clearTimeout(timer);
+    el.classList.remove('locking', 'unlocking');
+    void el.offsetWidth; // restart the animations
+    if (lock) el.classList.add('locked', 'locking');
+    else { el.classList.remove('locked'); el.classList.add('unlocking'); }
+    paint();
+    timer = setTimeout(() => el.classList.remove('locking', 'unlocking'), 1300);
+  };
+  btn.addEventListener('click', () => el.set(!el.classList.contains('locked')));
+  paint();
+  grid.append(el);
+  return el;
+});
+document.getElementById('allLock').onclick = () => demos.forEach((d) => d.set(true));
+document.getElementById('allUnlock').onclick = () => demos.forEach((d) => d.set(false));
+</script>
+</body>
+</html>

@@ -97,7 +97,7 @@ const cleanTitle = (t) => (typeof t === 'string' ? t.replace(/[\r\n\t]+/g, ' ').
 
 // Draw-over ink: { s: [stroke, ...] } in the note's own coordinates (px from the top-left of the text area).
 // stroke = { t: pen|hl|line|arrow|rect|ellipse, c: '#rrggbb', w: 1-40, l: 'a' (above text) | 'b' (behind),
-//            p: [x, y, x, y, ...] }  (pen/hl: the path; shapes: start and end corner)
+//            d: 'dash' | 'dot' (1.1.13, left out = a solid line), p: [x, y, x, y, ...] }  (pen/hl: the path; shapes: start and end corner)
 const INK_TOOLS = ['pen', 'hl', 'line', 'arrow', 'rect', 'ellipse'];
 const MAX_STROKES = 4000;
 function normalizeInk(ink) {
@@ -107,13 +107,20 @@ function normalizeInk(ink) {
     if (!st || !INK_TOOLS.includes(st.t) || !Array.isArray(st.p)) continue;
     const p = st.p.slice(0, 20000).map(Number);
     if (p.length < 2 || p.length % 2 || !p.every((v) => Number.isFinite(v) && v > -10000 && v < 100000)) continue;
-    out.push({
+    const clean = {
       t: st.t,
       c: /^#[0-9a-fA-F]{6}$/.test(st.c) ? st.c : '#2B2B2B',
       w: Math.min(40, Math.max(1, Number(st.w) || 3)),
       l: st.l === 'b' ? 'b' : 'a',
       p: p.map((v) => Math.round(v * 10) / 10),
-    });
+    };
+    if (st.d === 'dash' || st.d === 'dot') {
+      clean.d = st.d;
+      // where the dash pattern carries on from (px along the line it was erased out of), so dots don't move (1.1.14)
+      const o = Number(st.o);
+      if (Number.isFinite(o) && o > 0 && o < 1e6) clean.o = Math.round(o * 10) / 10;
+    }
+    out.push(clean);
   }
   return out.length ? { s: out } : null;
 }
@@ -127,6 +134,7 @@ function normalizeGroup(x) {
     style: GROUP_STYLES.includes(x.style) ? x.style : 'stack',
     color: GROUP_COLORS.includes(x.color) ? x.color : 'kraft',
     locked: !!x.locked,
+    favorite: !!x.favorite, // starred in the notes list (1.1.13)
   };
 }
 
@@ -142,11 +150,13 @@ function normalize(n) {
     font: n.font === 'round' ? 'round' : 'hand',
     size: ['s', 'm', 'l'].includes(n.size) ? n.size : 'm',
     opacity: clamp(Number(n.opacity) || 1, 0.25, 1),
+    zoom: clamp(Math.round((Number(n.zoom) || 1) * 10) / 10, 0.5, 3), // Ctrl + mouse wheel in the note (1.1.13)
     solidOnHover: n.solidOnHover !== false,
     pinned: !!n.pinned,
     open: !!n.open,
     rolled: !!n.rolled,
     locked: !!n.locked,
+    favorite: !!n.favorite, // starred in the notes list (1.1.13); not an edit, not copied by Duplicate
     ink: normalizeInk(n.ink),
     // text layout locked at this width (px) so text and pictures don't re-wrap; null = wraps with the note
     wrapWidth: Number.isFinite(Number(n.wrapWidth)) && Number(n.wrapWidth) >= 80 ? Math.min(4000, Math.round(Number(n.wrapWidth))) : null,

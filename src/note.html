@@ -21,6 +21,9 @@
   <button class="hb" id="btnPin" title="Pin on top of other windows" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
   <button class="hb" id="btnRoll" title="Roll up to just the top bar"><svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></button>
   <button class="hb" id="btnMenu" title="Title, colour, see-through, lock and more"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg></button>
+  <span class="hsep"></span>
+  <button class="hb" id="btnMin" title="Minimise (even a pinned note stays down until you bring it back)"><svg viewBox="0 0 24 24"><path d="M6 17h12"/></svg></button>
+  <button class="hb" id="btnMax" title="Maximise (or double-click the top bar)"><svg class="i-max" viewBox="0 0 24 24"><rect x="5.5" y="5.5" width="13" height="13" rx="2"/></svg><svg class="i-restore" viewBox="0 0 24 24"><rect x="4.5" y="8.5" width="11" height="11" rx="2"/><path d="M8.5 5.5h8a2.5 2.5 0 0 1 2.5 2.5v8"/></svg></button>
   <button class="hb" id="btnClose" title="Close note (it stays in your notes list)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
 </header>
 
@@ -37,7 +40,7 @@
 <!-- shown instead of the note when it is locked -->
 <div id="lockScreen" hidden>
   <form id="unlockForm" autocomplete="off">
-    <div class="lockicon"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="16" r="1.2" class="fill"/></svg></div>
+    <div class="lockicon"><svg viewBox="0 0 24 24"><defs><clipPath id="lockClip"><path d="M-4-4H28V28H-4ZM5 12H19V20H5Z" clip-rule="evenodd"/></clipPath></defs><g clip-path="url(#lockClip)"><path class="shackle" d="M8 16.5V7a4 4 0 0 1 8 0v4"/></g><rect x="4" y="11" width="16" height="10" rx="2.5"/><circle cx="12" cy="16" r="1.2" class="fill"/></svg></div>
     <div class="lt">This note is locked</div>
     <div class="lrow"><input type="password" id="unlockPw" placeholder="Password"><button class="lbtn" type="submit" title="Unlock"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
     <div class="lerr" id="unlockErr"></div>
@@ -58,10 +61,11 @@
   <button class="tb" data-cmd="bullets" title="Bullet list (Ctrl+Shift+L)"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.3" class="fill"/><circle cx="4.5" cy="12" r="1.3" class="fill"/><circle cx="4.5" cy="18" r="1.3" class="fill"/></svg></button>
   <button class="tb" data-cmd="checklist" title="Checklist (Ctrl+Shift+C)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="6" height="6" rx="1.5"/><path d="m4.4 7 1.3 1.3L8 5.8"/><rect x="3" y="14" width="6" height="6" rx="1.5"/><path d="M13 7h8M13 17h8"/></svg></button>
   <span class="tsep"></span>
-  <button class="tb" id="btnWrap" title="Word wrap"><svg viewBox="0 0 24 24"><mask id="wrapW" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff" stroke="none"/><path d="M5 3.5l3.4 17L12 9.5l3.6 11L19 3.5" stroke="#000" stroke-width="2.9"/><path class="slashcut" d="M3 21 21 3" stroke="#000" stroke-width="6"/></mask><path class="lines" d="M3 4h18M3 8h18M3 12h18M3 16h18M3 20h18" mask="url(#wrapW)"/><path class="slash" d="M3 21 21 3"/></svg></button>
-  <button class="tb" id="btnSpell" title="Spelling"><svg viewBox="0 0 24 24"><path d="m4 15 4.5-11L13 15"/><path d="M5.6 11h5.8"/><path d="m14 17 2.5 2.5L21 15"/><path class="slash" d="M3 21 21 3"/></svg></button>
+  <button class="tb" id="btnWrap" title="Word wrap"><svg viewBox="0 0 24 24"><mask id="wrapCut" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff" stroke="none"/><path class="slashcut" d="M3 21 21 3" stroke="#000" stroke-width="6"/></mask><g mask="url(#wrapCut)"><path d="M3 6h18"/><path d="M3 12h15a3 3 0 0 1 0 6h-5"/><path d="m15 15.5-2.5 2.5 2.5 2.5"/><path d="M3 18h6"/></g><path class="slash" d="M3 21 21 3"/></svg></button>
+  <button class="tb" id="btnSpell" title="Spelling"><svg viewBox="0 0 24 24"><mask id="spellCut" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff" stroke="none"/><path class="slashcut" d="M3 21 21 3" stroke="#000" stroke-width="6"/></mask><g mask="url(#spellCut)"><text class="fill" x="1" y="12" font-size="11">abc</text><path d="m12 18 2.5 2.5L21 14"/></g><path class="slash" d="M3 21 21 3"/></svg></button>
   </div>
   <button class="tb" id="btnUndo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+  <button class="tb" id="btnRedo" title="Redo (Ctrl+Y)"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
   <button id="btnInk" title="Draw over the note: pen, highlighter, arrows, circles…"><svg viewBox="0 0 24 24"><path d="M3 15c2-4 4-6 5.5-4.5S7 16 9 16.5s3.5-7 6-7 .5 6.5 2.5 6.5S21 12 21 10"/></svg><span>Draw</span></button>
   <button id="btnInsert" title="Add a photo, voice note, drawing, link, table and more"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg><span>Add</span></button>
 </footer>
@@ -87,7 +91,7 @@
   <div class="divider"></div>
   <button class="mi" id="miDuplicate"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2.5"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg><span>Duplicate note</span></button>
   <button class="mi" id="miLock"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="miLockText">Lock note</span></button>
-  <button class="mi danger" id="miDelete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span>Delete note <small>(goes to the bin)</small></span></button>
+  <button class="mi danger" id="miDelete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span id="miDeleteText">Delete note <small>(goes to the bin)</small></span></button>
   <div class="dates" id="dates"></div>
 </div>
 
@@ -239,6 +243,11 @@
     <div class="ilayer" id="inkLayer">
       <button data-l="a" title="Over: draw on top of the text and pictures"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="12.5" height="12.5" rx="2.5" class="pg"/><rect x="8.5" y="8.5" width="12.5" height="12.5" rx="2.5" class="ik"/></svg>Over</button>
       <button data-l="b" title="Behind: draw under the text and pictures, like marker on paper"><svg viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12.5" height="12.5" rx="2.5" class="ik"/><rect x="3" y="3" width="12.5" height="12.5" rx="2.5" class="pg"/></svg>Behind</button>
+    </div>
+    <div class="idash" id="inkDash">
+      <button data-d="" title="Solid line"><svg viewBox="0 0 24 24"><path d="M3 12h18"/></svg></button>
+      <button data-d="dash" title="Dashed line"><svg viewBox="0 0 24 24"><path d="M3 12h4.5M10 12h4.5M17 12h4"/></svg></button>
+      <button data-d="dot" title="Dotted line"><svg viewBox="0 0 24 24"><path d="M4 12h.01M9.3 12h.01M14.7 12h.01M20 12h.01" stroke-width="3.2"/></svg></button>
     </div>
     <button class="iact" id="inkClear" title="Remove all drawing"><svg viewBox="0 0 24 24"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
   </div>

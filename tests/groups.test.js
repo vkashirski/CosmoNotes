@@ -91,6 +91,11 @@ const ev = (w) => ({ sender: w.webContents, returnValue: undefined });
   v = await H['note:get'](ev(wc)); assert.equal(v.hidden, false);
   await H['groups:hide'](null, G);
   list = await H['list:get']();
+  assert.equal(list.notes.find((x) => x.id === b).locked, true);
+  // 1.1.14: a, unlocked in its own window, stays shown until that window is closed or locked again
+  assert.equal(list.notes.find((x) => x.id === a).locked, false);
+  await H['note:relock'](ev(wa));
+  list = await H['list:get']();
   assert.equal(list.notes.find((x) => x.id === a).locked, true);
   // remove group lock needs the password
   r = await H['groups:set-locked'](null, G, false, 'bad'); assert.equal(r.error, 'wrong');

@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 23 October 2026 · App version 1.1.12**
+**Last updated: 23 October 2026 · App version 1.1.14**
 
 Read this before changing anything. Keep it up to date: when you add or change a feature, update the
 relevant section here, `src/about.js` (the in-app feature list and version history) and `CHANGELOG.md`.
@@ -77,17 +77,17 @@ referenced from HTML as `../node_modules/@fontsource/...`, so they work offline 
 - **IPC** (see `preload.js` for the renderer side):
   - note window: `note:get`, `note:update`, `note:update-sync` (used on unload), `note:dates`,
     `note:new`, `note:duplicate`, `note:close`, `note:trash`, `note:hover`, `note:unlock`, `note:relock`,
-    `note:set-locked`, `lock:set` (`{current, next, kind}`, kind = 'pin' | 'password'), `att:save`,
+    `note:set-locked`, `lock:set` (`{current, next, kind}`, kind = 'pin' | 'password'), `note:minimize`, `note:maximize`, `att:save`,
     `att:pick-images`, `att:open`, `open-external`, `list:show`
   - list window: `list:get`, `list:new`, `list:duplicate`, `list:open-note`, `list:close-note`, `list:trash`,
-    `list:restore`, `list:destroy`, `list:empty-bin`, `list:bring-front`, `list:set-locked`,
+    `list:restore`, `list:destroy`, `list:empty-bin`, `list:bring-front`, `list:set-locked`, `list:favorite`, `list:apply`,
     `groups:make`, `groups:move-up`, `groups:move-to`, `groups:ungroup` (= move-up for a note),
-    `groups:dissolve`, `groups:rename`, `groups:update` (name/style/color), `groups:apply` (mass edit
+    `groups:make-from`, `groups:dissolve`, `groups:rename`, `groups:update` (name/style/color), `groups:apply` (mass edit
     colour/font), `groups:trash`, `groups:set-locked`, `groups:reveal`, `groups:hide`, `settings:set`,
     `backups:list`, `backups:now`, `backups:restore`, `backups:open-folder`, `data:open-folder`
   - main → windows: `notes:changed` (list reloads), `settings:changed` (`{spellCheck, hasPassword, lockKind,
     lockLen}`), `note:look` (a note's colour/font/lock/rolled changed from outside), `note:lock-now` (note became
-    locked from the list: the window saves, then calls `note:relock` and hides), `list:nav` (mouse back/forward
+    locked from the list: the window saves, then calls `note:relock` and hides), `note:win-state` (`{maximized}`), `list:nav` (mouse back/forward
     buttons sent as Windows app-commands)
   - **No native message boxes.** The list window asks every question with its own app-styled `modal()`
     (list.js) and only then calls main (`list:destroy`, `list:empty-bin`, `backups:restore` don't ask
@@ -116,7 +116,7 @@ referenced from HTML as `../node_modules/@fontsource/...`, so they work offline 
 notes/<uuid>.json      one note per file (+ .bak = previous version, .tmp during a write)
 attachments/<name>     photos (png/jpg/gif/webp/bmp), drawings (png), voice (webm)
 backups/YYYY-MM-DD[_HH-MM-SS]/   <uuid>.json…, groups.json, meta.json {created,count}
-groups.json            { groups: [{ id, name, createdAt, parentId, style, color, locked }] }
+groups.json            { groups: [{ id, name, createdAt, parentId, style, color, locked, favorite }] }
 settings.json          see below
 ```
 
@@ -128,12 +128,14 @@ save 350ms after typing stops, on blur, and synchronously on unload. Main flushe
 `id, title, html, text (plain text for list/search), firstImage, color (yellow|pink|green|blue|purple|
 orange|mint|charcoal), font (hand|round), size (s|m|l), ink (draw-over, see below), wrapWidth (px or null:
 locked text layout), opacity (0.25–1), solidOnHover, pinned, open
-(window open → reopens at start), rolled, locked, spell (null = follow Settings | true | false),
+(window open → reopens at start), rolled, zoom (0.5–3, Ctrl + wheel in the note; not an edit), locked, favorite (starred in the list; not an edit), spell (null = follow Settings | true | false),
 groupId, bounds {x,y,width,height} (unrolled height), createdAt, updatedAt, deletedAt (null or in Bin),
 restoredFrom`.
 
 **Draw-over ink** (`note.ink`): `{ s: [ { t: pen|hl|line|arrow|rect|ellipse, c: '#rrggbb', w: 1–40, l: 'a'|'b',
-p: [x,y,...] } ] }`. Coordinates are px relative to `#sheet` (the text area, origin top-left). pen/hl use the
+d: 'dash'|'dot' (optional, 1.1.13; missing = solid), o: dash offset in px (1.1.14, only on pieces left by the partial eraser, so
+the pattern carries on where it was), p: [x,y,...] } ] }`. When tracing shapes for the eraser, keep `tracePieces` drawing them exactly
+like the browser (square: starts after the top-left rounded corner, rx 4), or dashes slide after erasing. Coordinates are px relative to `#sheet` (the text area, origin top-left). pen/hl use the
 whole path; shapes use `[x1,y1,x2,y2]`. `l: 'a'` = over the text (SVG `#inkAbove`, z-index 2); `'b'` = behind it
 (`#inkBelow`, z-index 0, under `#editor` z-index 1, so pictures cover it). `normalizeInk` in store.js validates
 and caps it (4000 strokes, 20000 numbers per stroke). Ink is in `SECRET` (main.js): blanked for hidden locked
@@ -171,7 +173,9 @@ Settings sections fold (`foldPanels`, all closed at first).
 Attachments are only deleted when no note *and no backup* references them, and only once they're over 2
 days old (`sweepAttachments`).
 
-**Bin**: `list:trash` sets `deletedAt`, and only "Delete forever" / "Empty bin" removes the file.
+**Bin**: `list:trash` sets `deletedAt`, and only "Delete forever" / "Empty bin" removes the file. **Locked notes (own lock
+or a locked group around them) and groups with anything locked inside can't be binned or deleted** (main returns
+`{error:'locked'}`; Empty bin leaves them) — the owner's rule since 1.1.13.
 
 **Groups** form a folder tree: a note has `groupId` (its direct group), and a group has `parentId` (null = top
 level). `style` is one of stack|folder|envelope|notebook, `color` one of
@@ -235,7 +239,11 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
 | Password or PIN (auto-open PIN) | main.js `lock:set` (kind), `lockInfo`; list.js `modal()` `kindPick`/`pin`/`pinLen`, `askPassword`, `NEW_INPUTS`; note.js `paintUnlock`, `#pwKind` |
 | Group panel shows shared colour/font | list.js `panelScope`, `shared`, `paintPanel` |
 | Divider = full note width (`max(100%, --viewW)`) | note.css `#editor hr` |
-| Word wrap icon = lines with a W cut out (mask `#wrapW`, `.slashcut` gap when off; no box when on), placed before spelling; note menu "solid on hover" = sliding switch (`.check.switch`) | note.html `#btnInk`, `#btnWrap`; note.css 1.1.12 block |
+| Favourites (`favorite` on notes/groups, star `.fav` on cards, Favourites tab `tab='favs'`), selecting several cards (Ctrl/Shift+click, Ctrl+A, bottom bar `#bulk`, multi-drag `drag.many`) | list.js `paintCards`, `pickCard`, `paintBulk`, `bulk*`, `favourites()`; main.js `list:favorite`, `list:apply`, `groups:make-from` |
+| Zoom inside a note (Ctrl + wheel, Ctrl+0/=/-): CSS `zoom` on `#sheet`. **Anything that turns mouse/screen pixels into sizes inside the note must divide by `zoomNow()`** (`inkPt`, picture resize, `--viewW`, `contentRight`). Don't use Electron's page zoom: Chromium shares it between all windows of the same origin (every note is file://) | note.js `applyZoom`, `setZoom`, `zoomNow` |
+| "Snap shut" lock/unlock animation (1.1.14; the shackle's long side never leaves the body: clip path `#lockClip`) | note.js `lockGhost`, `lockFly`, `playLockAnim`; note.html `.lockicon`; list.js `ICON.lockA`, `snapLock`, `lockCentre`, `lockPos`, `lockSeen`; list.html `#lockClip`; `lk*` keyframes in both CSS files. Stardust (`.stardust`) is only used for the favourite star now (`starDust`) |
+| Minimise/maximise buttons (`win.userMin`, `maximizable: true`, `note:win-state`) and the ••• menu in the top-right corner (`#menu`, ≥ 40% of the note's width) | main.js `note:minimize`, `note:maximize`, `minimize`/`restore`/`maximize` handlers; note.css 1.1.13 blocks |
+| Word wrap icon = return arrow (no box when on), placed before spelling; spelling icon = "abc" (`<text>`) + tick; both off = slash with a gap (`<g mask>` `#wrapCut`/`#spellCut`, `.slashcut` hidden when `.on`); note menu "solid on hover" = sliding switch (`.check.switch`) | note.html `#btnWrap`, `#btnSpell`; note.css 1.1.12/1.1.13 blocks |
 | Caret visible next to tilted photos (`.caret-near` → z-index −1 while the caret is beside a photo and the mouse isn't on it) | note.js `imgsByCaret`, `overImg`, `selectionchange`/`mousemove`; note.css `#editor img.caret-near` |
 | Click in the side margin → start/end of that line or before/after a photo; photo's left 7 px edge → caret before it | note.js `#scroller` mousedown, `besideLine`, `caretAt`, `EDGE`/`edgeDown` |
 | Picture-only notes: card shows just the picture, no "🖼️ Photo"/"✏️ Drawing" line | list.js `cardBody`, `PICTURE_ONLY` (matches `collect()` in note.js) |
@@ -247,7 +255,7 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
 | App-styled confirm inside notes | note.js `ask()`; note.html `#askPop` |
 | Settings sections fold (all closed at first) | list.js `foldPanels`; list.css `.phead`, `.pbody`, `.pinner` |
 | Backups: pick a day to restore, restored notes in their own group | list.js `pickBackup`, `renderBackups`; store.js `restoreBackup`, `backupDayName` |
-| New notes: colour, font, see-through, solid on hover (Settings → General, "For new notes") | list.js `renderSettings`, `#sOpacity`, `#sSolidHover`; store.js `create` (`defaultOpacity`, `defaultSolidOnHover`) |
+| New notes: colour, font, see-through, solid on hover (Settings → its own "For new notes" section, after General) | list.js `renderSettings`, `#sOpacity`, `#sSolidHover`; store.js `create` (`defaultOpacity`, `defaultSolidOnHover`) |
 
 ---
 
@@ -267,7 +275,9 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
   true while that window may show contents (set at open for unlocked notes, after the password, or when opened
   from a group already opened in the list). The list window has `listOpenGroups` (groups opened with the
   password, cleared when the list closes). `list:get` blanks the text/photo of notes that are locked or sit in
-  an unopened locked group (`locked: true` = show as a locked card, `ownLock` = the note's own lock). A note
+  an unopened locked group (`locked: true` = show as a locked card, `ownLock` = the note's own lock) — except a note
+  whose open window is unlocked (`win.revealed` and not `win.lockPending`, 1.1.14, the owner's wish): it shows in the
+  list too (`openUnlocked: true`) until that window is closed or locked again. A note
   locked by its group can't remove the lock from inside the note ("Locked with its group").
 - When a note becomes locked from outside (list right-click, locking its group, dragging it into a locked
   group), main sends `note:lock-now`. The window first saves what was typed, then hides. Never hide it
@@ -290,7 +300,7 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
   or Draw calls `resumeInk()` (`inkState.paused`, `body.ink-paused`). Nothing ever disappears: the bar not in use is
   faded. `#textPop` (opens bottom-left) is NOT closed by `closePops()`: only A, its X or locking close it (rolling up only hides both toolbars: `body.rolled`)
   (`openText`/`closeText`, `body.text-open`). It fades while drawing or while the editor has focus. Its buttons act on
-  the selection, or the whole note when nothing is selected (`onText`, `#tScope` says which). The only Undo button is
+  the selection, or the whole note when nothing is selected (`onText`, `#tScope` says which). The only Undo button (with Redo `#btnRedo` right after it since 1.1.14, same rules: `redoAny`/`inkRedo`/`redoText`) is
   `#btnUndo` in the bottom bar (outside `.tleft`, so it never scrolls away; full opacity while the mouse is on the note
   (`body:hover`), otherwise it fades like the rest; the bar fades its children `#tools > *`, never `#tools` itself): `undoAny()` = drawing undo while drawing,
   else note-font undo (`textUndo`) or the editor's own undo. `note.size` (s/m/l) has no button any more (kept for old notes).
@@ -300,9 +310,11 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
   catcher sits inside the scroller.
 - Rolling a note up keeps drawing/text toolbars open but hidden (`body.rolled`), so they never cover the top bar.
 - `#scroller` has the arrow cursor (scrollbars), `#sheet` the text cursor.
-- The bottom bar must fit on a 340 px note (the default width). Order: B I U S A | bullets checklist | spelling word
-  wrap, then — outside the part that scrolls — Undo, Draw, Add. To fit with the "Draw" label and Undo, the `.tb`
-  buttons are 24 px wide below 440 px and 22 px (tighter gaps) below 430 px; below 390 px Add becomes a round "+".
+- The top bar (1.1.13): All notes, New | title | (lock again) Pin, Roll, ••• | Minimise, Maximise, X. Its buttons are 24 px
+  below 330 px and New hides below 250 px, so it fits the 200 px minimum.
+- The bottom bar must fit on a 340 px note (the default width). Order: B I U S A | bullets checklist | word wrap
+  spelling, then — outside the part that scrolls — Undo, Redo (1.1.14), Draw, Add. To fit with the "Draw" label, Undo and
+  Redo, the `.tb` buttons are 24 px wide below 440 px and 20 px (tighter gaps) below 430 px; below 390 px Add becomes a round "+".
   At 340 px it fits exactly: measure with a screenshot after adding a button. Narrower notes scroll `.tleft` sideways.
 - The renderer of a hidden locked note must never save: `changed()`/`saveNow()` return early when
   `hidden`, and main strips `html/text/firstImage` from patches. Keep both guards.
@@ -353,6 +365,11 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
     notes to front" unrolls (second launch doesn't); mouse back/forward app-commands reach the list (`list:nav`).
   - `pin-theme.test.js`: PIN rules (digits, 4–12, length kept), PIN↔password change, list theme kept/validated,
     see-through for new notes (`defaultOpacity`, 5 % steps, ≥ 25 %), `madeGroup` stays true after the last group is gone.
+  - `lock-refresh.test.js`: removing a note's or group's lock from the list sends the open window its contents
+    (`hidden:false`); still locked by its group = still hidden.
+  - `v1113.test.js`: favourites (not an edit, not duplicated, groups too), several notes' colour/font, new group from a
+    selection (never inside itself), locked things can't be binned/deleted, Empty bin keeps locked ones, dashed/dotted
+    ink kept, minimise (pinned stays down) and maximise (unrolls first).
   - `groups.test.js`: nested groups and drag rules, no loops, move-up/move-to, looks and colours, mass
     edit (with and without sub-groups) pushed to open windows, locking groups (windows hide, list blanks,
     reveal/hide, open-from-list), lock/unlock notes from the list, ungroup moving things up, bin a group.
@@ -369,7 +386,8 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
 ## 8. Releasing a new version (do this for EVERY update – see the versioning rule at the top)
 
 1. Bump `version` in `package.json`: third digit, unless the owner said otherwise.
-2. Add the version at the top of `VERSIONS` in `src/about.js`, and set `LAST_UPDATED`.
+2. Add the version at the top of `VERSIONS` in `src/about.js`, and set `LAST_UPDATED`. Keep it short (owner's wish since 1.1.13): a
+   few plain one-line highlights; the details go in CHANGELOG.md.
 3. Add the same entry to `CHANGELOG.md`.
 4. Update this file: the "Last updated" line at the top and any sections that changed.
 5. Update `HOW TO INSTALL.txt` and `build.bat` if they mention the version or file name (since 1.1.5 neither
