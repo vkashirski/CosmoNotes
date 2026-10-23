@@ -198,6 +198,7 @@
     if (tab === 'settings') renderSettings();
   }
 
+  const PICTURE_ONLY = ['\u{1F5BC}\uFE0F Photo', '\u270F\uFE0F Drawing']; // must match collect() in note.js
   function cardBody(n) {
     const body = h('div', { class: 'body' });
     const title = (n.title || '').trim();
@@ -207,6 +208,9 @@
       return body;
     }
     const lines = (n.text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    // A note that is just a picture or drawing gets the stand-in text "🖼️ Photo" / "✏️ Drawing" (for search and
+    // the window title). The card already shows the picture, so it doesn't repeat that line.
+    if (n.firstImage && lines.length === 1 && PICTURE_ONLY.includes(lines[0])) lines.length = 0;
     if (title) {
       body.append(h('div', { class: 'txt' }, h('span', { class: 't1 tt' }, title), lines.length ? '\n' + lines.join('\n') : ''));
     } else if (lines.length) {
@@ -518,6 +522,7 @@
     const op = Math.round((Number(s.defaultOpacity) || 1) * 100);
     if (document.activeElement !== $('#sOpacity')) $('#sOpacity').value = op; // not while it's being dragged
     $('#sOpVal').textContent = `${$('#sOpacity').value}%`;
+    $('#sSolidHover').checked = s.defaultSolidOnHover !== false;
     const th = $('#sTheme');
     th.innerHTML = '';
     for (const t of THEMES) {
@@ -1135,6 +1140,7 @@
   // see-through for new notes: shown while dragging, saved when let go
   $('#sOpacity').addEventListener('input', (e) => { $('#sOpVal').textContent = `${e.target.value}%`; });
   $('#sOpacity').addEventListener('change', (e) => { state.settings.defaultOpacity = Number(e.target.value) / 100; S.settings.set({ defaultOpacity: Number(e.target.value) / 100 }); });
+  $('#sSolidHover').addEventListener('change', (e) => S.settings.set({ defaultSolidOnHover: e.target.checked }));
   // password or PIN: set / change in an app-styled pop-up
   $('#pwSave').addEventListener('click', async () => {
     const has = !!state.settings.hasPassword;

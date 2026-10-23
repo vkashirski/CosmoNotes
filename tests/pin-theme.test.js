@@ -67,6 +67,18 @@ const settingsFile = () => JSON.parse(fs.readFileSync(path.join(process.env.FAKE
   assert.ok(fresh);
   await H['settings:set'](null, { defaultOpacity: 1 });
 
+  // ---- "turn solid when my mouse is over it" for new notes (1.1.12)
+  assert.equal((await H['list:get']()).settings.defaultSolidOnHover, true, 'on by default');
+  await H['settings:set'](null, { defaultSolidOnHover: false });
+  assert.equal((await H['list:get']()).settings.defaultSolidOnHover, false);
+  await H['list:new']();
+  const fw2 = E.__all.filter((x) => x.file.endsWith('note.html') && !x.destroyed).pop();
+  assert.equal((await H['note:get'](ev(fw2))).solidOnHover, false, 'a new note follows the setting');
+  await H['settings:set'](null, { defaultSolidOnHover: true });
+  await H['list:new']();
+  const fw3 = E.__all.filter((x) => x.file.endsWith('note.html') && !x.destroyed).pop();
+  assert.equal((await H['note:get'](ev(fw3))).solidOnHover, true);
+
   // ---- making a group switches the tip off for good, even after the group is gone
   await H['list:new']();
   const ids = (await H['list:get']()).notes.map((x) => x.id);

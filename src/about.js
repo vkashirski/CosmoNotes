@@ -108,12 +108,27 @@ window.COSMO_ABOUT = {
         'Name groups, lock them, ungroup them (it asks first), or move all their notes to the Bin.',
         'While a group is open, “New note” makes the note right inside it.',
         'Change the paper colour or font of every note in a group at once, optionally including the groups inside it.',
-        'Settings for start-up, the window colours, colour, font and see-through for new notes, spelling, the password, backups and where notes are stored.',
+        'Settings for start-up, the window colours, colour, font, see-through and “turn solid when my mouse is over it” for new notes, spelling, the password, backups and where notes are stored.',
       ],
     },
   ],
 
   VERSIONS: [
+    {
+      version: '1.1.12',
+      date: '2026-10-23',
+      changes: [
+        'A note no longer shows a sideways scrollbar when there’s nothing off to the side. With word wrap off, the note used to keep empty room on the right after you made it narrower; now it only scrolls sideways when text, a picture or a drawing really goes past the edge.',
+        'Notes list: a note that’s just a picture shows the picture on its card, without an extra “🖼️ Photo” (or “✏️ Drawing”) line.',
+        'A divider always runs across the whole note, however wide you make it.',
+        'Clearer word wrap button: lines with a W cut out of them, crossed out when word wrap is off (no highlighted box when it’s on). It now comes before the spelling button.',
+        'In a note’s ••• menu, “Turn solid when my mouse is over it” is now a sliding switch, like the ones in Settings.',
+        'Add → “Today’s date” (it used to just say “Date”).',
+        'Settings → General → For new notes: “Turn solid when my mouse is over it” can now be switched off for new notes, next to the see-through setting.',
+        'The blinking text cursor no longer hides behind a photo: right next to a photo it shows on the photo’s edge.',
+        'Easier to type in front of a photo: click in the margin left of it, or on its left white edge. Clicking the margin next to a line of text puts the cursor at the start (or end) of that line.',
+      ],
+    },
     {
       version: '1.1.11',
       date: '2026-10-23',

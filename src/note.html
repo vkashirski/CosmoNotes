@@ -58,8 +58,8 @@
   <button class="tb" data-cmd="bullets" title="Bullet list (Ctrl+Shift+L)"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.3" class="fill"/><circle cx="4.5" cy="12" r="1.3" class="fill"/><circle cx="4.5" cy="18" r="1.3" class="fill"/></svg></button>
   <button class="tb" data-cmd="checklist" title="Checklist (Ctrl+Shift+C)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="6" height="6" rx="1.5"/><path d="m4.4 7 1.3 1.3L8 5.8"/><rect x="3" y="14" width="6" height="6" rx="1.5"/><path d="M13 7h8M13 17h8"/></svg></button>
   <span class="tsep"></span>
+  <button class="tb" id="btnWrap" title="Word wrap"><svg viewBox="0 0 24 24"><mask id="wrapW" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff" stroke="none"/><path d="M5 3.5l3.4 17L12 9.5l3.6 11L19 3.5" stroke="#000" stroke-width="2.9"/><path class="slashcut" d="M3 21 21 3" stroke="#000" stroke-width="6"/></mask><path class="lines" d="M3 4h18M3 8h18M3 12h18M3 16h18M3 20h18" mask="url(#wrapW)"/><path class="slash" d="M3 21 21 3"/></svg></button>
   <button class="tb" id="btnSpell" title="Spelling"><svg viewBox="0 0 24 24"><path d="m4 15 4.5-11L13 15"/><path d="M5.6 11h5.8"/><path d="m14 17 2.5 2.5L21 15"/><path class="slash" d="M3 21 21 3"/></svg></button>
-  <button class="tb" id="btnWrap" title="Word wrap"><svg viewBox="0 0 24 24"><path d="M3 5h17M3 11h14a3.5 3.5 0 0 1 0 7h-4"/><path d="m15 15.5-2.5 2.5 2.5 2.5"/><path d="M3 17h6"/><path class="slash" d="M3 21 21 3"/></svg></button>
   </div>
   <button class="tb" id="btnUndo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
   <button id="btnInk" title="Draw over the note: pen, highlighter, arrows, circles…"><svg viewBox="0 0 24 24"><path d="M3 15c2-4 4-6 5.5-4.5S7 16 9 16.5s3.5-7 6-7 .5 6.5 2.5 6.5S21 12 21 10"/></svg><span>Draw</span></button>
@@ -83,7 +83,7 @@
   </div>
   <h4>See-through <span id="opVal" class="val">100%</span></h4>
   <input type="range" id="opacity" min="25" max="100" step="5" value="100">
-  <label class="check"><input type="checkbox" id="solidHover"> <span>Turn solid when my mouse is over it</span></label>
+  <label class="check switch"><span>Turn solid when my mouse is over it</span><input type="checkbox" id="solidHover"><i></i></label>
   <div class="divider"></div>
   <button class="mi" id="miDuplicate"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2.5"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg><span>Duplicate note</span></button>
   <button class="mi" id="miLock"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="miLockText">Lock note</span></button>
@@ -112,7 +112,7 @@
     <button class="tile" data-act="table"><span class="ic" style="--tc:#E8DDFF"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></span>Table</button>
     <button class="tile" data-act="numbers"><span class="ic" style="--tc:#CDF3E8"><svg viewBox="0 0 24 24"><path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></span>Numbers</button>
     <button class="tile" data-act="divider"><span class="ic" style="--tc:#FFF4A3"><svg viewBox="0 0 24 24"><path d="M3 12h3M10 12h4M18 12h3"/></svg></span>Divider</button>
-    <button class="tile" data-act="date"><span class="ic" style="--tc:#FFE1DC"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></span>Date</button>
+    <button class="tile" data-act="date"><span class="ic" style="--tc:#FFE1DC"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></span>Today’s date</button>
   </div>
 </div>
 

@@ -26,6 +26,7 @@
       if (t) t.textContent = fmt(+v.dataset.dur);
     });
     clone.querySelectorAll('.sel-img').forEach((i) => i.classList.remove('sel-img'));
+    clone.querySelectorAll('.caret-near').forEach((i) => i.classList.remove('caret-near'));
     clone.querySelectorAll('[class=""]').forEach((el) => el.removeAttribute('class'));
     const img = clone.querySelector('img');
     let text = editor.innerText.replace(/ /g, ' ').replace(/\n{3,}/g, '\n\n').trim();
@@ -63,6 +64,7 @@
 
   // Catch every edit (typing, undo, paste, commands); ignore voice-player animation.
   const observer = new MutationObserver((records) => {
+    fitSideways();
     if (records.some((r) => !(r.target.closest ? r.target : r.target.parentElement)?.closest?.('.voice'))) changed();
   });
 
@@ -719,7 +721,29 @@
   window.addEventListener('drop', (e) => e.preventDefault());
 
   // ================================================================ clicks inside the note
+  // The left edge of a photo (its white frame, EDGE px) counts as "just before the photo": the caret goes
+  // there instead of selecting the photo, so it's easy to type in front of it.
+  const EDGE = 7;
+  let edgeDown = false;
+  function caretAt(node, after) {
+    const r = document.createRange();
+    if (after) r.setStartAfter(node); else r.setStartBefore(node);
+    r.collapse(true);
+    const s = getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+  }
   editor.addEventListener('mousedown', (e) => {
+    edgeDown = false;
+    const pic = e.button === 0 && !e.shiftKey && ((e.target.closest && e.target.closest('img.att-img'))
+      || [...editor.querySelectorAll('img.att-img.caret-near')].find((i) => { const r = i.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; }));
+    if (pic && e.clientX < pic.getBoundingClientRect().left + EDGE) {
+      e.preventDefault();
+      edgeDown = true;
+      editor.focus();
+      caretAt(pic, false);
+      return;
+    }
     const li = e.target.closest && e.target.closest('ul.checklist li');
     if (li && editor.contains(li)) {
       const rect = li.getBoundingClientRect();
@@ -735,6 +759,7 @@
     const voice = e.target.closest('.voice');
     if (voice) { e.preventDefault(); togglePlay(voice); return; }
     const img = e.target.closest('img');
+    if (img && edgeDown) return; // clicked the photo's left edge: the caret is already in front of it
     if (img) { selectImage(img); return; }
     const a = e.target.closest('a[href]');
     if (a && getSelection().isCollapsed && !e.shiftKey) {
@@ -744,7 +769,7 @@
   });
   editor.addEventListener('dblclick', (e) => {
     const img = e.target.closest('img');
-    if (!img) return;
+    if (!img || edgeDown) return;
     if (img.classList.contains('att-drawing')) openDraw(img);
     else openPhoto(img);
   });
@@ -753,9 +778,63 @@
     if (src.startsWith('stickyfile:')) api.openAttachment(src);
     else if (/^https?:/i.test(src)) api.openExternal(src);
   }
-  // clicking empty space below the text puts the caret at the end
+  // Clicking the note's margin left or right of a line puts the caret at the start / end of that line
+  // (just before / after a photo). Clicking empty space below the text puts the caret at the end.
   $('#scroller').addEventListener('mousedown', (e) => {
-    if (e.target.id === 'scroller') { e.preventDefault(); editor.focus(); caretAtEnd(); }
+    if (e.target.id !== 'scroller') return;
+    e.preventDefault();
+    editor.focus();
+    const er = editor.getBoundingClientRect();
+    const y = e.clientY;
+    if (y >= er.top && y <= er.bottom && (e.clientX < er.left || e.clientX > er.right) && besideLine(e.clientX < er.left, y, er)) return;
+    caretAtEnd();
+  });
+  function besideLine(left, y, er) {
+    // a picture on that line: just before / after it
+    let pick = null;
+    for (const img of editor.querySelectorAll('img')) {
+      const r = img.getBoundingClientRect();
+      if (y < r.top || y > r.bottom) continue;
+      if (!pick || (left ? r.left < pick.r.left : r.right > pick.r.right)) pick = { img, r };
+    }
+    if (pick) { caretAt(pick.img, !left); return true; }
+    // text: where the line starts / ends
+    const x = left ? er.left + 1 : Math.min(er.right, $('#scroller').getBoundingClientRect().right) - 1;
+    const r = document.caretRangeFromPoint && document.caretRangeFromPoint(x, y);
+    if (!r || !editor.contains(r.startContainer)) return false;
+    const s = getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+    return true;
+  }
+
+  // Photos are tilted a little, and a tilted photo is drawn on top of the blinking caret next to it.
+  // While the caret is right before or after a photo, the photo goes one layer down (.caret-near,
+  // note.css) so the caret shows on its edge. It comes back up as soon as the mouse is over it, so it
+  // can still be clicked (a photo inside a paragraph can't be clicked while it's a layer down).
+  let mouseX = -1;
+  let mouseY = -1;
+  // (the photo's left edge doesn't count: clicking there puts the caret in front of it anyway)
+  const overImg = (img) => { const r = img.getBoundingClientRect(); return mouseX >= r.left + EDGE && mouseX <= r.right && mouseY >= r.top && mouseY <= r.bottom; };
+  function imgsByCaret() {
+    const s = getSelection();
+    if (!s.rangeCount || !s.isCollapsed) return [];
+    const { startContainer: n, startOffset: o } = s.getRangeAt(0);
+    if (!editor.contains(n)) return [];
+    const near = n.nodeType === 3
+      ? [o === 0 ? n.previousSibling : null, o === n.length ? n.nextSibling : null]
+      : [n.childNodes[o - 1], n.childNodes[o]];
+    return near.filter((x) => x && x.nodeName === 'IMG' && !overImg(x));
+  }
+  document.addEventListener('selectionchange', () => {
+    const near = imgsByCaret();
+    editor.querySelectorAll('img.caret-near').forEach((i) => { if (!near.includes(i)) i.classList.remove('caret-near'); });
+    near.forEach((i) => i.classList.add('caret-near'));
+  });
+  document.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+    editor.querySelectorAll('img.caret-near').forEach((i) => { if (overImg(i)) i.classList.remove('caret-near'); });
   });
 
   // ================================================================ keyboard
@@ -1437,7 +1516,7 @@
     const w = scroller.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
     sheet.style.setProperty('--viewW', `${Math.max(0, Math.floor(w))}px`);
   }
-  new ResizeObserver(() => { updateViewWidth(); placeHandle(); }).observe(scroller);
+  new ResizeObserver(() => { updateViewWidth(); placeHandle(); fitSideways(); }).observe(scroller);
   function applyLayout() {
     if (!note) return;
     sheet.style.width = note.wrapWidth ? `${note.wrapWidth}px` : '';
@@ -1450,7 +1529,46 @@
     const w = $('#btnWrap');
     w.classList.toggle('on', !note.wrapWidth);
     w.title = note.wrapWidth ? 'Word wrap: off (lines keep their width)' : 'Word wrap: on';
+    fitSideways();
   }
+
+  // Sideways scrolling only when something is really out of view. With word wrap off the text area
+  // keeps the width it had when the note was wider, so a narrower note could scroll sideways into
+  // empty space (e.g. a small photo and short lines). The layout itself is not changed (nothing
+  // re-wraps, drawings stay lined up); only the empty extra room stops being scrollable.
+  // Counted as content: text, pictures, voice notes, tables and the drawing.
+  function contentRight() {
+    const left = sheet.getBoundingClientRect().left;
+    const b = inkBounds();
+    let right = b ? b.x2 : 0;
+    const range = document.createRange();
+    const walk = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+    for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+      if (!t.nodeValue.trim()) continue;
+      range.selectNodeContents(t);
+      for (const r of range.getClientRects()) if (r.width) right = Math.max(right, r.right - left);
+    }
+    for (const el of editor.querySelectorAll('img, video, canvas, svg, table, .voice')) {
+      const r = el.getBoundingClientRect();
+      if (r.width) right = Math.max(right, r.right - left);
+    }
+    return right;
+  }
+  let sideFrame = 0;
+  function fitSideways() {
+    cancelAnimationFrame(sideFrame);
+    sideFrame = requestAnimationFrame(() => {
+      sideFrame = 0;
+      // room from the text area's left edge to the note's right edge
+      const room = scroller.clientWidth - (parseFloat(getComputedStyle(scroller).paddingLeft) || 0);
+      const needed = !!note && !hidden && contentRight() > room + 1;
+      scroller.style.overflowX = needed ? '' : 'hidden';
+      if (!needed) scroller.scrollLeft = 0;
+    });
+  }
+  new ResizeObserver(fitSideways).observe(editor);
+  editor.addEventListener('load', fitSideways, true); // a picture finished loading (load doesn't bubble)
+  if (document.fonts) document.fonts.ready.then(fitSideways);
   async function toggleWrap() {
     if (note.wrapWidth) {
       if (hasInk() && !(await ask('Turn word wrap on?', 'Text may move away from your drawing.', 'Turn on'))) return;
@@ -1581,6 +1699,7 @@
     return el;
   }
   function paintInk() {
+    fitSideways(); // the drawing counts as content for sideways scrolling
     const above = [];
     const below = [];
     if (hasInk()) for (const st of note.ink.s) (st.l === 'b' ? below : above).push(elFor(st));

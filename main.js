@@ -886,6 +886,7 @@ function registerIpc() {
     if (Number.isFinite(Number(patch.defaultOpacity)) && patch.defaultOpacity !== null && patch.defaultOpacity !== '') {
       store.settings.defaultOpacity = Math.min(1, Math.max(0.25, Math.round(Number(patch.defaultOpacity) * 20) / 20));
     }
+    if ('defaultSolidOnHover' in patch) store.settings.defaultSolidOnHover = !!patch.defaultSolidOnHover;
     if ('spellCheck' in patch) store.settings.spellCheck = !!patch.spellCheck;
     if ('spellCyrillic' in patch) { store.settings.spellCyrillic = !!patch.spellCyrillic; spellLanguages(); }
     if (patch.listSort && typeof patch.listSort === 'object') {

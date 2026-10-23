@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 23 October 2026 · App version 1.1.11**
+**Last updated: 23 October 2026 · App version 1.1.12**
 
 Read this before changing anything. Keep it up to date: when you add or change a feature, update the
 relevant section here, `src/about.js` (the in-app feature list and version history) and `CHANGELOG.md`.
@@ -141,7 +141,9 @@ notes, and patches can't change it while hidden. It counts as an edit for `updat
 
 **Text layout lock** (`note.wrapWidth`; called **"Word wrap" off** in the UI since 1.1.6): when set, `#sheet` has that fixed width (`applyLayout` in note.js), so text
 and pictures never re-wrap; `#scroller` is `overflow: auto` and shows a sideways scrollbar when the note is
-narrower. The first ink stroke sets it automatically (`saveInk`). Unlocking with ink present asks first.
+narrower, but only if real content (text, pictures, voice chips, tables, ink) reaches past the visible width:
+`fitSideways()`/`contentRight()` set `overflow-x: hidden` otherwise, so there's no scrolling into empty room (1.1.12).
+It never changes the layout. The first ink stroke sets it automatically (`saveInk`). Unlocking with ink present asks first.
 Pictures: `img.fixed` = keep size (`max-width: none`); otherwise they shrink with the note. When the layout is
 locked, `#sheet` is wider than the visible note, so note.js sets `--viewW` (visible writing width, `updateViewWidth`,
 also via a `ResizeObserver` on `#scroller`) and note.css caps non-fixed pictures at it under
@@ -155,7 +157,7 @@ redrew; that was the 1.0.2 double-refresh bug): `startWithWindows, defaultColor,
 spellCyrillic (false), listSort {by: updated|created, dir: desc|asc, groups: mixed|first|last},
 listSize (s|m|l|xl|xxl, card size in the list, also Ctrl + mouse wheel; like listSort it doesn't trigger a reload), defaultColor may be
 "random" (store.create picks one of the 7 pastel papers),
-defaultOpacity (0.25–1: see-through of new notes),
+defaultOpacity (0.25–1: see-through of new notes), defaultSolidOnHover (true: new notes turn solid on hover),
 listTheme (cream|rose|mint|sky|lilac, dark: night|midnight|forest|plum: colours of the list window; doesn't trigger a reload either),
 madeGroup (true once any group was ever made; hides the "drag to make a group" tip for good),
 lock ("salt:hash" scrypt, or null), lockKind ('pin'|'password', null = password from before 1.1.6),
@@ -232,6 +234,11 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
 | Bin search, Shift+click Delete | list.html `#bq`/`#bqClear`; list.js `binQuery`, `renderBin`, `destroyNote(n, skipAsk)` |
 | Password or PIN (auto-open PIN) | main.js `lock:set` (kind), `lockInfo`; list.js `modal()` `kindPick`/`pin`/`pinLen`, `askPassword`, `NEW_INPUTS`; note.js `paintUnlock`, `#pwKind` |
 | Group panel shows shared colour/font | list.js `panelScope`, `shared`, `paintPanel` |
+| Divider = full note width (`max(100%, --viewW)`) | note.css `#editor hr` |
+| Word wrap icon = lines with a W cut out (mask `#wrapW`, `.slashcut` gap when off; no box when on), placed before spelling; note menu "solid on hover" = sliding switch (`.check.switch`) | note.html `#btnInk`, `#btnWrap`; note.css 1.1.12 block |
+| Caret visible next to tilted photos (`.caret-near` → z-index −1 while the caret is beside a photo and the mouse isn't on it) | note.js `imgsByCaret`, `overImg`, `selectionchange`/`mousemove`; note.css `#editor img.caret-near` |
+| Click in the side margin → start/end of that line or before/after a photo; photo's left 7 px edge → caret before it | note.js `#scroller` mousedown, `besideLine`, `caretAt`, `EDGE`/`edgeDown` |
+| Picture-only notes: card shows just the picture, no "🖼️ Photo"/"✏️ Drawing" line | list.js `cardBody`, `PICTURE_ONLY` (matches `collect()` in note.js) |
 | Title vs untitled first line on cards | list.css `.card .t1` (600) / `.t1.tt` (800, bigger); needs `@fontsource/*/600.css` in list.html |
 | Password set/change button (pop-up) | list.js `#pwSave` handler (modal with 2 or 3 inputs) |
 | Draw-over (toolbar, tools, Shift, Over/Behind, eraser, pause, X, save; undo via `#btnUndo`) | note.html `#inkBar`, `#inkCatch`, `#inkAbove/#inkBelow`; note.js "draw-over" (`inkState`, `strokeEl`, `renderInk`, `eraseAt`, `rubOut`, `tracePieces`, `shapeEnd`, `saveInk`) |
@@ -240,7 +247,7 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
 | App-styled confirm inside notes | note.js `ask()`; note.html `#askPop` |
 | Settings sections fold (all closed at first) | list.js `foldPanels`; list.css `.phead`, `.pbody`, `.pinner` |
 | Backups: pick a day to restore, restored notes in their own group | list.js `pickBackup`, `renderBackups`; store.js `restoreBackup`, `backupDayName` |
-| New notes: colour, font, see-through (Settings → General, "For new notes") | list.js `renderSettings`, `#sOpacity`; store.js `create` (`defaultOpacity`) |
+| New notes: colour, font, see-through, solid on hover (Settings → General, "For new notes") | list.js `renderSettings`, `#sOpacity`, `#sSolidHover`; store.js `create` (`defaultOpacity`, `defaultSolidOnHover`) |
 
 ---
 
