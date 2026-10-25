@@ -4,8 +4,22 @@
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => [...document.querySelectorAll(s)];
 
-  const COLORS = ['yellow', 'pink', 'green', 'blue', 'purple', 'orange', 'mint', 'charcoal'];
-  const SWATCH = { yellow: '#FFE968', pink: '#FFB5D0', green: '#B9E79C', blue: '#A9D8FF', purple: '#D0BDFF', orange: '#FFC38C', mint: '#A4E5D1', charcoal: '#3A3940' };
+  // paper colours (1.1.15: with the colours of this window's themes), in the order they're shown:
+  // each colour next to its light version, the dark ones last (same as store.js)
+  const COLORS = ['yellow', 'cream', 'orange', 'pink', 'rose', 'purple', 'lavender', 'blue', 'mist', 'mint', 'sage', 'green',
+    'charcoal', 'night', 'plum', 'midnight', 'forest'];
+  const DARK_COLORS = ['charcoal', 'night', 'midnight', 'forest', 'plum'];
+  const COLOR_NAMES = {
+    yellow: 'Lemon', pink: 'Bubblegum', green: 'Lime', blue: 'Sky', purple: 'Lilac', orange: 'Peach', mint: 'Mint', charcoal: 'Charcoal',
+    cream: 'Cream', rose: 'Rose', sage: 'Sage', mist: 'Mist', lavender: 'Lavender', night: 'Night', midnight: 'Midnight', forest: 'Forest', plum: 'Plum',
+  };
+  // the dark theme colours are all nearly black: a small dot of each theme's own colour tells them apart
+  const darkDot = (dot, paper) => `radial-gradient(circle, ${dot} 0 22%, ${paper} 25%)`;
+  const SWATCH = {
+    yellow: '#FFE968', pink: '#FFB5D0', green: '#B9E79C', blue: '#A9D8FF', purple: '#D0BDFF', orange: '#FFC38C', mint: '#A4E5D1', charcoal: '#3A3940',
+    cream: '#E8DCC0', rose: '#F2CAD6', sage: '#C4E2D1', mist: '#C5DAF0', lavender: '#D5CAF2',
+    night: darkDot('#8E7BEF', '#2F2D35'), midnight: darkDot('#6E8BFF', '#252B3D'), forest: darkDot('#5BBF8A', '#232E28'), plum: darkDot('#C77DDB', '#2D2432'),
+  };
   // group colours (for folders, envelopes, notebooks and the clip of a stack)
   const GCOLORS = { kraft: '#D9B77E', sun: '#FFD54F', rose: '#F4A6C0', coral: '#FF9F87', lilac: '#BFA9F2', sky: '#92C6F2', mint: '#93D8BF', graphite: '#6E6A78' };
   const GNAMES = { kraft: 'Kraft', sun: 'Sunshine', rose: 'Rose', coral: 'Coral', lilac: 'Lilac', sky: 'Sky', mint: 'Mint', graphite: 'Graphite' };
@@ -27,6 +41,7 @@
   const sizeNow = () => (SIZES.includes(state.settings.listSize) ? state.settings.listSize : 'm');
   const themeNow = () => (THEMES.some((t) => t.id === state.settings.listTheme) ? state.settings.listTheme : 'cream');
   const ICON = {
+    edit: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>',
     open: '<svg viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
     hide: '<svg viewBox="0 0 24 24"><path d="M9.9 4.24A9 9 0 0 1 12 4c7 0 10 8 10 8a13 13 0 0 1-1.67 2.68M6.6 6.6A13.5 13.5 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.4-1.6M14.1 14.1a3 3 0 1 1-4.2-4.2M2 2l20 20"/></svg>',
     trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
@@ -41,7 +56,8 @@
     restore: '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
     info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
     // 1.1.14: the padlock that animates ("snap shut"): its shackle's long side reaches down inside the body (hidden by
-    // the clip path #lockClip in list.html), so it never comes loose when the shackle opens
+    // the clip path #lockClip in list.html: nothing of the shackle below the middle of the body's top line, 1.1.15),
+    // so it never comes loose when the shackle opens, and never shows inside the body
     lockA: '<svg viewBox="0 0 24 24"><g clip-path="url(#lockClip)"><path class="shackle" d="M8 16.5V7a4 4 0 0 1 8 0v4"/></g><rect x="4" y="11" width="16" height="10" rx="2.5"/></svg>',
     star: '<svg viewBox="0 0 24 24"><path d="M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9L3.4 9.4l6-.7z"/></svg>',
     check: '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
@@ -52,6 +68,7 @@
   let state = { notes: [], groups: [], settings: {} };
   let lastSig = '';
   let tab = 'notes';
+  const cardsTabNow = () => tab === 'notes' || tab === 'favs' || tab === 'locks'; // tabs that show cards
   let lastTab = 'notes'; // notes, favourites or bin: where clicking Settings again goes back to
   // group levels visited, for the mouse's back / forward buttons (null = all notes)
   let navBack = [];
@@ -113,6 +130,83 @@
     return ((x % 7) - 3) * 0.45;
   }
 
+  // ================================================================ colour row
+  // A row of colour circles that scrolls sideways (1.1.15): drag it, use the mouse wheel, or the arrows that
+  // show up on a side when there are more colours that way. A drag never counts as picking a colour.
+  // (The same function is in note.js.)
+  function swatchStrip(view) {
+    const wrap = view.parentElement;
+    const arrow = (side) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `swarr ${side}`;
+      b.title = 'More colours';
+      b.setAttribute('aria-label', side === 'l' ? 'More colours to the left' : 'More colours to the right');
+      b.innerHTML = `<svg viewBox="0 0 24 24"><path d="${side === 'l' ? 'm14.5 6-6 6 6 6' : 'm9.5 6 6 6-6 6'}"/></svg>`;
+      b.addEventListener('mousedown', (e) => e.preventDefault()); // keeps the focus where it was
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        view.scrollBy({ left: (side === 'l' ? -1 : 1) * Math.max(60, Math.round(view.clientWidth * 0.75)), behavior: 'smooth' });
+      });
+      wrap.append(b);
+      return b;
+    };
+    const left = arrow('l');
+    const right = arrow('r');
+    const paint = () => {
+      const max = view.scrollWidth - view.clientWidth;
+      left.hidden = view.scrollLeft <= 1;
+      right.hidden = max <= 1 || view.scrollLeft >= max - 1;
+    };
+    view.addEventListener('scroll', paint, { passive: true });
+    new ResizeObserver(paint).observe(view);
+    view.addEventListener('wheel', (e) => {
+      if (view.scrollWidth <= view.clientWidth + 1) return;
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (!d) return;
+      e.preventDefault();
+      view.scrollLeft += d;
+    }, { passive: false });
+    let drag = null;
+    view.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      drag = { x: e.clientX, left: view.scrollLeft, moved: false, id: e.pointerId };
+    });
+    view.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      if (!drag.moved && Math.abs(dx) < 4) return;
+      if (!drag.moved) {
+        drag.moved = true;
+        view.classList.add('dragging');
+        try { view.setPointerCapture(e.pointerId); } catch { /* fine */ }
+      }
+      view.scrollLeft = drag.left - dx;
+    });
+    const end = () => {
+      if (!drag) return;
+      const moved = drag.moved;
+      drag = null;
+      view.classList.remove('dragging');
+      if (moved) { view.dataset.dragged = '1'; setTimeout(() => { delete view.dataset.dragged; }, 0); }
+    };
+    view.addEventListener('pointerup', end);
+    view.addEventListener('pointercancel', end);
+    view.addEventListener('click', (e) => { if (view.dataset.dragged) { e.stopPropagation(); e.preventDefault(); } }, true);
+    paint();
+    return {
+      paint,
+      // scroll so a colour (the chosen one) is in view
+      reveal(el) {
+        if (!el) { paint(); return; }
+        const l = el.offsetLeft;
+        const r = l + el.offsetWidth;
+        if (l < view.scrollLeft + 6 || r > view.scrollLeft + view.clientWidth - 6) view.scrollLeft = Math.max(0, l - (view.clientWidth - el.offsetWidth) / 2);
+        paint();
+      },
+    };
+  }
+
   // ---------- data
   // Redraw only when something really changed, and only animate the cards when
   // the view itself changes (tab, group, search, sort). Fixes the "double refresh".
@@ -122,6 +216,7 @@
     if (sig === lastSig) return;
     lastSig = sig;
     state = next;
+    editRefresh();
     if (drag) { renderLater = true; return; }
     render();
   }
@@ -158,6 +253,15 @@
   // shown in the list, i.e. not inside a locked group that hasn't been opened with the password
   const noteShown = (n) => !n.groupId || !groupById(n.groupId) || groupById(n.groupId).open;
   const groupShown = (g) => !g.parentId || !groupById(g.parentId) || groupById(g.parentId).open;
+  // Locked (1.1.15): every note with its own lock and every locked group. Ones inside a locked group that
+  // isn't open stay hidden (a line under the cards says how many) until "Unlock all".
+  function lockedOnes() {
+    const notes = live().filter((n) => n.ownLock);
+    const groups = state.groups.filter((g) => g.locked && notesInTree(g.id).length);
+    const sn = notes.filter(noteShown);
+    const sg = groups.filter(groupShown);
+    return { notes: sn, groups: sg, hidden: notes.length + groups.length - sn.length - sg.length };
+  }
   function favourites() {
     const notes = live().filter((n) => n.favorite);
     const groups = state.groups.filter((g) => g.favorite && notesInTree(g.id).length);
@@ -208,9 +312,13 @@
     $('#cBin').textContent = binned.length;
     const favNow = favourites();
     $('#cFavs').textContent = favNow.notes.length + favNow.groups.length;
+    const lockNow = lockedOnes();
+    $('#cLocks').textContent = lockNow.notes.length + lockNow.groups.length + lockNow.hidden;
     $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tab));
-    $('#viewNotes').hidden = tab !== 'notes' && tab !== 'favs';
-    $('#viewNotes').classList.toggle('favs', tab === 'favs');
+    if (FX) paintFxPause();
+    $('#viewNotes').hidden = !cardsTabNow();
+    $('#viewNotes').classList.toggle('favs', tab === 'favs' || tab === 'locks');
+    paintLockBar();
     $('#viewBin').hidden = tab !== 'bin';
     $('#viewSettings').hidden = tab !== 'settings';
     $('#cards').classList.toggle('anim', animate);
@@ -221,11 +329,11 @@
       box.classList.add(`size-${size}`);
     }
     const inGroup = openGroup ? groupById(openGroup) : null;
-    $('#q').placeholder = tab === 'favs' ? 'Search your favourites' : inGroup ? 'Search your notes inside this group' : 'Search your notes';
+    $('#q').placeholder = tab === 'favs' ? 'Search your favourites' : tab === 'locks' ? 'Search your locked notes' : inGroup ? 'Search your notes inside this group' : 'Search your notes';
     $('#qClear').hidden = !query;
     $('#bqClear').hidden = !binQuery;
     $('#btnNew').title = inGroup ? `New note inside “${inGroup.name || 'this group'}”` : 'New note';
-    if (tab === 'notes' || tab === 'favs') renderNotes(liveNotes, animate);
+    if (cardsTabNow()) renderNotes(liveNotes, animate);
     else paintBulk();
     if (tab === 'bin') renderBin(binned);
     if (tab === 'settings') renderSettings();
@@ -515,6 +623,27 @@
       return;
     }
 
+    // Locked (1.1.15): like Favourites, for locked notes and groups. Their words only show (and can be
+    // searched) after "Unlock all".
+    if (tab === 'locks') {
+      const f = lockedOnes();
+      let items = [
+        ...f.groups.map((fg) => ({ kind: 'group', group: fg, notes: notesInTree(fg.id) })),
+        ...f.notes.map((n) => ({ kind: 'note', note: n })),
+      ];
+      if (q) items = items.filter((it) => (it.kind === 'group' ? (it.group.name || '') : `${it.note.title || ''}\n${it.note.text || ''}`).toLowerCase().includes(q));
+      if (!items.length) {
+        els.push(q
+          ? emptyState('Nothing found', state.settings.unlockedAll ? `No locked note contains “${query.trim()}”.` : `No locked note’s title has “${query.trim()}”. Unlock all to search their words too.`)
+          : emptyState('Nothing locked', 'Lock a note or group from its ⋯ menu, by right-clicking it, or with the lock button on its card.'));
+      }
+      sortItems(items).forEach((it, i) => els.push(it.kind === 'group' ? groupEl(it.group, it.notes, i, used) : noteEl(it.note, i, !!it.note.groupId, used)));
+      done();
+      if (f.hidden) $('#tip').textContent = f.hidden === 1 ? '1 more locked note or group is inside a locked group. Unlock all to see it here.' : `${f.hidden} more locked notes and groups are inside a locked group. Unlock all to see them here.`;
+      if ($('#viewNotes').scrollTop !== scroll) $('#viewNotes').scrollTop = scroll;
+      return;
+    }
+
     // search: one flat list of every matching note (only inside the open group, when one is open)
     if (q) {
       const pool = g ? notesInTree(g.id) : liveNotes;
@@ -665,6 +794,7 @@
     lockSeen = seen;
     for (const k of [...sel]) if (!shown.has(k)) sel.delete(k);
     paintBulk();
+    paintFx();
   }
   // "Snap shut" (1.1.14; 1.1.13 had "stardust"): locking drops the padlock in with a little bounce and its shackle
   // snaps shut; unlocking pops the shackle open and the padlock floats up as the card's contents fade in.
@@ -720,11 +850,12 @@
     bb('bBin', ICON.trash, 'Bin', 'Move the selected notes to the Bin (Delete key)', 'danger'),
     h('button', { class: 'bb x', id: 'bX', title: 'Clear the selection (Esc)', html: ICON.x }),
     h('div', { class: 'bulkpop', id: 'bulkColors', hidden: true },
-      h('div', { class: 'sws' }, ...COLORS.map((c) => h('button', { class: 'bsw', title: c[0].toUpperCase() + c.slice(1), style: `background:${SWATCH[c]}`, onclick: () => bulkApply({ color: c }) }))),
+      h('div', { class: 'swstrip' }, h('div', { class: 'sws', id: 'bulkSws' }, ...COLORS.map((c) => h('button', { class: 'bsw', title: COLOR_NAMES[c], style: `background:${SWATCH[c]}`, onclick: () => bulkApply({ color: c }) })))),
       h('div', { class: 'bfonts' },
         h('button', { class: 'hand', onclick: () => bulkApply({ font: 'hand' }) }, 'Handwritten'),
         h('button', { onclick: () => bulkApply({ font: 'round' }) }, 'Rounded'))));
   document.body.append(bulk);
+  swatchStrip($('#bulkSws'));
   function bulkParts() {
     const items = selItems();
     const notes = items.filter((it) => it.note).map((it) => it.note);
@@ -733,7 +864,7 @@
   }
   function paintBulk() {
     const { items, notes, groups } = bulkParts();
-    const show = items.length > 0 && (tab === 'notes' || tab === 'favs');
+    const show = items.length > 0 && cardsTabNow();
     bulk.hidden = !show;
     document.body.classList.toggle('selecting', show);
     if (!show) { $('#bulkColors').hidden = true; return; }
@@ -864,32 +995,72 @@
     });
   }
 
+  // ---- Settings → For new notes → Colour (1.1.15): pick one or more colours; each new note gets one of them at random
+  const newColors = () => {
+    const s = state.settings || {};
+    const list = Array.isArray(s.defaultColors) ? s.defaultColors.filter((c) => COLORS.includes(c)) : [];
+    if (list.length) return list;
+    if (s.defaultColor === 'random') return COLORS.slice(0, 7);
+    return [COLORS.includes(s.defaultColor) ? s.defaultColor : 'yellow'];
+  };
+  function setNewColors(list) {
+    const set = new Set(list);
+    const clean = COLORS.filter((c) => set.has(c));
+    if (!clean.length) return;
+    state.settings.defaultColors = clean; // paint straight away; main sends the list a refresh too
+    state.settings.defaultColor = clean[0];
+    paintNewColors();
+    S.settings.set({ defaultColors: clean });
+  }
+  function paintNewColors() {
+    const sc = $('#sColors');
+    const picked = newColors();
+    if (!sc.childElementCount) {
+      for (const c of COLORS) {
+        sc.append(h('button', {
+          class: 'sw pick' + (DARK_COLORS.includes(c) ? ' darkp' : ''),
+          'data-color': c,
+          style: `background:${SWATCH[c]}`,
+          title: COLOR_NAMES[c],
+          html: '<svg class="tick" viewBox="0 0 24 24"><path d="m5.5 12.5 4.5 4.5 8.5-10"/></svg>',
+          onclick: () => {
+            const now = newColors();
+            if (now.includes(c)) {
+              if (now.length === 1) { toast('Keep at least one colour for new notes'); return; }
+              setNewColors(now.filter((x) => x !== c));
+            } else setNewColors([...now, c]);
+          },
+        }));
+      }
+    }
+    for (const b of sc.children) {
+      const on = picked.includes(b.dataset.color);
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
+    $('#sColorsCount').textContent = picked.length === 1 ? COLOR_NAMES[picked[0]] : `${picked.length} picked`;
+    $('#sColorsHint').textContent = picked.length === 1
+      ? 'Every new note gets this colour. Pick more and each new note gets one of them at random.'
+      : 'Each new note gets one of these at random. Click a colour to add or remove it.';
+  }
+  $('#sPickAll').addEventListener('click', () => setNewColors(COLORS));
+  $('#sPickLight').addEventListener('click', () => setNewColors(COLORS.filter((c) => !DARK_COLORS.includes(c))));
+  $('#sPickDark').addEventListener('click', () => setNewColors(DARK_COLORS));
+  $('#sPickOne').addEventListener('click', () => setNewColors([newColors()[0]]));
+
   async function renderSettings() {
     const s = state.settings;
     $('#sStartup').checked = !!s.startWithWindows;
     $('#sSpell').checked = !!s.spellCheck;
     $('#sCyr').checked = !!s.spellCyrillic;
-    const sc = $('#sColors');
-    sc.innerHTML = '';
-    sc.append(h('button', {
-      class: 'sw random' + (s.defaultColor === 'random' ? ' on' : ''),
-      title: 'Random: every new note gets a surprise colour',
-      html: '<svg viewBox="0 0 24 24"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>',
-      onclick: () => S.settings.set({ defaultColor: 'random' }),
-    }));
-    for (const c of COLORS) {
-      sc.append(h('button', {
-        class: 'sw' + (s.defaultColor === c ? ' on' : ''),
-        style: `background:${SWATCH[c]}`,
-        title: c,
-        onclick: () => S.settings.set({ defaultColor: c }),
-      }));
-    }
+    paintNewColors();
     $$('#sFont button').forEach((b) => b.classList.toggle('on', b.dataset.font === s.defaultFont));
     const op = Math.round((Number(s.defaultOpacity) || 1) * 100);
     if (document.activeElement !== $('#sOpacity')) $('#sOpacity').value = op; // not while it's being dragged
     $('#sOpVal').textContent = `${$('#sOpacity').value}%`;
     $('#sSolidHover').checked = s.defaultSolidOnHover !== false;
+    $('#sNoRepeat').checked = s.newColorNoRepeat !== false;
+    if (FX) { $('#sFxNow').textContent = fxSummary(); $('#sFxPause').checked = !!s.fxPaused; }
     const th = $('#sTheme');
     th.innerHTML = '';
     for (const t of THEMES) {
@@ -1092,9 +1263,13 @@
   }
 
   // ---------- right-click menu
-  function hideCtx() { $('#ctx').hidden = true; }
+  // the card that was right-clicked gets a faint outline while its menu is open (1.1.16)
+  function hideCtx() { $('#ctx').hidden = true; document.querySelectorAll('.card.ctxon').forEach((c) => c.classList.remove('ctxon')); }
   function showCtx(e, items) {
     const ctx = $('#ctx');
+    document.querySelectorAll('.card.ctxon').forEach((c) => c.classList.remove('ctxon'));
+    const card = e.target && e.target.closest ? e.target.closest('.card') : null;
+    if (card) card.classList.add('ctxon');
     ctx.innerHTML = '';
     for (const it of items) {
       if (!it) continue;
@@ -1118,6 +1293,7 @@
   function noteMenu(n, e) {
     showCtx(e, [
       { label: n.open ? 'Bring to front' : 'Open on desktop', icon: ICON.open, run: () => S.list.openNote(n.id) },
+      { label: 'Edit…', icon: ICON.edit, run: () => openEdit(n) },
       n.open ? { label: 'Close note', icon: ICON.hide, run: () => S.list.closeNote(n.id) } : null,
       { label: 'Duplicate note', icon: ICON.copy, run: async () => { await S.list.duplicate(n.id); toast('Note duplicated'); } },
       n.favorite
@@ -1155,6 +1331,211 @@
         : { label: 'Move its notes to Bin…', icon: ICON.trash, danger: true, run: () => trashGroup(g) },
     ]);
   }
+
+  // ================================================================ effects (1.1.16)
+  // A note's effect plays on its card too, behind the card's writing (a canvas .fxc as the card's first child,
+  // z-index -1), and its mouse follower trails the pointer over the card. Same rules as the note window
+  // (COSMO_FX.resolve in fx.js). Only cards on screen draw (fxIO), all in fx.js's one shared loop.
+  const FX = window.COSMO_FX;
+  const fxLayers = new Map(); // card element → its layer
+  const fxIO = FX ? new IntersectionObserver((list) => {
+    for (const en of list) { const L = fxLayers.get(en.target.parentElement); if (L) L.setVisible(en.isIntersecting); }
+  }) : null;
+  const fxName = (kind, id) => (!id || id === 'none' ? 'none' : ((kind === 'effect' ? FX.EFFECTS : FX.FOLLOWERS)[id] || {}).name || 'none');
+  function paintFx() {
+    if (!FX) return;
+    const keep = new Set();
+    for (const card of $('#cards').children) {
+      const k = card.dataset.key;
+      if (!k || k[0] !== 'n') continue;
+      const n = state.notes.find((x) => x.id === k.slice(2));
+      if (!n) continue;
+      const r = FX.resolve(n.fx, state.settings, n.fxPaused, n.fxPlay);
+      let L = fxLayers.get(card);
+      if (r.effect === 'none' && r.follower === 'none') {
+        if (L) { L.destroy(); fxLayers.delete(card); const cv = card.querySelector(':scope > .fxc'); if (cv) { fxIO.unobserve(cv); cv.remove(); } }
+        continue;
+      }
+      if (!L) {
+        const cv = h('canvas', { class: 'fxc', 'aria-hidden': 'true' });
+        card.prepend(cv);
+        L = FX.Layer(cv);
+        fxLayers.set(card, L);
+        fxIO.observe(cv);
+        card.addEventListener('pointermove', (e) => { const rr = cv.getBoundingClientRect(); L.move(e.clientX - rr.left, e.clientY - rr.top); });
+        card.addEventListener('pointerleave', () => L.leave());
+      }
+      keep.add(card);
+      L.resize();
+      L.set({ effect: r.effect, follower: r.follower, effectAmount: r.effectAmount, followerAmount: r.followerAmount, effectOpacity: r.effectOpacity, followerOpacity: r.followerOpacity, dark: DARK_COLORS.includes(n.color) });
+      L.setPaused(r.paused);
+    }
+    for (const [card, L] of fxLayers) if (!keep.has(card)) { L.destroy(); fxLayers.delete(card); }
+  }
+  if (FX) new ResizeObserver(() => { for (const L of fxLayers.values()) L.resize(); }).observe($('#cards'));
+
+  // ---- Settings → Effects, and its pop-up (Choose…)
+  function fxSummary() {
+    const s = state.settings;
+    // e.g. "Snow (more, 60%)": the frequency unless normal, the opacity unless 100 %
+    const more = (a, o) => {
+      const p = [];
+      if (a === 'low') p.push('less'); else if (a === 'high') p.push('more');
+      const op = FX.opacityOf(o) ?? 1; if (op < 1) p.push(`${Math.round(op * 100)}%`);
+      return p.length ? ` (${p.join(', ')})` : '';
+    };
+    const e = fxName('effect', s.fxEffect) + (s.fxEffect && s.fxEffect !== 'none' ? more(s.fxEffectAmount, s.fxEffectOpacity) : '');
+    const f = fxName('follower', s.fxFollower) + (s.fxFollower && s.fxFollower !== 'none' ? more(s.fxFollowerAmount, s.fxFollowerOpacity) : '');
+    return `Background: ${e} · Mouse: ${f}${s.fxForceAll ? ' · used on every note' : ''}`;
+  }
+  const CHECK = '<svg class="ok" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+  const fxIcon = ([col, inner]) => `<span class="ic"${col ? ` style="--ic:${col}"` : ''}><svg viewBox="0 0 24 24">${inner}</svg></span>`;
+  function fxAllList(box, kind) {
+    const ids = kind === 'effect' ? FX.EFFECT_IDS : FX.FOLLOWER_IDS;
+    const key = kind === 'effect' ? 'fxEffect' : 'fxFollower';
+    for (const id of ['none', ...ids]) {
+      const b = h('button', { type: 'button', class: 'fxi', 'data-v': id, html: `${fxIcon(id === 'none' ? FX.ICONS.none : FX.ICONS[kind][id])}<span class="nm"></span>${CHECK}` });
+      b.querySelector('.nm').textContent = id === 'none' ? 'None' : fxName(kind, id);
+      b.addEventListener('click', () => { state.settings[key] = id; paintFxSheet(); S.settings.set({ [key]: id }); });
+      box.append(b);
+    }
+  }
+  if (FX) { fxAllList($('#fxAllEffects'), 'effect'); fxAllList($('#fxAllFollowers'), 'follower'); }
+  function paintFxSheet() {
+    const s = state.settings;
+    for (const [box, cur] of [[$('#fxAllEffects'), s.fxEffect || 'none'], [$('#fxAllFollowers'), s.fxFollower || 'none']]) {
+      for (const b of box.children) { const on = b.dataset.v === cur; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); }
+    }
+    for (const [id, cur, kindOn] of [['#fxAllEAmt', s.fxEffectAmount || 'mid', (s.fxEffect || 'none') !== 'none'], ['#fxAllFAmt', s.fxFollowerAmount || 'mid', (s.fxFollower || 'none') !== 'none']]) {
+      $(id).hidden = !kindOn;
+      $$(`${id} button`).forEach((b) => b.classList.toggle('on', b.dataset.a === cur));
+    }
+    for (const [id, o, kindOn] of [['#fxAllEOp', s.fxEffectOpacity, (s.fxEffect || 'none') !== 'none'], ['#fxAllFOp', s.fxFollowerOpacity, (s.fxFollower || 'none') !== 'none']]) {
+      const pct = Math.round((FX.opacityOf(o) ?? 1) * 100);
+      $(id).hidden = !kindOn;
+      $(`${id} input`).value = String(pct);
+      $(`${id} em`).textContent = `${pct}%`;
+    }
+    $('#fxForceAll').checked = !!s.fxForceAll;
+    $('#sFxNow').textContent = fxSummary();
+  }
+  for (const [id, key] of [['#fxAllEAmt', 'fxEffectAmount'], ['#fxAllFAmt', 'fxFollowerAmount']]) {
+    $$(`${id} button`).forEach((b) => b.addEventListener('click', () => { state.settings[key] = b.dataset.a; paintFxSheet(); S.settings.set({ [key]: b.dataset.a }); }));
+  }
+  // 1.1.17: opacity for all notes. Dragging shows it on the cards at once; it's saved (and sent to the open
+  // notes) when the slider is let go, or 300 ms after it stops moving
+  for (const [id, key] of [['#fxAllEOp', 'fxEffectOpacity'], ['#fxAllFOp', 'fxFollowerOpacity']]) {
+    const range = $(`${id} input`);
+    let timer = null;
+    const save = () => { clearTimeout(timer); timer = null; S.settings.set({ [key]: state.settings[key] }); };
+    range.addEventListener('input', () => {
+      state.settings[key] = Number(range.value) / 100;
+      $(`${id} em`).textContent = `${range.value}%`;
+      $('#sFxNow').textContent = fxSummary();
+      paintFx();
+      clearTimeout(timer); timer = setTimeout(save, 300);
+    });
+    range.addEventListener('change', save);
+  }
+  function openFxSheet() { $('#fxSheet').hidden = false; requestAnimationFrame(paintFxSheet); }
+  const closeFxSheet = () => { $('#fxSheet').hidden = true; };
+  $('#sFxChoose').addEventListener('click', openFxSheet);
+  $('#fxSheetX').addEventListener('click', closeFxSheet);
+  $('#fxBox').addEventListener('submit', (e) => { e.preventDefault(); closeFxSheet(); });
+  $('#fxSheet').addEventListener('mousedown', (e) => { if (e.target === $('#fxSheet')) closeFxSheet(); });
+  $('#fxForceAll').addEventListener('change', (e) => { state.settings.fxForceAll = e.target.checked; paintFxSheet(); S.settings.set({ fxForceAll: e.target.checked }); });
+  $('#sFxPause').addEventListener('change', (e) => S.settings.set({ fxPaused: e.target.checked }));
+  // the pause button left of Settings (1.1.16): pause / play every effect
+  function paintFxPause() {
+    const b = $('#btnFxPause');
+    const p = !!state.settings.fxPaused;
+    b.classList.toggle('paused', p);
+    b.setAttribute('aria-pressed', String(p));
+    b.title = p ? 'Effects are paused: click to play them again' : 'Pause all effects';
+  }
+  $('#btnFxPause').addEventListener('click', async () => {
+    const p = !state.settings.fxPaused;
+    state.settings.fxPaused = p;
+    paintFxPause();
+    paintFx();
+    await S.settings.set({ fxPaused: p });
+    toast(p ? 'Effects paused' : 'Effects playing again');
+  });
+
+  // ================================================================ Edit sheet (1.1.15)
+  // Right-click a note → Edit…: its title and colour, right here in the list. The title saves as you type
+  // (350 ms after you stop), the colour at once, and an open window of the note changes along with it
+  // (main.js 'list:edit'). A change made in the note's own window shows here too (editRefresh).
+  const ed = { id: null, color: 'yellow', title: '', timer: null, pending: null };
+  for (const c of COLORS) {
+    $('#editColors').append(h('button', {
+      type: 'button', class: 'sw', 'data-color': c, title: COLOR_NAMES[c], style: `background:${SWATCH[c]}`,
+      onclick: () => editSet({ color: c }),
+    }));
+  }
+  function editPaint() {
+    $('#editPaper').dataset.color = ed.color;
+    for (const b of $('#editColors').children) b.classList.toggle('on', b.dataset.color === ed.color);
+    $('#editColorName').textContent = COLOR_NAMES[ed.color] || '';
+  }
+  function openEdit(n) {
+    hideCtx();
+    if (ed.id) closeEdit();
+    ed.id = n.id;
+    ed.pending = null;
+    ed.color = n.color;
+    ed.title = n.title || '';
+    $('#editTitle').value = ed.title;
+    editPaint();
+    $('#editSheet').hidden = false;
+    requestAnimationFrame(() => {
+      const t = $('#editTitle');
+      t.focus();
+      t.setSelectionRange(t.value.length, t.value.length);
+    });
+  }
+  function editQueue(patch, now = false) {
+    if (!ed.id) return;
+    ed.pending = { ...(ed.pending || {}), ...patch };
+    clearTimeout(ed.timer);
+    if (now) editFlush(); else ed.timer = setTimeout(editFlush, 350);
+  }
+  async function editFlush() {
+    clearTimeout(ed.timer);
+    if (!ed.id || !ed.pending) return;
+    const id = ed.id;
+    const patch = ed.pending;
+    ed.pending = null;
+    await S.list.edit(id, patch);
+  }
+  function editSet(patch) {
+    if (!ed.id) return;
+    Object.assign(ed, patch);
+    editPaint();
+    editQueue(patch, true);
+  }
+  function closeEdit() {
+    if (!ed.id) return;
+    editFlush();
+    ed.id = null;
+    $('#editSheet').hidden = true;
+  }
+  // the note changed somewhere else (its window, the selection bar…) while the sheet is open
+  function editRefresh() {
+    if (!ed.id) return;
+    const n = state.notes.find((x) => x.id === ed.id);
+    if (!n || n.deletedAt) { ed.pending = null; closeEdit(); return; }
+    if (ed.pending) return; // our own change is on its way
+    if (n.color !== ed.color) { ed.color = n.color; editPaint(); }
+    const typingHere = document.hasFocus() && document.activeElement === $('#editTitle');
+    if ((n.title || '') !== ed.title && !typingHere) { ed.title = n.title || ''; $('#editTitle').value = ed.title; }
+  }
+  $('#editTitle').addEventListener('input', () => { ed.title = $('#editTitle').value; editQueue({ title: ed.title }); });
+  $('#editTitle').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); closeEdit(); } });
+  $('#editBox').addEventListener('submit', (e) => { e.preventDefault(); closeEdit(); });
+  $('#editX').addEventListener('click', () => closeEdit());
+  $('#editSheet').addEventListener('mousedown', (e) => { if (e.target === $('#editSheet')) closeEdit(); });
+  $('#editOpen').addEventListener('click', () => { const id = ed.id; closeEdit(); if (id) S.list.openNote(id); });
 
   // ================================================================ actions (with confirmations)
   async function trashNote(n, skipAsk) {
@@ -1280,6 +1661,34 @@
       },
     });
   };
+  // ---- Locked tab (1.1.15): uncover every locked note and group in this list, or cover them again
+  function paintLockBar() {
+    const bar = $('#lockBar');
+    bar.hidden = tab !== 'locks';
+    if (bar.hidden) return;
+    const all = !!state.settings.unlockedAll;
+    const pin = state.settings.lockKind === 'pin';
+    const any = lockedOnes();
+    const count = any.notes.length + any.groups.length + any.hidden;
+    $('#lockBarText').textContent = all
+      ? 'Unlocked in this list, and in notes you open from it, until you lock them again or close the list.'
+      : `Locked notes don’t show their words, and searching doesn’t look inside them. Unlock all with your ${pin ? 'PIN' : 'password'} to see and search them.`;
+    $('#btnUnlockAll').innerHTML = `${ICON.unlock}<span>Unlock all…</span>`;
+    $('#btnLockAll').innerHTML = `${ICON.lock}<span>Lock again</span>`;
+    $('#btnUnlockAll').hidden = all;
+    $('#btnLockAll').hidden = !all && !state.groups.some((g) => g.locked && g.open); // also covers groups opened with the password
+    $('#btnUnlockAll').disabled = !count || !state.settings.hasPassword;
+  }
+  $('#btnUnlockAll').addEventListener('click', async () => {
+    const r = await askPassword('Unlock all?', 'Type your password to see and search every locked note and group in this list. They stay locked; “Lock again” or closing the list covers them again.', 'Unlock all', (pw) => S.list.unlockAll(pw));
+    if (r) { await load(); toast('Unlocked in this list'); }
+  });
+  $('#btnLockAll').addEventListener('click', async () => {
+    await S.list.lockAll();
+    await load();
+    toast('Locked again 🔒');
+  });
+
   async function lockNote(n) {
     if (!(await ensurePassword())) return;
     await S.list.setLocked(n.id, true);
@@ -1306,7 +1715,7 @@
       if (!r) return;
       await load();
     }
-    if (tab !== 'notes') { tab = 'notes'; lastTab = 'notes'; } // from Favourites: the group opens in Notes
+    if (tab !== 'notes') { tab = 'notes'; lastTab = 'notes'; } // from Favourites or Locked: the group opens in Notes
     openGroup = g.id;
     closePanel();
     query = '';
@@ -1343,8 +1752,9 @@
       $('#gColors').append(h('button', { class: 'sw', 'data-gc': k, title: GNAMES[k], style: `background:${v}`, onclick: () => S.groups.update(openGroup, { color: k }) }));
     }
     for (const c of COLORS) {
-      $('#gNoteColors').append(h('button', { class: 'sw', 'data-color': c, title: `Make every note ${c}`, style: `background:${SWATCH[c]}`, onclick: () => massEdit({ color: c }) }));
+      $('#gNoteColors').append(h('button', { class: 'sw', 'data-color': c, title: `Make every note ${COLOR_NAMES[c]}`, style: `background:${SWATCH[c]}`, onclick: () => massEdit({ color: c }) }));
     }
+    swatchStrip($('#gNoteColors'));
   })();
   async function massEdit(patch) {
     const count = await S.groups.apply(openGroup, patch, $('#gInner').checked);
@@ -1532,6 +1942,7 @@
   $('#sOpacity').addEventListener('input', (e) => { $('#sOpVal').textContent = `${e.target.value}%`; });
   $('#sOpacity').addEventListener('change', (e) => { state.settings.defaultOpacity = Number(e.target.value) / 100; S.settings.set({ defaultOpacity: Number(e.target.value) / 100 }); });
   $('#sSolidHover').addEventListener('change', (e) => S.settings.set({ defaultSolidOnHover: e.target.checked }));
+  $('#sNoRepeat').addEventListener('change', (e) => S.settings.set({ newColorNoRepeat: e.target.checked }));
   // password or PIN: set / change in an app-styled pop-up
   $('#pwSave').addEventListener('click', async () => {
     const has = !!state.settings.hasPassword;
@@ -1569,6 +1980,8 @@
   $('#btnDataFolder').addEventListener('click', () => S.openDataFolder());
   document.addEventListener('keydown', (e) => {
     if (!$('#modal').hidden) { if (e.key === 'Escape' && modalDone) modalDone(null); return; }
+    if (!$('#editSheet').hidden) { if (e.key === 'Escape') { e.preventDefault(); closeEdit(); } return; }
+    if (!$('#fxSheet').hidden) { if (e.key === 'Escape') { e.preventDefault(); closeFxSheet(); } return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); newNote(); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
       e.preventDefault();
@@ -1576,7 +1989,7 @@
       $(tab === 'bin' ? '#bq' : '#q').focus();
     }
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
-    const cardsTab = tab === 'notes' || tab === 'favs';
+    const cardsTab = cardsTabNow();
     // Ctrl+A picks every card shown; Delete moves the picked ones to the Bin (Shift+Delete: no question)
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && cardsTab && !typing) {
       e.preventDefault();

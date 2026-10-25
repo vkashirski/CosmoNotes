@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { pathToFileURL } = require('url');
-const { Store } = require('./store');
+const { Store, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity } = require('./store');
 
 const APP_NAME = 'CosmoNotes';
 const OLD_DATA_DIR = 'Sticky Pins'; // where notes lived before the rename
@@ -14,6 +14,9 @@ const OLD_DATA_DIR = 'Sticky Pins'; // where notes lived before the rename
 const PAPER = {
   yellow: '#FFF4A3', pink: '#FFD6E6', green: '#D8F5C4', blue: '#D2ECFF',
   purple: '#E8DDFF', orange: '#FFDFBF', mint: '#CDF3E8', charcoal: '#3A3940',
+  // 1.1.15: the list themes' colours
+  cream: '#F5EDD9', rose: '#FBE1E8', sage: '#DCEFE4', mist: '#DCEAF8', lavender: '#E7E0F9',
+  night: '#2F2D35', midnight: '#252B3D', forest: '#232E28', plum: '#2D2432',
 };
 const ROLLED_H = 34;
 const MIN_W = 200;
@@ -24,7 +27,7 @@ const BIG = 16384;
 const ASSETS = path.join(__dirname, 'assets');
 const WIN_ICON = path.join(ASSETS, process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const PRELOAD = path.join(__dirname, 'preload.js');
-const EDITABLE = ['title', 'html', 'text', 'firstImage', 'ink', 'wrapWidth', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'pinned', 'rolled', 'spell', 'zoom'];
+const EDITABLE = ['title', 'html', 'text', 'firstImage', 'ink', 'wrapWidth', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'pinned', 'rolled', 'spell', 'zoom', 'fx', 'fxPaused', 'fxPlay'];
 const SECRET = ['html', 'text', 'firstImage', 'ink'];
 const ATT_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'webm', 'ogg', 'mp3', 'm4a', 'wav'];
 
@@ -126,7 +129,11 @@ function spellLanguages() {
 
 // Locked groups opened with the password in the list window (forgotten when the list closes).
 const listOpenGroups = new Set();
+// 1.1.15: "Unlock all" in the list's Locked tab: every locked note and group shows (and can be searched) in the
+// list until "Lock again" or the list closes. The notes stay locked; this only uncovers them in the list.
+let listUnlockedAll = false;
 function groupOpenInList(groupId) {
+  if (listUnlockedAll) return true;
   return store.chain(groupId).every((g) => !g.locked || listOpenGroups.has(g.id));
 }
 // Any open note window showing a note that just became locked hides itself
@@ -141,6 +148,11 @@ function hideNewlyLocked() {
     else win.webContents.send('note:look', viewOf(n, win));
   }
 }
+// 1.1.14: a locked note that's unlocked in its own window shows in the list too, until that window is
+// closed or locked again
+function revealedNow(n) { const w = wins.get(n.id); return !!(w && !w.isDestroyed() && w.revealed && !w.lockPending); }
+// the list never gets the words or pictures of these notes
+function hiddenInList(n) { return !listUnlockedAll && (n.locked || !groupOpenInList(n.groupId)) && !revealedNow(n); }
 function pushLook(id) {
   const win = wins.get(id);
   const n = store.get(id);
@@ -152,7 +164,21 @@ function pushLook(id) {
 }
 
 function noteSettings() {
-  return { spellCheck: !!store.settings.spellCheck, hasPassword: !!store.settings.lock, ...lockInfo() };
+  // appTheme (1.1.16): the notes list's colours; a note's pop-ups and toolbars use them too
+  return { spellCheck: !!store.settings.spellCheck, hasPassword: !!store.settings.lock, ...lockInfo(), ...fxSettings(), appTheme: store.settings.listTheme || 'cream' };
+}
+// 1.1.16: effects for all notes (Settings → Effects), sent to every note window
+function fxSettings() {
+  const s = store.settings;
+  return { fxEffect: s.fxEffect, fxFollower: s.fxFollower, fxEffectAmount: s.fxEffectAmount, fxFollowerAmount: s.fxFollowerAmount,
+    fxEffectOpacity: cleanFxOpacity(s.fxEffectOpacity) ?? 1, fxFollowerOpacity: cleanFxOpacity(s.fxFollowerOpacity) ?? 1, fxForceAll: !!s.fxForceAll, fxPaused: !!s.fxPaused };
+}
+function setFxPaused(on) {
+  store.settings.fxPaused = !!on;
+  store.saveSettings();
+  broadcastSettings();
+  buildTray();
+  notifyList();
 }
 // PIN or password: a PIN only takes digits and opens as soon as all of them are typed.
 function lockInfo() {
@@ -191,8 +217,13 @@ function fitBounds(b) {
   };
 }
 
-function hardenContents(wc) {
-  wc.setWindowOpenHandler(({ url }) => {
+function hardenContents(wc, { inkBarFor = null } = {}) {
+  wc.setWindowOpenHandler(({ url, frameName }) => {
+    // 1.1.15: a note may open one empty little window for its drawing toolbar (see "drawing toolbar outside")
+    // 1.1.16: and one for its text toolbar
+    if (inkBarFor && url === 'about:blank' && BAR_FRAMES[frameName]) {
+      return { action: 'allow', overrideBrowserWindowOptions: inkBarOptions(inkBarFor, BAR_FRAMES[frameName]) };
+    }
     openExternal(url);
     return { action: 'deny' };
   });
@@ -234,11 +265,143 @@ function notifyList() {
   }, 120);
 }
 
+// ------------------------------------------------------------------ drawing toolbar outside the note (1.1.15)
+// Dragged past the note's edge, the drawing toolbar moves into a small see-through window of its own (the note
+// opens it with window.open('about:blank') and moves the very same toolbar into it, so every button keeps
+// working: note.js "inkOut"). Here we place that window. Close to one of the note's sides it sticks to that
+// side (and follows the note when it moves or changes size); further away it stays where it was dropped.
+// Dropped back on the note, it goes back inside. win.inkWin = that window, win.inkOut = the toolbar is in it,
+// win.inkState = { mode: 'dock', side, off } | { mode: 'free', x, y }, plus its size w, h and inset (where the
+// visible toolbar starts inside its window: l, t, r, b).
+// 1.1.16: the text toolbar does the same, in a window of its own: win.textWin, win.textOut, win.textState. Every
+// function and message below takes the toolbar's kind, 'ink' (the default) or 'text' (messages: `bar: 'text'`).
+// The ⋯ menu ('menu') and the Effects pop-up ('fx') can go outside too (1.1.16, same rules).
+const BAR_FRAMES = { cosmoInkBar: 'ink', cosmoTextBar: 'text', cosmoMenuBar: 'menu', cosmoFxBar: 'fx' };
+const BAR_KINDS = ['ink', 'text', 'menu', 'fx'];
+const BAR_TITLES = { ink: 'Drawing', text: 'Text', menu: 'Note settings', fx: 'Effects' };
+const barKind = (k) => (BAR_KINDS.includes(k) ? k : 'ink');
+const INK_GAP = 4; // px between the note and a toolbar stuck to it
+const INK_SNAP = 40; // px: this close to a side, it sticks
+const INK_TOUCH = 16; // px: a stuck toolbar always overlaps its side by at least this much (1.1.16)
+function inkBarOptions(win, kind = 'ink') {
+  const n = store.get(win.noteId);
+  return {
+    width: 320, height: 200, show: false,
+    frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false,
+    resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
+    skipTaskbar: true, focusable: kind === 'menu', // clicking it never takes the focus from the note (the menu: its title field needs the keyboard)
+    alwaysOnTop: !!(n && n.pinned),
+    parent: win, // stays above its note, and goes with it when the note is minimised or closed
+    title: BAR_TITLES[barKind(kind)],
+  };
+}
+function watchInkBar(win) {
+  win.webContents.on('did-create-window', (child, details) => {
+    const k = BAR_FRAMES[details.frameName];
+    if (!k || (win[`${k}Win`] && !win[`${k}Win`].isDestroyed())) { child.destroy(); return; }
+    win[`${k}Win`] = child;
+    hardenContents(child.webContents);
+    try { child.setParentWindow(win); } catch { /* fine */ }
+    const n = store.get(win.noteId);
+    child.setAlwaysOnTop(!!(n && n.pinned), 'screen-saver');
+    child.on('closed', () => { if (win[`${k}Win`] === child) { win[`${k}Win`] = null; win[`${k}Out`] = false; } });
+    if (win[`${k}Out`]) placeInk(win, k);
+  });
+  const follow = () => { for (const k of BAR_KINDS) if (win[`${k}Out`] && win[`${k}State`] && win[`${k}State`].mode === 'dock') placeInk(win, k); };
+  win.on('move', follow);
+  win.on('resize', follow);
+}
+const clampN = (v, a, b) => Math.min(Math.max(v, a), Math.max(a, b));
+function cleanInkSize(s) {
+  const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+  const inset = s && s.inset ? s.inset : {};
+  return {
+    w: clampN(Math.round(num(s && s.w, 320)), 80, 1200), h: clampN(Math.round(num(s && s.h, 200)), 40, 1200),
+    inset: { l: num(inset.l, 0), t: num(inset.t, 0), r: num(inset.r, 0), b: num(inset.b, 0) },
+  };
+}
+// the visible toolbar's box when its window is at x, y
+function inkBox(x, y, st) {
+  return { x: x + st.inset.l, y: y + st.inset.t, w: st.w - st.inset.l - st.inset.r, h: st.h - st.inset.t - st.inset.b };
+}
+// where the toolbar's window goes now
+function inkSpot(win, kind = 'ink') {
+  const st = win[`${barKind(kind)}State`];
+  const b = win.getBounds();
+  const v = inkBox(0, 0, st);
+  let vx;
+  let vy;
+  if (st.mode === 'dock') {
+    // 1.1.16: stuck to a side, it can slide past the note's corners (it used to stop at the top/bottom or left/right
+    // edge); it only has to keep touching the side by INK_TOUCH px. Dragged further, it comes loose (snapInk).
+    const offY = clampN(st.off, INK_TOUCH - v.h, b.height - INK_TOUCH);
+    const offX = clampN(st.off, INK_TOUCH - v.w, b.width - INK_TOUCH);
+    if (st.side === 'right') { vx = b.x + b.width + INK_GAP; vy = b.y + offY; }
+    else if (st.side === 'left') { vx = b.x - INK_GAP - v.w; vy = b.y + offY; }
+    else if (st.side === 'top') { vx = b.x + offX; vy = b.y - INK_GAP - v.h; }
+    else { vx = b.x + offX; vy = b.y + b.height + INK_GAP; }
+  } else {
+    vx = st.x + st.inset.l;
+    vy = st.y + st.inset.t;
+  }
+  // always on a screen (a note maximised or at the screen's edge: the toolbar comes over the note instead)
+  const a = screen.getDisplayNearestPoint({ x: Math.round(vx + v.w / 2), y: Math.round(vy + v.h / 2) }).workArea;
+  vx = clampN(vx, a.x, a.x + a.width - v.w);
+  vy = clampN(vy, a.y, a.y + a.height - v.h);
+  return { x: Math.round(vx - st.inset.l), y: Math.round(vy - st.inset.t), width: st.w, height: st.h };
+}
+function placeInk(win, kind = 'ink') {
+  const k = barKind(kind);
+  const c = win[`${k}Win`];
+  if (!c || c.isDestroyed() || !win[`${k}State`] || win.isDestroyed()) return;
+  c.setBounds(inkSpot(win, k));
+  const n = store.get(win.noteId);
+  if (win[`${k}Out`] && !(n && n.rolled) && !win.isMinimized() && !c.isVisible()) c.showInactive();
+}
+// kind left out: both toolbars
+function showInk(win, on, kind = null) {
+  for (const k of kind ? [barKind(kind)] : BAR_KINDS) {
+    const c = win[`${k}Win`];
+    if (!c || c.isDestroyed()) continue;
+    if (on && win[`${k}Out`]) placeInk(win, k);
+    else if (!on) c.hide();
+  }
+}
+// while dragging: stick to a side when close to it
+function snapInk(win, p) {
+  const st = { ...cleanInkSize(p) };
+  const b = win.getBounds();
+  const x = Number(p.x) || 0;
+  const y = Number(p.y) || 0;
+  const px = Number(p.px);
+  const py = Number(p.py);
+  const overNote = px >= b.x && px <= b.x + b.width && py >= b.y && py <= b.y + b.height;
+  const v = inkBox(x, y, st);
+  const cands = [];
+  if (!overNote) {
+    const overlapY = v.y < b.y + b.height && v.y + v.h > b.y;
+    const overlapX = v.x < b.x + b.width && v.x + v.w > b.x;
+    const near = (d, size) => d > -size / 2 && d < INK_SNAP;
+    const dR = v.x - (b.x + b.width);
+    const dL = b.x - (v.x + v.w);
+    const dT = b.y - (v.y + v.h);
+    const dB = v.y - (b.y + b.height);
+    if (overlapY && near(dR, v.w)) cands.push({ side: 'right', d: Math.abs(dR), off: v.y - b.y });
+    if (overlapY && near(dL, v.w)) cands.push({ side: 'left', d: Math.abs(dL), off: v.y - b.y });
+    if (overlapX && near(dT, v.h)) cands.push({ side: 'top', d: Math.abs(dT), off: v.x - b.x });
+    if (overlapX && near(dB, v.h)) cands.push({ side: 'bottom', d: Math.abs(dB), off: v.x - b.x });
+  }
+  cands.sort((a1, a2) => a1.d - a2.d);
+  if (cands.length) return { ...st, mode: 'dock', side: cands[0].side, off: Math.round(cands[0].off) };
+  return { ...st, mode: 'free', x: Math.round(x), y: Math.round(y) };
+}
+
 // ------------------------------------------------------------------ note windows
 function applyState(win, n) {
   if (win.isDestroyed()) return;
   win.setOpacity(n.opacity);
   win.setAlwaysOnTop(n.pinned, 'screen-saver');
+  for (const k of BAR_KINDS) if (win[`${k}Win`] && !win[`${k}Win`].isDestroyed()) win[`${k}Win`].setAlwaysOnTop(n.pinned, 'screen-saver');
   win.setBackgroundColor(PAPER[n.color] || PAPER.yellow);
   setWinTitle(win, n);
 }
@@ -252,6 +415,7 @@ function setWinTitle(win, n) {
 
 function setRolled(win, n) {
   const b = win.getBounds();
+  showInk(win, !n.rolled); // a toolbar outside the note hides while it's rolled up
   if (n.rolled) {
     n.bounds = { x: b.x, y: b.y, width: b.width, height: Math.max(MIN_H, b.height > ROLLED_H + 4 ? b.height : (n.bounds?.height || DEFAULT_H)) };
     store.save(n.id);
@@ -309,7 +473,8 @@ function openNoteWindow(n, { focus = false } = {}) {
   // true while the window may show the note's contents (unlocked note, or password typed in it)
   win.revealed = !isLocked(n);
   wins.set(n.id, win);
-  hardenContents(win.webContents);
+  hardenContents(win.webContents, { inkBarFor: win });
+  watchInkBar(win);
 
   let shown = false;
   const showIt = () => {
@@ -526,7 +691,7 @@ function showList() {
   listWin.on('move', remember);
   listWin.on('resize', remember);
   listWin.on('close', () => { remember(); try { store.saveSettings(); } catch { /* ignore */ } });
-  listWin.on('closed', () => { listWin = null; listOpenGroups.clear(); });
+  listWin.on('closed', () => { listWin = null; listOpenGroups.clear(); listUnlockedAll = false; });
   // the mouse's back / forward buttons (some mice send these as Windows commands): move between group levels
   listWin.on('app-command', (e, cmd) => {
     if (cmd !== 'browser-backward' && cmd !== 'browser-forward') return;
@@ -561,6 +726,7 @@ function buildTray() {
     { label: 'All notes', click: showList },
     { label: 'Bring notes to front', click: () => bringToFront({ unroll: true }) },
     { type: 'separator' },
+    { label: 'Pause effects', type: 'checkbox', checked: !!store.settings.fxPaused, click: (mi) => setFxPaused(mi.checked) }, // 1.1.16
     { label: 'Start with Windows', type: 'checkbox', checked: !!store.settings.startWithWindows, click: (mi) => setStartup(mi.checked) },
     { type: 'separator' },
     { label: `Quit ${APP_NAME}`, click: () => { quitting = true; app.quit(); } },
@@ -699,6 +865,62 @@ function registerIpc() {
     win.setOpacity(over && note.solidOnHover ? 1 : note.opacity);
   });
 
+  // 1.1.15: the drawing toolbar in its own window (see "drawing toolbar outside the note")
+  // (1.1.16: also the text toolbar, with `bar: 'text'`)
+  // put it at a remembered place ({ mode: 'dock', side, off } or { mode: 'free', x, y }) and show it
+  ipcMain.on('ink:show', (e, s) => {
+    const { win, note } = senderNote(e);
+    if (!note || !s || typeof s !== 'object') return;
+    const k = barKind(s.bar);
+    const st = cleanInkSize(s);
+    if (s.mode === 'dock' && ['left', 'right', 'top', 'bottom'].includes(s.side)) Object.assign(st, { mode: 'dock', side: s.side, off: Number(s.off) || 0 });
+    else Object.assign(st, { mode: 'free', x: Number(s.x) || 0, y: Number(s.y) || 0 });
+    win[`${k}State`] = st;
+    win[`${k}Out`] = true;
+    placeInk(win, k);
+  });
+  // dragging it: x, y = where its window would go, px, py = the mouse pointer (screen)
+  ipcMain.on('ink:drag', (e, p) => {
+    const { win, note } = senderNote(e);
+    if (!note || !p || typeof p !== 'object') return;
+    const k = barKind(p.bar);
+    win[`${k}State`] = snapInk(win, p);
+    win[`${k}Out`] = true;
+    placeInk(win, k);
+  });
+  // its size changed (it's measured in the note)
+  ipcMain.on('ink:size', (e, s) => {
+    const { win, note } = senderNote(e);
+    const k = barKind(s && s.bar);
+    if (!note || !win[`${k}State`]) return;
+    Object.assign(win[`${k}State`], cleanInkSize(s));
+    if (win[`${k}Out`]) placeInk(win, k);
+  });
+  // let go: on the note → back inside it; anywhere else it stays (stuck to a side, or free)
+  ipcMain.handle('ink:drop', (e, p = {}) => {
+    const { win, note } = senderNote(e);
+    if (!note) return null;
+    const k = barKind(p && p.bar);
+    const b = win.getBounds();
+    const px = Number(p.px);
+    const py = Number(p.py);
+    if (px >= b.x && px <= b.x + b.width && py >= b.y && py <= b.y + b.height) {
+      win[`${k}Out`] = false;
+      showInk(win, false, k);
+      return { inside: true, x: b.x, y: b.y };
+    }
+    const st = win[`${k}State`];
+    if (!st) return null;
+    return { inside: false, state: st.mode === 'dock' ? { mode: 'dock', side: st.side, off: st.off } : { mode: 'free', x: st.x, y: st.y } };
+  });
+  ipcMain.on('ink:hide', (e, bar) => {
+    const { win, note } = senderNote(e);
+    if (!note) return;
+    const k = barKind(bar);
+    win[`${k}Out`] = false;
+    showInk(win, false, k);
+  });
+
   ipcMain.handle('att:save', (e, bytes, ext) => {
     ext = String(ext || '').toLowerCase();
     if (!ATT_EXT.includes(ext)) throw new Error('Unsupported file type');
@@ -730,10 +952,6 @@ function registerIpc() {
   ipcMain.handle('list:show', () => showList());
   ipcMain.handle('list:get', () => {
     const { lock, ...settings } = store.settings;
-    // 1.1.14: a locked note that's unlocked in its own window shows in the list too, until that window is
-    // closed or locked again
-    const revealedNow = (n) => { const w = wins.get(n.id); return !!(w && !w.isDestroyed() && w.revealed && !w.lockPending); };
-    const hiddenInList = (n) => (n.locked || !groupOpenInList(n.groupId)) && !revealedNow(n);
     return {
       notes: store.all().map((n) => ({
         id: n.id,
@@ -747,6 +965,9 @@ function registerIpc() {
         font: n.font,
         pinned: n.pinned,
         favorite: n.favorite,
+        fx: n.fx, // 1.1.16: the card shows the note's effect too
+        fxPaused: n.fxPaused,
+        fxPlay: n.fxPlay,
         groupId: n.groupId,
         open: wins.has(n.id),
         createdAt: n.createdAt,
@@ -755,7 +976,7 @@ function registerIpc() {
         restoredFrom: n.restoredFrom,
       })),
       groups: [...store.groups.values()].map((g) => ({ ...g, open: groupOpenInList(g.id) })),
-      settings: { ...settings, ...lockInfo(), hasPassword: !!lock, dataPath: store.root, version: app.getVersion() },
+      settings: { ...settings, ...lockInfo(), hasPassword: !!lock, dataPath: store.root, version: app.getVersion(), unlockedAll: listUnlockedAll },
     };
   });
 
@@ -892,6 +1113,26 @@ function registerIpc() {
     notifyList();
   });
   ipcMain.handle('list:new', (e, groupId) => { createNote({ groupId }); });
+  // 1.1.15: the Locked tab. "Unlock all" (with the password) uncovers every locked note and group in the list;
+  // "Lock again" covers them again, also in open note windows that were unlocked.
+  ipcMain.handle('list:unlock-all', async (e, pw) => {
+    if (!checkPassword(pw)) { await wait(450); return { ok: false }; }
+    listUnlockedAll = true;
+    notifyList();
+    return { ok: true };
+  });
+  ipcMain.handle('list:lock-all', () => {
+    listUnlockedAll = false;
+    listOpenGroups.clear();
+    for (const [id, win] of wins) {
+      const n = store.get(id);
+      if (!n || win.isDestroyed()) continue;
+      // the window saves what was typed, then hides itself (like locking from the list)
+      if (isLocked(n) && win.revealed) { win.lockPending = true; win.webContents.send('note:lock-now'); }
+    }
+    notifyList();
+    return true;
+  });
   ipcMain.handle('list:open-note', (e, id) => {
     const n = store.get(id);
     if (!n || n.deletedAt) return;
@@ -899,8 +1140,9 @@ function registerIpc() {
     store.save(n.id);
     const fresh = !wins.has(n.id);
     const win = openNoteWindow(n, { focus: true });
-    // Its locked group was just opened with the password in the list, so don't ask again.
-    if (fresh && !n.locked && isLocked(n) && groupOpenInList(n.groupId)) win.revealed = true;
+    // Its locked group was just opened with the password in the list (or everything was, with "Unlock all"),
+    // so don't ask again.
+    if (fresh && isLocked(n) && (listUnlockedAll || (!n.locked && groupOpenInList(n.groupId)))) win.revealed = true;
     notifyList();
   });
   ipcMain.handle('list:close-note', (e, id) => {
@@ -934,6 +1176,29 @@ function registerIpc() {
     return count;
   });
   // paper colour / font for several notes
+  // 1.1.15: right-click → Edit… in the list: a note's title and colour. An open window of the note gets the
+  // change straight away ('note:look'), so both stay the same. A new title counts as an edit; a colour doesn't.
+  ipcMain.handle('list:edit', (e, id, patch = {}) => {
+    const n = store.get(id);
+    if (!n || n.deletedAt || !patch || typeof patch !== 'object') return null;
+    const clean = {};
+    if (typeof patch.title === 'string') clean.title = patch.title;
+    if (PAPER[patch.color]) clean.color = patch.color;
+    if (!Object.keys(clean).length) return null;
+    const oldTitle = n.title;
+    store.update(n.id, clean, { content: false });
+    const m = store.get(n.id);
+    if (m.title !== oldTitle) store.update(n.id, {}, { content: true }); // counts as an edit (updatedAt)
+    const win = wins.get(n.id);
+    if (win && !win.isDestroyed()) {
+      if ('color' in clean) applyState(win, m);
+      else setWinTitle(win, m);
+      win.webContents.send('note:look', viewOf(m, win));
+    }
+    notifyList();
+    return { updatedAt: m.updatedAt, title: m.title, color: m.color };
+  });
+
   ipcMain.handle('list:apply', (e, ids = [], patch = {}) => {
     const clean = {};
     if (PAPER[patch.color]) clean.color = patch.color;
@@ -997,7 +1262,15 @@ function registerIpc() {
   ipcMain.handle('settings:set', (e, patch) => {
     patch = patch || {};
     if ('startWithWindows' in patch) setStartup(patch.startWithWindows);
-    if (typeof patch.defaultColor === 'string' && (PAPER[patch.defaultColor] || patch.defaultColor === 'random')) store.settings.defaultColor = patch.defaultColor;
+    // 1.1.15: new notes pick at random from a list of colours. The old single colour (or "random") still works.
+    let colors = null;
+    if (Array.isArray(patch.defaultColors)) colors = patch.defaultColors;
+    else if (patch.defaultColor === 'random') colors = ['yellow', 'pink', 'green', 'blue', 'purple', 'orange', 'mint'];
+    else if (typeof patch.defaultColor === 'string' && PAPER[patch.defaultColor]) colors = [patch.defaultColor];
+    if (colors) {
+      store.settings.defaultColors = cleanColors(colors.filter((c) => PAPER[c]), store.settings.defaultColors?.[0]);
+      store.settings.defaultColor = store.settings.defaultColors[0];
+    }
     if (['s', 'm', 'l', 'xl', 'xxl'].includes(patch.listSize)) store.settings.listSize = patch.listSize;
     if (LIST_THEMES[patch.listTheme]) { store.settings.listTheme = patch.listTheme; paintListFrame(); }
     if (patch.defaultFont === 'hand' || patch.defaultFont === 'round') store.settings.defaultFont = patch.defaultFont;
@@ -1005,6 +1278,20 @@ function registerIpc() {
       store.settings.defaultOpacity = Math.min(1, Math.max(0.25, Math.round(Number(patch.defaultOpacity) * 20) / 20));
     }
     if ('defaultSolidOnHover' in patch) store.settings.defaultSolidOnHover = !!patch.defaultSolidOnHover;
+    if ('newColorNoRepeat' in patch) store.settings.newColorNoRepeat = !!patch.newColorNoRepeat;
+    // 1.1.16: effects for all notes
+    let fxChanged = false;
+    if (patch.fxEffect === 'none' || FX_EFFECTS.includes(patch.fxEffect)) { store.settings.fxEffect = patch.fxEffect; fxChanged = true; }
+    if (patch.fxFollower === 'none' || FX_FOLLOWERS.includes(patch.fxFollower)) { store.settings.fxFollower = patch.fxFollower; fxChanged = true; }
+    if (FX_AMOUNTS.includes(patch.fxEffectAmount)) { store.settings.fxEffectAmount = patch.fxEffectAmount; fxChanged = true; }
+    if (FX_AMOUNTS.includes(patch.fxFollowerAmount)) { store.settings.fxFollowerAmount = patch.fxFollowerAmount; fxChanged = true; }
+    // 1.1.17: opacity of the background / the mouse follower (10 % – 100 %)
+    for (const k of ['fxEffectOpacity', 'fxFollowerOpacity']) {
+      const v = cleanFxOpacity(patch[k]);
+      if (v !== null) { store.settings[k] = v; fxChanged = true; }
+    }
+    if ('fxForceAll' in patch) { store.settings.fxForceAll = !!patch.fxForceAll; fxChanged = true; }
+    if ('fxPaused' in patch) { store.settings.fxPaused = !!patch.fxPaused; fxChanged = true; buildTray(); }
     if ('spellCheck' in patch) store.settings.spellCheck = !!patch.spellCheck;
     if ('spellCyrillic' in patch) { store.settings.spellCyrillic = !!patch.spellCyrillic; spellLanguages(); }
     if (patch.listSort && typeof patch.listSort === 'object') {
@@ -1015,7 +1302,7 @@ function registerIpc() {
       store.settings.listSort = ls;
     }
     store.saveSettings();
-    if ('spellCheck' in patch || 'spellCyrillic' in patch) broadcastSettings();
+    if ('spellCheck' in patch || 'spellCyrillic' in patch || 'listTheme' in patch || fxChanged) broadcastSettings();
     // The list already shows a new sort order itself; telling it again made it redraw twice.
     const onlySort = Object.keys(patch).every((k) => k === 'listSort' || k === 'listSize' || k === 'listTheme');
     if (!onlySort) notifyList();

@@ -26,7 +26,9 @@
 <nav class="tabs">
   <button class="tab on" data-tab="notes">Notes <span class="count" id="cNotes">0</span></button>
   <button class="tab" data-tab="favs" title="Your starred notes and groups"><svg class="tstar" viewBox="0 0 24 24"><path d="M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9L3.4 9.4l6-.7z"/></svg>Favourites <span class="count" id="cFavs">0</span></button>
+  <button class="tab" data-tab="locks" title="Your locked notes and groups"><svg class="tlock" viewBox="0 0 24 24"><path d="M8 11V7a4 4 0 0 1 8 0v4"/><rect x="4" y="11" width="16" height="10" rx="2.5"/></svg>Locked <span class="count" id="cLocks">0</span></button>
   <button class="tab" data-tab="bin">Bin <span class="count" id="cBin">0</span></button>
+  <button class="fxpause" id="btnFxPause" title="Pause all effects" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 3c.6 3.6 2.4 5.4 6 6-3.6.6-5.4 2.4-6 6-.6-3.6-2.4-5.4-6-6 3.6-.6 5.4-2.4 6-6z"/><path d="M18.5 15c.3 1.6 1 2.3 2.5 2.5-1.5.3-2.2 1-2.5 2.5-.3-1.5-1-2.2-2.5-2.5 1.5-.2 2.2-.9 2.5-2.5z"/><path class="slash" d="M4 20 20 4"/></svg></button>
   <button class="tab" data-tab="settings" title="Settings (click again to go back)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
 </nav>
 
@@ -40,6 +42,12 @@
     <button class="iconbtn" id="btnSort" title="Sort"><svg viewBox="0 0 24 24"><path d="M3 6h13M3 12h9M3 18h5"/><path d="M18 8v12M15 17l3 3 3-3"/></svg></button>
     <button class="iconbtn" id="btnSize" title="Card size"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5" opacity=".55"/><rect x="3" y="14" width="5" height="5" rx="1.2" opacity=".55"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg></button>
     <button class="iconbtn" id="btnFront" title="Bring all open notes to the front (and unroll rolled-up ones)"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
+  </div>
+  <!-- 1.1.15: the Locked tab's bar: uncover every locked note in this list with the password, and cover them again -->
+  <div class="lockbar" id="lockBar" hidden>
+    <span class="lbtext" id="lockBarText"></span>
+    <button class="pill small" id="btnUnlockAll"></button>
+    <button class="pill ghost small" id="btnLockAll"></button>
   </div>
   <div class="sortpop" id="sizePop" hidden>
     <h4>Card size</h4>
@@ -80,7 +88,7 @@
       <h4>Group colour</h4>
       <div class="swatches" id="gColors"></div>
       <h4>Change every note inside</h4>
-      <div class="row2"><span>Paper</span><div class="swatches small" id="gNoteColors"></div></div>
+      <div class="row2"><span>Paper</span><div class="swstrip small"><div class="swatches small" id="gNoteColors"></div></div></div>
       <div class="row2"><span>Font</span><div class="seg" id="gFont"><button data-font="hand" class="hand">Handwritten</button><button data-font="round">Rounded</button></div></div>
       <label class="check"><input type="checkbox" id="gInner" checked> <span>Also the notes in groups inside this one</span></label>
       <p class="gmixed" id="gMixed"></p>
@@ -125,9 +133,20 @@
     <h3>For new notes</h3>
     <p class="muted">Notes you make from now on start like this. Notes you already have keep their own look.</p>
     <div class="row col">
-      <span><b>Colour</b></span>
-      <div class="swatches" id="sColors"></div>
+      <span class="oprow"><b>Colour</b><em id="sColorsCount"></em></span>
+      <div class="swstrip wide"><div class="swatches" id="sColors"></div></div>
+      <small class="shint" id="sColorsHint"></small>
+      <div class="pickbtns">
+        <button class="pill ghost small" id="sPickAll">Pick all</button>
+        <button class="pill ghost small" id="sPickLight">Light only</button>
+        <button class="pill ghost small" id="sPickDark">Dark only</button>
+        <button class="pill ghost small" id="sPickOne">Just one</button>
+      </div>
     </div>
+    <label class="row toggle">
+      <span><b>Never the same colour twice in a row</b><small>A new note never gets the colour of the note made just before it. Only when you’ve picked more than one colour.</small></span>
+      <input type="checkbox" id="sNoRepeat"><i></i>
+    </label>
     <div class="row col">
       <span><b>Font</b></span>
       <div class="seg" id="sFont">
@@ -142,6 +161,20 @@
     <label class="row toggle">
       <span><b>Turn solid when my mouse is over it</b><small>See-through notes become solid while you point at them. Each note can still change this in its own ••• menu.</small></span>
       <input type="checkbox" id="sSolidHover"><i></i>
+    </label>
+  </div>
+
+  <!-- 1.1.16 -->
+  <div class="panel">
+    <h3>Effects</h3>
+    <p class="muted">Little moving pictures in the background of your notes, and a trail that follows your mouse over a note. Each note can also choose its own: ⋯ menu → Effects…</p>
+    <div class="row">
+      <span><b>For all notes</b><small id="sFxNow"></small></span>
+      <button class="pill ghost small" id="sFxChoose">Choose…</button>
+    </div>
+    <label class="row toggle">
+      <span><b>Pause all effects</b><small>Also with the sparkle button left of Settings, and in the menu of the CosmoNotes icon by the clock.</small></span>
+      <input type="checkbox" id="sFxPause"><i></i>
     </label>
   </div>
 
@@ -199,8 +232,9 @@
 </section>
 
 <!-- app-styled right-click menu and pop-ups -->
-<!-- 1.1.14: the inside of a padlock's body, where the long side of its shackle is hidden -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><clipPath id="lockClip"><path d="M-4-4H28V28H-4ZM5 12H19V20H5Z" clip-rule="evenodd"/></clipPath></defs></svg>
+<!-- 1.1.14: the padlock's shackle is only drawn above the middle of the body's top line (1.1.15), so its long side,
+     which reaches down into the body, never shows inside the body -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><clipPath id="lockClip"><path d="M-4-4H28V11H-4Z"/></clipPath></defs></svg>
 <div class="ctx" id="ctx" hidden></div>
 <div class="modal" id="modal" hidden>
   <form class="mbox" id="mbox" autocomplete="off">
@@ -213,9 +247,48 @@
     <div class="mbtns"><button type="button" class="pill ghost" id="mCancel">Cancel</button><button type="submit" class="pill" id="mOk">OK</button></div>
   </form>
 </div>
+<!-- 1.1.16: Settings → Effects → Choose…: the effect and mouse follower for all notes -->
+<div class="modal esheet" id="fxSheet" hidden>
+  <form class="ebox" id="fxBox" autocomplete="off">
+    <div class="ehead">
+      <h3>Effects for all notes</h3>
+      <button type="button" class="qclear" id="fxSheetX" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="erow"><b>Background of a note</b><div class="fxlist" id="fxAllEffects"></div><div class="fxamt" id="fxAllEAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div><div class="fxop" id="fxAllEOp"><span>Opacity</span><input type="range" class="srange" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div></div>
+    <div class="erow"><b>Follows your mouse</b><div class="fxlist" id="fxAllFollowers"></div><div class="fxamt" id="fxAllFAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div><div class="fxop" id="fxAllFOp"><span>Opacity</span><input type="range" class="srange" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div></div>
+    <label class="row toggle">
+      <span><b>Use these on every note</b><small>Even on notes that chose their own. Their own choice is kept, and comes back when you switch this off.</small></span>
+      <input type="checkbox" id="fxForceAll"><i></i>
+    </label>
+    <div class="ebtns"><small>Changes show straight away</small><button type="submit" class="pill">Done</button></div>
+  </form>
+</div>
+<!-- 1.1.15: right-click a note → Edit… (title and colour). Saves as you type; an open note window follows. -->
+<div class="modal esheet" id="editSheet" hidden>
+  <form class="ebox" id="editBox" autocomplete="off">
+    <div class="ehead">
+      <h3>Edit note</h3>
+      <button type="button" class="qclear" id="editX" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="erow">
+      <b>Title</b>
+      <div class="epaper" id="editPaper" data-color="yellow"><input class="etitle" id="editTitle" maxlength="120" placeholder="(optional)" spellcheck="false"></div>
+    </div>
+    <div class="erow">
+      <span class="oprow"><b>Colour</b><em id="editColorName"></em></span>
+      <div class="swstrip wide"><div class="swatches" id="editColors"></div></div>
+    </div>
+    <div class="ebtns">
+      <small id="editSaved">Changes save as you type</small>
+      <button type="button" class="pill ghost" id="editOpen">Open note</button>
+      <button type="submit" class="pill" id="editDone">Done</button>
+    </div>
+  </form>
+</div>
 <div class="toast" id="toast" hidden></div>
 
 <script src="about.js"></script>
+<script src="fx.js"></script>
 <script src="list.js"></script>
 </body>
 </html>

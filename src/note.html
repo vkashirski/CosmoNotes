@@ -12,12 +12,15 @@
 <link rel="stylesheet" href="note.css">
 </head>
 <body data-color="yellow" data-font="hand" data-size="m">
+<!-- 1.1.16: the note's effect and mouse follower, drawn behind everything (fx.js) -->
+<canvas id="fxCanvas" aria-hidden="true"></canvas>
 
 <header id="bar">
   <button class="hb" id="btnList" title="All notes"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
   <button class="hb" id="btnNew" title="New note (Ctrl+N)"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
   <div id="title"></div>
   <button class="hb" id="btnRelock" title="Unlocked for now. Click to lock it again" hidden><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></svg></button>
+  <button class="hb" id="btnFx" title="Pause effects on this note" aria-pressed="false" hidden><svg viewBox="0 0 24 24"><path d="M12 3c.6 3.6 2.4 5.4 6 6-3.6.6-5.4 2.4-6 6-.6-3.6-2.4-5.4-6-6 3.6-.6 5.4-2.4 6-6z"/><path d="M18.5 15c.3 1.6 1 2.3 2.5 2.5-1.5.3-2.2 1-2.5 2.5-.3-1.5-1-2.2-2.5-2.5 1.5-.2 2.2-.9 2.5-2.5z"/></svg></button>
   <button class="hb" id="btnPin" title="Pin on top of other windows" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
   <button class="hb" id="btnRoll" title="Roll up to just the top bar"><svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></button>
   <button class="hb" id="btnMenu" title="Title, colour, see-through, lock and more"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg></button>
@@ -40,7 +43,7 @@
 <!-- shown instead of the note when it is locked -->
 <div id="lockScreen" hidden>
   <form id="unlockForm" autocomplete="off">
-    <div class="lockicon"><svg viewBox="0 0 24 24"><defs><clipPath id="lockClip"><path d="M-4-4H28V28H-4ZM5 12H19V20H5Z" clip-rule="evenodd"/></clipPath></defs><g clip-path="url(#lockClip)"><path class="shackle" d="M8 16.5V7a4 4 0 0 1 8 0v4"/></g><rect x="4" y="11" width="16" height="10" rx="2.5"/><circle cx="12" cy="16" r="1.2" class="fill"/></svg></div>
+    <div class="lockicon"><svg viewBox="0 0 24 24"><defs><clipPath id="lockClip"><path d="M-4-4H28V11H-4Z"/></clipPath></defs><g clip-path="url(#lockClip)"><path class="shackle" d="M8 16.5V7a4 4 0 0 1 8 0v4"/></g><rect x="4" y="11" width="16" height="10" rx="2.5"/><circle cx="12" cy="16" r="1.2" class="fill"/></svg></div>
     <div class="lt">This note is locked</div>
     <div class="lrow"><input type="password" id="unlockPw" placeholder="Password"><button class="lbtn" type="submit" title="Unlock"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
     <div class="lerr" id="unlockErr"></div>
@@ -72,27 +75,59 @@
 
 <!-- ⋯ menu -->
 <div class="pop" id="menu" hidden>
-  <h4>Title <span class="val soft">optional</span></h4>
-  <input class="titlefld" id="titleInput" maxlength="120" placeholder="Shows on the top bar" autocomplete="off" spellcheck="false">
+  <button class="ix" id="menuX" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  <div class="igrip" title="Drag to move, also out of the note (double-click: back)"><i></i></div>
+  <h4>Title</h4>
+  <input class="titlefld" id="titleInput" maxlength="120" placeholder="(optional)" autocomplete="off" spellcheck="false">
   <h4>Colour</h4>
-  <div class="swatches" id="colors">
+  <div class="swstrip"><div class="swatches" id="colors">
     <button class="sw" data-color="yellow" title="Lemon"></button>
-    <button class="sw" data-color="pink" title="Bubblegum"></button>
-    <button class="sw" data-color="green" title="Lime"></button>
-    <button class="sw" data-color="blue" title="Sky"></button>
-    <button class="sw" data-color="purple" title="Lilac"></button>
+    <button class="sw" data-color="cream" title="Cream"></button>
     <button class="sw" data-color="orange" title="Peach"></button>
+    <button class="sw" data-color="pink" title="Bubblegum"></button>
+    <button class="sw" data-color="rose" title="Rose"></button>
+    <button class="sw" data-color="purple" title="Lilac"></button>
+    <button class="sw" data-color="lavender" title="Lavender"></button>
+    <button class="sw" data-color="blue" title="Sky"></button>
+    <button class="sw" data-color="mist" title="Mist"></button>
     <button class="sw" data-color="mint" title="Mint"></button>
+    <button class="sw" data-color="sage" title="Sage"></button>
+    <button class="sw" data-color="green" title="Lime"></button>
     <button class="sw" data-color="charcoal" title="Charcoal"></button>
-  </div>
+    <button class="sw" data-color="night" title="Night"></button>
+    <button class="sw" data-color="plum" title="Plum"></button>
+    <button class="sw" data-color="midnight" title="Midnight"></button>
+    <button class="sw" data-color="forest" title="Forest"></button>
+  </div></div>
   <h4>See-through <span id="opVal" class="val">100%</span></h4>
   <input type="range" id="opacity" min="25" max="100" step="5" value="100">
   <label class="check switch"><span>Turn solid when my mouse is over it</span><input type="checkbox" id="solidHover"><i></i></label>
+  <button class="mi" id="miFx"><svg viewBox="0 0 24 24"><path d="M12 3c.6 3.6 2.4 5.4 6 6-3.6.6-5.4 2.4-6 6-.6-3.6-2.4-5.4-6-6 3.6-.6 5.4-2.4 6-6z"/><path d="M18.5 15c.3 1.6 1 2.3 2.5 2.5-1.5.3-2.2 1-2.5 2.5-.3-1.5-1-2.2-2.5-2.5 1.5-.2 2.2-.9 2.5-2.5z"/></svg><span>Effects…</span><small class="mival" id="miFxVal"></small></button>
   <div class="divider"></div>
   <button class="mi" id="miDuplicate"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2.5"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg><span>Duplicate note</span></button>
   <button class="mi" id="miLock"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="miLockText">Lock note</span></button>
   <button class="mi danger" id="miDelete"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span id="miDeleteText">Delete note <small>(goes to the bin)</small></span></button>
   <div class="dates" id="dates"></div>
+</div>
+
+<!-- 1.1.16: this note's effect and mouse follower -->
+<div class="pop" id="fxPop" hidden>
+  <button class="ix" id="fxX" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  <div class="igrip" title="Drag to move, also out of the note (double-click: back)"><i></i></div>
+  <h4>Effects</h4>
+  <p class="hint" id="fxForce" hidden>Right now Settings uses the same effects for every note, so this note shows those. What you pick here is kept for when that’s switched off.</p>
+  <div class="seg fxtabs" id="fxTabs"><button type="button" data-t="e" class="on">Background</button><button type="button" data-t="f">Mouse</button></div>
+  <div class="fxsec" data-t="e">
+  <div class="fxlist" id="fxEffects"></div>
+  <div class="fxamt" id="fxEAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div>
+  <div class="fxop" id="fxEOp"><span>Opacity</span><input type="range" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div>
+  </div>
+  <div class="fxsec" data-t="f" hidden>
+  <div class="fxlist" id="fxFollowers"></div>
+  <div class="fxamt" id="fxFAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div>
+  <div class="fxop" id="fxFOp"><span>Opacity</span><input type="range" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div>
+  </div>
+  <label class="check switch"><span>Pause effects on this note</span><input type="checkbox" id="fxPause"><i></i></label>
 </div>
 
 <!-- create the one password for locked notes -->
@@ -124,9 +159,9 @@
 <div class="pop tbar" id="textPop" hidden>
   <div class="igrip" title="Drag to move (double-click: back to the corner)"><i></i></div>
   <button class="ix" id="textX" title="Close"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-  <!-- what the buttons change: the selected text, or the whole note when nothing is selected -->
+  <!-- what the buttons change: the selected text, or (nothing selected) what you type next -->
   <div class="irow thead">
-    <span class="tscope" id="tScope">Changes: <b>whole note</b></span>
+    <span class="tscope" id="tScope">Changes: <b>what you type next</b></span>
   </div>
   <div class="irow">
     <div class="seg" id="fontSeg">
@@ -138,6 +173,7 @@
     <span class="tlab"><svg viewBox="0 0 24 24"><path d="m6 16 6-12 6 12M8.2 12h7.6"/><path d="M4 20.5h16" class="cbar"/></svg></span>
     <div class="dots">
     <button class="dot" data-fore="inherit" title="Normal"><span class="none"></span></button>
+    <button class="dot" data-fore="#1B1B1B" style="--c:#1B1B1B" title="Black"></button>
     <button class="dot" data-fore="#D93B3B" style="--c:#D93B3B"></button>
     <button class="dot" data-fore="#E8780C" style="--c:#E8780C"></button>
     <button class="dot" data-fore="#2E9E4F" style="--c:#2E9E4F"></button>
@@ -216,7 +252,6 @@
 <!-- draw-over toolbar (bottom right) -->
 <div id="inkBar" hidden>
   <div class="igrip" id="inkGrip" title="Drag to move the toolbar (double-click: back to the corner)"><i></i></div>
-  <button class="ipz" id="inkPz" title="Pause drawing, to type for a moment"><svg class="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.9" y="5" width="3.6" height="14" rx="1.2"/></svg><svg class="i-play" viewBox="0 0 24 24"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.3-6.8a.8.8 0 0 0 0-1.4L9.2 4.5A.8.8 0 0 0 8 5.2z"/></svg></button>
   <button class="ix" id="inkX" title="Close drawing (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
   <div class="irow tools" id="inkTools">
     <button data-tool="pen" title="Pen (hold Shift for a straight line)"><svg viewBox="0 0 24 24"><path d="M4 20c1-4 3-6 5-8l7-7a2 2 0 0 1 3 3l-7 7c-2 2-4 4-8 5z"/><path d="m14 7 3 3"/></svg></button>
@@ -249,9 +284,13 @@
       <button data-d="dash" title="Dashed line"><svg viewBox="0 0 24 24"><path d="M3 12h4.5M10 12h4.5M17 12h4"/></svg></button>
       <button data-d="dot" title="Dotted line"><svg viewBox="0 0 24 24"><path d="M4 12h.01M9.3 12h.01M14.7 12h.01M20 12h.01" stroke-width="3.2"/></svg></button>
     </div>
-    <button class="iact" id="inkClear" title="Remove all drawing"><svg viewBox="0 0 24 24"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
   </div>
   <div class="ihint" id="inkHint"></div>
+  <!-- 1.1.15: pause and "remove all drawing" sit inside the toolbar, below the tip -->
+  <div class="irow ifoot">
+    <button class="ipz" id="inkPz" title="Pause drawing, to type for a moment"><svg class="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.9" y="5" width="3.6" height="14" rx="1.2"/></svg><svg class="i-play" viewBox="0 0 24 24"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.3-6.8a.8.8 0 0 0 0-1.4L9.2 4.5A.8.8 0 0 0 8 5.2z"/></svg><span class="l-pause">Pause</span><span class="l-play">Carry on</span></button>
+    <button class="iclear" id="inkClear" title="Remove all drawing"><svg viewBox="0 0 24 24"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg><span>Clear all</span></button>
+  </div>
 </div>
 
 <!-- small "are you sure?" pop-up in the app's style -->
@@ -265,6 +304,7 @@
 <div id="toast" hidden></div>
 <div class="corner"></div>
 
+<script src="fx.js"></script>
 <script src="note.js"></script>
 </body>
 </html>

@@ -6,6 +6,9 @@
   --pop-soft: #F5EEDD;
   --pop-soft2: #EDE3CB;
   --pop-mute: #9A8B70;
+  --pop-ink2: #5C4D35; /* second text colour on pop-ups (1.1.16) */
+  --pop-card: #fff; /* raised bits on a pop-up: fields, the picked button of a row (1.1.16) */
+  --pop-pick: #3B3226; --pop-pickfg: #FFF8E6; /* a picked tool, dark pills */
 }
 
 body[data-color="yellow"]   { --paper:#FFF4A3; --paper2:#FFEC85; --bar:#FBE278; --accent:#7A5C00; --ink:#3B3220; --sel:rgba(255,190,0,.42); --line:rgba(122,92,0,.28); }
@@ -16,6 +19,16 @@ body[data-color="purple"]   { --paper:#E8DDFF; --paper2:#DDCEFF; --bar:#D0BDFF; 
 body[data-color="orange"]   { --paper:#FFDFBF; --paper2:#FFD2A8; --bar:#FFC38C; --accent:#9A4E0C; --ink:#3A2A1A; --sel:rgba(255,140,40,.32); --line:rgba(154,78,12,.28); }
 body[data-color="mint"]     { --paper:#CDF3E8; --paper2:#BCEDDE; --bar:#A4E5D1; --accent:#1F7560; --ink:#1C332D; --sel:rgba(30,180,140,.3);  --line:rgba(31,117,96,.28); }
 body[data-color="charcoal"] { --paper:#3A3940; --paper2:#333239; --bar:#2B2A30; --accent:#FFD86B; --ink:#F3EFE6; --sel:rgba(255,216,107,.3); --line:rgba(255,216,107,.3); }
+/* 1.1.15: the colours of the list themes */
+body[data-color="cream"]    { --paper:#F5EDD9; --paper2:#EFE4CB; --bar:#E8DCC0; --accent:#7D6C50; --ink:#3B3226; --sel:rgba(200,160,80,.32);  --line:rgba(125,108,80,.28); }
+body[data-color="rose"]     { --paper:#FBE1E8; --paper2:#F7D3DE; --bar:#F2CAD6; --accent:#86606B; --ink:#3F2A31; --sel:rgba(190,90,120,.28);  --line:rgba(134,96,107,.3); }
+body[data-color="sage"]     { --paper:#DCEFE4; --paper2:#CFE8D9; --bar:#C4E2D1; --accent:#4F6D5D; --ink:#25362D; --sel:rgba(60,130,95,.28);   --line:rgba(79,109,93,.3); }
+body[data-color="mist"]     { --paper:#DCEAF8; --paper2:#CEE0F3; --bar:#C5DAF0; --accent:#4F6782; --ink:#24313F; --sel:rgba(60,110,170,.26);  --line:rgba(79,103,130,.3); }
+body[data-color="lavender"] { --paper:#E7E0F9; --paper2:#DCD3F5; --bar:#D5CAF2; --accent:#5E5480; --ink:#2F2843; --sel:rgba(110,80,190,.26);  --line:rgba(94,84,128,.3); }
+body[data-color="night"]    { --paper:#2F2D35; --paper2:#2A2830; --bar:#25232A; --accent:#B3A4FF; --ink:#EDE6D8; --sel:rgba(142,123,239,.35); --line:rgba(179,164,255,.3); }
+body[data-color="midnight"] { --paper:#252B3D; --paper2:#212637; --bar:#1D2232; --accent:#9FB2FF; --ink:#E4E8F2; --sel:rgba(110,139,255,.35); --line:rgba(159,178,255,.3); }
+body[data-color="forest"]   { --paper:#232E28; --paper2:#1F2924; --bar:#1C2520; --accent:#8FD9B0; --ink:#E2ECE4; --sel:rgba(91,191,138,.33);  --line:rgba(143,217,176,.3); }
+body[data-color="plum"]     { --paper:#2D2432; --paper2:#28202D; --bar:#251D29; --accent:#E0A6EE; --ink:#EEE3F0; --sel:rgba(199,125,219,.33); --line:rgba(224,166,238,.3); }
 
 body[data-font="hand"][data-size="s"]  { --fs: 19px; }
 body[data-font="hand"][data-size="m"]  { --fs: 23px; }
@@ -63,7 +76,7 @@ svg .fill { fill: currentColor; stroke: none; }
   transition: opacity .12s, background .12s;
 }
 .hb:hover { opacity: 1; background: rgba(0,0,0,.08); }
-body[data-color="charcoal"] .hb:hover { background: rgba(255,255,255,.1); }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .hb:hover { background: rgba(255,255,255,.1); }
 .hb svg { width: 16px; height: 16px; }
 #btnPin[aria-pressed="true"] { opacity: 1; }
 #btnPin[aria-pressed="true"] svg { fill: currentColor; transform: rotate(-25deg); }
@@ -98,7 +111,7 @@ body.locked-hidden #scroller, body.locked-hidden #tools, body.locked-hidden #sta
   background: rgba(255,255,255,.5);
   color: var(--accent);
 }
-body[data-color="charcoal"] .lockicon { background: rgba(255,255,255,.08); }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .lockicon { background: rgba(255,255,255,.08); }
 .lockicon svg { width: 22px; height: 22px; }
 .lt { font: 700 22px var(--hand); color: var(--accent); margin-bottom: 10px; }
 .lrow { display: flex; gap: 5px; }
@@ -121,7 +134,7 @@ body[data-color="charcoal"] .lockicon { background: rgba(255,255,255,.08); }
   cursor: pointer;
 }
 .lerr { min-height: 18px; margin-top: 6px; font: 700 12px var(--ui); color: #B3261E; }
-body[data-color="charcoal"] .lerr { color: #FF9A92; }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .lerr { color: #FF9A92; }
 .shake { animation: shake .35s; }
 @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 
@@ -171,7 +184,7 @@ body.resizing, body.resizing * { cursor: nwse-resize !important; user-select: no
 .ink.below { z-index: 0; }
 .ink.above { z-index: 2; }
 .ink .hl { mix-blend-mode: multiply; }
-body[data-color="charcoal"] .ink .hl { mix-blend-mode: screen; }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .ink .hl { mix-blend-mode: screen; }
 #inkCatch { position: absolute; inset: 0; z-index: 3; cursor: crosshair; touch-action: none; }
 #inkCatch[hidden] { display: none; }
 body.erasing-ink #inkCatch { cursor: cell; }
@@ -228,13 +241,13 @@ body[data-font="round"] #editor { font-family: var(--ui); line-height: 1.45; }
 }
 body[data-font="round"] #editor ul.checklist li { padding-left: 1.55em; }
 body[data-font="round"] #editor ul.checklist li::before { top: .3em; width: 1em; height: 1em; }
-body[data-color="charcoal"] #editor ul.checklist li:not(.done)::before { background-color: transparent; }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #editor ul.checklist li:not(.done)::before { background-color: transparent; }
 #editor ul.checklist li.done::before {
   opacity: 1;
   background-color: var(--accent);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
 }
-body[data-color="charcoal"] #editor ul.checklist li.done::before {
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #editor ul.checklist li.done::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232B2A30' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
 }
 #editor ul.checklist li.done { text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: .55; }
@@ -266,7 +279,7 @@ body[data-color="charcoal"] #editor ul.checklist li.done::before {
 #editor img.att-img.w-s { max-width: 45%; }
 #editor img.att-img.w-m { max-width: 72%; }
 #editor img.att-drawing { display: block; margin: .25em 0; cursor: pointer; }
-body[data-color="charcoal"] #editor img.att-drawing { background: rgba(255,255,255,.88); border-radius: 6px; }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #editor img.att-drawing { background: rgba(255,255,255,.88); border-radius: 6px; }
 #editor img.sel-img { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 #editor table { border-collapse: collapse; width: 100%; margin: .35em 0; table-layout: fixed; }
@@ -290,7 +303,7 @@ body[data-color="charcoal"] #editor img.att-drawing { background: rgba(255,255,2
   cursor: pointer;
   line-height: 1;
 }
-body[data-color="charcoal"] #editor .voice { background: rgba(255,255,255,.08); }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #editor .voice { background: rgba(255,255,255,.08); }
 .voice .v-play {
   position: relative;
   width: 26px; height: 26px;
@@ -351,7 +364,7 @@ body:hover #tools > *, body:focus-within #tools > *, body.pop-open #tools > * { 
   cursor: pointer;
 }
 .tb:hover { background: rgba(0,0,0,.08); }
-body[data-color="charcoal"] .tb:hover, body[data-color="charcoal"] .tb.on { background: rgba(255,255,255,.12); }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .tb:hover, body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .tb.on { background: rgba(255,255,255,.12); }
 .tb.on { background: rgba(0,0,0,.12); }
 .tb.i { font-style: italic; font-family: Georgia, serif; }
 .tb.u { text-decoration: underline; text-underline-offset: 2px; }
@@ -429,7 +442,7 @@ body:hover .corner, body:focus-within .corner { opacity: 0; }
   padding: 7px 10px;
   border: 1.5px solid var(--pop-soft2);
   border-radius: 10px;
-  background: #fff;
+  background: var(--pop-card);
   color: var(--pop-ink);
   font: 800 13.5px var(--ui);
   outline: none;
@@ -467,19 +480,58 @@ body:hover .corner, body:focus-within .corner { opacity: 0; }
 .sw[data-color="green"] { background: #B9E79C; } .sw[data-color="blue"] { background: #A9D8FF; }
 .sw[data-color="purple"] { background: #D0BDFF; } .sw[data-color="orange"] { background: #FFC38C; }
 .sw[data-color="mint"] { background: #A4E5D1; } .sw[data-color="charcoal"] { background: #3A3940; }
+.sw[data-color="cream"] { background: #E8DCC0; } .sw[data-color="rose"] { background: #F2CAD6; }
+.sw[data-color="sage"] { background: #C4E2D1; } .sw[data-color="mist"] { background: #C5DAF0; }
+.sw[data-color="lavender"] { background: #D5CAF2; }
+/* the dark theme colours are all nearly black: a small dot of each theme's own colour tells them apart */
+.sw[data-color="night"] { background: radial-gradient(circle, #8E7BEF 0 22%, #2F2D35 25%); }
+.sw[data-color="midnight"] { background: radial-gradient(circle, #6E8BFF 0 22%, #252B3D 25%); }
+.sw[data-color="forest"] { background: radial-gradient(circle, #5BBF8A 0 22%, #232E28 25%); }
+.sw[data-color="plum"] { background: radial-gradient(circle, #C77DDB 0 22%, #2D2432 25%); }
+
+/* 1.1.15: 17 colours in the same space as the old 8. The row shows 8 circles of the same size and scrolls
+   sideways: drag it, use the mouse wheel, or the arrows that appear on a side when there are more colours
+   that way (swatchStrip in note.js). The extra padding (taken back by the margin) leaves room for the
+   ring around the chosen colour. */
+.swstrip { position: relative; }
+.swstrip .swatches {
+  position: relative;
+  grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: calc((100% - 49px) / 8);
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  padding: 5px; margin: -3px;
+  cursor: grab; touch-action: pan-y;
+}
+.swstrip .swatches::-webkit-scrollbar { display: none; }
+.swstrip .swatches.dragging, .swstrip .swatches.dragging .sw { cursor: grabbing; }
+.swstrip .swatches.dragging .sw:hover { transform: none; }
+.swarr {
+  position: absolute; top: -3px; bottom: -3px; width: 34px; z-index: 1;
+  display: flex; align-items: center; padding: 0;
+  border: 0; cursor: pointer; color: var(--pop-ink);
+}
+.swarr[hidden] { display: none; }
+.swarr.l { left: -3px; justify-content: flex-start; padding-left: 1px; background: linear-gradient(90deg, var(--pop-bg) 45%, transparent); }
+.swarr.r { right: -3px; justify-content: flex-end; padding-right: 1px; background: linear-gradient(270deg, var(--pop-bg) 45%, transparent); }
+.swarr svg {
+  width: 20px; height: 20px; padding: 4px; box-sizing: border-box;
+  border-radius: 50%; background: var(--pop-bg);
+  box-shadow: 0 1px 4px rgba(60,40,10,.28);
+  fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
+}
+.swarr:hover svg { background: var(--pop-card); }
 .seg { display: flex; gap: 3px; padding: 3px; border-radius: 11px; background: var(--pop-soft); }
 .seg button {
   flex: 1; min-width: 0;
   padding: 6px 4px;
   border: 0; border-radius: 8px;
   background: transparent;
-  color: #6A5A40;
+  color: var(--pop-ink2);
   font: 800 12.5px var(--ui);
   cursor: pointer;
   white-space: nowrap;
 }
-.seg button:hover { background: rgba(255,255,255,.6); }
-.seg button.on { background: #fff; color: var(--pop-ink); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+.seg button:hover { background: var(--pop-hover, rgba(255,255,255,.6)); }
+.seg button.on { background: var(--pop-card); color: var(--pop-ink); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
 .seg button.hand { font-family: var(--hand); font-size: 17px; font-weight: 700; padding: 2px 4px; }
 input[type="range"] { width: 100%; margin: 2px 0 4px; accent-color: #C9A227; }
 .check { display: flex; align-items: flex-start; gap: 7px; margin: 4px 2px 2px; font-weight: 700; font-size: 12.5px; cursor: pointer; }
@@ -497,9 +549,9 @@ input[type="range"] { width: 100%; margin: 2px 0 4px; accent-color: #C9A227; }
   cursor: pointer;
 }
 .mi:hover { background: var(--pop-soft); }
-.mi svg { width: 16px; height: 16px; color: #8A7652; }
+.mi svg { width: 16px; height: 16px; color: var(--pop-ink2); }
 .mi small { color: var(--pop-mute); font-weight: 700; }
-.mi.danger, .mi.danger svg { color: #B3261E; }
+.mi.danger, .mi.danger svg { color: var(--pop-danger, #B3261E); }
 
 .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .tile {
@@ -507,7 +559,7 @@ input[type="range"] { width: 100%; margin: 2px 0 4px; accent-color: #C9A227; }
   padding: 8px 2px 7px;
   border: 0; border-radius: 12px;
   background: var(--pop-soft);
-  color: #4A3D2A;
+  color: var(--pop-ink);
   font: 800 11px var(--ui);
   cursor: pointer;
   transition: background .12s, transform .12s;
@@ -536,7 +588,7 @@ input[type="range"] { width: 100%; margin: 2px 0 4px; accent-color: #C9A227; }
   padding: 7px 9px;
   border: 1.5px solid var(--pop-soft2);
   border-radius: 9px;
-  background: #fff;
+  background: var(--pop-card);
   color: var(--pop-ink);
   font: 700 13px var(--ui);
   outline: none;
@@ -546,13 +598,13 @@ input[type="range"] { width: 100%; margin: 2px 0 4px; accent-color: #C9A227; }
 .btn {
   padding: 6px 14px;
   border: 0; border-radius: 999px;
-  background: #3B3226;
-  color: #FFF8E6;
+  background: var(--pop-pick);
+  color: var(--pop-pickfg);
   font: 800 12.5px var(--ui);
   cursor: pointer;
 }
 .btn:hover { background: #54473A; }
-.btn.ghost { background: transparent; color: #6A5A40; }
+.btn.ghost { background: transparent; color: var(--pop-ink2); }
 .btn.ghost:hover { background: var(--pop-soft); }
 
 /* ---------- right-click menu ---------- */
@@ -624,7 +676,7 @@ input[type="range"] { width: 100%; margin: 2px 0 4px; accent-color: #C9A227; }
 .size { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 7px; background: transparent; display: grid; place-items: center; cursor: pointer; }
 .size i { display: block; border-radius: 50%; background: var(--accent); }
 .size.on, .dtool.on { background: rgba(0,0,0,.1); }
-body[data-color="charcoal"] .size.on, body[data-color="charcoal"] .dtool.on { background: rgba(255,255,255,.14); }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .size.on, body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .dtool.on { background: rgba(255,255,255,.14); }
 .dtool { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--accent); display: grid; place-items: center; cursor: pointer; }
 .dtool:hover, .size:hover { background: rgba(0,0,0,.07); }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
@@ -700,20 +752,20 @@ body.inking:not(.ink-paused) #scroller, body.inking:not(.ink-paused) #sheet { cu
 .irow.tools button, .iact {
   width: 27px; height: 27px; flex: none;
   padding: 0; border: 0; border-radius: 8px;
-  background: transparent; color: #5C4D35;
+  background: transparent; color: var(--pop-ink2);
   display: grid; place-items: center;
   cursor: pointer;
 }
 .irow.tools button:hover, .iact:hover { background: var(--pop-soft); }
-.irow.tools button.on { background: #3B3226; color: #FFF8E6; }
+.irow.tools button.on { background: var(--pop-pick); color: var(--pop-pickfg); }
 .irow.tools svg, .iact svg { width: 17px; height: 17px; }
 .irow.tools .hlbar { stroke-width: 4; stroke: #FFD43B; }
 .icolors { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; min-width: 0; }
 .icolors button { width: 16px; height: 16px; flex: none; padding: 0; border-radius: 50%; border: 2px solid #fff; background: var(--c); box-shadow: 0 0 0 1px rgba(0,0,0,.15); cursor: pointer; }
-.icolors button.on { box-shadow: 0 0 0 2px #3B3226; }
-.iwidths { display: flex; gap: 1px; padding-left: 4px; border-left: 1px solid var(--pop-soft2); }
+.icolors button.on { box-shadow: 0 0 0 2px var(--pop-pick); }
+.iwidths { display: flex; gap: 1px; padding-left: 4px; border-left: 1px solid var(--pop-soft2); flex: none; }
 .iwidths button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 7px; background: transparent; display: grid; place-items: center; cursor: pointer; }
-.iwidths button i { display: block; border-radius: 50%; background: #3B3226; }
+.iwidths button i { display: block; border-radius: 50%; background: var(--pop-ink); }
 .iwidths button.on { background: var(--pop-soft2); }
 .ilayer { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--pop-soft); flex: 1; min-width: 0; }
 .ilayer button {
@@ -722,11 +774,11 @@ body.inking:not(.ink-paused) #scroller, body.inking:not(.ink-paused) #sheet { cu
   height: 25px; padding: 0 2px;
   white-space: nowrap; overflow: hidden;
   border: 0; border-radius: 7px;
-  background: transparent; color: #6A5A40;
+  background: transparent; color: var(--pop-ink2);
   font: 800 11px var(--ui);
   cursor: pointer;
 }
-.ilayer button.on { background: #fff; color: #3B3226; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+.ilayer button.on { background: var(--pop-card); color: var(--pop-ink); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
 .ilayer svg { width: 15px; height: 15px; flex: none; }
 .ilayer .soft, .ilayer .txt { stroke: #8A7652; stroke-width: 2; }
 /* Over / Behind: which square is in front: the red one (your drawing) or the paper one (the note) */
@@ -735,12 +787,12 @@ body.inking:not(.ink-paused) #scroller, body.inking:not(.ink-paused) #sheet { cu
 .ilayer button:not(.on) svg { opacity: .8; }
 .ilayer .strong { stroke: #E5484D; stroke-width: 2.6; }
 .ilayer .faint { stroke-opacity: .55; stroke-width: 4; }
-.idone { height: 27px; padding: 0 10px; border: 0; border-radius: 999px; background: #3B3226; color: #FFF8E6; font: 800 11.5px var(--ui); cursor: pointer; }
+.idone { height: 27px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--pop-pick); color: var(--pop-pickfg); font: 800 11.5px var(--ui); cursor: pointer; }
 .emode[hidden], .icolors[hidden], .iwidths[hidden] { display: none; }
 /* "Whole line" has no size: the size buttons stay where they are, greyed out */
 .iwidths.off { opacity: .32; pointer-events: none; }
 .emode { flex: 1; }
-.emode .ring { stroke: #3B3226; stroke-width: 1.8; }
+.emode .ring { stroke: var(--pop-ink); stroke-width: 1.8; }
 .emode .x { stroke: #3B3226; stroke-width: 2.2; }
 .ihint {
   margin: 5px 2px 0; height: 14px;
@@ -788,7 +840,7 @@ body.rolled #inkBar { display: none !important; }
 }
 .igrip:hover { background: var(--pop-soft); }
 .igrip i { width: 34px; height: 4px; border-radius: 4px; background: var(--pop-soft2); box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
-.igrip:hover i { background: #CDBF9E; }
+.igrip:hover i { background: var(--pop-mute); }
 body.moving-inkbar, body.moving-inkbar * { cursor: grabbing !important; user-select: none; }
 @media (max-width: 279px) { #btnInk span { display: none; } #btnInk { padding: 0 6px; } }
 /* 1.1.13: word wrap icon = return arrow, spelling icon = "abc" + tick. When off, a slash goes through them with a
@@ -796,17 +848,17 @@ body.moving-inkbar, body.moving-inkbar * { cursor: grabbing !important; user-sel
 #btnWrap.on .slashcut, #btnSpell.on .slashcut { display: none; }
 #btnSpell text { font: 800 11px var(--ui); }
 /* word wrap on = just the icon without the slash (no highlighted box) */
-#btnWrap.on, body[data-color="charcoal"] #btnWrap.on { background: transparent; }
+#btnWrap.on, body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #btnWrap.on { background: transparent; }
 #btnWrap.on:hover { background: rgba(0,0,0,.08); }
-body[data-color="charcoal"] #btnWrap.on:hover { background: rgba(255,255,255,.12); }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #btnWrap.on:hover { background: rgba(255,255,255,.12); }
 /* 1.1.13: no shaded boxes in the bottom bar for buttons that are "on" (bold, lists, spelling…). Only while the
    text toolbar (A) is open do B I U S and the lists show their state with a box, and A itself is shaded.
    Pointing at a button still tints it. */
-#tools .tb.on, body[data-color="charcoal"] #tools .tb.on { background: transparent; }
+#tools .tb.on, body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #tools .tb.on { background: transparent; }
 #tools .tb.on:hover { background: rgba(0,0,0,.08); }
-body[data-color="charcoal"] #tools .tb.on:hover { background: rgba(255,255,255,.12); }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #tools .tb.on:hover { background: rgba(255,255,255,.12); }
 body.text-open #tools .tb[data-cmd].on, body.text-open #btnText { background: rgba(0,0,0,.12); }
-body.text-open[data-color="charcoal"] #tools .tb[data-cmd].on, body.text-open[data-color="charcoal"] #btnText { background: rgba(255,255,255,.12); }
+body.text-open:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #tools .tb[data-cmd].on, body.text-open:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #btnText { background: rgba(255,255,255,.12); }
 /* 1.1.12: "Turn solid when my mouse is over it" is a sliding switch, like the ones in Settings */
 .check.switch { align-items: center; justify-content: space-between; gap: 10px; }
 .check.switch input { position: absolute; opacity: 0; pointer-events: none; }
@@ -826,12 +878,9 @@ body.ink-paused #inkBar { background: color-mix(in srgb, var(--pop-bg) 55%, tran
 body.ink-paused #btnInk { background: var(--accent); color: var(--paper); } /* drawing is on hold: Draw brings it back */
 
 /* ================================================================ 1.1.9 */
-  position: absolute; right: -4px; bottom: -4px;
-  width: 15px; height: 15px; border-radius: 50%;
-  background: #8E7BEF; color: #fff;
-  display: grid; place-items: center;
-  box-shadow: 0 0 0 2px var(--pop-bg), 0 1px 2px rgba(0,0,0,.25);
-}
+/* 1.1.16: a leftover rule here had lost its selector (declarations with no "selector {" before them), so the
+   browser threw away the NEXT rule too: the text toolbar's own size and place (#textPop.tbar). That's why the
+   text toolbar was as wide as the note, and squashed in its own window outside the note. Removed. */
 
 /* the text panel (A): a small toolbar like the drawing one, stays open, can be dragged */
 #textPop.tbar {
@@ -864,7 +913,7 @@ body[data-font="hand"] #editor font[face="Nunito"] { font-size: .68em; }
 .tlab .cbar { stroke: #E5484D; stroke-width: 3; }
 .tlab .hbar { stroke: #FFD43B; stroke-width: 4; }
 .tbar .dots { gap: 4px; padding: 0; flex-wrap: nowrap; }
-.tbar .dot { width: 25px; height: 25px; flex: none; }
+.tbar .dot { width: 23px; height: 23px; flex: none; } /* 1.1.16: 23 px, so 8 colours fit (black added) */
 .tbar .dot .none { width: 12px; }
 
 /* ================================================================ 1.1.10 */
@@ -878,6 +927,45 @@ body[data-font="hand"] #editor font[face="Nunito"] { font-size: .68em; }
   display: grid; place-items: center; cursor: pointer;
 }
 .ix:hover { background: var(--pop-soft); color: var(--pop-ink); }
+/* ---------- 1.1.16: effects ---------- */
+/* behind everything in the note (the paper is the page's own background, under it) */
+#fxCanvas { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; }
+body.rolled #fxCanvas { display: none; }
+#btnFx svg { stroke-width: 1.7; }
+#btnFx.off { opacity: .45; } /* paused */
+#btnFx.off svg { stroke-dasharray: 2 2.2; }
+@media (max-width: 279px) { #btnFx { display: none; } }
+.mi .mival { margin-left: auto; padding-left: 8px; font: 700 11.5px var(--ui); color: var(--pop-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+#fxPop > .ix { top: 8px; right: 8px; }
+.fxsub { margin: 10px 2px 6px; font: 800 12px var(--ui); color: var(--pop-ink); }
+.fxlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 2px 6px; }
+.fxi {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  min-height: 34px; padding: 4px 8px 4px 5px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--pop-ink); cursor: pointer;
+  font: 800 12.5px var(--ui); text-align: left;
+}
+.fxi:hover { background: var(--pop-soft); }
+.fxi .ic { flex: none; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--pop-soft); color: var(--ic, var(--pop-mute)); }
+.fxi .ic svg { width: 17px; height: 17px; stroke-width: 1.8; }
+.fxi .ic .f { fill: currentColor; stroke: none; }
+.fxi .nm { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; overflow-wrap: anywhere; }
+.fxi .nm small { font: 700 10.5px var(--ui); color: var(--pop-mute); }
+.fxamt { display: flex; align-items: center; gap: 8px; margin: 6px 2px 0; font: 800 11.5px var(--ui); color: var(--pop-mute); }
+.fxamt .seg { flex: 1; }
+.fxamt[hidden] { display: none; }
+/* 1.1.17: opacity slider under each Frequency row */
+.fxamt > span, .fxop > span { flex: none; min-width: 58px; }
+.fxop { display: flex; align-items: center; gap: 8px; margin: 6px 2px 0; font: 800 11.5px var(--ui); color: var(--pop-mute); }
+.fxop input[type="range"] { flex: 1; min-width: 0; margin: 0; cursor: pointer; }
+.fxop em { flex: none; min-width: 34px; text-align: right; font-style: normal; color: var(--pop-ink); }
+.fxop[hidden] { display: none; }
+.fxi .ok { flex: none; width: 15px; height: 15px; stroke-width: 2.6; visibility: hidden; }
+.fxi.on { background: var(--pop-soft2); }
+.fxi.on .ic { background: var(--pop-bg); }
+.fxi.on .ok { visibility: visible; }
+#fxPop .check.switch { margin-top: 12px; }
+#menu > .ix { top: 8px; right: 8px; } /* 1.1.15: the ⋯ menu's X, level with "Title" */
 .ix svg { width: 13px; height: 13px; stroke-width: 2.6; }
 /* typing while drawing: the whole drawing toolbar fades (clicking a tool goes back to drawing) */
 body.ink-paused #inkBar > * { opacity: .38; transition: opacity .15s; }
@@ -901,22 +989,38 @@ body.text-open #stamp { opacity: 0; }
   #btnInk { padding: 0 6px 0 4px; }
   #btnUndo { margin-left: 1px; }
 }
-/* pause button: at the top of the drawing toolbar, just left of the grip line (the X is top right). Paused, it turns into a
-   play button and stays at full strength while the rest of the toolbar fades */
-.ipz {
-  position: absolute; top: 4px; left: -40px; /* outside the toolbar, on its left; moves with it */
-  width: 32px; height: 32px; padding: 0;
-  border: 0; border-radius: 50%;
-  background: var(--pop-bg); color: var(--pop-ink);
-  box-shadow: 0 6px 16px rgba(60,40,10,.25), 0 1px 3px rgba(0,0,0,.12);
-  display: grid; place-items: center; cursor: pointer;
+/* bottom row (1.1.15, below the tip): pause on the left, "Clear all" on the right. Paused, the pause button turns into
+   "Carry on" and stays at full strength while the rest of the toolbar fades */
+.ifoot { justify-content: space-between; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--pop-soft2); }
+.ipz, .iclear {
+  height: 26px; padding: 0 10px 0 8px;
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 0; border-radius: 8px;
+  background: var(--pop-soft); color: var(--pop-ink);
+  font: 800 11.5px var(--ui); white-space: nowrap; cursor: pointer;
 }
-.ipz:hover { background: #fff; }
-.ipz svg { width: 13px; height: 13px; fill: currentColor; stroke: none; }
+.ipz:hover, .iclear:hover { background: var(--pop-soft2); }
+.iclear { background: transparent; color: var(--pop-danger, #A5402F); }
+.iclear:hover { background: #FBE5E1; }
+.iclear svg { width: 15px; height: 15px; }
+.ipz .l-play { display: none; }
+body.ink-paused .ipz .l-pause { display: none; }
+body.ink-paused .ipz .l-play { display: inline; }
+/* 1.1.15: the drawing toolbar in its own see-through window, outside the note (inkOut in note.js).
+   The window is the toolbar's size plus a little room for its shadow. */
+body.inkbar-out { background: transparent !important; overflow: hidden; }
+body.inkbar-out #inkBar {
+  position: absolute; left: 12px !important; top: 8px !important; right: auto !important; bottom: auto !important;
+  max-width: none; animation: none;
+  box-shadow: 0 4px 12px rgba(60,40,10,.26), 0 1px 3px rgba(0,0,0,.12);
+}
+.ipz svg { width: 11px; height: 11px; fill: currentColor; stroke: none; }
 .ipz .i-play { display: none; }
-body.ink-paused #inkBar > #inkPz { opacity: 1; background: #3B3226; color: #FFF8E6; }
+body.ink-paused #inkBar > .ifoot { opacity: 1; }
+body.ink-paused #inkBar .iclear { opacity: .38; }
+body.ink-paused #inkPz { background: var(--pop-pick); color: var(--pop-pickfg); }
 body.ink-paused .ipz .i-pause { display: none; }
-body.ink-paused .ipz .i-play { display: block; width: 12px; height: 12px; margin-left: 2px; }
+body.ink-paused .ipz .i-play { display: block; }
 /* ---------- lock / unlock animation: "Snap shut" (1.1.14; 1.1.13 had "stardust") ---------- */
 .lockghost { position: fixed !important; display: block !important; z-index: 40; margin: 0 !important; overflow: hidden !important; pointer-events: none; animation: blurAway .45s ease-in forwards; }
 @keyframes blurAway { to { filter: blur(8px); opacity: 0; } }
@@ -942,8 +1046,9 @@ body.anim-unlock #scroller { animation: fadeInSoft .5s .1s ease-out both; }
 /* 1.1.14: the text toolbar opens at full strength, and only fades once you go back to typing or drawing */
 body.text-fresh #textPop { opacity: 1 !important; }
 /* 1.1.13: solid / dashed / dotted line, for every drawing tool (greyed out with the eraser) */
-.idash { display: flex; gap: 1px; padding: 0 2px 0 4px; border-left: 1px solid var(--pop-soft2); flex: none; }
-.idash button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #3B3226; display: grid; place-items: center; cursor: pointer; }
+/* same width as the line thickness buttons above it, so Over/Behind is as wide as Partial/Whole line (1.1.15) */
+.idash { display: flex; gap: 1px; padding: 0 0 0 4px; border-left: 1px solid var(--pop-soft2); flex: none; }
+.idash button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--pop-ink); display: grid; place-items: center; cursor: pointer; }
 .idash button svg { width: 16px; height: 16px; stroke-width: 2.4; }
 .idash button:hover { background: var(--pop-soft); }
 .idash button.on { background: var(--pop-soft2); }
@@ -965,3 +1070,58 @@ body.maxed #btnMax .i-restore { display: block; }
    (also while a pop-up or the text toolbar keeps the bar visible), and only comes back after the bar has faded */
 .corner { transition: opacity .12s .2s; }
 body:hover .corner, body:focus-within .corner, body.pop-open .corner, body.text-open .corner { opacity: 0; transition: opacity .05s 0s; }
+
+/* ---------- 1.1.16: a small note never hides the X of its pop-ups and toolbars ---------- */
+/* a toolbar taller than the note scrolls (not when it's in its own window outside the note) */
+body:not(.inkbar-out) .fit-tall { max-height: calc(100vh - 8px) !important; overflow-y: auto !important; overflow-x: hidden !important; scrollbar-width: thin; }
+/* the X stays at the top while the rest scrolls under it (note.js pinX), on a small backing so it reads */
+.ix.pinned { z-index: 3; background: var(--pop-bg); box-shadow: 0 1px 4px rgba(0,0,0,.16); }
+.ix.pinned:hover { background: var(--pop-soft); }
+/* 1.1.16: the text toolbar outside the note, in its own window (like the drawing toolbar) */
+body.inkbar-out #textPop.tbar {
+  position: absolute; left: 12px !important; top: 8px !important; right: auto !important; bottom: auto !important;
+  max-width: none; animation: none;
+  box-shadow: 0 4px 12px rgba(60,40,10,.26), 0 1px 3px rgba(0,0,0,.12);
+}
+/* 1.1.16 (second round): the Effects pop-up is smaller: in the top-right corner like the ⋯ menu, one list at a
+   time (tabs), two columns of compact rows */
+#fxPop { left: auto; right: 4px; top: 34px; width: clamp(250px, 62vw, calc(100vw - 8px)); max-height: min(calc(100vh - 42px), 360px); }
+#fxPop h4 { margin-bottom: 4px; }
+#fxPop .fxtabs { margin: 0 26px 6px 0; }
+#fxPop .fxtabs button { flex: 1; }
+.fxsec[hidden] { display: none; }
+#fxPop .fxlist { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 1px 4px; }
+#fxPop .fxi { min-height: 28px; gap: 6px; padding: 2px 6px 2px 3px; font-size: 12px; }
+#fxPop .fxi .ic { width: 22px; height: 22px; border-radius: 7px; }
+#fxPop .fxi .ic svg { width: 15px; height: 15px; }
+#fxPop .fxi .ok { width: 13px; height: 13px; }
+#fxPop .check.switch { margin-top: 8px; }
+#fxPop { width: clamp(270px, 66vw, calc(100vw - 8px)); }
+#fxPop .fxi .ok { display: none; } /* the picked one already has the darker background */
+#fxPop .fxi .nm { overflow-wrap: break-word; }
+#fxPop .fxi .nm small { font-size: 10px; }
+/* 1.1.16: the ⋯ menu and Effects pop-up have the same top bar as the toolbars: a grip to drag them (also out of
+   the note) and the X at the top right */
+#menu > .igrip, #fxPop > .igrip { height: 18px; margin: -4px 24px 4px; }
+#menu > .ix, #fxPop > .ix { top: 4px; right: 5px; }
+#menu > .igrip + h4, #fxPop > .igrip + h4 { margin-top: 0; }
+#fxPop .fxtabs { margin-right: 0; }
+/* outside the note, in their own windows */
+body.inkbar-out #menu, body.inkbar-out #fxPop {
+  position: absolute; left: 12px !important; top: 8px !important; right: auto !important; bottom: auto !important;
+  max-height: none !important; overflow: visible; animation: none;
+  box-shadow: 0 4px 12px rgba(60,40,10,.26), 0 1px 3px rgba(0,0,0,.12);
+}
+
+/* ---------- 1.1.16: pop-ups and toolbars in the app's colours ----------
+   body[data-apptheme] = the notes list's theme (Settings → General), sent with the settings (appTheme).
+   Same colours as list.css's themes: the pop-up = their card colour, rows = soft / soft2, text = ink / mute. */
+body[data-apptheme="rose"]  { --pop-ink2: #5E4049; --pop-bg: #FFFAFB; --pop-soft: #FBE1E8; --pop-soft2: #F2CAD6; --pop-mute: #A57A87; --pop-ink: #3F2A31; --pop-pick: #3F2A31; --pop-pickfg: #FFF0F3; }
+body[data-apptheme="mint"]  { --pop-ink2: #3F574A; --pop-bg: #FAFEFC; --pop-soft: #DCEFE4; --pop-soft2: #C4E2D1; --pop-mute: #789686; --pop-ink: #25362D; --pop-pick: #25362D; --pop-pickfg: #EDF8F2; }
+body[data-apptheme="sky"]   { --pop-ink2: #3D5066; --pop-bg: #FAFCFF; --pop-soft: #DCEAF8; --pop-soft2: #C5DAF0; --pop-mute: #7A8EA4; --pop-ink: #24313F; --pop-pick: #24313F; --pop-pickfg: #EDF5FD; }
+body[data-apptheme="lilac"] { --pop-ink2: #4A4166; --pop-bg: #FCFBFF; --pop-soft: #E7E0F9; --pop-soft2: #D5CAF2; --pop-mute: #8B80A8; --pop-ink: #2F2843; --pop-pick: #2F2843; --pop-pickfg: #F4F0FD; }
+body[data-apptheme="night"]    { --pop-ink2: #CFC6B6; --pop-hover: rgba(255,255,255,.08); --pop-bg: #2F2D35; --pop-card: #45414D; --pop-soft: #3A3742; --pop-soft2: #4A4652; --pop-mute: #A89F90; --pop-ink: #EDE6D8; --pop-pick: #EDE6D8; --pop-pickfg: #25232A; --pop-danger: #FF8A80; }
+body[data-apptheme="midnight"] { --pop-ink2: #C3C9D8; --pop-hover: rgba(255,255,255,.08); --pop-bg: #252B3D; --pop-card: #3A4259; --pop-soft: #2E3549; --pop-soft2: #3E4660; --pop-mute: #98A1B8; --pop-ink: #E4E8F2; --pop-pick: #E4E8F2; --pop-pickfg: #1D2232; --pop-danger: #FF8A80; }
+body[data-apptheme="forest"]   { --pop-ink2: #C2D0C5; --pop-hover: rgba(255,255,255,.08); --pop-bg: #232E28; --pop-card: #38463D; --pop-soft: #2C3830; --pop-soft2: #3C4A41; --pop-mute: #9AAE9F; --pop-ink: #E2ECE4; --pop-pick: #E2ECE4; --pop-pickfg: #1C2520; --pop-danger: #FF8A80; }
+body[data-apptheme="plum"]     { --pop-ink2: #D2C3D5; --pop-hover: rgba(255,255,255,.08); --pop-bg: #2D2432; --pop-card: #45384B; --pop-soft: #362C3B; --pop-soft2: #48394D; --pop-mute: #AE9FB3; --pop-ink: #EEE3F0; --pop-pick: #EEE3F0; --pop-pickfg: #251D29; --pop-danger: #FF8A80; }
+body:is([data-apptheme="night"], [data-apptheme="midnight"], [data-apptheme="forest"], [data-apptheme="plum"]) :is(.pop, #inkBar, .ctx) { box-shadow: 0 12px 32px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06); }

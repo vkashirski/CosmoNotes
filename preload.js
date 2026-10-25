@@ -29,6 +29,14 @@ contextBridge.exposeInMainWorld('sticky', {
   openAttachment: (url) => inv('att:open', url),
   openExternal: (url) => inv('open-external', url),
   showList: () => inv('list:show'),
+  // 1.1.15: the drawing toolbar in its own little window, outside the note
+  ink: {
+    show: (s) => ipcRenderer.send('ink:show', s),
+    drag: (p) => ipcRenderer.send('ink:drag', p),
+    size: (s) => ipcRenderer.send('ink:size', s),
+    drop: (p) => inv('ink:drop', p),
+    hide: (bar) => ipcRenderer.send('ink:hide', bar), // bar: 'text' for the text toolbar (1.1.16)
+  },
 
   // list window
   list: {
@@ -47,6 +55,9 @@ contextBridge.exposeInMainWorld('sticky', {
     setLocked: (id, locked, pw) => inv('list:set-locked', id, !!locked, pw),
     favorite: (ids, on) => inv('list:favorite', ids, !!on),
     apply: (ids, patch) => inv('list:apply', ids, patch),
+    edit: (id, patch) => inv('list:edit', id, patch), // 1.1.15: title / colour from the Edit sheet
+    unlockAll: (pw) => inv('list:unlock-all', pw), // 1.1.15: the Locked tab
+    lockAll: () => inv('list:lock-all'),
   },
   groups: {
     make: (dragId, targetId) => inv('groups:make', dragId, targetId),

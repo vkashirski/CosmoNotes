@@ -126,7 +126,8 @@ const ev = (w) => ({ sender: w.webContents, returnValue: undefined });
   // random colour for new notes (never the dark paper)
   await H['settings:set'](null, { defaultColor: 'random', listSize: 'l' });
   list = await H['list:get']();
-  assert.equal(list.settings.defaultColor, 'random'); assert.equal(list.settings.listSize, 'l');
+  // 1.1.15: the old "random" becomes the list of the 7 original pastel papers
+  assert.deepEqual([...list.settings.defaultColors].sort(), ['blue', 'green', 'mint', 'orange', 'pink', 'purple', 'yellow']); assert.equal(list.settings.listSize, 'l');
   const colours = new Set();
   for (let i = 0; i < 25; i++) { const b4 = new Set((await H['list:get']()).notes.map((x) => x.id)); await H['list:new'](null, null); const l2 = await H['list:get'](); colours.add(l2.notes.find((x) => !b4.has(x.id)).color); }
   assert.ok(colours.size >= 3, 'random gives different colours');

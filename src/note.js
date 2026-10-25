@@ -1,8 +1,12 @@
 'use strict';
 (() => {
   const api = window.sticky;
-  const $ = (s) => document.querySelector(s);
-  const $$ = (s) => [...document.querySelectorAll(s)];
+  // 1.1.15: while the drawing toolbar is outside the note, it lives in its own little window (inkOut below);
+  // $ and $$ look there too, so the code that paints and wires up the toolbar works the same either way.
+  // 1.1.16: the text toolbar too (textOut), so there can be two of those windows.
+  const outDocs = new Set();
+  const $ = (s) => { const el = document.querySelector(s); if (el) return el; for (const d of outDocs) { const x = d.querySelector(s); if (x) return x; } return null; };
+  const $$ = (s) => { const all = [...document.querySelectorAll(s)]; for (const d of outDocs) all.push(...d.querySelectorAll(s)); return all; };
   const editor = $('#editor');
   const body = document.body;
 
@@ -15,6 +19,83 @@
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = (sec) => { sec = Math.max(0, Math.round(sec || 0)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+
+  // ================================================================ colour row
+  // A row of colour circles that scrolls sideways (1.1.15): drag it, use the mouse wheel, or the arrows that
+  // show up on a side when there are more colours that way. A drag never counts as picking a colour.
+  // (The same function is in list.js.)
+  function swatchStrip(view) {
+    const wrap = view.parentElement;
+    const arrow = (side) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `swarr ${side}`;
+      b.title = 'More colours';
+      b.setAttribute('aria-label', side === 'l' ? 'More colours to the left' : 'More colours to the right');
+      b.innerHTML = `<svg viewBox="0 0 24 24"><path d="${side === 'l' ? 'm14.5 6-6 6 6 6' : 'm9.5 6 6 6-6 6'}"/></svg>`;
+      b.addEventListener('mousedown', (e) => e.preventDefault()); // keeps the focus where it was
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        view.scrollBy({ left: (side === 'l' ? -1 : 1) * Math.max(60, Math.round(view.clientWidth * 0.75)), behavior: 'smooth' });
+      });
+      wrap.append(b);
+      return b;
+    };
+    const left = arrow('l');
+    const right = arrow('r');
+    const paint = () => {
+      const max = view.scrollWidth - view.clientWidth;
+      left.hidden = view.scrollLeft <= 1;
+      right.hidden = max <= 1 || view.scrollLeft >= max - 1;
+    };
+    view.addEventListener('scroll', paint, { passive: true });
+    new ResizeObserver(paint).observe(view);
+    view.addEventListener('wheel', (e) => {
+      if (view.scrollWidth <= view.clientWidth + 1) return;
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (!d) return;
+      e.preventDefault();
+      view.scrollLeft += d;
+    }, { passive: false });
+    let drag = null;
+    view.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      drag = { x: e.clientX, left: view.scrollLeft, moved: false, id: e.pointerId };
+    });
+    view.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      if (!drag.moved && Math.abs(dx) < 4) return;
+      if (!drag.moved) {
+        drag.moved = true;
+        view.classList.add('dragging');
+        try { view.setPointerCapture(e.pointerId); } catch { /* fine */ }
+      }
+      view.scrollLeft = drag.left - dx;
+    });
+    const end = () => {
+      if (!drag) return;
+      const moved = drag.moved;
+      drag = null;
+      view.classList.remove('dragging');
+      if (moved) { view.dataset.dragged = '1'; setTimeout(() => { delete view.dataset.dragged; }, 0); }
+    };
+    view.addEventListener('pointerup', end);
+    view.addEventListener('pointercancel', end);
+    view.addEventListener('click', (e) => { if (view.dataset.dragged) { e.stopPropagation(); e.preventDefault(); } }, true);
+    paint();
+    return {
+      paint,
+      // scroll so a colour (the chosen one) is in view
+      reveal(el) {
+        if (!el) { paint(); return; }
+        const l = el.offsetLeft;
+        const r = l + el.offsetWidth;
+        if (l < view.scrollLeft + 6 || r > view.scrollLeft + view.clientWidth - 6) view.scrollLeft = Math.max(0, l - (view.clientWidth - el.offsetWidth) / 2);
+        paint();
+      },
+    };
+  }
 
   // ================================================================ saving
   function collect() {
@@ -138,6 +219,123 @@
     $('#opacity').value = String(pct);
     $('#opVal').textContent = pct === 100 ? 'Solid' : `${pct}%`;
     $('#solidHover').checked = !!note.solidOnHover;
+    applyFx();
+  }
+
+  // ================================================================ effects (1.1.16)
+  // The note's effect plays behind everything (#fxCanvas, z-index -1), and its mouse follower trails the
+  // pointer. What shows: Settings → Effects for all notes, unless this note chose its own (note.fx = { e, f },
+  // null = same as all notes) or Settings says to use its choice on every note (fxForceAll). Paused by this
+  // note's own button (note.fxPaused) or for all notes (settings.fxPaused, also in the tray menu). fx.js does
+  // the drawing, in one shared loop that sleeps when nothing moves.
+  const FX = window.COSMO_FX;
+  const DARK_PAPERS = ['charcoal', 'night', 'midnight', 'forest', 'plum'];
+  const fxLayer = FX ? FX.Layer($('#fxCanvas')) : null;
+  const fxName = (kind, id) => (id === 'none' ? 'None' : ((kind === 'effect' ? FX.EFFECTS : FX.FOLLOWERS)[id] || {}).name || 'None');
+  function applyFx() {
+    if (!fxLayer || !note) return;
+    const r = FX.resolve(note.fx, settings, note.fxPaused, note.fxPlay);
+    fxLayer.resize();
+    fxLayer.set({ effect: r.effect, follower: r.follower, effectAmount: r.effectAmount, followerAmount: r.followerAmount, effectOpacity: r.effectOpacity, followerOpacity: r.followerOpacity, dark: DARK_PAPERS.includes(note.color) });
+    fxLayer.setPaused(r.paused);
+    fxLayer.setVisible(!note.rolled);
+    const any = r.effect !== 'none' || r.follower !== 'none';
+    const b = $('#btnFx');
+    b.hidden = !any;
+    b.classList.toggle('off', r.paused);
+    b.setAttribute('aria-pressed', String(r.paused));
+    b.title = r.paused ? (settings.fxPaused ? 'Play effects on this note (all others stay paused)' : 'Play effects on this note') : 'Pause effects on this note';
+    const parts = [r.effect !== 'none' ? fxName('effect', r.effect) : '', r.follower !== 'none' ? fxName('follower', r.follower) : ''].filter(Boolean);
+    $('#miFxVal').textContent = parts.length ? parts.join(' · ') : 'None';
+    if (!$('#fxPop').hidden) paintFxPop();
+  }
+  window.addEventListener('resize', () => { if (fxLayer) fxLayer.resize(); });
+  document.addEventListener('pointermove', (e) => { if (fxLayer) fxLayer.move(e.clientX, e.clientY); }, { passive: true });
+  document.documentElement.addEventListener('mouseleave', () => { if (fxLayer) fxLayer.leave(); });
+  $('#btnFx').addEventListener('click', () => {
+    setFxPlaying(FX.resolve(note.fx, settings, note.fxPaused, note.fxPlay).paused);
+  });
+  // ---- the Effects pop-up (⋯ menu → Effects…): a list of icons and names
+  const CHECK = '<svg class="ok" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+  const fxIcon = ([col, inner]) => `<span class="ic"${col ? ` style="--ic:${col}"` : ''}><svg viewBox="0 0 24 24">${inner}</svg></span>`;
+  function fxList(box, kind) {
+    const ids = kind === 'effect' ? FX.EFFECT_IDS : FX.FOLLOWER_IDS;
+    const key = kind === 'effect' ? 'e' : 'f';
+    const item = (v, label, icon) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'fxi';
+      b.dataset.v = v === null ? '' : v;
+      b.innerHTML = `${fxIcon(icon)}<span class="nm"></span>${CHECK}`;
+      b.querySelector('.nm').textContent = label;
+      if (v === null) b.querySelector('.nm').append(Object.assign(document.createElement('small'), { className: 'allname' }));
+      b.addEventListener('click', () => setProp({ fx: { ...(note.fx || { e: null, f: null }), [key]: v } }));
+      box.append(b);
+    };
+    item(null, 'Same as all notes', FX.ICONS.all);
+    item('none', 'None', FX.ICONS.none);
+    for (const id of ids) item(id, fxName(kind, id), FX.ICONS[kind][id]);
+  }
+  if (FX) { fxList($('#fxEffects'), 'effect'); fxList($('#fxFollowers'), 'follower'); }
+  for (const [id, key] of [['#fxEAmt', 'ea'], ['#fxFAmt', 'fa']]) {
+    $$(`${id} button`).forEach((b) => b.addEventListener('click', () => setProp({ fx: { ...(note.fx || { e: null, f: null }), [key]: b.dataset.a } })));
+  }
+  // 1.1.17: opacity of this note's background / mouse follower (eo / fo). Dragging shows it at once; it's saved
+  // when the slider is let go (and 300 ms after it stops moving, in case the release isn't seen)
+  let fxOpTimer = null;
+  const saveFxOp = () => { clearTimeout(fxOpTimer); fxOpTimer = null; setProp({ fx: { ...(note.fx || { e: null, f: null }) } }); };
+  for (const [id, key] of [['#fxEOp', 'eo'], ['#fxFOp', 'fo']]) {
+    const range = $(`${id} input`);
+    range.addEventListener('input', () => {
+      note.fx = { ...(note.fx || { e: null, f: null }), [key]: Number(range.value) / 100 };
+      $(`${id} em`).textContent = `${range.value}%`;
+      applyFx();
+      clearTimeout(fxOpTimer); fxOpTimer = setTimeout(saveFxOp, 300);
+    });
+    range.addEventListener('change', saveFxOp);
+  }
+  function paintFxPop() {
+    const mine = note.fx || { e: null, f: null };
+    for (const [box, kind, key, all] of [[$('#fxEffects'), 'effect', 'e', settings.fxEffect], [$('#fxFollowers'), 'follower', 'f', settings.fxFollower]]) {
+      for (const b of box.children) {
+        const v = b.dataset.v === '' ? null : b.dataset.v;
+        const on = (mine[key] ?? null) === v;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', String(on));
+        if (v === null) b.querySelector('.allname').textContent = fxName(kind, all || 'none');
+      }
+    }
+    // how much: what this note shows now (its own, or all notes' amount)
+    const r = FX.resolve(note.fx, settings, note.fxPaused, note.fxPlay);
+    for (const [id, cur, kindOn] of [['#fxEAmt', r.effectAmount, r.effect !== 'none'], ['#fxFAmt', r.followerAmount, r.follower !== 'none']]) {
+      $(id).hidden = !kindOn;
+      $$(`${id} button`).forEach((b) => b.classList.toggle('on', b.dataset.a === cur));
+    }
+    for (const [id, op, kindOn] of [['#fxEOp', r.effectOpacity, r.effect !== 'none'], ['#fxFOp', r.followerOpacity, r.follower !== 'none']]) {
+      const pct = Math.round(op * 100);
+      $(id).hidden = !kindOn;
+      $(`${id} input`).value = String(pct);
+      $(`${id} input`).disabled = !!settings.fxForceAll; // Settings uses the same on every note: its opacity shows
+      $(`${id} em`).textContent = `${pct}%`;
+    }
+    $('#fxForce').hidden = !settings.fxForceAll;
+    $('#fxPause').checked = r.paused;
+    $('#fxPause').disabled = false;
+  }
+  // 1.1.16: two tabs (Background / Mouse), so the pop-up only shows one list and stays small
+  function fxTab(t) {
+    $$('#fxTabs button').forEach((b) => { b.classList.toggle('on', b.dataset.t === t); b.setAttribute('aria-pressed', String(b.dataset.t === t)); });
+    $$('#fxPop .fxsec').forEach((s) => { s.hidden = s.dataset.t !== t; });
+  }
+  $$('#fxTabs button').forEach((b) => b.addEventListener('click', () => fxTab(b.dataset.t)));
+  $('#miFx').addEventListener('click', () => { openPop('#fxPop'); requestAnimationFrame(paintFxPop); });
+  $('#fxX').addEventListener('click', () => closePops());
+  $('#fxPause').addEventListener('change', (e) => setFxPlaying(!e.target.checked));
+  // 1.1.16: this note's own pause wins over "pause all": playing it while all effects are paused sets fxPlay
+  // (it keeps playing until it's paused here again); pausing it sets fxPaused
+  function setFxPlaying(play) {
+    if (play) setProp({ fxPaused: false, fxPlay: !!settings.fxPaused });
+    else setProp(settings.fxPaused ? { fxPlay: false } : { fxPaused: true, fxPlay: false });
   }
 
   function setProp(patch) {
@@ -168,9 +366,12 @@
     setProp({ spell: next === !!settings.spellCheck ? null : next });
     toast(next ? 'Checking spelling in this note' : 'Ignoring spelling in this note');
   });
+  // 1.1.16: pop-ups and toolbars in the app's colours (Settings → General → colours of the notes list)
+  function applyTheme() { body.dataset.apptheme = settings.appTheme || 'cream'; }
   api.onSettings((s) => {
     settings = { ...settings, ...s };
-    if (note) applySpell();
+    applyTheme();
+    if (note) { applySpell(); applyFx(); }
     paintUnlock();
   });
 
@@ -307,9 +508,18 @@
 
   // ================================================================ popovers
   let openPopId = null;
-  function closePops() {
+  // 1.1.16: the ⋯ menu and the Effects pop-up can be dragged (by their grip) and out of the note, like the
+  // toolbars: id → { out: barOut(…), move: movable(…) } (filled in further down, next to the toolbars)
+  const popOuts = {};
+  // keepOut: a click in the note leaves a pop-up that's outside the note open (it closes with its X or Esc)
+  function closePops(keepOut = false) {
     if (askResolve) { const r = askResolve; askResolve = null; r(false); }
-    $$('.pop:not(#textPop)').forEach((p) => { p.hidden = true; }); // the text toolbar only closes by A or its X
+    $$('.pop:not(#textPop)').forEach((p) => { // the text toolbar only closes by A or its X
+      const po = popOuts[`#${p.id}`];
+      if (keepOut && po && po.out.isOut() && !p.hidden) return;
+      p.hidden = true;
+      if (po) po.out.stop();
+    });
     body.classList.remove('pop-open');
     openPopId = null;
   }
@@ -319,14 +529,16 @@
     $(id).hidden = false;
     body.classList.add('pop-open');
     openPopId = id;
+    if (popOuts[id]) { popOuts[id].out.start(); popOuts[id].move.place(); }
+    if (id === '#menu') colorStrip.reveal($('#colors .sw.on'));
   }
   function togglePop(id) {
-    if (openPopId === id) closePops();
+    if (!$(id).hidden) closePops();
     else { saveSel(); openPop(id); }
   }
   document.addEventListener('mousedown', (e) => {
     // the text panel stays open while you click around the note; the A button (or Esc) closes it
-    if (!e.target.closest('.pop, #btnMenu, #btnInsert, #btnText')) closePops();
+    if (!e.target.closest('.pop, #btnMenu, #btnInsert, #btnText')) closePops(true);
     if (!e.target.closest('.ctx')) hideCtx();
   });
   // Buttons inside popovers should not steal the text selection.
@@ -337,6 +549,7 @@
   $('#btnClose').addEventListener('click', () => { saveNow(); api.close(); });
   $('#btnPin').addEventListener('click', () => setProp({ pinned: !note.pinned }));
   $('#btnMenu').addEventListener('click', () => togglePop('#menu'));
+  $('#menuX').addEventListener('click', () => closePops());
   // 1.1.13: minimise and maximise (double-clicking the top bar maximises too: Windows does that for the drag area)
   $('#btnMin').addEventListener('click', () => { closePops(); saveNow(); api.minimize(); });
   $('#btnMax').addEventListener('click', () => api.maximize());
@@ -365,18 +578,21 @@
     body.classList.add('text-fresh'); // full strength until you type or click in the note again (1.1.14)
     $('#textPop').hidden = false;
     body.classList.add('text-open');
+    textOut.start(); // its own window, ready for dragging it out (or straight outside, where it was last time; 1.1.16)
     textMove.place();
     paintTextPanel();
   }
   function closeText() {
     $('#textPop').hidden = true;
     body.classList.remove('text-open');
+    textOut.stop();
   }
   $('#btnText').addEventListener('click', () => ($('#textPop').hidden ? openText() : closeText()));
   $('#textX').addEventListener('click', closeText);
 
   // ---------- ⋯ menu
   $$('#colors .sw').forEach((b) => b.addEventListener('click', () => setProp({ color: b.dataset.color })));
+  const colorStrip = swatchStrip($('#colors'));
 
   $('#opacity').addEventListener('input', (e) => {
     const v = Number(e.target.value) / 100;
@@ -417,73 +633,74 @@
   $$('#insert [data-act]').forEach((b) => b.addEventListener('click', () => doInsert(b.dataset.act)));
 
   // ---------- text panel (A)
-  // Every button changes the selected text, or the whole note when nothing is selected (the top
-  // line says which). Changes go through the editor's own undo, so the panel's undo button (and
-  // Ctrl+Z) can take them back. The font is the note's setting when nothing is selected; with a
-  // selection, only that text gets the other font (<font face>, sized to match in note.css).
+  // Every button changes the selected text. With nothing selected (1.1.16), it changes what you type next, from
+  // the cursor on, and the rest of the note stays as it is (the top line says which). That's the browser's
+  // "typing style": it lasts until the cursor moves somewhere else, and several buttons add up (red + Big).
+  // Changes go through the editor's own undo, so Undo (and Ctrl+Z) can take them back. Another font on part of
+  // the text is a <font face>, sized to match in note.css.
   const RESET_COLOR = '#010203';
   const FACE = { hand: 'Caveat', round: 'Nunito' };
-  // The note's font isn't part of the text, so the editor's own undo can't take it back: those
-  // changes are kept here (cleared as soon as the text changes again, so undo stays in order).
+  // Before 1.1.16 the font buttons changed the note's own font (not part of the text, so the editor's undo couldn't
+  // take it back): kept here for undo/redo of those (cleared as soon as the text changes again, so undo stays in order).
   const textUndo = []; // { font } = the note's font before
   const textRedo = []; // { font } = the font an undo took away (1.1.14)
   const hasTextSel = () => !!(savedRange && !savedRange.collapsed && editor.contains(savedRange.commonAncestorContainer));
   function paintTextPanel() {
     if (!note) return;
     const sel = hasTextSel();
-    const scope = `Changes: <b>${sel ? 'selected text' : 'whole note'}</b>`;
+    const scope = `Changes: <b>${sel ? 'selected text' : 'what you type next'}</b>`;
     if ($('#tScope').innerHTML !== scope) $('#tScope').innerHTML = scope; // runs on every cursor move: only touch it when it changes
     let f = note.font;
-    if (sel) {
+    if (savedRange && document.activeElement === editor) {
       const v = String(document.queryCommandValue('fontName') || '').toLowerCase();
       f = v.includes('caveat') ? 'hand' : v.includes('nunito') ? 'round' : note.font;
     }
     $$('#fontSeg button').forEach((b) => b.classList.toggle('on', b.dataset.font === f));
   }
+  // the cursor is exactly where it was saved (then it's left alone: putting it back would forget the typing style)
+  function caretIsSaved() {
+    const s = getSelection();
+    if (!s.rangeCount || !savedRange) return false;
+    const r = s.getRangeAt(0);
+    return r.collapsed && r.startContainer === savedRange.startContainer && r.startOffset === savedRange.startOffset;
+  }
+  // "Normal" colour = the sentinel colour, then taken off again (also from text typed later in that colour)
+  function cleanResetColor() {
+    editor.querySelectorAll(`font[color="${RESET_COLOR}"]`).forEach((f) => {
+      f.removeAttribute('color');
+      if (!f.attributes.length) f.replaceWith(...f.childNodes);
+    });
+    editor.querySelectorAll('[style*="color"]').forEach((el) => {
+      if (/rgb\(1, 2, 3\)/.test(el.style.color)) el.style.color = '';
+      if (!el.getAttribute('style')) el.removeAttribute('style');
+    });
+  }
   function onText(fn) {
     const sel = hasTextSel();
-    const caret = savedRange ? savedRange.cloneRange() : null;
     const before = editor.innerHTML;
-    editor.focus({ preventScroll: true });
-    const s = getSelection();
-    if (sel) restoreSel();
-    else { const r = document.createRange(); r.selectNodeContents(editor); s.removeAllRanges(); s.addRange(r); }
-    fn();
-    if (!sel) { // back to where the caret was
-      s.removeAllRanges();
-      if (caret && editor.contains(caret.startContainer)) s.addRange(caret); else caretAtEnd();
-    }
+    if (document.activeElement !== editor) editor.focus({ preventScroll: true });
+    if (sel || !caretIsSaved()) restoreSel();
+    fn(sel);
+    if (sel) cleanResetColor();
     if (editor.innerHTML !== before) changed();
     paintTextPanel();
   }
-  $$('#fontSeg button').forEach((b) => b.addEventListener('click', () => {
-    if (hasTextSel()) { onText(() => document.execCommand('fontName', false, FACE[b.dataset.font])); return; }
-    if (note.font === b.dataset.font) return;
-    textUndo.push({ font: note.font });
-    textRedo.length = 0;
-    setProp({ font: b.dataset.font });
-    paintTextPanel();
-  }));
+  editor.addEventListener('input', () => { if (editor.querySelector(`font[color="${RESET_COLOR}"], [style*="rgb(1, 2, 3)"]`)) cleanResetColor(); });
+  $$('#fontSeg button').forEach((b) => b.addEventListener('click', () => onText(() => document.execCommand('fontName', false, FACE[b.dataset.font]))));
   $$('#textPop [data-fore]').forEach((b) => b.addEventListener('click', () => onText(() => {
-    if (b.dataset.fore === 'inherit') {
-      // back to the note's normal ink colour, keeping bold/italic etc.
-      document.execCommand('foreColor', false, RESET_COLOR);
-      editor.querySelectorAll('font[color]').forEach((f) => {
-        if (f.getAttribute('color').toLowerCase() !== RESET_COLOR) return;
-        f.removeAttribute('color');
-        if (!f.attributes.length) f.replaceWith(...f.childNodes);
-      });
-      editor.querySelectorAll('[style*="color"]').forEach((el) => {
-        if (/rgb\(1, 2, 3\)/.test(el.style.color)) el.style.color = '';
-        if (!el.getAttribute('style')) el.removeAttribute('style');
-      });
-    } else {
-      document.execCommand('foreColor', false, b.dataset.fore);
-    }
+    document.execCommand('foreColor', false, b.dataset.fore === 'inherit' ? RESET_COLOR : b.dataset.fore); // back to the note's normal ink colour, keeping bold/italic etc.
   })));
   $$('#textPop [data-hilite]').forEach((b) => b.addEventListener('click', () => onText(() => document.execCommand('hiliteColor', false, b.dataset.hilite))));
   $$('#fsizeSeg button').forEach((b) => b.addEventListener('click', () => onText(() => document.execCommand('fontSize', false, b.dataset.fsize))));
-  $('#miClearFmt').addEventListener('click', () => onText(() => document.execCommand('removeFormat')));
+  // clear formatting: the selected text; with nothing selected, what you type next is plain again
+  $('#miClearFmt').addEventListener('click', () => onText((sel) => {
+    if (sel) { document.execCommand('removeFormat'); return; }
+    for (const c of ['bold', 'italic', 'underline', 'strikeThrough']) if (document.queryCommandState(c)) document.execCommand(c);
+    document.execCommand('foreColor', false, RESET_COLOR);
+    document.execCommand('hiliteColor', false, 'transparent');
+    document.execCommand('fontSize', false, '3');
+    document.execCommand('fontName', false, FACE[note.font] || 'Caveat');
+  }));
   editor.addEventListener('input', (e) => { if (!/^history/.test(e.inputType || '')) { textUndo.length = 0; textRedo.length = 0; } });
   // ---- the one Undo button (bottom bar, left of Draw): drawing while drawing, otherwise the text
   function undoText() {
@@ -1482,7 +1699,7 @@
   // Colour/font/lock changed from the notes list.
   api.onLook((v) => {
     if (!note || !v) return;
-    for (const k of ['color', 'font', 'size', 'title', 'locked', 'lockedBy', 'pinned', 'opacity', 'rolled']) if (k in v) note[k] = v[k];
+    for (const k of ['color', 'font', 'size', 'title', 'locked', 'lockedBy', 'pinned', 'opacity', 'rolled', 'fx', 'fxPaused', 'fxPlay']) if (k in v) note[k] = v[k];
     if (v.hidden && !hidden) { hideContent(); return; }
     // the lock was removed from the notes list while this window still asked for the password/PIN:
     // show the note straight away
@@ -1942,6 +2159,7 @@
     $('#inkBar').hidden = false;
     handle.hidden = true;
     paintInkBar();
+    inkOut.start(); // its own window, ready for when it's dragged out (or straight outside, where it was last time)
     placeInkBar();
   }
   function exitInk() {
@@ -1954,6 +2172,7 @@
     editor.contentEditable = 'true';
     $('#inkCatch').hidden = true;
     $('#inkBar').hidden = true;
+    inkOut.stop();
     saveInk();
     paintUndo();
   }
@@ -1962,66 +2181,250 @@
   // dragBtn only starts moving after 4 px, so a normal click on it still works. The place is kept as the
   // distance from the bottom-right corner (remembered for next time); double-click the grip
   // to put it back. It always stays inside the note and below the top bar.
-  function movable(el, { key, roomLeft = 0, dragBtn = null }) {
+  // `out` (the drawing toolbar, 1.1.15; the text toolbar too, 1.1.16): dragged past the note's edge, it moves into its own window (barOut).
+  // 1.1.16: `handle` = only that part starts a drag (the pop-ups: their grip); `top` = placed from the top (the
+  // pop-ups open under the top bar), so the place is kept as { r, t } instead of { r, b }.
+  function movable(el, { key, roomLeft = 0, dragBtn = null, out = null, handle = null, top = false }) {
     let pos = null;
-    try { const v = JSON.parse(localStorage.getItem(key) || 'null'); if (v && Number.isFinite(v.r) && Number.isFinite(v.b)) pos = v; } catch { /* fine */ }
+    try { const v = JSON.parse(localStorage.getItem(key) || 'null'); if (v && Number.isFinite(v.r) && Number.isFinite(top ? v.t : v.b)) pos = v; } catch { /* fine */ }
     const m = { dragged: false };
+    m.setPos = (p) => {
+      pos = p;
+      try { if (p) localStorage.setItem(key, JSON.stringify(p)); else localStorage.removeItem(key); } catch { /* fine */ }
+      m.place();
+    };
     m.place = () => {
-      if (el.hidden) return;
-      if (!pos) { el.style.left = ''; el.style.right = ''; el.style.bottom = ''; return; }
+      if (el.hidden || (out && out.isOut())) return;
+      if (!pos) { el.style.left = ''; el.style.right = ''; el.style.bottom = ''; el.style.top = ''; fitIn(); return; }
       el.style.left = 'auto'; // the text panel opens on the left by default; a saved spot counts from the right
       const w = el.offsetWidth; const hgt = el.offsetHeight;
       const r = Math.max(4, Math.min(pos.r, innerWidth - w - 4 - roomLeft));
+      if (top) { // a pop-up: from the top, never over the top bar unless the note is too small for it
+        el.style.right = `${r}px`;
+        el.style.top = `${Math.max(4, Math.min(Math.max(pos.t, 34), innerHeight - hgt - 4))}px`;
+        return;
+      }
       const b = Math.max(4, Math.min(pos.b, innerHeight - hgt - 36)); // never over the top bar
       el.style.right = `${r}px`;
       el.style.bottom = `${b}px`;
+      fitIn();
     };
+    // 1.1.16: in a small note the toolbar never goes past the top (that hid its X): it moves down so its top
+    // shows, and if it's still taller than the note it scrolls (its X stays put, see pinX)
+    function fitIn() {
+      if (top || el.hidden || (out && out.isOut())) return;
+      const tall = el.scrollHeight > innerHeight - 8;
+      if (el.classList.contains('fit-tall') !== tall) el.classList.toggle('fit-tall', tall);
+      if (el.getBoundingClientRect().top < 4) el.style.bottom = `${Math.max(4, innerHeight - el.offsetHeight - 4)}px`;
+    }
     window.addEventListener('resize', m.place);
+    if (window.ResizeObserver) new ResizeObserver(() => m.place()).observe(el);
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
+      if (handle && !e.target.closest(handle)) return;
       const btn = e.target.closest('button');
       if (btn && btn !== dragBtn) return;
       if (!btn) e.preventDefault(); // also keeps the text selection
+      // the window the toolbar is in right now: the note, or its own window when it's outside
+      const view = el.ownerDocument.defaultView || window;
       const rect = el.getBoundingClientRect();
-      const start = { x: e.clientX, y: e.clientY, r: innerWidth - rect.right, b: innerHeight - rect.bottom };
+      const start = { sx: e.screenX, sy: e.screenY, r: innerWidth - rect.right, b: innerHeight - rect.bottom, t: rect.top };
       let moving = false;
+      let outside = !!(out && out.isOut());
+      let grab = outside ? out.grab(e.clientX, e.clientY) : null; // where the pointer holds it, in its own window
       const move = (ev) => {
         if (!moving) {
-          if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 4) return;
+          if (Math.hypot(ev.screenX - start.sx, ev.screenY - start.sy) < 4) return;
           moving = true;
           body.classList.add('moving-inkbar');
-          try { e.target.setPointerCapture(e.pointerId); } catch { /* fine */ }
+          // captured by the page itself (not the button), so the drag carries on if the toolbar changes windows
+          try { view.document.documentElement.setPointerCapture(e.pointerId); } catch { /* fine */ }
         }
-        pos = { r: start.r - (ev.clientX - start.x), b: start.b - (ev.clientY - start.y) };
+        if (!outside && out && (ev.clientX < -6 || ev.clientY < -6 || ev.clientX > innerWidth + 6 || ev.clientY > innerHeight + 6)) {
+          const r = el.getBoundingClientRect();
+          grab = out.popOut(ev.clientX - r.left, ev.clientY - r.top);
+          if (grab) outside = true;
+        }
+        if (outside) { out.dragTo(ev.screenX - grab.x, ev.screenY - grab.y, ev.screenX, ev.screenY); return; }
+        pos = { r: start.r - (ev.screenX - start.sx), b: start.b - (ev.screenY - start.sy), t: start.t + (ev.screenY - start.sy) };
         m.place();
       };
-      const up = () => {
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
-        window.removeEventListener('pointercancel', up);
+      const up = (ev) => {
+        view.removeEventListener('pointermove', move);
+        view.removeEventListener('pointerup', up);
+        view.removeEventListener('pointercancel', up);
         if (!moving) return;
         body.classList.remove('moving-inkbar');
         if (btn) { m.dragged = true; setTimeout(() => { m.dragged = false; }, 0); } // a drag is not a click
+        if (outside) { out.drop(ev.screenX, ev.screenY, grab); return; }
         const r2 = el.getBoundingClientRect();
-        pos = { r: Math.round(innerWidth - r2.right), b: Math.round(innerHeight - r2.bottom) };
-        try { localStorage.setItem(key, JSON.stringify(pos)); } catch { /* fine */ }
+        m.setPos({ r: Math.round(innerWidth - r2.right), b: Math.round(innerHeight - r2.bottom), t: Math.round(r2.top) });
       };
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', up);
-      window.addEventListener('pointercancel', up);
+      view.addEventListener('pointermove', move);
+      view.addEventListener('pointerup', up);
+      view.addEventListener('pointercancel', up);
     });
     const grip = el.querySelector('.igrip');
     if (grip) grip.addEventListener('dblclick', () => {
-      pos = null;
-      try { localStorage.removeItem(key); } catch { /* fine */ }
-      m.place();
+      if (out && out.isOut()) out.comeBack(); // outside: back into the note, in the corner
+      m.setPos(null);
     });
     return m;
   }
+
+  // ---- 1.1.15: the drawing toolbar outside the note
+  // A page can't draw outside its window, so when the toolbar is dragged past the note's edge it moves into a
+  // small see-through window of its own (window.open('about:blank'), allowed only for this in main.js). It's
+  // the very same toolbar (moved, not copied), so every button keeps working. main.js places that window:
+  // close to one of the note's sides it sticks to it and follows the note around; further away it stays put.
+  // Dropped back on the note, it comes back inside. The window is made (hidden) when drawing starts, so
+  // dragging out is instant, and closed when drawing ends. Where it was is remembered (localStorage
+  // inkBarOut: { mode: 'dock', side, off } or { mode: 'free', x, y }), so next time it opens there again.
+  // 1.1.16: the text toolbar can go outside too, the same way (its own window, 'cosmoTextBar'): barOut() makes
+  // one of these for each toolbar. `kind` goes with every message to main.js ('ink' or 'text').
+  function barOut({ el, kind, frame, title, key, mover, onEsc = null }) {
+    const PAD = { l: 12, t: 8, r: 12, b: 14 }; // room around the toolbar in its window (for its shadow)
+    const INSET = PAD; // where the visible toolbar starts in its window
+    let w = null; // its window
+    let isOut = false;
+    let saved = null;
+    let sizeObs = null;
+    let ready = Promise.resolve(); // the styles in its window have loaded
+    try { const v = JSON.parse(localStorage.getItem(key) || 'null'); if (v && (v.mode === 'dock' || v.mode === 'free')) saved = v; } catch { /* fine */ }
+    const remember = (v) => {
+      saved = v;
+      try { if (v) localStorage.setItem(key, JSON.stringify(v)); else localStorage.removeItem(key); } catch { /* fine */ }
+    };
+    const alive = () => !!(w && !w.closed && w.document && w.document.body);
+    const size = () => ({ bar: kind, w: el.offsetWidth + PAD.l + PAD.r, h: el.offsetHeight + PAD.t + PAD.b, inset: INSET });
+    // the toolbar's window looks like the note (same styles, same body classes: paused, rolled, colour…)
+    function mirror() {
+      if (!alive()) return;
+      const b = w.document.body;
+      b.className = `${body.className} inkbar-out`;
+      for (const [k, v] of Object.entries(body.dataset)) b.dataset[k] = v;
+    }
+    new MutationObserver(mirror).observe(body, { attributes: true });
+    function open() {
+      if (alive()) return true;
+      try { w = window.open('about:blank', frame, 'width=320,height=200'); } catch { w = null; }
+      if (!alive()) { w = null; return false; }
+      const d = w.document;
+      d.title = title;
+      const loads = [];
+      for (const l of document.querySelectorAll('link[rel="stylesheet"]')) {
+        const c = d.createElement('link');
+        c.rel = 'stylesheet';
+        c.href = l.href;
+        loads.push(new Promise((res) => { c.onload = res; c.onerror = res; setTimeout(res, 1500); }));
+        d.head.append(c);
+      }
+      ready = Promise.all(loads);
+      for (const s of document.querySelectorAll('head style')) d.head.append(d.importNode(s, true));
+      if (onEsc) d.addEventListener('keydown', (e) => { if (e.key === 'Escape') onEsc(); });
+      mirror();
+      // the toolbar can change size (eraser options…): its window follows
+      try {
+        sizeObs = new w.ResizeObserver(() => { if (isOut) api.ink.size(size()); });
+        sizeObs.observe(el);
+      } catch { sizeObs = null; }
+      return true;
+    }
+    function moveOut() {
+      if (!open()) return false;
+      const width = el.offsetWidth;
+      w.document.body.append(el);
+      el.style.left = ''; // its place inside the note doesn't count in its own window
+      el.style.right = '';
+      el.style.bottom = '';
+      el.style.top = '';
+      el.style.width = `${width}px`; // its width came from the note's size (pop-ups): keep it, not its window's
+      el.classList.remove('fit-tall');
+      outDocs.add(w.document);
+      isOut = true;
+      mirror();
+      return true;
+    }
+    function moveIn() {
+      if (w && w.document) outDocs.delete(w.document);
+      if (el.ownerDocument !== document) document.body.append(el);
+      el.style.width = '';
+      isOut = false;
+    }
+    return {
+      isOut: () => isOut,
+      // the toolbar opens: make the window now; if the toolbar was outside last time, put it there again
+      start() {
+        if (!open()) return;
+        if (saved && moveOut()) {
+          // show it once its styles have loaded, so it has its real size
+          ready.then(() => requestAnimationFrame(() => { if (isOut) api.ink.show({ ...saved, ...size() }); }));
+        }
+      },
+      // the toolbar closes: it goes back into the note (hidden), and its window closes
+      stop() {
+        if (isOut) { moveIn(); api.ink.hide(kind); }
+        if (w && !w.closed) { try { w.close(); } catch { /* fine */ } }
+        w = null;
+        sizeObs = null;
+      },
+      // the pointer holds the toolbar at (gx, gy) of the toolbar itself → move it out; returns the hold point in its window
+      popOut(gx, gy) {
+        if (!moveOut()) return null;
+        return { x: gx + PAD.l, y: gy + PAD.t };
+      },
+      // already outside: where the pointer (clientX/Y in its window) holds it
+      grab: (cx, cy) => ({ x: cx, y: cy }),
+      dragTo(x, y, px, py) { api.ink.drag({ x, y, px, py, ...size() }); },
+      async drop(px, py, grab) {
+        const r = await api.ink.drop({ bar: kind, px, py });
+        if (r && r.inside) {
+          // back on the note: inside it again, under the pointer
+          const bw = el.offsetWidth;
+          const bh = el.offsetHeight;
+          moveIn();
+          remember(null);
+          const left = px - window.screenX - (grab.x - PAD.l);
+          const top = py - window.screenY - (grab.y - PAD.t);
+          mover().setPos({ r: Math.round(innerWidth - left - bw), b: Math.round(innerHeight - top - bh), t: Math.round(top) });
+        } else if (r && r.state) remember(r.state);
+      },
+      comeBack() {
+        if (!isOut) return;
+        moveIn();
+        remember(null);
+        api.ink.hide(kind);
+      },
+    };
+  }
+  const inkOut = barOut({ el: $('#inkBar'), kind: 'ink', frame: 'cosmoInkBar', title: 'Drawing', key: 'inkBarOut', mover: () => inkMove });
+  const textOut = barOut({ el: $('#textPop'), kind: 'text', frame: 'cosmoTextBar', title: 'Text', key: 'textBarOut', mover: () => textMove });
   const inkBar = $('#inkBar');
-  const inkMove = movable(inkBar, { key: 'inkBarPos', roomLeft: 40, dragBtn: $('#inkPz') }); // 40 px: the pause button on its left (it can drag the toolbar too)
+  const inkMove = movable(inkBar, { key: 'inkBarPos', dragBtn: $('#inkPz'), out: inkOut }); // the pause button can drag the toolbar too
   const placeInkBar = () => inkMove.place();
-  const textMove = movable($('#textPop'), { key: 'textBarPos' });
+  const textMove = movable($('#textPop'), { key: 'textBarPos', out: textOut });
+  // 1.1.16: the ⋯ menu (note settings) and the Effects pop-up: dragged by their grip, inside or out of the note.
+  // The menu's window can take the keyboard (for its title field); Esc there closes it.
+  for (const [id, kind, frame, title] of [['#menu', 'menu', 'cosmoMenuBar', 'Note settings'], ['#fxPop', 'fx', 'cosmoFxBar', 'Effects']]) {
+    const el = $(id);
+    const po = { out: null, move: null };
+    po.out = barOut({ el, kind, frame, title, key: `${kind}PopOut`, mover: () => po.move, onEsc: () => closePops() });
+    po.move = movable(el, { key: `${kind}PopPos`, out: po.out, handle: '.igrip', top: true });
+    popOuts[id] = po;
+  }
+  // 1.1.16: when a pop-up or toolbar has to scroll (a small note), its X stays at the top right, always visible
+  function pinX(box) {
+    const x = box && box.querySelector(':scope > .ix');
+    if (!x) return;
+    const keep = () => {
+      const y = box.scrollTop;
+      x.style.transform = y > 0 ? `translateY(${y}px)` : '';
+      x.classList.toggle('pinned', y > 0);
+    };
+    box.addEventListener('scroll', keep, { passive: true });
+    if (window.ResizeObserver) new ResizeObserver(keep).observe(box); // also when it opens again (back at the top)
+  }
+  [$('#menu'), $('#fxPop'), $('#textPop'), inkBar].forEach(pinX);
 
   $('#btnInk').addEventListener('mousedown', (e) => e.preventDefault());
   // Drawing ⇄ typing: using the bottom bar or the text toolbar puts drawing on hold so you can
@@ -2499,6 +2902,7 @@
     note = await api.getNote();
     if (!note) return;
     if (note.settings) settings = { ...settings, ...note.settings };
+    applyTheme();
     paintUnlock();
     hidden = !!note.hidden;
     editor.innerHTML = hidden ? '' : (note.html || '');

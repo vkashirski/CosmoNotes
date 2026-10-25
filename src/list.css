@@ -49,7 +49,7 @@ body[data-theme="plum"] {
 /* things every dark theme needs (list.js puts .dark on the body) */
 body.dark .card .acts { box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
 body.dark .sw { border-color: rgba(255,255,255,.2); }
-body.dark .card[data-color="charcoal"]:not(.group), body.dark .sheet[data-color="charcoal"] { box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 6px 14px -6px rgba(0,0,0,.6); }
+body.dark .card:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]):not(.group), body.dark .sheet:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) { box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 6px 14px -6px rgba(0,0,0,.6); }
 body.dark .modal { background: rgba(0,0,0,.45); }
 body.dark .search input::placeholder, body.dark .minput::placeholder { color: var(--mute); }
 body.dark .tab.on, body.dark .panel, body.dark .search, body.dark .iconbtn { box-shadow: 0 1px 3px rgba(0,0,0,.4), inset 0 0 0 1.5px var(--soft); }
@@ -315,6 +315,15 @@ body.is-dragging .backbtn { background: #F1EDFF; color: #5B3AA8; box-shadow: 0 0
 .sheet[data-color="orange"]   { --paper:#FFDFBF; --cink:#3A2A1A; }
 .sheet[data-color="mint"]     { --paper:#CDF3E8; --cink:#1C332D; }
 .sheet[data-color="charcoal"] { --paper:#3A3940; --cink:#F3EFE6; }
+.sheet[data-color="cream"]    { --paper:#F5EDD9; --cink:#3B3226; }
+.sheet[data-color="rose"]     { --paper:#FBE1E8; --cink:#3F2A31; }
+.sheet[data-color="sage"]     { --paper:#DCEFE4; --cink:#25362D; }
+.sheet[data-color="mist"]     { --paper:#DCEAF8; --cink:#24313F; }
+.sheet[data-color="lavender"] { --paper:#E7E0F9; --cink:#2F2843; }
+.sheet[data-color="night"]    { --paper:#2F2D35; --cink:#EDE6D8; }
+.sheet[data-color="midnight"] { --paper:#252B3D; --cink:#E4E8F2; }
+.sheet[data-color="forest"]   { --paper:#232E28; --cink:#E2ECE4; }
+.sheet[data-color="plum"]     { --paper:#2D2432; --cink:#EEE3F0; }
 .clip {
   position: absolute; left: 50%; top: -9px; z-index: 2;
   width: 30px; height: 20px; margin-left: -15px;
@@ -357,13 +366,23 @@ body.is-dragging .backbtn { background: #F1EDFF; color: #5B3AA8; box-shadow: 0 0
 .cards.anim .card { animation: drop .22s ease-out backwards; }
 @keyframes drop { from { opacity: 0; transform: translateY(6px) rotate(var(--r, 0deg)); } }
 .card:hover { transform: rotate(0deg) translateY(-3px); box-shadow: 0 2px 2px rgba(0,0,0,.08), 0 14px 22px -8px rgba(80,60,20,.4); }
-.card[data-color="pink"]     { --paper:#FFD6E6; --bar:#FFB5D0; --accent:#9C2A5B; --cink:#3D2430; }
-.card[data-color="green"]    { --paper:#D8F5C4; --bar:#B9E79C; --accent:#3D7A1A; --cink:#25331C; }
-.card[data-color="blue"]     { --paper:#D2ECFF; --bar:#A9D8FF; --accent:#1F5F93; --cink:#1D2B38; }
-.card[data-color="purple"]   { --paper:#E8DDFF; --bar:#D0BDFF; --accent:#5B3AA8; --cink:#2B2340; }
-.card[data-color="orange"]   { --paper:#FFDFBF; --bar:#FFC38C; --accent:#9A4E0C; --cink:#3A2A1A; }
-.card[data-color="mint"]     { --paper:#CDF3E8; --bar:#A4E5D1; --accent:#1F7560; --cink:#1C332D; }
-.card[data-color="charcoal"] { --paper:#3A3940; --bar:#2B2A30; --accent:#FFD86B; --cink:#F3EFE6; }
+.card[data-color="pink"], .epaper[data-color="pink"]     { --paper:#FFD6E6; --bar:#FFB5D0; --accent:#9C2A5B; --cink:#3D2430; }
+.card[data-color="green"], .epaper[data-color="green"]    { --paper:#D8F5C4; --bar:#B9E79C; --accent:#3D7A1A; --cink:#25331C; }
+.card[data-color="blue"], .epaper[data-color="blue"]     { --paper:#D2ECFF; --bar:#A9D8FF; --accent:#1F5F93; --cink:#1D2B38; }
+.card[data-color="purple"], .epaper[data-color="purple"]   { --paper:#E8DDFF; --bar:#D0BDFF; --accent:#5B3AA8; --cink:#2B2340; }
+.card[data-color="orange"], .epaper[data-color="orange"]   { --paper:#FFDFBF; --bar:#FFC38C; --accent:#9A4E0C; --cink:#3A2A1A; }
+.card[data-color="mint"], .epaper[data-color="mint"]     { --paper:#CDF3E8; --bar:#A4E5D1; --accent:#1F7560; --cink:#1C332D; }
+.card[data-color="charcoal"], .epaper[data-color="charcoal"] { --paper:#3A3940; --bar:#2B2A30; --accent:#FFD86B; --cink:#F3EFE6; }
+/* 1.1.15: the colours of the list themes */
+.card[data-color="cream"], .epaper[data-color="cream"]    { --paper:#F5EDD9; --bar:#E8DCC0; --accent:#7D6C50; --cink:#3B3226; }
+.card[data-color="rose"], .epaper[data-color="rose"]     { --paper:#FBE1E8; --bar:#F2CAD6; --accent:#86606B; --cink:#3F2A31; }
+.card[data-color="sage"], .epaper[data-color="sage"]     { --paper:#DCEFE4; --bar:#C4E2D1; --accent:#4F6D5D; --cink:#25362D; }
+.card[data-color="mist"], .epaper[data-color="mist"]     { --paper:#DCEAF8; --bar:#C5DAF0; --accent:#4F6782; --cink:#24313F; }
+.card[data-color="lavender"], .epaper[data-color="lavender"] { --paper:#E7E0F9; --bar:#D5CAF2; --accent:#5E5480; --cink:#2F2843; }
+.card[data-color="night"], .epaper[data-color="night"]    { --paper:#2F2D35; --bar:#25232A; --accent:#B3A4FF; --cink:#EDE6D8; }
+.card[data-color="midnight"], .epaper[data-color="midnight"] { --paper:#252B3D; --bar:#1D2232; --accent:#9FB2FF; --cink:#E4E8F2; }
+.card[data-color="forest"], .epaper[data-color="forest"]   { --paper:#232E28; --bar:#1C2520; --accent:#8FD9B0; --cink:#E2ECE4; }
+.card[data-color="plum"], .epaper[data-color="plum"]     { --paper:#2D2432; --bar:#251D29; --accent:#E0A6EE; --cink:#EEE3F0; }
 .card .strip { height: 9px; flex: none; background: var(--bar); }
 .card .pin {
   position: absolute; top: -1px; left: 50%;
@@ -412,7 +431,7 @@ body.is-dragging .backbtn { background: #F1EDFF; color: #5B3AA8; box-shadow: 0 0
 }
 .card .when { flex: 1; min-width: 0; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px 1px 5px; border-radius: 999px; background: rgba(255,255,255,.55); font-size: 10.5px; }
-.card[data-color="charcoal"] .badge { background: rgba(255,255,255,.12); }
+.card:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .badge { background: rgba(255,255,255,.12); }
 .badge i { width: 6px; height: 6px; border-radius: 50%; background: #34A853; }
 .card .acts { position: absolute; right: 5px; bottom: 5px; display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--paper); box-shadow: 0 0 0 1px rgba(0,0,0,.06); opacity: 0; transition: opacity .12s; }
 .card:hover .acts, .card:focus-within .acts { opacity: 1; }
@@ -424,7 +443,7 @@ body.is-dragging .backbtn { background: #F1EDFF; color: #5B3AA8; box-shadow: 0 0
   cursor: pointer;
 }
 .act:hover { background: rgba(0,0,0,.09); }
-.card[data-color="charcoal"] .act:hover { background: rgba(255,255,255,.12); }
+.card:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .act:hover { background: rgba(255,255,255,.12); }
 .act svg { width: 15px; height: 15px; }
 .card.binned { cursor: default; filter: saturate(.7); }
 .card.binned .pill { font-size: 11px; height: 24px; padding: 0 9px; }
@@ -555,6 +574,11 @@ code { display: block; padding: 8px 10px; margin-bottom: 10px; border-radius: 9p
 .paper[data-color="green"] { --paper:#D8F5C4; } .paper[data-color="blue"] { --paper:#D2ECFF; }
 .paper[data-color="purple"] { --paper:#E8DDFF; } .paper[data-color="orange"] { --paper:#FFDFBF; }
 .paper[data-color="mint"] { --paper:#CDF3E8; } .paper[data-color="charcoal"] { --paper:#55545C; }
+.paper[data-color="cream"] { --paper:#F5EDD9; } .paper[data-color="rose"] { --paper:#FBE1E8; }
+.paper[data-color="sage"] { --paper:#DCEFE4; } .paper[data-color="mist"] { --paper:#DCEAF8; }
+.paper[data-color="lavender"] { --paper:#E7E0F9; } .paper[data-color="night"] { --paper:#4A4752; }
+.paper[data-color="midnight"] { --paper:#3E4660; } .paper[data-color="forest"] { --paper:#3C4A42; }
+.paper[data-color="plum"] { --paper:#4A3D52; }
 .paper::after { content: ""; position: absolute; left: 12%; right: 25%; top: 22%; height: 3px; border-radius: 3px; background: rgba(0,0,0,.12); box-shadow: 0 7px 0 rgba(0,0,0,.09), 0 14px 0 rgba(0,0,0,.07); }
 .card.group.locked .paper::after { display: none; }
 
@@ -894,6 +918,63 @@ body.dark .phead:hover { background: var(--card2); }
 /* ================= 1.1.13: favourites, picking several cards, the "Stardust" lock animation ================= */
 .tab .tstar { width: 14px; height: 14px; color: #E0A800; }
 .tab.on .tstar { fill: #FFD54A; }
+/* 1.1.15: Locked tab */
+.tab .tlock { width: 14px; height: 14px; }
+.lockbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 0 0 12px; padding: 10px 12px;
+  border-radius: 14px; background: var(--card); box-shadow: 0 1px 3px rgba(80,60,20,.12), inset 0 0 0 1.5px var(--soft);
+}
+.lockbar[hidden] { display: none; }
+.lbtext { flex: 1 1 220px; font: 700 12.5px/1.4 var(--ui); color: var(--ink2); }
+.lockbar .pill svg { width: 14px; height: 14px; }
+
+/* ---------- 1.1.16: effects ---------- */
+/* a note's effect on its card, behind the card's writing (the card is its own layer, so -1 stays inside it) */
+.card { isolation: isolate; }
+.card > .fxc { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; border-radius: inherit; }
+/* the pickers: a list of icons and names */
+.fxlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 2px 8px; }
+.fxi {
+  display: flex; align-items: center; gap: 9px; min-width: 0;
+  min-height: 38px; padding: 4px 10px 4px 5px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--ink); cursor: pointer;
+  font: 800 13px var(--ui); text-align: left;
+}
+.fxi:hover { background: var(--soft); }
+.fxi .ic { flex: none; width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: var(--soft); color: var(--ic, var(--mute)); }
+body.dark .fxi .ic { color: color-mix(in srgb, var(--ic, var(--mute)) 70%, #fff); }
+.fxi .ic svg { width: 18px; height: 18px; stroke-width: 1.8; }
+.fxi .ic .f { fill: currentColor; stroke: none; }
+.fxi .nm { flex: 1; min-width: 0; line-height: 1.2; overflow-wrap: anywhere; }
+.fxamt { display: flex; align-items: center; gap: 10px; margin-top: 4px; font: 800 12px var(--ui); color: var(--mute); }
+.fxamt .seg { flex: 1; max-width: 320px; }
+.fxamt[hidden] { display: none; }
+/* 1.1.17: opacity slider under each Frequency row */
+.fxamt > span, .fxop > span { flex: none; min-width: 64px; }
+.fxop { display: flex; align-items: center; gap: 10px; margin-top: 6px; font: 800 12px var(--ui); color: var(--mute); }
+.fxop .srange { flex: 1; min-width: 0; max-width: 320px; margin: 0; }
+.fxop em { flex: none; min-width: 36px; font-style: normal; color: var(--ink2); }
+.fxop[hidden] { display: none; }
+.fxi .ok { width: 16px; height: 16px; stroke-width: 2.6; visibility: hidden; }
+.fxi.on { background: var(--soft2); }
+.fxi.on .ic { background: var(--card); }
+.fxi.on .ok { visibility: visible; }
+.fxi:focus-visible { outline: 2.5px solid #E8C547; outline-offset: 1px; }
+/* the pause button left of Settings */
+.fxpause {
+  margin-left: auto; width: 34px; height: 34px; flex: none; align-self: center;
+  border: 0; border-radius: 10px; background: transparent; color: var(--ink3);
+  display: grid; place-items: center; cursor: pointer;
+}
+.fxpause:hover { background: var(--soft); color: var(--ink); }
+.fxpause svg { width: 18px; height: 18px; stroke-width: 1.8; }
+.fxpause .slash { display: none; stroke-width: 2.2; }
+.fxpause.paused { color: var(--mute); }
+.fxpause.paused .slash { display: inline; }
+.fxpause + .tab[data-tab="settings"] { margin-left: 0; }
+#fxSheet .ebox { max-width: 560px; }
+#fxSheet .row.toggle { padding: 4px 0; }
 /* the star in a card's top-right corner: an outline while you point at the card, filled (soft yellow) once starred */
 .card > .fav {
   position: absolute; top: 10px; right: 2px; z-index: 4;
@@ -910,7 +991,7 @@ body.dark .phead:hover { background: var(--card2); }
 .card > .fav svg { width: 21.5px; height: 21.5px; stroke-width: 2; rotate: -9deg; transition: fill .2s, stroke .2s; }
 .card > .fav.on { color: #D9A10A; }
 .card > .fav.on svg { fill: #FFD54A; stroke: #D9A10A; }
-.card[data-color="charcoal"] > .fav.on svg { stroke: #FFD54A; }
+.card:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) > .fav.on svg { stroke: #FFD54A; }
 /* (1.1.14: the star only sits on top of the card; it no longer makes room for itself, which squeezed pictures) */
 /* stars bursting from the favourite star: a fixed layer, so the card's edge doesn't cut them off; 15 % quicker */
 .stardust.fixed { position: fixed; z-index: 60; }
@@ -950,6 +1031,9 @@ body.dark .phead:hover { background: var(--card2); }
   box-shadow: 0 2px 5px rgba(80,50,180,.35);
 }
 .card.group.sel::before { top: -4px; left: -2px; }
+/* 1.1.16: the card whose right-click menu is open: the same outline, fainter and thinner, no tick */
+.card.ctxon:not(.sel) { outline: 2px solid rgba(142,123,239,.5); outline-offset: 3px; transform: rotate(0deg); }
+.card.group.ctxon:not(.sel) { outline-offset: 1px; border-radius: 10px; }
 .dragchip { position: fixed; left: -500px; top: 0; padding: 7px 13px; border-radius: 999px; background: #8E7BEF; color: #fff; font: 800 12px var(--ui); }
 
 /* the bar for the picked cards */
@@ -995,6 +1079,86 @@ body.dark .phead:hover { background: var(--card2); }
 }
 .bulkpop[hidden] { display: none; }
 .bulkpop .sws { display: flex; gap: 6px; }
+
+/* ---------- 1.1.15: rows of colour circles that scroll sideways (swatchStrip in list.js) ----------
+   Same circle sizes as before; the row is as wide as the old one (Settings: 9 circles, group panel and the
+   selection bar: 8) and scrolls: drag it, use the mouse wheel, or the arrows on a side with more colours. */
+.swstrip { --sz: 28px; --gap: 8px; --n: 9; --stripbg: var(--card); position: relative; width: calc(var(--n) * var(--sz) + (var(--n) - 1) * var(--gap)); max-width: 100%; }
+.swstrip.small, .bulkpop .swstrip { --sz: 24px; --gap: 6px; --n: 8; }
+/* Settings and the Edit sheet: every colour shows at once. When the window is too narrow they carry on in the
+   next line, like text does (no scrolling, no arrows) */
+.swstrip.wide { width: 100%; }
+.swstrip.wide > .swatches { flex-wrap: wrap; row-gap: 10px; overflow: visible; padding: 0; margin: 0; cursor: default; }
+.swstrip.wide .swarr { display: none; }
+#groupPanel .swstrip { --stripbg: var(--card2); }
+.bulkpop .swstrip { --stripbg: #FFFDF7; }
+.swstrip > .swatches, .swstrip > .sws {
+  display: flex; flex-wrap: nowrap; gap: var(--gap);
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  padding: 5px; margin: -5px;
+  cursor: grab; touch-action: pan-y;
+}
+.swstrip > .swatches::-webkit-scrollbar, .swstrip > .sws::-webkit-scrollbar { display: none; }
+.swstrip > * > .sw, .swstrip > * > .bsw { flex: none; }
+.swstrip .dragging, .swstrip .dragging > * { cursor: grabbing; }
+.swstrip .dragging > *:hover { transform: none; }
+.swarr {
+  position: absolute; top: -5px; bottom: -5px; width: 36px; z-index: 1;
+  display: flex; align-items: center; padding: 0;
+  border: 0; cursor: pointer; color: var(--ink);
+}
+.bulkpop .swarr { color: #3B3226; }
+.swarr[hidden] { display: none; }
+.swarr.l { left: -5px; justify-content: flex-start; padding-left: 2px; background: linear-gradient(90deg, var(--stripbg) 45%, transparent); }
+.swarr.r { right: -5px; justify-content: flex-end; padding-right: 2px; background: linear-gradient(270deg, var(--stripbg) 45%, transparent); }
+.swarr svg {
+  width: 20px; height: 20px; padding: 4px; box-sizing: border-box;
+  border-radius: 50%; background: var(--stripbg);
+  box-shadow: 0 1px 4px rgba(0,0,0,.28);
+  fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
+}
+/* Settings → For new notes: pick several colours (a tick on each picked one) */
+.sw.pick { display: grid; place-items: center; }
+.sw.pick .tick { width: 15px; height: 15px; fill: none; stroke: #3B3226; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; opacity: 0; filter: drop-shadow(0 0 1.5px rgba(255,255,255,.9)); transition: opacity .12s; }
+.sw.pick.darkp .tick { stroke: #fff; filter: drop-shadow(0 0 1.5px rgba(0,0,0,.8)); }
+.sw.pick.on .tick { opacity: 1; }
+.shint { margin-top: -2px !important; line-height: 1.4; }
+
+/* ---------- 1.1.15: Edit sheet (right-click a note → Edit…) ---------- */
+.esheet { align-items: end; padding: 12px; }
+.ebox {
+  width: 100%; max-width: 440px; max-height: calc(100vh - 24px); overflow: auto;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 14px 16px 14px;
+  border-radius: 20px;
+  background: var(--card2);
+  box-shadow: 0 24px 60px rgba(60,40,10,.35);
+  animation: popup .16s ease-out;
+  --stripbg: var(--card2);
+}
+.ebox .swstrip { --stripbg: var(--card2); }
+.ehead { display: flex; align-items: center; justify-content: space-between; }
+.ehead h3 { margin: 0; font: 700 25px/1.1 var(--hand); color: var(--ink); }
+.epaper {
+  --paper: #FFF4A3; --bar: #FBE278; --accent: #7A5C00; --cink: #3B3220; /* yellow, like .card */
+  padding: 9px 12px;
+  border-radius: 3px 3px 3px 14px;
+  background: var(--paper); color: var(--cink);
+  box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 6px 16px -8px rgba(80,60,20,.45);
+  transition: background .2s, color .2s;
+}
+.etitle {
+  width: 100%; border: 0; outline: 0; padding: 2px 0;
+  background: transparent; color: inherit;
+  font: 800 15px var(--ui);
+}
+.etitle::placeholder { color: inherit; opacity: .45; font-weight: 700; }
+.erow { display: flex; flex-direction: column; gap: 8px; }
+.erow b { font-weight: 800; font-size: 13.5px; }
+.ebtns { display: flex; align-items: center; gap: 8px; }
+.ebtns small { flex: 1; font: 700 11.5px var(--ui); color: var(--mute); }
+.pickbtns { display: flex; flex-wrap: wrap; gap: 6px; }
+
 .bsw { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); cursor: pointer; transition: transform .1s; }
 .bsw:hover { transform: scale(1.15); }
 .bfonts { display: flex; gap: 4px; }

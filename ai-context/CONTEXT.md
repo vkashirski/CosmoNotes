@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 23 October 2026 · App version 1.1.14**
+**Last updated: 25 October 2026 · App version 1.1.18**
 
 Read this before changing anything. Keep it up to date: when you add or change a feature, update the
 relevant section here, `src/about.js` (the in-app feature list and version history) and `CHANGELOG.md`.
@@ -48,6 +48,7 @@ preload.js         Safe bridge: exposes window.sticky.* to both windows (context
 src/note.html/.css/.js   One sticky-note window (the editor)
 src/list.html/.css/.js   The "All notes" window: Notes / Bin / Settings tabs, groups, sorting
 src/about.js       In-app feature list + version history (window.COSMO_ABOUT) + LAST_UPDATED date
+src/fx.js          Note effects + mouse followers (window.COSMO_FX), used by both windows (1.1.16; 22 more backgrounds in 1.1.18)
 assets/            icon.ico/png (windows), tray.ico/png
 build/             icon.ico/png for the installer/shortcuts; afterPack.js is an unused stub (see §6 Smart App Control)
 build.bat          One-click: (private Node if needed) + npm install + electron-builder → dist/CosmoNotes Setup <ver>.exe
@@ -78,9 +79,11 @@ referenced from HTML as `../node_modules/@fontsource/...`, so they work offline 
   - note window: `note:get`, `note:update`, `note:update-sync` (used on unload), `note:dates`,
     `note:new`, `note:duplicate`, `note:close`, `note:trash`, `note:hover`, `note:unlock`, `note:relock`,
     `note:set-locked`, `lock:set` (`{current, next, kind}`, kind = 'pin' | 'password'), `note:minimize`, `note:maximize`, `att:save`,
-    `att:pick-images`, `att:open`, `open-external`, `list:show`
+    `att:pick-images`, `att:open`, `open-external`, `list:show`, `ink:show`, `ink:drag`, `ink:size`, `ink:drop`, `ink:hide`
+    (1.1.15: the drawing toolbar's own window, see §6)
   - list window: `list:get`, `list:new`, `list:duplicate`, `list:open-note`, `list:close-note`, `list:trash`,
     `list:restore`, `list:destroy`, `list:empty-bin`, `list:bring-front`, `list:set-locked`, `list:favorite`, `list:apply`,
+    `list:edit` (1.1.15, the Edit sheet: title + colour), `list:unlock-all` / `list:lock-all` (1.1.15, the Locked tab),
     `groups:make`, `groups:move-up`, `groups:move-to`, `groups:ungroup` (= move-up for a note),
     `groups:make-from`, `groups:dissolve`, `groups:rename`, `groups:update` (name/style/color), `groups:apply` (mass edit
     colour/font), `groups:trash`, `groups:set-locked`, `groups:reveal`, `groups:hide`, `settings:set`,
@@ -126,11 +129,13 @@ save 350ms after typing stops, on blur, and synchronously on unload. Main flushe
 
 **Note fields** (`normalize()` in store.js is the schema; it always fills defaults):
 `id, title, html, text (plain text for list/search), firstImage, color (yellow|pink|green|blue|purple|
-orange|mint|charcoal), font (hand|round), size (s|m|l), ink (draw-over, see below), wrapWidth (px or null:
+orange|mint|charcoal, and since 1.1.15 the list themes' colours cream|rose|sage|mist|lavender|night|midnight|forest|plum;
+dark ones = `DARK_COLORS`: charcoal, night, midnight, forest, plum), font (hand|round), size (s|m|l), ink (draw-over, see below), wrapWidth (px or null:
 locked text layout), opacity (0.25–1), solidOnHover, pinned, open
 (window open → reopens at start), rolled, zoom (0.5–3, Ctrl + wheel in the note; not an edit), locked, favorite (starred in the list; not an edit), spell (null = follow Settings | true | false),
 groupId, bounds {x,y,width,height} (unrolled height), createdAt, updatedAt, deletedAt (null or in Bin),
-restoredFrom`.
+restoredFrom, fx ({ e, f, ea, fa, eo, fo }: the note's own effect / mouse follower, null = same as all notes, 'none' = nothing; ea /
+fa = how much, low | mid | high or null; eo / fo = opacity 0.1–1 in 5 % steps or null (1.1.17, `cleanFxOpacity`); not an edit; 1.1.16), fxPaused (effects paused on this note; not an edit)`.
 
 **Draw-over ink** (`note.ink`): `{ s: [ { t: pen|hl|line|arrow|rect|ellipse, c: '#rrggbb', w: 1–40, l: 'a'|'b',
 d: 'dash'|'dot' (optional, 1.1.13; missing = solid), o: dash offset in px (1.1.14, only on pieces left by the partial eraser, so
@@ -157,8 +162,13 @@ Resizing a picture while the note has ink asks first (`needsResizeWarning` / `re
 **Settings** (changing only `listSort` deliberately does *not* send `notes:changed`, since the list already
 redrew; that was the 1.0.2 double-refresh bug): `startWithWindows, defaultColor, defaultFont, firstRunDone, listBounds, spellCheck (false),
 spellCyrillic (false), listSort {by: updated|created, dir: desc|asc, groups: mixed|first|last},
-listSize (s|m|l|xl|xxl, card size in the list, also Ctrl + mouse wheel; like listSort it doesn't trigger a reload), defaultColor may be
-"random" (store.create picks one of the 7 pastel papers),
+listSize (s|m|l|xl|xxl, card size in the list, also Ctrl + mouse wheel; like listSort it doesn't trigger a reload),
+defaultColors (1.1.15: the colours new notes pick from at random, never empty, `cleanColors`; old settings move over on load:
+defaultColor "random" → the 7 original pastels), defaultColor (kept = the first of defaultColors, for older versions),
+newColorNoRepeat (1.1.15, true: with several colours, never the same colour as the last new note), lastNewColor (that colour),
+fxEffect / fxFollower (1.1.16: effect and mouse follower for all notes, 'none' or an id), fxEffectAmount / fxFollowerAmount (how
+much: low | mid | high), fxEffectOpacity / fxFollowerOpacity (1.1.17: 0.1–1, default 1), fxForceAll (use them on every note;
+each note's own choice is kept), fxPaused (pause all effects; also the tray's "Pause effects"),
 defaultOpacity (0.25–1: see-through of new notes), defaultSolidOnHover (true: new notes turn solid on hover),
 listTheme (cream|rose|mint|sky|lilac, dark: night|midnight|forest|plum: colours of the list window; doesn't trigger a reload either),
 madeGroup (true once any group was ever made; hides the "drag to make a group" tip for good),
@@ -205,7 +215,7 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
 | Window closed via X → `open=false`. Closed by Windows shutdown → stays open | main.js `note:close`, `closed` handler with 2.5s grace |
 | Title (⋯ menu `#titleInput`) → top bar `#title` + window title | note.js, main.js `titleOf` |
 | Formatting, bullets, checklists (`ul.checklist`, `li.done`; click the box to tick) | note.js `runCmd`, `toggleChecklist`; uses `document.execCommand` |
-| Text panel `#textPop` (the A button): font, colour, highlight, size, clear; selection or whole note (`onText`, `paintTextPanel`); undo is the bottom-bar `#btnUndo` | note.js. "Normal colour" = apply sentinel `#010203` then strip it |
+| Text panel `#textPop` (the A button): font, colour, highlight, size, clear; the selection, or with nothing selected what you type next (browser typing style; `onText`, `caretIsSaved`, `paintTextPanel`); undo is the bottom-bar `#btnUndo` | note.js. "Normal colour" = apply sentinel `#010203` then strip it |
 | Spelling: per-note `spell`, global `spellCheck`; Cyrillic ignored | note.js `applySpell`; main.js `spellLanguages` |
 | Add panel: photo, voice, drawing, link, table, numbers, divider, date | note.js `doInsert`, `insertNodes` (direct DOM insert, keeps voice chips intact) |
 | Photo resize handle `#imgHandle` (60px → editor width, stored as `width` attr) | note.js "photo resizing" section |
@@ -225,7 +235,7 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
 | Group settings panel (look, colour, mass edit, lock, ungroup, bin) | list.html `#groupPanel`; list.js "group settings panel"; main.js `groups:update`, `groups:apply` |
 | Lock groups; open a locked group in the list | main.js `groups:set-locked`, `groups:reveal`/`hide`, `listOpenGroups`, `groupOpenInList` |
 | Lock/unlock notes from the list | main.js `list:set-locked`, `hideNewlyLocked`; list.js `lockNote`/`unlockNote` |
-| Right-click menus (notes, groups, Bin) | list.js `showCtx`, `noteMenu`, `groupMenu` |
+| Right-click menus (notes, groups, Bin) | list.js `showCtx`, `noteMenu`, `groupMenu`; the right-clicked card gets `.ctxon` (faint outline, 1.1.16) |
 | Duplicate note (list right-click, note ⋯ menu) | main.js `duplicateNote` → store.js `duplicate`; attachments are shared, not copied (safe: `sweepAttachments` keeps anything still referenced) |
 | App-styled pop-ups + toasts | list.js `modal()`, `toast()`; list.html `#modal`, `#toast` |
 | Bin confirmation (Shift+click skips) | list.js `trashNote(n, skipAsk)` |
@@ -255,7 +265,13 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
 | App-styled confirm inside notes | note.js `ask()`; note.html `#askPop` |
 | Settings sections fold (all closed at first) | list.js `foldPanels`; list.css `.phead`, `.pbody`, `.pinner` |
 | Backups: pick a day to restore, restored notes in their own group | list.js `pickBackup`, `renderBackups`; store.js `restoreBackup`, `backupDayName` |
-| New notes: colour, font, see-through, solid on hover (Settings → its own "For new notes" section, after General) | list.js `renderSettings`, `#sOpacity`, `#sSolidHover`; store.js `create` (`defaultOpacity`, `defaultSolidOnHover`) |
+| New notes: colours (several = random one), font, see-through, solid on hover (Settings → its own "For new notes" section, after General) | list.js `renderSettings`, `paintNewColors`, `setNewColors`, `#sColors`, `#sOpacity`, `#sSolidHover`; store.js `create`, `newNoteColor`, `cleanColors` (`defaultColors`, `defaultOpacity`, `defaultSolidOnHover`) |
+| Colour rows that scroll sideways (note ⋯ menu: 8 circles visible, same size as before; group panel and selection bar 8). Settings and the Edit sheet don't scroll: every colour shows, wrapping to a second line when narrow (`.swstrip.wide`) | `swatchStrip` (the same in note.js and list.js), `.swstrip`, `.swarr` |
+| Paper colours (17), shown in `COLORS` order (each colour next to its light version, dark ones last; note.html's buttons follow it too) | store.js `COLORS`/`DARK_COLORS`; main.js `PAPER`; note.css `body[data-color]` + `.sw`; list.css `.card`/`.epaper`/`.sheet`/`.paper`; list.js `COLORS`, `SWATCH`, `COLOR_NAMES`. Dark-paper rules use `:is([data-color="charcoal"],…)` with all five dark colours: add a new dark colour there too |
+| Edit a note's title and colour from the list (right-click → Edit…), synced with its open window (`note:look`) | list.html `#editSheet`; list.js "Edit sheet" (`openEdit`, `editQueue`, `editFlush`, `editRefresh`); main.js `list:edit` |
+| Locked tab: all locked notes/groups; "Unlock all" uncovers them in the list (and in notes opened from it) until "Lock again" or the list closes | list.js `lockedOnes`, `paintLockBar`, `tab = 'locks'`, `cardsTabNow`; list.html `#lockBar`, `#cLocks`; main.js `listUnlockedAll` (used by `hiddenInList`, `groupOpenInList`, `list:open-note`), `list:unlock-all`, `list:lock-all` |
+| Note effects + mouse followers (1.1.16): choosing rules `COSMO_FX.resolve`; one shared 30 fps loop that sleeps | src/fx.js; note.js "effects" (`applyFx`, `#fxCanvas`, `#btnFx`, `#fxPop`, `paintFxPop`); list.js "effects" (`paintFx`, `.fxc`, `#fxSheet`, `paintFxSheet`, Settings `#sFxNow`/`#sFxChoose`/`#sFxPause`, `#btnFxPause` left of Settings); pickers = `.fxlist` of `.fxi` (icons `COSMO_FX.ICONS`) + `.fxamt` Frequency Rarely/Normal/Often + `.fxop` Opacity slider (1.1.17: note `#fxEOp`/`#fxFOp`, list `#fxAllEOp`/`#fxAllFOp`; shows live while dragging, saved on release or 300 ms after it stops); note pop-up has tabs (`#fxTabs`); follower order = background order (`FOLLOWER_IDS`); store.js `FX_EFFECTS`/`FX_FOLLOWERS`/`cleanFx` (ids must match fx.js); main.js `fxSettings`, `setFxPaused`, tray "Pause effects" |
+| Drawing and text toolbars outside the note (stick to a side and follow the note; text toolbar 1.1.16) | note.js `barOut` (`inkOut`, `textOut`), `movable(…, { out })`, `outDocs`; note.css `body.inkbar-out`; main.js `inkBarOptions`, `watchInkBar`, `snapInk`, `inkSpot`, `placeInk`, `showInk`, `ink:*` |
 
 ---
 
@@ -300,7 +316,7 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
   or Draw calls `resumeInk()` (`inkState.paused`, `body.ink-paused`). Nothing ever disappears: the bar not in use is
   faded. `#textPop` (opens bottom-left) is NOT closed by `closePops()`: only A, its X or locking close it (rolling up only hides both toolbars: `body.rolled`)
   (`openText`/`closeText`, `body.text-open`). It fades while drawing or while the editor has focus. Its buttons act on
-  the selection, or the whole note when nothing is selected (`onText`, `#tScope` says which). The only Undo button (with Redo `#btnRedo` right after it since 1.1.14, same rules: `redoAny`/`inkRedo`/`redoText`) is
+  the selection, or (1.1.16) with nothing selected what you type next, never the whole note (`onText`, `#tScope` says which; don't move the cursor after a button, it would forget the typing style). The only Undo button (with Redo `#btnRedo` right after it since 1.1.14, same rules: `redoAny`/`inkRedo`/`redoText`) is
   `#btnUndo` in the bottom bar (outside `.tleft`, so it never scrolls away; full opacity while the mouse is on the note
   (`body:hover`), otherwise it fades like the rest; the bar fades its children `#tools > *`, never `#tools` itself): `undoAny()` = drawing undo while drawing,
   else note-font undo (`textUndo`) or the editor's own undo. `note.size` (s/m/l) has no button any more (kept for old notes).
@@ -308,6 +324,50 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
   While drawing, the editor is
   `contentEditable=false` and `#inkCatch` gets the pointer. Mouse-wheel scrolling still works because the
   catcher sits inside the scroller.
+- **Pop-up colours (1.1.16):** everything on a note's pop-ups/toolbars uses `--pop-*` variables, set per app theme by
+  `body[data-apptheme]` (note.css end; `appTheme` = `listTheme`, in `noteSettings()`). Don't hard-code colours there.
+- **⋯ menu and Effects pop-up outside the note (1.1.16):** like the toolbars (`barOut` kinds `menu`, `fx`), dragged only
+  by their `.igrip`, placed from the top (`movable(…, { handle, top })`). The menu's window is focusable (title field).
+- **CSS gotcha:** a block of declarations without a selector makes the browser drop the NEXT rule too (that hid
+  `#textPop.tbar` until 1.1.16). Check for orphan `}` / missing selectors when a rule seems to do nothing.
+- **Text toolbar outside the note (1.1.16)** works exactly like the drawing toolbar below: `barOut()` makes one helper per
+  toolbar (`kind` 'ink' / 'text', window name `cosmoInkBar` / `cosmoTextBar`); main keeps `win.<kind>Win/Out/State` and
+  the `ink:*` messages carry `bar: 'text'`. `$`/`$$` search all outside windows (`outDocs`). Its window opens and closes
+  with the text toolbar. The text buttons work from there because they use the saved selection (`savedRange`).
+- **Drawing toolbar outside the note (1.1.15).** A page can't paint outside its window, so `#inkBar` *moves* (same DOM node,
+  listeners and all) into a small window the note opens with `window.open('about:blank', 'cosmoInkBar')`. An about:blank
+  window opened by a page is same-origin with it, so note.js can put elements into it and its code keeps running in the
+  note. Rules that make this work: `$`/`$$` also search `outDocs`; anything that listens for the toolbar's pointer events
+  must use `el.ownerDocument.defaultView`, not `window`; the drag captures the pointer on the page's `<html>` (an element
+  that stays put), so it carries on when the toolbar changes windows; positions are screen coordinates. That window loads
+  the note's stylesheets and copies `<body>`'s classes and data (`mirror`), plus `inkbar-out`. main.js allows only this
+  window, only for note windows, and makes it frameless, transparent, not focusable (clicks never take the focus from the
+  note, so the keyboard stays in the note) and a child (`parent`) of the note. Main places it (`inkSpot`: always fully on a
+  screen; near a side = stuck, following the note's `move`/`resize`). It's made hidden when drawing starts and closed when
+  drawing ends; its place is kept in `localStorage.inkBarOut`. Only the drawing toolbar does this; the text toolbar stays
+  inside. Pause (`#inkPz`) and Clear all (`#inkClear`) are in the toolbar's bottom row (`.ifoot`) since 1.1.15, so nothing
+  sticks out of it. Needs a check on real Windows (transparent window, focus, dragging across windows).
+- **Padlock icons** (note lock screen, list cards): the shackle path reaches down into the body; `#lockClip` (note.html and
+  list.html) only draws it above y 11, the middle of the body's top line, so no sliver of it ever shows inside the body
+  (1.1.15). Keep that if the icon changes.
+- **Effects (1.1.16) must stay light.** The first eleven are a few dozen shapes each; the 22 added in 1.1.18 (picked by the
+  owner from the "CosmoNotes Effect Lab" preview page, two versions per idea) go up to ~150–260 dots, always with a hard
+  cap (`capped(n, k, max)`), and each measured well under 1 ms a frame in Chromium. Draw many lines/dots in a few calls
+  (`strokeSegs`, `bucketDots`) and don't use `Path2D`: the tests run fx.js against a fake canvas without it. All drawn on a canvas by fx.js's one shared
+  loop (`requestAnimationFrame`, at most 30 frames a second). The loop stops by itself when no layer `wants()` a frame:
+  paused, rolled up, off screen (list cards: `IntersectionObserver`), no effect, or only a follower and the mouse is still
+  (followers report `busy()` while their trail is still fading). Don't add per-element DOM particles or CSS animations for
+  these. A new effect or follower needs its id in both fx.js and store.js (`FX_EFFECTS` / `FX_FOLLOWERS`; a test checks). The old follower id `comet` (Rainbow line) was folded into `rainbow`: `resolve` and store `cleanFxId` map it, so saved choices keep working. The Rainbow background paints each bow solid and masks it once (no seams).
+  **Opacity (1.1.17)** is a multiplier, not an extra canvas: `fadeable(ctx)` in fx.js wraps the context's `globalAlpha` so
+  whatever an effect sets is multiplied by the layer's `eOp` / `fOp` (effects don't need to know). Changing it only redraws
+  (`Layer.set` → `opChanged`), never remakes the effect. `resolve` returns `effectOpacity` / `followerOpacity` (`opacityOf`,
+  same rule as store.js `cleanFxOpacity`).
+  The note's canvas is `position: fixed; z-index: -1` (behind everything, above the paper, which is the page background).
+  While a note is resized, `Layer.resize()` keeps the running effect and only makes it again 300 ms after resizing stops
+  (making it on every resize event made it restart over and over). Matrix draws Windows' Japanese fonts (the film's font
+  can't be shipped; used if installed), mirrored, with `mirror()`.
+- **Pop-ups and toolbars in a small note** (1.1.16): a scrolling pop-up keeps its X visible (`pinX`); the text and drawing
+  toolbars stay inside the note's top (`movable` → `fitIn`, `.fit-tall` scrolls). A new pop-up with an `.ix` X should get `pinX`.
 - Rolling a note up keeps drawing/text toolbars open but hidden (`body.rolled`), so they never cover the top bar.
 - `#scroller` has the arrow cursor (scrollbars), `#sheet` the text cursor.
 - The top bar (1.1.13): All notes, New | title | (lock again) Pin, Roll, ••• | Minimise, Maximise, X. Its buttons are 24 px
@@ -370,6 +430,18 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
   - `v1113.test.js`: favourites (not an edit, not duplicated, groups too), several notes' colour/font, new group from a
     selection (never inside itself), locked things can't be binned/deleted, Empty bin keeps locked ones, dashed/dotted
     ink kept, minimise (pinned stays down) and maximise (unrolls first).
+  - `v1115.test.js`: the new colours, `defaultColors` (random from the list, never empty, old "random"/single colour), the
+    list's Edit (`list:edit`: title and colour only, `note:look` to the open window), Unlock all / Lock again, the drawing
+    toolbar's window (only that window, only for notes; sticking to each side, following the note, screen edges, rolled,
+    pinned, dropped back inside).
+  - `v1116.test.js`: effects: ids match in fx.js and store.js, `resolve` rules (own choice, none, use on every note,
+    paused), every effect and follower runs, settings + `settings:changed`, a note's choice is not an edit and is copied by
+    Duplicate, pause from Settings and the tray (fx.js is run in a `vm` sandbox).
+  - `v1118.test.js`: the 22 new backgrounds: each has a name and an icon, runs on light and dark paper, on a small card and a
+    big note at "Often", and never draws at NaN.
+  - `v1117.test.js`: effect / follower opacity: cleaning (store.js and fx.js agree), `resolve` rules, the layer multiplies
+    every alpha it draws (fake 2D context with a real `globalAlpha` getter/setter), settings + `settings:changed`, a note's
+    own opacity (not an edit, copied by Duplicate).
   - `groups.test.js`: nested groups and drag rules, no loops, move-up/move-to, looks and colours, mass
     edit (with and without sub-groups) pushed to open windows, locking groups (windows hide, list blanks,
     reveal/hide, open-from-list), lock/unlock notes from the list, ungroup moving things up, bin a group.

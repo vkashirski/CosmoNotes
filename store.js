@@ -17,12 +17,47 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const COLORS = ['yellow', 'pink', 'green', 'blue', 'purple', 'orange', 'mint', 'charcoal'];
+// Paper colours. 1.1.15 added the colours of the list themes (cream, rose, sage = the Mint theme, mist = Sky,
+// lavender = Lilac, and the dark night, midnight, forest, plum). In this order everywhere colours are shown:
+// each colour next to its light version, the dark ones last.
+const COLORS = ['yellow', 'cream', 'orange', 'pink', 'rose', 'purple', 'lavender', 'blue', 'mist', 'mint', 'sage', 'green',
+  'charcoal', 'night', 'plum', 'midnight', 'forest'];
+const DARK_COLORS = ['charcoal', 'night', 'midnight', 'forest', 'plum'];
+// 1.1.16: note effects and mouse followers (the same ids as src/fx.js: keep both lists the same)
+const FX_EFFECTS = ['snow', 'fireworks', 'stardust', 'fireflies', 'bubbles', 'leaves', 'hearts', 'rain', 'confetti', 'matrix', 'rainbow',
+  // 1.1.18: the owner's picks from the Effect Lab
+  'plankton', 'fairy', 'warp', 'network', 'embers', 'lorenz', 'blossom', 'nightsky', 'glitch', 'blackhole', 'ocean', 'silk', 'shards', 'xp', 'morph', 'ghost', 'fish', 'solar', 'topo', 'tunnel', 'synthwave', 'dust'];
+const FX_FOLLOWERS = ['frost', 'fireworks', 'stardust', 'fireflies', 'bubbles', 'leaves', 'hearts', 'ripples', 'confetti', 'matrix', 'rainbow', 'pencil'];
+// a note's own choice: null = same as all notes (Settings), 'none' = nothing on this note, or an id
+const cleanFxId = (v, ids) => { if (v === 'comet') v = 'rainbow'; return v === 'none' || ids.includes(v) ? v : null; }; // 'comet' (Rainbow line) was folded into Rainbow
+const FX_AMOUNTS = ['low', 'mid', 'high']; // how much: less, normal, more
+const cleanFxAmount = (v) => (FX_AMOUNTS.includes(v) ? v : null);
+// 1.1.17: how see-through an effect / follower is: 0.1 – 1 in 5 % steps (null = not set; same rule as opacityOf in fx.js)
+const cleanFxOpacity = (v) => {
+  if (v === null || v === undefined || v === '' || typeof v === 'boolean') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(1, Math.max(0.1, Math.round(n * 20) / 20)) : null;
+};
+function cleanFx(fx) {
+  const o = fx && typeof fx === 'object' ? fx : {};
+  // ea / fa: how much of the effect / follower on this note, eo / fo: its opacity (1.1.17) (null = same as all notes)
+  return { e: cleanFxId(o.e, FX_EFFECTS), f: cleanFxId(o.f, FX_FOLLOWERS), ea: cleanFxAmount(o.ea), fa: cleanFxAmount(o.fa), eo: cleanFxOpacity(o.eo), fo: cleanFxOpacity(o.fo) };
+}
+// what "random" meant before 1.1.15: one of the 7 original pastel papers
+const OLD_RANDOM = ['yellow', 'pink', 'green', 'blue', 'purple', 'orange', 'mint'];
+// The colours new notes may get (Settings → For new notes). One = always that colour; several = a random one of them.
+// Anything unknown is dropped, the order follows COLORS, and there is always at least one.
+function cleanColors(list, fallback = 'yellow') {
+  const set = new Set(Array.isArray(list) ? list : []);
+  const out = COLORS.filter((c) => set.has(c));
+  return out.length ? out : [COLORS.includes(fallback) ? fallback : 'yellow'];
+}
 const GROUP_STYLES = ['stack', 'folder', 'envelope', 'notebook'];
 const GROUP_COLORS = ['kraft', 'sun', 'rose', 'coral', 'lilac', 'sky', 'mint', 'graphite'];
 const DEFAULT_SETTINGS = {
   startWithWindows: true,
-  defaultColor: 'yellow',
+  defaultColor: 'yellow', // kept for older versions: the first of defaultColors
+  defaultColors: null, // 1.1.15: the colours new notes pick from at random (null = work it out from defaultColor)
   defaultFont: 'hand',
   firstRunDone: false,
   listBounds: null,
@@ -35,6 +70,16 @@ const DEFAULT_SETTINGS = {
   lockLen: 0, // length of the PIN, so a note opens by itself once that many digits are typed
   defaultOpacity: 1, // see-through for new notes (0.25 – 1)
   defaultSolidOnHover: true, // new notes turn solid while the mouse is over them
+  newColorNoRepeat: true, // 1.1.15: with several colours picked, a new note never gets the colour of the one made just before it
+  lastNewColor: null, // the colour the last new note got (for newColorNoRepeat)
+  fxEffect: 'none', // 1.1.16: the effect behind the writing of every note that hasn't chosen its own
+  fxFollower: 'none', // the mouse follower for every note that hasn't chosen its own
+  fxEffectAmount: 'mid', // how much of it: low (less) | mid (normal) | high (more)
+  fxFollowerAmount: 'mid',
+  fxEffectOpacity: 1, // 1.1.17: how see-through the background effect is (0.1 – 1; 1 = as drawn)
+  fxFollowerOpacity: 1, // and the mouse follower
+  fxForceAll: false, // true: every note shows fxEffect / fxFollower, even ones with their own choice (kept for later)
+  fxPaused: false, // pause every effect and follower
   listTheme: 'cream', // colours of the notes list window (see THEMES in list.js; night, midnight, forest, plum are dark)
   madeGroup: false, // true once a group was ever made: the "drag to make a group" tip stops for good
 };
@@ -157,6 +202,9 @@ function normalize(n) {
     rolled: !!n.rolled,
     locked: !!n.locked,
     favorite: !!n.favorite, // starred in the notes list (1.1.13); not an edit, not copied by Duplicate
+    fx: cleanFx(n.fx), // 1.1.16: this note's own effect / mouse follower ({ e, f }; null = same as all notes); not an edit
+    fxPaused: !!n.fxPaused, // effects paused on this note; not an edit
+    fxPlay: !!n.fxPlay, // 1.1.16: effects play on this note even while all effects are paused (Settings / tray); not an edit
     ink: normalizeInk(n.ink),
     // text layout locked at this width (px) so text and pictures don't re-wrap; null = wraps with the note
     wrapWidth: Number.isFinite(Number(n.wrapWidth)) && Number(n.wrapWidth) >= 80 ? Math.min(4000, Math.round(Number(n.wrapWidth))) : null,
@@ -188,6 +236,12 @@ class Store {
     this.timers = new Map();
     this.settings = { ...DEFAULT_SETTINGS, ...(readJson(this.settingsFile) || readJson(this.settingsFile + '.bak') || {}) };
     this.settings.listSort = { ...DEFAULT_SETTINGS.listSort, ...(this.settings.listSort || {}) };
+    // 1.1.15: one colour for new notes became a list to pick from. "random" meant the 7 original pastels.
+    if (!Array.isArray(this.settings.defaultColors)) {
+      this.settings.defaultColors = this.settings.defaultColor === 'random' ? [...OLD_RANDOM] : cleanColors([this.settings.defaultColor]);
+    }
+    this.settings.defaultColors = cleanColors(this.settings.defaultColors);
+    this.settings.defaultColor = this.settings.defaultColors[0];
     this.groups = new Map();
     const g = readJson(this.groupsFile) || readJson(this.groupsFile + '.bak') || {};
     for (const x of Array.isArray(g.groups) ? g.groups : []) {
@@ -261,10 +315,22 @@ class Store {
     }
   }
 
+  // a colour for a new note: one of the colours picked in Settings, at random. With "never the same colour twice
+  // in a row" on (and more than one colour picked), not the colour the last new note got.
+  newNoteColor() {
+    let list = cleanColors(this.settings.defaultColors, this.settings.defaultColor);
+    if (this.settings.newColorNoRepeat !== false && list.length > 1) list = list.filter((c) => c !== this.settings.lastNewColor);
+    const color = list[Math.floor(Math.random() * list.length)];
+    this.settings.lastNewColor = color;
+    this.saveSettings();
+    return color;
+  }
+
   create(partial = {}) {
+    // a copy (or the welcome note) brings its own colour; only a really new note picks one
+    const color = COLORS.includes(partial.color) ? partial.color : this.newNoteColor();
     const n = normalize({
-      // "random" picks one of the pastel papers (not the dark one)
-      color: this.settings.defaultColor === 'random' ? COLORS[Math.floor(Math.random() * (COLORS.length - 1))] : this.settings.defaultColor,
+      color,
       font: this.settings.defaultFont,
       opacity: Math.min(1, Math.max(0.25, Number(this.settings.defaultOpacity) || 1)),
       solidOnHover: this.settings.defaultSolidOnHover !== false,
@@ -284,7 +350,7 @@ class Store {
   duplicate(id, extra = {}) {
     const src = this.notes.get(id);
     if (!src || src.deletedAt) return null;
-    const keys = ['html', 'text', 'firstImage', 'ink', 'wrapWidth', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'spell', 'locked', 'groupId'];
+    const keys = ['html', 'text', 'firstImage', 'ink', 'wrapWidth', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'spell', 'locked', 'groupId', 'fx'];
     const copy = {};
     for (const k of keys) copy[k] = src[k] && typeof src[k] === 'object' ? JSON.parse(JSON.stringify(src[k])) : src[k];
     copy.title = src.title ? `${src.title} (copy)` : '';
@@ -608,4 +674,4 @@ function backupDayName(name) {
   return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-module.exports = { backupDayName, normalizeInk, Store, COLORS, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };
+module.exports = { backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };
