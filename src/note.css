@@ -860,7 +860,12 @@ body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[da
 body.text-open #tools .tb[data-cmd].on, body.text-open #btnText { background: rgba(0,0,0,.12); }
 body.text-open:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #tools .tb[data-cmd].on, body.text-open:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #btnText { background: rgba(255,255,255,.12); }
 /* 1.1.12: "Turn solid when my mouse is over it" is a sliding switch, like the ones in Settings */
-.check.switch { align-items: center; justify-content: space-between; gap: 10px; }
+.check.switch { display: grid; grid-template-columns: fit-content(240px) auto; justify-content: start; align-items: center; column-gap: 12px; }
+.check.switch[hidden] { display: none; }
+/* 1.1.20: the switch sits right after its text; switches one after another line up (.switches, note.js groupSwitches) */
+.switches { display: grid; grid-template-columns: fit-content(240px) 1fr; column-gap: 12px; }
+.switches > .check.switch { grid-column: 1 / -1; grid-template-columns: subgrid; justify-content: normal; }
+.switches > .check.switch > i { justify-self: start; }
 .check.switch input { position: absolute; opacity: 0; pointer-events: none; }
 .check.switch i { position: relative; flex: none; width: 34px; height: 20px; border-radius: 999px; background: var(--pop-soft2); transition: background .15s; }
 .check.switch i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s; }
@@ -960,6 +965,9 @@ body.rolled #fxCanvas { display: none; }
 .fxop input[type="range"] { flex: 1; min-width: 0; margin: 0; cursor: pointer; }
 .fxop em { flex: none; min-width: 34px; text-align: right; font-style: normal; color: var(--pop-ink); }
 .fxop[hidden] { display: none; }
+/* 1.1.22: switched off (the effect is None): greyed out, still there */
+.fxamt.off, .fxop.off, #fxInteractRow.off { opacity: .45; }
+.fxamt.off button, .fxop.off input, #fxInteractRow.off input { cursor: default; pointer-events: none; }
 .fxi .ok { flex: none; width: 15px; height: 15px; stroke-width: 2.6; visibility: hidden; }
 .fxi.on { background: var(--pop-soft2); }
 .fxi.on .ic { background: var(--pop-bg); }
@@ -1085,7 +1093,7 @@ body.inkbar-out #textPop.tbar {
 }
 /* 1.1.16 (second round): the Effects pop-up is smaller: in the top-right corner like the ⋯ menu, one list at a
    time (tabs), two columns of compact rows */
-#fxPop { left: auto; right: 4px; top: 34px; width: clamp(250px, 62vw, calc(100vw - 8px)); max-height: min(calc(100vh - 42px), 360px); }
+#fxPop { left: auto; right: 4px; top: 34px; width: clamp(250px, 62vw, calc(100vw - 8px)); max-height: min(calc(100vh - 42px), 440px); }
 #fxPop h4 { margin-bottom: 4px; }
 #fxPop .fxtabs { margin: 0 26px 6px 0; }
 #fxPop .fxtabs button { flex: 1; }

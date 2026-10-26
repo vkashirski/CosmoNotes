@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { pathToFileURL } = require('url');
-const { Store, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity } = require('./store');
+const { Store, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity, cleanFx } = require('./store');
 
 const APP_NAME = 'CosmoNotes';
 const OLD_DATA_DIR = 'Sticky Pins'; // where notes lived before the rename
@@ -171,7 +171,8 @@ function noteSettings() {
 function fxSettings() {
   const s = store.settings;
   return { fxEffect: s.fxEffect, fxFollower: s.fxFollower, fxEffectAmount: s.fxEffectAmount, fxFollowerAmount: s.fxFollowerAmount,
-    fxEffectOpacity: cleanFxOpacity(s.fxEffectOpacity) ?? 1, fxFollowerOpacity: cleanFxOpacity(s.fxFollowerOpacity) ?? 1, fxForceAll: !!s.fxForceAll, fxPaused: !!s.fxPaused };
+    fxEffectOpacity: cleanFxOpacity(s.fxEffectOpacity) ?? 1, fxFollowerOpacity: cleanFxOpacity(s.fxFollowerOpacity) ?? 1, fxForceAll: !!s.fxForceAll, fxPaused: !!s.fxPaused,
+    fxInteract: s.fxInteract !== false };
 }
 function setFxPaused(on) {
   store.settings.fxPaused = !!on;
@@ -281,7 +282,7 @@ const BAR_KINDS = ['ink', 'text', 'menu', 'fx'];
 const BAR_TITLES = { ink: 'Drawing', text: 'Text', menu: 'Note settings', fx: 'Effects' };
 const barKind = (k) => (BAR_KINDS.includes(k) ? k : 'ink');
 const INK_GAP = 4; // px between the note and a toolbar stuck to it
-const INK_SNAP = 40; // px: this close to a side, it sticks
+const INK_SNAP = 12; // px: this close to a side, it sticks (1.1.20: was 40, it grabbed toolbars and menus from too far away)
 const INK_TOUCH = 16; // px: a stuck toolbar always overlaps its side by at least this much (1.1.16)
 function inkBarOptions(win, kind = 'ink') {
   const n = store.get(win.noteId);
@@ -381,15 +382,15 @@ function snapInk(win, p) {
   if (!overNote) {
     const overlapY = v.y < b.y + b.height && v.y + v.h > b.y;
     const overlapX = v.x < b.x + b.width && v.x + v.w > b.x;
-    const near = (d, size) => d > -size / 2 && d < INK_SNAP;
+    const near = (d) => d > -INK_SNAP && d < INK_SNAP; // 1.1.22: only when the edges are within a few px of each other (was: could overlap the note by half its own width)
     const dR = v.x - (b.x + b.width);
     const dL = b.x - (v.x + v.w);
     const dT = b.y - (v.y + v.h);
     const dB = v.y - (b.y + b.height);
-    if (overlapY && near(dR, v.w)) cands.push({ side: 'right', d: Math.abs(dR), off: v.y - b.y });
-    if (overlapY && near(dL, v.w)) cands.push({ side: 'left', d: Math.abs(dL), off: v.y - b.y });
-    if (overlapX && near(dT, v.h)) cands.push({ side: 'top', d: Math.abs(dT), off: v.x - b.x });
-    if (overlapX && near(dB, v.h)) cands.push({ side: 'bottom', d: Math.abs(dB), off: v.x - b.x });
+    if (overlapY && near(dR)) cands.push({ side: 'right', d: Math.abs(dR), off: v.y - b.y });
+    if (overlapY && near(dL)) cands.push({ side: 'left', d: Math.abs(dL), off: v.y - b.y });
+    if (overlapX && near(dT)) cands.push({ side: 'top', d: Math.abs(dT), off: v.x - b.x });
+    if (overlapX && near(dB)) cands.push({ side: 'bottom', d: Math.abs(dB), off: v.x - b.x });
   }
   cands.sort((a1, a2) => a1.d - a2.d);
   if (cands.length) return { ...st, mode: 'dock', side: cands[0].side, off: Math.round(cands[0].off) };
@@ -966,6 +967,7 @@ function registerIpc() {
         pinned: n.pinned,
         favorite: n.favorite,
         fx: n.fx, // 1.1.16: the card shows the note's effect too
+        opacity: n.opacity, // 1.1.20: for the Edit design sheet's see-through slider
         fxPaused: n.fxPaused,
         fxPlay: n.fxPlay,
         groupId: n.groupId,
@@ -1184,6 +1186,9 @@ function registerIpc() {
     const clean = {};
     if (typeof patch.title === 'string') clean.title = patch.title;
     if (PAPER[patch.color]) clean.color = patch.color;
+    // 1.1.20 (Edit design): see-through and the note's own effects; neither counts as an edit
+    if (Number.isFinite(Number(patch.opacity)) && patch.opacity !== null && patch.opacity !== '' && typeof patch.opacity !== 'boolean') clean.opacity = Math.min(1, Math.max(0.25, Math.round(Number(patch.opacity) * 20) / 20));
+    if (patch.fx && typeof patch.fx === 'object') clean.fx = cleanFx(patch.fx);
     if (!Object.keys(clean).length) return null;
     const oldTitle = n.title;
     store.update(n.id, clean, { content: false });
@@ -1191,12 +1196,12 @@ function registerIpc() {
     if (m.title !== oldTitle) store.update(n.id, {}, { content: true }); // counts as an edit (updatedAt)
     const win = wins.get(n.id);
     if (win && !win.isDestroyed()) {
-      if ('color' in clean) applyState(win, m);
+      if ('color' in clean || 'opacity' in clean) applyState(win, m);
       else setWinTitle(win, m);
       win.webContents.send('note:look', viewOf(m, win));
     }
     notifyList();
-    return { updatedAt: m.updatedAt, title: m.title, color: m.color };
+    return { updatedAt: m.updatedAt, title: m.title, color: m.color, opacity: m.opacity, fx: m.fx };
   });
 
   ipcMain.handle('list:apply', (e, ids = [], patch = {}) => {
@@ -1291,6 +1296,7 @@ function registerIpc() {
       if (v !== null) { store.settings[k] = v; fxChanged = true; }
     }
     if ('fxForceAll' in patch) { store.settings.fxForceAll = !!patch.fxForceAll; fxChanged = true; }
+    if ('fxInteract' in patch) { store.settings.fxInteract = !!patch.fxInteract; fxChanged = true; } // 1.1.21
     if ('fxPaused' in patch) { store.settings.fxPaused = !!patch.fxPaused; fxChanged = true; buildTray(); }
     if ('spellCheck' in patch) store.settings.spellCheck = !!patch.spellCheck;
     if ('spellCyrillic' in patch) { store.settings.spellCyrillic = !!patch.spellCyrillic; spellLanguages(); }

@@ -9,7 +9,8 @@
  *
  * window.COSMO_FX = { EFFECTS, FOLLOWERS, EFFECT_IDS, FOLLOWER_IDS, resolve, Layer, ICONS }
  *   EFFECTS / FOLLOWERS: id → { name, make(w, h, P, dark, k) }   (k = size factor: 1 for a normal note)
- *   resolve(noteFx, settings) → { effect, follower, effectAmount, followerAmount, effectOpacity, followerOpacity, paused }
+ *   resolve(noteFx, settings) → { effect, follower, effectAmount, followerAmount, effectOpacity, followerOpacity, interact, paused }
+ *   An effect's step(dt, t, m) gets the pointer m = { x, y, vx, vy, sp } (1.1.21, "Mouse plays with the background", called "Mouse can interact with the background" since 1.1.22) or null.
  *   Layer(canvas) → one canvas showing one effect and/or one follower
  *   ICONS: little pictures for the pickers (ICONS.effect[id], ICONS.follower[id], ICONS.none, ICONS.all), with a colour each
  * The ids are also listed in store.js (FX_EFFECTS, FX_FOLLOWERS): keep both lists the same.
@@ -24,15 +25,18 @@
     confetti: ['#E5484D', '#F0A020', '#3A8DDE', '#8E5BD8', '#2FA36B', '#E0608E'],
     code: '#0B7A33', codeDim: '#3E8F5A', codeHead: '#04361A', // Matrix on light paper: deep green, near-black head
     // 1.1.18 (the Effect Lab picks)
-    tide: '#1E6FC0', tideHi: '#0A3F7A', fairy: ['#E0608E', '#8E5BD8', '#3A8DDE', '#2FA36B', '#D49A00'], fairyCore: '#C98A00', fairyHead: '#B07800',
+    tide: '#1E6FC0', tideHi: '#0A3F7A',
     star: '#38446A', warp: '#3A6FD8', net: '#4A5D80', netNode: '#33456A', ember: ['#B3261E', '#D2560A', '#C27C00'], fireGlow: '#E0700A',
-    attr: ['#8E5BD8', '#D9622B', '#1F8FA0'], blossom: ['#EE88AE', '#F29BBB', '#E2709C', '#F5B3CB'], skyStar: '#38446A', shoot: '#3A6FD8',
-    glitch: ['#E5484D', '#2FA36B', '#3A6FD8'], glitchInk: '#3A3A48', disk: ['#C9302C', '#E0700A', '#D99A00'], hole: '#1E1A26', ring: '#E08A00', jet: '#3A6FD8',
+    blossom: ['#EE88AE', '#F29BBB', '#E2709C', '#F5B3CB'], skyStar: '#38446A', shoot: '#3A6FD8',
+    scan: '#3A3A48', 
     wave: '#2C63B8', waveHi: '#0E3A80', silk: ['#8E5BD8', '#3A8DDE', '#D9622B'], shardS: 72, shardL: 55, shardEdge: '#5A6A95', shardGlint: '#FFFFFF',
-    xp: ['#1F9A50', '#2A7FD0'], xpText: '#1F7A40', morph: ['#8E5BD8', '#E0608E', '#3A8DDE'], ripple: '#3A6FD8', rippleHi: '#0E3A80',
+    ripple: '#3A6FD8', rippleHi: '#0E3A80',
+    fishEye: '#0F2340', // 1.1.19
     fish: ['#2A7FD0', '#1F9A8A', '#4F6FD0'], sun: '#E08A00', planet: ['#3A8DDE', '#C9452E', '#2FA36B', '#8E5BD8'], orbit: '#5A6A95',
-    topo: '#7A6440', topoHi: '#4A3A1E', tunnel: '#8E3AD8', tunnel2: '#1F8FC0', sunTop: '#E0507E', sunBot: '#E09A00', horizon: '#E0507E',
     dust: '#8A6A30', shaft: '#FFFFFF',
+    // 1.1.18, third round (Spell Lab picks)
+    heal: ['#1F9A50', '#C28A00'], healHi: '#1F7A40', lightning: '#3A5FD0', lightningHi: '#1E3A9C',
+    brew: ['#0E8A86', '#4E9A06', '#7A4FC8'], brewHi: '#FFFFFF', steam: '#7A8A8A', sea: ['#0E8A86', '#2F6FB0'], fel: ['#3F8A00', '#5FA800'], felHi: '#1F5A00',
   };
   const DARK = {
     snow: '#FFFFFF', gold: '#FFD86B', glow: '#FFE27A', blue: '#9FC4FF', bubble: '#A9CBFF', rain: '#A9C4E4',
@@ -42,15 +46,18 @@
     confetti: ['#FF8A8A', '#FFC46B', '#8EC8FF', '#C9A4FF', '#7FE0AE', '#FF9EC4'],
     code: '#00FF41', codeDim: '#00B82E', codeHead: '#D8FFE2', // Matrix on dark paper: the film's phosphor green
     // 1.1.18 (the Effect Lab picks)
-    tide: '#4FC2FF', tideHi: '#E0F6FF', fairy: ['#FFB3D9', '#D9B8FF', '#A8D8FF', '#A8F0CF', '#FFE08A'], fairyCore: '#FFF1C2', fairyHead: '#FFFFFF',
+    tide: '#4FC2FF', tideHi: '#E0F6FF',
     star: '#FFFFFF', warp: '#9CC4FF', net: '#AFC3F0', netNode: '#E1E9FF', ember: ['#FF4A2E', '#FF8F2A', '#FFD45C'], fireGlow: '#FF6A1E',
-    attr: ['#C9A4FF', '#FFB36B', '#6FE3E0'], blossom: ['#FFB3CC', '#FFC4D8', '#FF9EBE', '#FFD6E4'], skyStar: '#FFFFFF', shoot: '#CFE4FF',
-    glitch: ['#FF4D5E', '#3DFF9A', '#4D8DFF'], glitchInk: '#E8ECF8', disk: ['#FF4A2E', '#FF9A3D', '#FFE08A'], hole: '#05040A', ring: '#FFC46B', jet: '#8EC8FF',
+    blossom: ['#FFB3CC', '#FFC4D8', '#FF9EBE', '#FFD6E4'], skyStar: '#FFFFFF', shoot: '#CFE4FF',
+    scan: '#E8ECF8', 
     wave: '#7FB8FF', waveHi: '#E4F2FF', silk: ['#C9A4FF', '#7FC8FF', '#FFB36B'], shardS: 90, shardL: 72, shardEdge: '#E4ECFF', shardGlint: '#FFFFFF',
-    xp: ['#7DFF7A', '#7FE0FF'], xpText: '#B8FFB0', morph: ['#C9A4FF', '#FF9EC4', '#8EC8FF'], ripple: '#7FB8FF', rippleHi: '#E4F2FF',
+    ripple: '#7FB8FF', rippleHi: '#E4F2FF',
+    fishEye: '#0B1530', // 1.1.19
     fish: ['#6FC0FF', '#5FE3D0', '#9FA8FF'], sun: '#FFD36B', planet: ['#7FC8FF', '#FF8A6B', '#7FE0AE', '#C9A4FF'], orbit: '#9FB4E8',
-    topo: '#C9B48A', topoHi: '#F2E6C8', tunnel: '#D96BFF', tunnel2: '#5CE1FF', sunTop: '#FF5FA8', sunBot: '#FFC24D', horizon: '#FF5FA8',
     dust: '#FFE7B0', shaft: '#FFF2CC',
+    // 1.1.18, third round (Spell Lab picks)
+    heal: ['#7FE0AE', '#FFE08A'], healHi: '#E8FFF2', lightning: '#9FC0FF', lightningHi: '#F2F7FF',
+    brew: ['#5FF2D6', '#B8FF5C', '#C9A4FF'], brewHi: '#FFFFFF', steam: '#E6F0EE', sea: ['#7FFFE0', '#7FB8FF'], fel: ['#4FD020', '#9DFF4A'], felHi: '#EAFFD0',
   };
 
   // ---------------------------------------------------------------- tiny helpers
@@ -103,7 +110,6 @@
   const flow = (x, y, t, s = .011) => Math.sin(x * s + t * .31) * 1.7 + Math.cos(y * s * 1.27 - t * .23) * 1.7 + Math.sin((x - y) * s * .61 + t * .19) * 1.3;
   function wrap(q, w, h, m) { if (q.x < -m) q.x += w + 2 * m; else if (q.x > w + m) q.x -= w + 2 * m; if (q.y < -m) q.y += h + 2 * m; else if (q.y > h + m) q.y -= h + 2 * m; }
   const hsla = (hu, s, l, a) => `hsla(${hu % 360}, ${s}%, ${l}%, ${a})`;
-  function mixHex(a, b, u) { const p = (s, i) => parseInt(s.slice(1 + i * 2, 3 + i * 2), 16); return `rgb(${[0, 1, 2].map((i) => Math.round(p(a, i) + (p(b, i) - p(a, i)) * u)).join(',')})`; }
   // many lines / dots in one go: [x1, y1, x2, y2, …] → one stroke; [[x, y, r, a], …] → a few fills grouped by strength
   function strokeSegs(c, s) { if (!s.length) return; c.beginPath(); for (let i = 0; i < s.length; i += 4) { c.moveTo(s[i], s[i + 1]); c.lineTo(s[i + 2], s[i + 3]); } c.stroke(); }
   function bucketDots(c, items, col, B, maxA) {
@@ -111,6 +117,49 @@
     for (const it of items) groups[Math.min(B - 1, Math.floor(clamp(it[3], 0, .999) * B))].push(it);
     c.fillStyle = col;
     groups.forEach((g, i) => { if (!g.length) return; c.globalAlpha = (i + .5) / B * maxA; c.beginPath(); for (const [x, y, r] of g) { c.moveTo(x + r, y); c.arc(x, y, r, 0, TAU); } c.fill(); });
+  }
+  // 1.1.22: like bucketDots, but everything is also dimmed by one smooth `fade` (0…1), so a fade can run all the way to
+  // nothing (bucketDots keeps its faintest group at about 12 %, so something fading through it vanished with a jump)
+  function bucketFade(c, items, col, B, maxA, fade) {
+    if (fade <= .003) return;
+    const groups = Array.from({ length: B }, () => []);
+    for (const it of items) groups[Math.min(B - 1, Math.floor(clamp(it[3], 0, .999) * B))].push(it);
+    c.fillStyle = col;
+    groups.forEach((g, i) => { if (!g.length) return; c.globalAlpha = (i + .5) / B * maxA * fade; c.beginPath(); for (const [x, y, r] of g) { c.moveTo(x + r, y); c.arc(x, y, r, 0, TAU); } c.fill(); });
+  }
+  // 1.1.20 (mouse followers): [[x1, y1, x2, y2, a], …] → a few strokes grouped by strength
+  function bucketSegs(c, items, col, B, maxA) {
+    const groups = Array.from({ length: B }, () => []);
+    for (const it of items) groups[Math.min(B - 1, Math.floor(clamp(it[4], 0, .999) * B))].push(it);
+    c.strokeStyle = col;
+    groups.forEach((g, i) => { if (!g.length) return; c.globalAlpha = (i + .5) / B * maxA; c.beginPath(); for (const [x1, y1, x2, y2] of g) { c.moveTo(x1, y1); c.lineTo(x2, y2); } c.stroke(); });
+  }
+  // a companion follower (fish, planets, jellyfish…) shows while the mouse moves and fades away `hold` seconds after
+  // it stops; moved() says whether it was gone (so it can come back in next to the pointer)
+  function presence(hold = 2.5) {
+    let still = 1e9; let vis = 0;
+    return {
+      moved() { const gone = vis < .02; still = 0; return gone; },
+      step(dt) { still += dt; vis = clamp(vis + (still < hold ? 1 : -1) * dt * 2.2, 0, 1); },
+      get vis() { return vis; },
+      busy: () => still < hold || vis > 0,
+    };
+  }
+  // 1.1.21: "Mouse plays with the background". An effect's step gets m = { x, y, vx, vy, sp } (where the pointer is,
+  // how fast it's going, px/s) while the mouse is over the note and the toggle is on, otherwise null.
+  // near(q, m, r): 0 far away … 1 right at the pointer
+  const near = (q, m, r) => { const dx = q.x - m.x; const dy = q.y - m.y; if (dx > r || dx < -r || dy > r || dy < -r) return 0; const d = Math.hypot(dx, dy); return d < r ? 1 - d / r : 0; };
+  // shove(q, m, r, f, dt): pushes q's speed away from the pointer (closer = harder) and along the way it's moving
+  function shove(q, m, r, f, dt, carry = .6) {
+    const u = near(q, m, r); if (!u) return 0;
+    const dx = q.x - m.x; const dy = q.y - m.y; const d = Math.hypot(dx, dy) || 1; const p = u * u * f * dt;
+    q.vx += dx / d * p + m.vx * u * carry * dt; q.vy += dy / d * p + m.vy * u * carry * dt; return u;
+  }
+  // nudge(q, m, r, f, dt): the same for something without its own speed: moves q itself
+  function nudge(q, m, r, f, dt, carry = .5) {
+    const u = near(q, m, r); if (!u) return 0;
+    const dx = q.x - m.x; const dy = q.y - m.y; const d = Math.hypot(dx, dy) || 1; const p = u * u * f * dt;
+    q.x += dx / d * p + m.vx * u * carry * dt; q.y += dy / d * p + m.vy * u * carry * dt; return u;
   }
   // a field of stars flying out of a vanishing point (Warp speed)
   function starfield(w, h, N) {
@@ -167,39 +216,84 @@
       q.x += q.vx * dt; q.y += q.vy * dt; q.x = clamp(q.x, -20, w + 20); q.y = clamp(q.y, -20, h + 20);
     }
   }
-  // Shape shifter: outlines, each fitted into -1..1
-  const MORPH_SHAPES = {
-    heart: (u) => { const t = u * TAU; return [16 * Math.sin(t) ** 3 / 17, -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) / 17 - .1]; },
-    star: (u) => { const n = 10; const f = u * n; const i = Math.floor(f) % n; const j = (i + 1) % n; const r = (k) => (k % 2 ? .42 : 1); const a = (k) => -Math.PI / 2 + k * TAU / n; const s = f - Math.floor(f); return [Math.cos(a(i)) * r(i) * (1 - s) + Math.cos(a(j)) * r(j) * s, Math.sin(a(i)) * r(i) * (1 - s) + Math.sin(a(j)) * r(j) * s + .08]; },
-    moon: (u) => { if (u < .6) { const a = .62 + u / .6 * (TAU - 1.24); return [Math.cos(a) * .95, Math.sin(a) * .95]; } const a = 2.05 - (u - .6) / .4 * 4.1; return [.42 + Math.cos(a + Math.PI) * .7, Math.sin(a + Math.PI) * .7]; },
-    infinity: (u) => { const t = u * TAU; const d = 1 + Math.sin(t) ** 2; return [Math.cos(t) / d * 1.05, Math.sin(t) * Math.cos(t) / d * 1.2]; },
-    flower: (u) => { const t = u * TAU; const r = .62 + .36 * Math.cos(5 * t); return [Math.cos(t) * r, Math.sin(t) * r]; },
-  };
+  // a jagged line from x0, y0 to x1, y1 (midpoint displacement) as segments for strokeSegs (Lightning)
+  function zig(x0, y0, x1, y1, rough, depth, out) { if (depth === 0) { out.push(x0, y0, x1, y1); return; } const mx = (x0 + x1) / 2 + R(-rough, rough); const my = (y0 + y1) / 2 + R(-rough, rough) * .4; zig(x0, y0, mx, my, rough / 2, depth - 1, out); zig(mx, my, x1, y1, rough / 2, depth - 1, out); }
   // an even field of dots (Ghost ripple)
   function dotLattice(w, h, sp) { const d = []; let row = 0; for (let y = sp / 2; y < h + sp; y += sp * .87, row++) for (let x = (row % 2 ? sp / 2 : 0); x < w + sp; x += sp) d.push({ bx: x, by: y, x, y, vx: 0, vy: 0, b: 0 }); return d; }
-  // Contour map: an imaginary landscape, and its contour lines by marching squares (every 4th level is a darker
-  // "index" line, like on real maps): { lines: [x1, y1, x2, y2, …], index: […] }
-  const terrain = (x, y, t) => Math.sin(x * .018 + t * .05) + Math.sin(y * .022 - t * .04) * .8 + Math.sin((x + y) * .011 + t * .03) * 1.1 + Math.sin(Math.hypot(x - 200, y - 110) * .03 - t * .08) * .6;
-  function contours(w, h, t, g, step) {
-    const cols = Math.ceil(w / g) + 1; const rows = Math.ceil(h / g) + 1; const v = new Float32Array(cols * rows);
-    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) v[j * cols + i] = terrain(i * g, j * g, t);
-    const lines = []; const index = [];
-    for (let L = -3.2, n = 0; L <= 3.2; L += step, n++) {
-      const out = n % 4 === 0 ? index : lines;
-      for (let j = 0; j < rows - 1; j++) for (let i = 0; i < cols - 1; i++) {
-        const a = v[j * cols + i]; const b = v[j * cols + i + 1]; const c = v[(j + 1) * cols + i + 1]; const d = v[(j + 1) * cols + i];
-        const m = (a > L ? 8 : 0) | (b > L ? 4 : 0) | (c > L ? 2 : 0) | (d > L ? 1 : 0); if (m === 0 || m === 15) continue;
-        const x = i * g; const y = j * g; const f = (p, q) => (L - p) / (q - p);
-        const T = [x + g * f(a, b), y]; const Rr = [x + g, y + g * f(b, c)]; const B = [x + g * f(d, c), y + g]; const Lf = [x, y + g * f(a, d)];
-        const seg = (p1, p2) => out.push(p1[0], p1[1], p2[0], p2[1]);
-        switch (m) {
-          case 1: case 14: seg(Lf, B); break; case 2: case 13: seg(B, Rr); break; case 3: case 12: seg(Lf, Rr); break;
-          case 4: case 11: seg(T, Rr); break; case 6: case 9: seg(T, B); break; case 7: case 8: seg(Lf, T); break;
-          case 5: seg(Lf, T); seg(B, Rr); break; case 10: seg(T, Rr); seg(Lf, B); break; default: break;
-        }
-      }
+
+  // 1.1.19 Fish, drawn along a short bending spine (shared with the Fish mouse follower since 1.1.20). A fish q has
+  // sp (FISH_NS + 1 spine points), sw (swim phase), BL (body length) and ph
+  const FISH_NS = 4;
+  // half the body's width along it (u: 0 at the nose, 1 where the tail starts): round head, slim towards the tail
+  const fishHw = (u, BL) => BL * .19 * (u < .3 ? .7 + .3 * Math.sin(u / .3 * Math.PI / 2) : 1 - .8 * Math.pow((u - .3) / .7, 1.1));
+  // the spine with the swimming wave on it: [x, y, forward x, forward y, u]
+  const fishSpine = (q) => { const NS = FISH_NS;
+    const pts = [];
+    for (let j = 0; j <= NS; j++) {
+      const p = q.sp[j]; const a = q.sp[Math.max(0, j - 1)]; const z = q.sp[Math.min(NS, j + 1)];
+      let tx = a.x - z.x; let ty = a.y - z.y; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+      const u = j / NS; const o = Math.sin(q.sw - u * 2.4) * q.BL * .07 * u * u;
+      pts.push([p.x - ty * o, p.y + tx * o, tx, ty, u]);
     }
-    return { lines, index };
+    return pts;
+  };
+  // the body: one smooth closed outline (nose, down one side, the tail end, back up the other side)
+  function fishBody(c, q, pts) { const NS = FISH_NS;
+    const n = pts[0]; const s0 = fishHw(0, q.BL); const ring = [[n[0] + n[2] * s0 * 1.25, n[1] + n[3] * s0 * 1.25]];
+    for (const p of pts) { const s = fishHw(p[4], q.BL); ring.push([p[0] - p[3] * s, p[1] + p[2] * s]); }
+    const e = pts[NS]; ring.push([e[0] - e[2] * q.BL * .04, e[1] - e[3] * q.BL * .04]);
+    for (let j = NS; j >= 0; j--) { const p = pts[j]; const s = fishHw(p[4], q.BL); ring.push([p[0] + p[3] * s, p[1] - p[2] * s]); }
+    const m = ring.length; const mid = (i) => { const a = ring[i % m]; const z = ring[(i + 1) % m]; return [(a[0] + z[0]) / 2, (a[1] + z[1]) / 2]; };
+    const st = mid(m - 1); c.moveTo(st[0], st[1]);
+    for (let i = 0; i < m; i++) { const z = mid(i); c.quadraticCurveTo(ring[i][0], ring[i][1], z[0], z[1]); }
+    c.closePath();
+  }
+  // the fins: a forked tail that swings a beat behind the body (its tips lag a little more), and two side fins
+  function fishFins(c, q, pts) { const NS = FISH_NS;
+    const e = pts[NS]; const wag = Math.sin(q.sw - 3.3) * .5; const ca = Math.cos(wag); const sa = Math.sin(wag);
+    const bx = -(e[2] * ca - e[3] * sa); const by = -(e[2] * sa + e[3] * ca); const nx = -by; const ny = bx; const TL = q.BL * .42;
+    const curl = Math.sin(q.sw - 4.2) * .16;
+    const Pt = (a, s) => [e[0] + bx * a * TL + nx * s * TL, e[1] + by * a * TL + ny * s * TL];
+    const p0 = Pt(-.12, -.13); const c1 = Pt(.35, -.22); const t1 = Pt(1, -.6 + curl); const c2 = Pt(.62, -.16); const nt = Pt(.52, curl * .5); const c3 = Pt(.62, .16); const t2 = Pt(1, .6 + curl); const c4 = Pt(.35, .22); const p1 = Pt(-.12, .13);
+    c.moveTo(p0[0], p0[1]); c.quadraticCurveTo(c1[0], c1[1], t1[0], t1[1]); c.quadraticCurveTo(c2[0], c2[1], nt[0], nt[1]);
+    c.quadraticCurveTo(c3[0], c3[1], t2[0], t2[1]); c.quadraticCurveTo(c4[0], c4[1], p1[0], p1[1]); c.closePath();
+    const p = pts[1]; const s = fishHw(p[4], q.BL); const L = q.BL;
+    for (const side of [-1, 1]) {
+      const fl = 1 + .35 * Math.sin(q.sw * .6 + q.ph + side * 1.4);
+      const B = [p[0] - p[3] * side * s * .7, p[1] + p[2] * side * s * .7];
+      const tip = [B[0] - p[2] * L * .2 - p[3] * side * L * .14 * fl, B[1] - p[3] * L * .2 + p[2] * side * L * .14 * fl];
+      c.moveTo(B[0], B[1]); c.quadraticCurveTo(B[0] - p[3] * side * L * .13 * fl, B[1] + p[2] * side * L * .13 * fl, tip[0], tip[1]);
+      c.quadraticCurveTo(B[0] - p[2] * L * .12, B[1] - p[3] * L * .12, B[0] - p[2] * L * .1, B[1] - p[3] * L * .1); c.closePath();
+    }
+  }
+
+  // the spine follows the head (q.x, q.y), and the tail beats faster when it swims faster
+  function fishBend(q, dt, S) {
+    const p0 = q.sp[0]; p0.x = q.x; p0.y = q.y; const sl = q.BL / FISH_NS;
+    for (let j = 1; j <= FISH_NS; j++) { const p = q.sp[j]; const r = q.sp[j - 1]; const dx = p.x - r.x; const dy = p.y - r.y; const d = Math.hypot(dx, dy) || 1; p.x = r.x + dx / d * sl; p.y = r.y + dy / d * sl; }
+    q.sw += dt * (7 + Math.hypot(q.vx, q.vy) / S * .12);
+  }
+  // a new fish heading at angle a (g = which of the three colours)
+  function fishNew(x, y, a, BL, g) { return { x, y, vx: Math.cos(a) * 30, vy: Math.sin(a) * 30, g, ph: R(0, TAU), BL, sw: R(0, TAU), sp: Array.from({ length: FISH_NS + 1 }, (_, j) => ({ x: x - Math.cos(a) * j * BL / FISH_NS, y: y - Math.sin(a) * j * BL / FISH_NS })) }; }
+  // draws a list of fish: one fill per colour for the fins, one for the bodies, then a sheen and the eyes (7 fills)
+  function fishDraw(c, b, P, dark, S) {
+    const all = b.map((q) => [q, fishSpine(q)]);
+    // one fill per colour for the fins, one for the bodies: cheap however many fish there are
+    for (let g = 0; g < 3; g++) {
+      c.fillStyle = P.fish[g];
+      c.globalAlpha = dark ? .6 : .55; c.beginPath(); for (const [q, pts] of all) if (q.g === g) fishFins(c, q, pts); c.fill();
+      c.globalAlpha = .9; c.beginPath(); for (const [q, pts] of all) if (q.g === g) fishBody(c, q, pts); c.fill();
+    }
+    // a soft sheen along each back, and two tiny eyes
+    c.strokeStyle = '#FFFFFF'; c.lineCap = 'round'; c.lineWidth = Math.max(.6, 1.1 * S); c.globalAlpha = dark ? .3 : .38; c.beginPath();
+    for (const [, pts] of all) { const a = pts[0]; const m = pts[1]; const z = pts[2]; c.moveTo(a[0] + a[2] * 1.2, a[1] + a[3] * 1.2); c.quadraticCurveTo(m[0], m[1], z[0], z[1]); }
+    c.stroke();
+    c.fillStyle = P.fishEye; c.globalAlpha = .65; c.beginPath();
+    for (const [q, pts] of all) {
+      const a = pts[0]; const s = fishHw(.08, q.BL) * .58; const r = Math.max(.45, .55 * S); const x = a[0] + a[2] * q.BL * .02; const y = a[1] + a[3] * q.BL * .02;
+      for (const side of [-1, 1]) { const ex = x - a[3] * s * side; const ey = y + a[2] * s * side; c.moveTo(ex + r, ey); c.arc(ex, ey, r, 0, TAU); }
+    }
+    c.fill();
   }
 
   // ---------------------------------------------------------------- Matrix: the film's digital rain
@@ -229,9 +323,33 @@
   const EFFECTS = {
     snow: { name: 'Snow', make(w, h, P, dark, k) {
       const f = Array.from({ length: count(26, k) }, () => ({ x: R(0, w), y: R(0, h), s: R(2.4, 4.6), vy: R(11, 21), rot: R(0, TAU), vr: R(-.7, .7), ph: R(0, TAU), sw: R(.5, 1) }));
+      // 1.1.22: a flake the pointer touches shatters: its six arms break off and tumble away the way the pointer was
+      // going, with a puff of powder, then fade; a new flake starts falling from the top
+      const bits = [];
+      const shatter = (p, x, m) => {
+        for (let i = 0; i < 6; i++) {
+          const a = p.rot + i * Math.PI / 3; const v = R(18, 45);
+          if (bits.length < 140) bits.push({ x: x + Math.cos(a) * p.s * .5, y: p.y + Math.sin(a) * p.s * .5, vx: Math.cos(a) * v + m.vx * R(.15, .3), vy: Math.sin(a) * v + m.vy * R(.15, .3) - 8, a, va: R(-6, 6), len: p.s * R(.45, .7), age: 0, life: R(.9, 1.5) });
+        }
+        for (let i = 0; i < 5; i++) if (bits.length < 140) bits.push({ x, y: p.y, vx: R(-25, 25) + m.vx * .2, vy: R(-25, 15) + m.vy * .2, dust: true, age: 0, life: R(.5, 1) });
+        p.y = -6; p.x = R(0, w);
+      };
       return {
-        step(dt) { for (const p of f) { p.y += p.vy * dt; p.rot += p.vr * dt; if (p.y > h + 6) { p.y = -6; p.x = R(0, w); } } },
-        draw(c, t) { c.strokeStyle = P.snow; c.lineCap = 'round'; c.lineWidth = 1.1; c.globalAlpha = .75; for (const p of f) flake(c, p.x + Math.sin(t * p.sw + p.ph) * 8, p.y, p.s, p.rot); },
+        step(dt, t, m) {
+          for (const p of f) {
+            p.y += p.vy * dt; p.rot += p.vr * dt;
+            if (m) { const x = p.x + Math.sin(t * p.sw + p.ph) * 8; if (Math.abs(x - m.x) < p.s + 7 && Math.abs(p.y - m.y) < p.s + 7) shatter(p, x, m); }
+            if (p.y > h + 6) { p.y = -6; p.x = R(0, w); } if (p.x < -10) p.x += w + 20; else if (p.x > w + 10) p.x -= w + 20;
+          }
+          const dr = Math.pow(.35, dt); for (const b of bits) { b.vx *= dr; b.vy = b.vy * dr + 30 * dt; b.x += b.vx * dt; b.y += b.vy * dt; if (!b.dust) b.a += b.va * dt; } cull(bits, dt);
+        },
+        draw(c, t) {
+          c.strokeStyle = P.snow; c.lineCap = 'round'; c.lineWidth = 1.1; c.globalAlpha = .75; for (const p of f) flake(c, p.x + Math.sin(t * p.sw + p.ph) * 8, p.y, p.s, p.rot);
+          if (bits.length) {
+            bucketSegs(c, bits.filter((b) => !b.dust).map((b) => { const dx = Math.cos(b.a) * b.len / 2; const dy = Math.sin(b.a) * b.len / 2; return [b.x - dx, b.y - dy, b.x + dx, b.y + dy, 1 - b.age / b.life]; }), P.snow, 3, .8);
+            bucketDots(c, bits.filter((b) => b.dust).map((b) => [b.x, b.y, .8, 1 - b.age / b.life]), P.snow, 3, .7);
+          }
+        },
       };
     } },
     fireworks: { name: 'Fireworks', make(w, h, P, dark, k) {
@@ -265,7 +383,7 @@
         }
       }
       return {
-        step(dt) {
+        step(dt, t, m) {
           if (go(dt)) {
             const n = Math.random() < .3 ? (Math.random() < .4 ? 3 : 2) : 1;
             for (let i = 0; i < n; i++) {
@@ -282,11 +400,11 @@
             const r = rockets[i];
             r.tr.push({ x: r.x, y: r.y }); if (r.tr.length > 5) r.tr.shift();
             r.vy += 70 * scale * dt; r.x += r.vx * dt; r.y += r.vy * dt; // leans and slows as it climbs
-            if (r.y <= r.top || r.vy > -12) { burst(r); rockets.splice(i, 1); }
+            if (r.y <= r.top || r.vy > -12 || (m && near(r, m, 16))) { burst(r); rockets.splice(i, 1); }
           }
           const drag = Math.pow(.55, dt);
           for (let i = sparks.length - 1; i >= 0; i--) {
-            const q = sparks[i]; q.age += dt; q.vx *= drag; q.vy = q.vy * drag + q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt;
+            const q = sparks[i]; if (m) shove(q, m, 50, 260, dt, .8); q.age += dt; q.vx *= drag; q.vy = q.vy * drag + q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt;
             if (q.age > q.life) sparks.splice(i, 1);
           }
         },
@@ -309,10 +427,10 @@
     stardust: { name: 'Stardust', make(w, h, P, dark, k) {
       const s = Array.from({ length: count(14, k) }, () => ({ x: R(6, w - 6), y: R(6, h - 6), t: R(0, 1), sp: R(.35, .65), r: R(3, 5.5) }));
       return {
-        step(dt) { for (const q of s) { q.t += q.sp * dt; if (q.t >= 1) { q.t = 0; q.x = R(6, w - 6); q.y = R(6, h - 6); } } },
+        step(dt, t, m) { for (const q of s) { q.t += q.sp * dt; if (q.t >= 1) { q.t = 0; q.x = R(6, w - 6); q.y = R(6, h - 6); } q.g = Math.max(m ? near(q, m, 70) : 0, (q.g || 0) - dt * 1.5); } },
         draw(c) {
           for (const q of s) {
-            const v = Math.sin(q.t * Math.PI); if (v <= 0) continue;
+            const v = Math.min(1, Math.sin(q.t * Math.PI) + (q.g || 0) * .8) * (1 + (q.g || 0) * .45); if (v <= 0) continue;
             const g = c.createRadialGradient(q.x, q.y, 0, q.x, q.y, q.r * 2.6);
             g.addColorStop(0, P.gold); g.addColorStop(1, 'transparent');
             c.globalAlpha = v * (dark ? .45 : .35); c.fillStyle = g; c.beginPath(); c.arc(q.x, q.y, q.r * 2.6, 0, TAU); c.fill();
@@ -327,16 +445,36 @@
     fireflies: { name: 'Fireflies', make(w, h, P, dark, k) {
       const f = Array.from({ length: count(9, k) }, () => ({ x: R(0, w), y: R(0, h), a: R(0, TAU), sp: R(8, 15), ph: R(0, TAU) }));
       return {
-        step(dt) { for (const q of f) { q.a += R(-1.6, 1.6) * dt; q.x += Math.cos(q.a) * q.sp * dt; q.y += Math.sin(q.a) * q.sp * dt; if (q.x < 0 || q.x > w) q.a = Math.PI - q.a; if (q.y < 0 || q.y > h) q.a = -q.a; q.x = Math.max(0, Math.min(w, q.x)); q.y = Math.max(0, Math.min(h, q.y)); } },
+        // 1.1.22: fireflies near the pointer get curious and follow it for a few seconds (hovering round it, like the
+        // Fireflies mouse effect), then lose interest and wander off again for a while. Third round (the magnet was too
+        // strong): only fireflies close to the pointer (70 px) get interested, the pull is gentle (they drift over instead
+        // of snapping to it, weaker the further away they are) and one lets go once the pointer is over ~110 px away
+        step(dt, t, m) {
+          for (const q of f) {
+            q.a += R(-1.6, 1.6) * dt; q.cool = Math.max(0, (q.cool || 0) - dt);
+            if (m && !q.fol && !q.cool && near(q, m, 70)) { q.fol = R(1.6, 3); q.ox = R(-26, 26); q.oy = R(-20, 20); q.k = R(.5, 1.1); }
+            if (q.fol && m && !near(q, m, 110)) { q.fol = 0; q.cool = R(4, 8); q.a = Math.atan2(q.y - m.y, q.x - m.x) + R(-.7, .7); } // the pointer got away: the pull doesn't reach that far
+            if (q.fol && m) {
+              q.fol = Math.max(0, q.fol - dt); const tx = m.x + q.ox + Math.sin(t * 2 + q.ph) * 6; const ty = m.y + q.oy + Math.cos(t * 1.7 + q.ph) * 6;
+              const pull = Math.min(1, q.k * (.4 + .6 * near(q, m, 110)) * dt); const nx = q.x + (tx - q.x) * pull; const ny = q.y + (ty - q.y) * pull;
+              if (Math.hypot(nx - q.x, ny - q.y) > .05) q.a = Math.atan2(ny - q.y, nx - q.x); q.x = nx; q.y = ny;
+              if (!q.fol) { q.cool = R(10, 16); q.a = Math.atan2(q.y - m.y, q.x - m.x) + R(-.7, .7); } // bored: off it goes, away from the pointer
+            } else {
+              if (q.fol) { q.fol = 0; q.cool = R(1, 2); }
+              q.x += Math.cos(q.a) * q.sp * dt; q.y += Math.sin(q.a) * q.sp * dt;
+            }
+            if (q.x < 0 || q.x > w) q.a = Math.PI - q.a; if (q.y < 0 || q.y > h) q.a = -q.a; q.x = Math.max(0, Math.min(w, q.x)); q.y = Math.max(0, Math.min(h, q.y));
+          }
+        },
         draw(c, t) { for (const q of f) glowDot(c, q.x, q.y, 3.4, P.glow, .45 + .45 * Math.sin(t * 1.6 + q.ph)); },
       };
     } },
     bubbles: { name: 'Bubbles', make(w, h, P, dark, k) {
       const b = []; const pops = []; const go = every(.35, .7, k);
       return {
-        step(dt) {
+        step(dt, t, m) {
           if (go(dt)) b.push({ x: R(8, w - 8), y: h + 8, r: R(4, 8), vy: R(18, 30), at: R(h * .1, h * .7), ph: R(0, TAU) });
-          for (let i = b.length - 1; i >= 0; i--) { const q = b[i]; q.y -= q.vy * dt; if (q.y <= q.at) { pops.push({ x: q.x, y: q.y, r: q.r, age: 0, life: .3 }); b.splice(i, 1); } }
+          for (let i = b.length - 1; i >= 0; i--) { const q = b[i]; q.y -= q.vy * dt; if (q.y <= q.at || (m && Math.hypot(q.x - m.x, q.y - m.y) < q.r + 5)) { pops.push({ x: q.x, y: q.y, r: q.r, age: 0, life: .3 }); b.splice(i, 1); } }
           cull(pops, dt);
         },
         draw(c, t) {
@@ -347,9 +485,9 @@
       };
     } },
     leaves: { name: 'Autumn leaves', make(w, h, P, dark, k) {
-      const f = Array.from({ length: count(8, k) }, () => ({ x: R(0, w), y: R(0, h), vy: R(12, 20), ph: R(0, TAU), s: R(5, 7.5), col: pick(P.leaf) }));
+      const f = Array.from({ length: count(8, k) }, () => ({ x: R(0, w), y: R(0, h), vy: R(12, 20), ph: R(0, TAU), s: R(5, 7.5), col: pick(P.leaf), gx: 0, gy: 0 }));
       return {
-        step(dt) { for (const q of f) { q.y += q.vy * dt; if (q.y > h + 10) { q.y = -10; q.x = R(0, w); q.col = pick(P.leaf); } } },
+        step(dt, t, m) { const dr = Math.pow(.25, dt); for (const q of f) { if (m) { const o = { x: q.x, y: q.y, vx: q.gx, vy: q.gy }; if (shove(o, m, 55, 220, dt, 1.2)) { q.gx = o.vx; q.gy = o.vy; q.ph += dt * 4; } } q.gx *= dr; q.gy *= dr; q.x += q.gx * dt; q.y += q.gy * dt; if (q.x < -14) q.x += w + 28; else if (q.x > w + 14) q.x -= w + 28; q.y += q.vy * dt; if (q.y > h + 10) { q.y = -10; q.x = R(0, w); q.col = pick(P.leaf); } } },
         draw(c, t) {
           for (const q of f) {
             const sw = Math.sin(t * 1.4 + q.ph); c.save(); c.translate(q.x + sw * 14, q.y); c.rotate(sw * .8);
@@ -362,21 +500,36 @@
     hearts: { name: 'Hearts', make(w, h, P, dark, k) {
       const f = Array.from({ length: count(9, k) }, () => ({ x: R(0, w), y: R(0, h), vy: R(13, 22), s: R(4, 7.5), ph: R(0, TAU) }));
       return {
-        step(dt) { for (const q of f) { q.y -= q.vy * dt; if (q.y < -10) { q.y = h + 10; q.x = R(0, w); } } },
-        draw(c, t) { c.fillStyle = P.heart; for (const q of f) { c.globalAlpha = Math.min(1, q.y / (h * .5)) * .75; heart(c, q.x + Math.sin(t * 1.6 + q.ph) * 5, q.y, q.s); } },
+        step(dt, t, m) { for (const q of f) { q.big = Math.max(m ? near(q, m, 60) : 0, (q.big || 0) - dt * 1.2); q.y -= q.vy * (1 + (q.big || 0) * 1.5) * dt; if (q.y < -10) { q.y = h + 10; q.x = R(0, w); } } },
+        draw(c, t) { c.fillStyle = P.heart; for (const q of f) { const b = q.big || 0; c.globalAlpha = Math.min(1, q.y / (h * .5)) * (.75 + b * .25); heart(c, q.x + Math.sin(t * 1.6 + q.ph) * 5, q.y, q.s * (1 + b * (.45 + .15 * Math.sin(t * 14)))); } },
       };
     } },
     rain: { name: 'Rain', make(w, h, P, dark, k) {
       const d = Array.from({ length: count(30, k) }, () => ({ x: R(0, w), y: R(0, h), len: R(6, 11), sp: R(190, 250) }));
+      const splash = []; const UMB = 15; // 1.1.21: drops that hit the pointer splash off it
       return {
-        step(dt) { for (const q of d) { q.y += q.sp * dt; q.x += q.sp * .14 * dt; if (q.y > h + 12) { q.y = -12; q.x = R(-20, w); } } },
-        draw(c) { c.strokeStyle = P.rain; c.lineWidth = 1.1; c.lineCap = 'round'; c.globalAlpha = .5; c.beginPath(); for (const q of d) { c.moveTo(q.x, q.y); c.lineTo(q.x - q.len * .14, q.y - q.len); } c.stroke(); },
+        step(dt, t, m) {
+          for (const q of d) {
+            const y0 = q.y; q.y += q.sp * dt; q.x += q.sp * .14 * dt;
+            if (m && Math.abs(q.x - m.x) < UMB && y0 <= m.y - 3 && q.y > m.y - 3 - (UMB - Math.abs(q.x - m.x)) * .5 - 8) {
+              const sy = m.y - 3 - Math.sqrt(Math.max(0, UMB * UMB - (q.x - m.x) ** 2)) * .45;
+              if (splash.length < 60) for (let i = 0; i < 3; i++) splash.push({ x: q.x, y: sy, vx: (q.x - m.x) * R(2, 4) + R(-25, 25), vy: -R(30, 60), age: 0, life: R(.25, .4) });
+              q.y = -12 - R(0, 30); q.x = R(-20, w);
+            }
+            if (q.y > h + 12) { q.y = -12; q.x = R(-20, w); }
+          }
+          for (const s of splash) { s.vy += 300 * dt; s.x += s.vx * dt; s.y += s.vy * dt; } cull(splash, dt);
+        },
+        draw(c) {
+          c.strokeStyle = P.rain; c.lineWidth = 1.1; c.lineCap = 'round'; c.globalAlpha = .5; c.beginPath(); for (const q of d) { c.moveTo(q.x, q.y); c.lineTo(q.x - q.len * .14, q.y - q.len); } c.stroke();
+          if (splash.length) { c.fillStyle = P.rain; c.globalAlpha = .7; c.beginPath(); for (const s of splash) { const r = 1.1 * (1 - s.age / s.life * .5); c.moveTo(s.x + r, s.y); c.arc(s.x, s.y, r, 0, TAU); } c.fill(); }
+        },
       };
     } },
     confetti: { name: 'Confetti', make(w, h, P, dark, k) {
-      const f = Array.from({ length: count(22, k) }, () => ({ x: R(0, w), y: R(0, h), vy: R(20, 36), rot: R(0, TAU), vr: R(-3, 3), ph: R(0, TAU), col: pick(P.confetti) }));
+      const f = Array.from({ length: count(22, k) }, () => ({ x: R(0, w), y: R(0, h), vy: R(20, 36), rot: R(0, TAU), vr: R(-3, 3), ph: R(0, TAU), col: pick(P.confetti), gx: 0, gy: 0 }));
       return {
-        step(dt) { for (const q of f) { q.y += q.vy * dt; q.rot += q.vr * dt; if (q.y > h + 6) { q.y = -6; q.x = R(0, w); } } },
+        step(dt, t, m) { const dr = Math.pow(.3, dt); for (const q of f) { if (m) { const o = { x: q.x, y: q.y, vx: q.gx, vy: q.gy }; if (shove(o, m, 50, 300, dt, 1.4)) { q.gx = o.vx; q.gy = o.vy; q.rot += dt * 10; } } q.gx *= dr; q.gy *= dr; q.x += q.gx * dt; q.y += (q.vy + q.gy) * dt; q.rot += q.vr * dt; if (q.x < -8) q.x += w + 16; else if (q.x > w + 8) q.x -= w + 16; if (q.y > h + 6) { q.y = -6; q.x = R(0, w); } } },
         draw(c, t) { for (const q of f) { c.save(); c.translate(q.x + Math.sin(t + q.ph) * 6, q.y); c.rotate(q.rot); c.scale(1, Math.cos(t * 3 + q.ph)); c.globalAlpha = .82; c.fillStyle = q.col; c.fillRect(-2, -3.5, 4, 7); c.restore(); } },
       };
     } },    // "The film": columns of code at different speeds, bright heads, long fading trails
@@ -387,7 +540,16 @@
       const cols = [];
       for (let x = size / 2; x < w; x += size) if (Math.random() < dens) { const col = { x, cells: codeCells(rows + 2) }; fresh(col); col.head = R(-rows, rows); cols.push(col); }
       return {
-        step(dt) {
+        step(dt, t, m) {
+          if (m) {
+            const mx = w - m.x; const row = Math.floor(m.y / size);
+            for (const col of cols) {
+              if (Math.abs(col.x - mx) > size * .6) continue;
+              if (row >= 0 && row < col.cells.length) col.cells[row] = glyph();
+              const idle = col.wait > 0 || col.head - col.len > row + 2 || col.head < row - 6;
+              if (idle && m.sp > 25 && Math.random() < dt * 5) { col.wait = 0; col.head = m.y / size; col.sp = R(10, 16); col.len = Math.round(R(8, 18)); }
+            }
+          }
           for (const col of cols) {
             if (col.wait > 0) { col.wait -= dt; continue; }
             col.head += col.sp * dt;
@@ -453,11 +615,21 @@
         o.drawImage(sc, 0, 0);
       }
       const GROW = 4.8; const STAY = 3; const FADE = 2.6; const WAIT = 1.6 / Math.max(.15, k); // "Often" comes back sooner
-      let cur = null; let first = true;
+      let cur = null; let first = true; const glints = [];
       return {
-        step(dt) {
+        step(dt, t, m) {
           if (!cur) { cur = { g: path(), age: first ? GROW * .5 : 0 }; first = false; }
           cur.age += dt;
+          // 1.1.21: where the pointer touches the drawn part of the bow, it glitters in the bow's colours
+          if (m && glints.length < 40 && cur.age < GROW + STAY + FADE * .5) {
+            const g = cur.g; const dr = Math.hypot(m.x - g.cx, m.y - g.cy); const depth = g.r - dr;
+            if (depth > -band && depth < band * 8) {
+              let a = Math.atan2(m.y - g.cy, m.x - g.cx) - g.aS; while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU;
+              const u = a / g.d; const prog = ease(cur.age / GROW);
+              if (u > .03 && u < Math.min(.97, prog) && Math.random() < dt * (8 + m.sp * .05)) glints.push({ x: m.x + R(-6, 6), y: m.y + R(-6, 6), hue: RAINBOW_HUES[clamp(Math.floor(depth / band), 0, 6)], age: 0, life: R(.5, .9), vy: R(-14, -4) });
+            }
+          }
+          for (const q of glints) q.y += q.vy * dt; cull(glints, dt);
           if (cur.age > GROW + STAY + FADE + WAIT) cur = null;
         },
         draw(c) {
@@ -470,6 +642,7 @@
           // a double rainbow: the second bow is just as wide and solid, a little fainter, colours the other way round
           if (cur.g.double) bow(cur.g, cur.g.r + band * 9, true, ease((t - GROW * .3) / GROW) * (1 + FRONT), .62);
           c.save(); c.filter = 'blur(1.6px)'; c.globalAlpha = alpha; c.drawImage(off, 0, 0, w, h); c.restore();
+          for (const q of glints) { const v = q.age / q.life; c.globalAlpha = Math.sin(Math.PI * v) * .95; c.fillStyle = `hsl(${q.hue} ${dark ? 95 : 85}% ${dark ? 78 : 62}%)`; star4(c, q.x, q.y, 3.2 * (1 - v * .4)); }
         },
       };
     } },
@@ -480,7 +653,8 @@
       const f = Array.from({ length: capped(60, k, 150) }, () => ({ x: R(0, w), y: R(0, h), vx: 0, vy: 0, ph: R(0, TAU), r: R(1.3, 2.4), lit: 0 }));
       let wave = null; let wait = R(.2, .8); const go = every(1.5, 4, k);
       return {
-        step(dt, t) {
+        step(dt, t, m) {
+          if (m) for (const q of f) { const u = shove(q, m, 42, 120, dt, .5); if (u) q.lit = Math.max(q.lit, Math.min(1, u * 2.2)); }
           if (!wave) {
             wait -= dt;
             if (wait <= 0) {
@@ -504,43 +678,17 @@
         draw(c, t) { for (const q of f) glow2(c, q.x, q.y, q.r * (1 + q.lit * .6), P.tide, q.lit > .6 ? P.tideHi : P.tide, .12 + .06 * Math.sin(t * 1.7 + q.ph) + q.lit * .85, dark ? .4 : .3); },
       };
     } },
-    // Fairy dust: a tiny bright fairy loops around, leaving pastel sparkles that twinkle and drift down
-    fairy: { name: 'Fairy dust', make(w, h, P, dark, k) {
-      const dust = []; let acc = 0; const ph = R(0, 100);
-      const pos = (t) => [w / 2 + Math.sin(t * .41 + ph) * w * .36 + Math.sin(t * 1.07 + ph * 2) * w * .08, h / 2 + Math.sin(t * .57 + ph * 1.7) * h * .32 + Math.cos(t * 1.31 + ph) * h * .1];
-      let [fx, fy] = pos(0);
-      const tw = Array.from({ length: capped(10, k, 30) }, () => ({ x: R(0, w), y: R(0, h), t: R(0, 1), sp: R(.3, .6) }));
-      return {
-        step(dt, t) {
-          const [nx, ny] = pos(t); const d = Math.hypot(nx - fx, ny - fy); fx = nx; fy = ny;
-          acc += Math.min(d, 40) * .22 * clamp(k, .3, 3);
-          while (acc >= 1) { acc -= 1; if (dust.length < 220) dust.push({ x: fx + R(-3, 3), y: fy + R(-3, 3), vx: R(-8, 8), vy: R(2, 14), age: 0, life: R(1.4, 2.6), col: pick(P.fairy), s: R(1.2, 2.6), ph: R(0, TAU) }); }
-          const dr = Math.pow(.6, dt);
-          for (const q of dust) { q.vx *= dr; q.x += q.vx * dt; q.y += q.vy * dt; }
-          cull(dust, dt);
-          for (const q of tw) { q.t += q.sp * dt; if (q.t >= 1) { q.t = 0; q.x = R(0, w); q.y = R(0, h); } }
-        },
-        draw(c, t) {
-          c.fillStyle = P.fairyCore;
-          for (const q of tw) { const v = Math.sin(q.t * Math.PI); c.globalAlpha = v * .5; star4(c, q.x, q.y, 2.2 * v); }
-          for (const q of dust) {
-            const v = q.age / q.life; c.globalAlpha = (1 - v) * (.6 + .4 * Math.sin(t * 9 + q.ph)) * .9; c.fillStyle = q.col;
-            if (q.s > 2.1) star4(c, q.x, q.y, q.s * 1.5 * (1 - v * .5)); else dot(c, q.x, q.y, q.s * .6);
-          }
-          glow2(c, fx, fy, 4.5, P.fairyCore, P.fairyHead, .95, dark ? .45 : .35);
-        },
-      };
-    } },
-    // Warp speed ("Warp jump"): cruises among the stars, then they stretch into long blue streaks at light speed,
-    // with a soft flash, and it drops back to calm
+    // Warp speed ("Warp jump"): cruises slowly among the stars for about half a minute, then they stretch into long
+    // blue streaks at light speed for 3 seconds, with a soft flash, and it drops back to calm (the owner's timing)
     warp: { name: 'Warp speed', make(w, h, P, dark, k) {
       const sf = starfield(w, h, capped(80, k, 220));
-      const CRUISE = 3.6; const SPOOL = 1.4; const WARP = 2.2; const DROP = 1.3; const CYCLE = CRUISE + SPOOL + WARP + DROP;
+      const CRUISE = 30; const SPOOL = 1.2; const WARP = 3; const DROP = 1.2; const CYCLE = CRUISE + SPOOL + WARP + DROP;
       const ease = (x) => .5 - .5 * Math.cos(Math.PI * clamp(x, 0, 1));
       let tm = R(0, CRUISE); let speed = .1; let flash = 0;
       const speedAt = (x) => (x < CRUISE ? .1 : x < CRUISE + SPOOL ? .1 + 1.5 * ease((x - CRUISE) / SPOOL) : x < CRUISE + SPOOL + WARP ? 1.6 : 1.6 - 1.5 * ease((x - CRUISE - SPOOL - WARP) / DROP));
       return {
-        step(dt) {
+        step(dt, t, m) {
+          const tx = m ? m.x : w / 2; const ty = m ? m.y : h / 2; const f = Math.min(1, dt * 1.6); sf.vp.x += (tx - sf.vp.x) * f; sf.vp.y += (ty - sf.vp.y) * f;
           const before = tm; tm = (tm + dt) % CYCLE; speed = speedAt(tm);
           if (before < CRUISE + SPOOL && tm >= CRUISE + SPOOL) flash = 1;
           flash = Math.max(0, flash - dt * 1.6);
@@ -561,11 +709,13 @@
     network: { name: 'Network', make(w, h, P, dark, k) {
       const N = capped(30, k, 70); const D = clamp(Math.sqrt(w * h / N) * 1.25, 60, 95);
       const p = Array.from({ length: N }, () => ({ x: R(0, w), y: R(0, h), vx: R(-9, 9), vy: R(-9, 9), ph: R(0, TAU) }));
-      const B = 5;
+      const B = 5; let M = null;
       return {
-        step(dt, t) {
+        step(dt, t, m) {
+          M = m;
           for (const q of p) {
             const a = flow(q.x, q.y, t * .5); q.vx += Math.cos(a) * 3 * dt; q.vy += Math.sin(a) * 3 * dt;
+            if (m) { const u = near(q, m, D * 1.3); if (u > .25) { q.vx += (m.x - q.x) * u * .9 * dt; q.vy += (m.y - q.y) * u * .9 * dt; } }
             const sp = Math.hypot(q.vx, q.vy); if (sp > 12) { q.vx *= 12 / sp; q.vy *= 12 / sp; }
             q.x += q.vx * dt; q.y += q.vy * dt;
             if (q.x < 0) { q.x = 0; q.vx = Math.abs(q.vx); } if (q.x > w) { q.x = w; q.vx = -Math.abs(q.vx); }
@@ -579,8 +729,10 @@
             const d = Math.hypot(dx, dy); if (d >= D) continue;
             segs[Math.min(B - 1, Math.floor(Math.pow(1 - d / D, 1.2) * B))].push(a.x, a.y, b.x, b.y);
           }
+          if (M) for (const a of p) { const dx = a.x - M.x; const dy = a.y - M.y; if (Math.abs(dx) > D * 1.2 || Math.abs(dy) > D * 1.2) continue; const d = Math.hypot(dx, dy); if (d < D * 1.2) segs[Math.min(B - 1, Math.floor((1 - d / (D * 1.2)) * B))].push(a.x, a.y, M.x, M.y); }
           c.strokeStyle = P.net; c.lineWidth = .9;
           segs.forEach((s, i) => { c.globalAlpha = (i + 1) / B * (dark ? .55 : .5); strokeSegs(c, s); });
+          if (M) { c.globalAlpha = .85; c.fillStyle = P.netNode; dot(c, M.x, M.y, 2.2); }
           c.fillStyle = P.netNode;
           for (const q of p) { c.globalAlpha = .8; dot(c, q.x, q.y, 1.7 + .5 * Math.sin(t * 1.3 + q.ph)); }
         },
@@ -592,8 +744,10 @@
       const e = []; let acc = 0; const lift = Math.max(.8, h / 280);
       const add = (o) => { if (e.length < 170) e.push(o); };
       return {
-        step(dt, t) {
+        step(dt, t, m) {
           acc += dt * 9 * clamp(k, .2, 3.5);
+          if (m && m.y > h * .45 && m.sp > 40) { acc += dt * Math.min(30, m.sp * .04); if (Math.random() < dt * Math.min(12, m.sp * .02)) add({ x: m.x + R(-8, 8), y: m.y + R(-4, 4), vx: m.vx * .15 + R(-10, 10), vy: -R(30, 60) * lift, age: 0, life: R(1, 2), r: R(.9, 1.8), fl: R(8, 18), ph: R(0, TAU) }); }
+          if (m) for (const q of e) shove(q, m, 48, 160, dt, .7);
           while (acc >= 1) { acc -= 1; add({ x: w / 2 + (R(-1, 1) + R(-1, 1)) * w * .32, y: h + R(0, 8), vx: R(-6, 6), vy: -R(22, 46) * lift, age: 0, life: R(2.2, 4.2), r: R(.9, 2.1), fl: R(8, 18), ph: R(0, TAU) }); }
           const dr = Math.pow(.5, dt);
           for (const q of e) {
@@ -618,43 +772,16 @@
         },
       };
     } },
-    // Lorenz butterfly (a strange attractor): three tracers start almost together and soon go their own ways;
-    // the whole shape turns slowly in 3D
-    lorenz: { name: 'Lorenz', make(w, h, P, dark, k) {
-      const NT = clamp(Math.round(3 * Math.sqrt(k)), 2, 6); const L = 600;
-      const tr = Array.from({ length: NT }, (_, i) => ({ x: 1 + i * .25, y: 1, z: 20, c: 0, pts: [], col: P.attr[i % P.attr.length] }));
-      const sub = (q, dt) => { const dx = 10 * (q.y - q.x); const dy = q.x * (28 - q.z) - q.y; const dz = q.x * q.y - 8 / 3 * q.z; q.x += dx * dt; q.y += dy * dt; q.z += dz * dt; };
-      for (const q of tr) for (let i = 0; i < 600; i++) sub(q, .005);
-      let rot = R(0, TAU);
-      return {
-        step(dt) {
-          rot += dt * .12; const n = Math.max(1, Math.ceil(dt * .75 / .004)); const hS = dt * .75 / n;
-          for (const q of tr) { for (let i = 0; i < n; i++) { sub(q, hS); if (++q.c % 3 === 0) q.pts.push(q.x, q.y, q.z); } if (q.pts.length > L * 3) q.pts.splice(0, q.pts.length - L * 3); }
-        },
-        draw(c) {
-          const s = Math.min(w / 52, h / 56) * .95; const cs = Math.cos(rot); const sn = Math.sin(rot);
-          const px = (x, y) => w / 2 + (x * cs - y * sn) * s; const py = (z) => h / 2 - (z - 25) * s;
-          c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = 1.2;
-          for (const q of tr) {
-            const pts = q.pts; const m = pts.length / 3; if (m < 2) continue; const CH = 12; c.strokeStyle = q.col;
-            for (let s0 = 0; s0 < m - 1; s0 += CH) {
-              const e = Math.min(m - 1, s0 + CH); c.globalAlpha = Math.pow(e / m, 1.4) * (dark ? .85 : .75); c.beginPath();
-              for (let i = s0; i <= e; i++) { const x = px(pts[i * 3], pts[i * 3 + 1]); const y = py(pts[i * 3 + 2]); if (i === s0) c.moveTo(x, y); else c.lineTo(x, y); }
-              c.stroke();
-            }
-            glow2(c, px(q.x, q.y), py(q.z), 2.6, q.col, q.col, 1, .5);
-          }
-        },
-      };
-    } },
     // Cherry blossom ("Gust whirls"): petals flutter down, flipping over; every few seconds a little whirlwind
     // lifts the nearby petals into a spiral and lets them go again
     blossom: { name: 'Cherry blossom', make(w, h, P, dark, k) {
       const f = Array.from({ length: capped(22, k, 70) }, () => ({ x: R(-20, w), y: R(-10, h), vx: R(5, 15), vy: R(10, 20), rot: R(0, TAU), vr: R(-1.4, 1.4), fp: R(0, TAU), fs: R(1.6, 3.4), s: R(3.5, 6), m: R(.6, 1.3), col: pick(P.blossom) }));
       const whirls = []; const go = every(4.5, 8, k); const S = Math.min(w, h) / 280;
       return {
-        step(dt, t) {
+        step(dt, t, m) {
           const wind = 9 + 6 * Math.sin(t * .35);
+          if (m && m.sp > 380 && whirls.length < 2 && Math.random() < dt * 2.5) whirls.push({ x: m.x, y: m.y, age: 0, life: R(2.2, 3), r: R(35, 55) * S, dir: m.vx >= 0 ? 1 : -1 });
+          if (m) for (const q of f) if (shove(q, m, 50, 140, dt, 1.1)) q.fs += dt * 6;
           if (go(dt) && whirls.length < 2) whirls.push({ x: R(w * .2, w * .8), y: R(h * .3, h * .8), age: 0, life: R(3.2, 4.2), r: R(45, 75) * S, dir: Math.random() < .5 ? 1 : -1 });
           for (const wh of whirls) wh.x += wind * .8 * dt;
           for (const q of f) {
@@ -664,7 +791,7 @@
               if (d < R0) { const f0 = Math.sin(Math.PI * wh.age / wh.life) * (1 - d / R0); tvx += (-dy / d * 85 * wh.dir) * f0; tvy += (dx / d * 85 * wh.dir - 30) * f0; pull += f0 * 4; q.rot += wh.dir * f0 * 4 * dt; }
             }
             q.vx += (tvx - q.vx) * Math.min(1, pull * dt); q.vy += (tvy - q.vy) * Math.min(1, pull * dt);
-            q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt; q.fp += q.fs * dt;
+            q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt; q.fp += q.fs * dt; if (q.fs > 3.4) q.fs = Math.max(3.4, q.fs - dt * 4);
             if (q.y > h + 10) { q.y = -10; q.x = R(-w * .25, w); } if (q.x > w + 12) { q.x = -12; q.y = R(-10, h * .7); } if (q.x < -40) q.x = w + 10; if (q.y < -40) q.y = h + 10;
           }
           cull(whirls, dt);
@@ -679,18 +806,26 @@
       };
     } },
     // Night sky ("Twinkle & shooting stars"): stars twinkle at their own pace, the bright ones with little cross
-    // sparkles, and every few seconds a shooting star streaks past
+    // sparkles, and about every 12 seconds a shooting star streaks past (the same on any note size or frequency;
+    // the frequency only changes how many stars there are)
     nightsky: { name: 'Night sky', make(w, h, P, dark, k) {
       const s = Array.from({ length: capped(70, k, 180) }, () => ({ x: R(0, w), y: R(0, h), r: .35 + Math.pow(Math.random(), 3) * 1.3, f: R(.6, 3.5), ph: R(0, TAU), base: R(.3, .85) }));
-      const sh = []; const go = every(3.5, 8, k);
+      const sh = []; const go = every(10, 14); let cool = 0;
       const shooter = () => { const L = Math.random() < .5; const a = (L ? 0 : Math.PI) + (L ? 1 : -1) * R(.3, .7); const sp = R(260, 380); return { x: L ? R(-10, w * .5) : R(w * .5, w + 10), y: R(-10, h * .35), vx: Math.cos(a) * sp, vy: Math.abs(Math.sin(a)) * sp, age: 0, life: R(.7, 1.1), len: R(55, 90) }; };
       return {
-        step(dt) { if (go(dt)) sh.push(shooter()); for (const m of sh) { m.x += m.vx * dt; m.y += m.vy * dt; } cull(sh, dt); },
+        step(dt, t, mp) {
+          if (go(dt)) sh.push(shooter());
+          if (mp) {
+            for (const q of s) q.g = Math.max(near(q, mp, 55), (q.g || 0) - dt * 1.2);
+            cool -= dt; if (mp.sp > 650 && cool <= 0 && sh.length < 3) { cool = 1.2; const sp = R(300, 400); sh.push({ x: mp.x, y: mp.y, vx: mp.vx / mp.sp * sp, vy: mp.vy / mp.sp * sp, age: 0, life: R(.6, .9), len: R(55, 90) }); }
+          } else for (const q of s) if (q.g) q.g = Math.max(0, q.g - dt * 1.2);
+          for (const m of sh) { m.x += m.vx * dt; m.y += m.vy * dt; } cull(sh, dt);
+        },
         draw(c, t) {
           c.fillStyle = P.skyStar;
           for (const q of s) {
-            const a = q.base * (.55 + .45 * Math.sin(t * q.f + q.ph)); c.globalAlpha = a; dot(c, q.x, q.y, q.r);
-            if (q.r > 1.2) { c.globalAlpha = a * .5; c.fillRect(q.x - q.r * 3, q.y - .35, q.r * 6, .7); c.fillRect(q.x - .35, q.y - q.r * 3, .7, q.r * 6); }
+            const g = q.g || 0; const a = Math.min(1, q.base * (.55 + .45 * Math.sin(t * q.f + q.ph)) + g * .6); c.globalAlpha = a; dot(c, q.x, q.y, q.r * (1 + g * .7));
+            if (q.r > 1.2 || g > .5) { c.globalAlpha = a * .5; c.fillRect(q.x - q.r * 3, q.y - .35, q.r * 6, .7); c.fillRect(q.x - .35, q.y - q.r * 3, .7, q.r * 6); }
           }
           for (const m of sh) {
             const v = m.age / m.life; const a = Math.sin(Math.PI * Math.min(1, v * 1.4)); const sp = Math.hypot(m.vx, m.vy);
@@ -702,71 +837,79 @@
         },
       };
     } },
-    // Glitch ("Glitch storm"): faint scanlines and a slow refresh bar like an old screen; every few seconds the
-    // picture "breaks" for half a second with torn, colour-split bands and noise
-    glitch: { name: 'Glitch', make(w, h, P, dark, k) {
-      let burst = 0; let bands = []; let reroll = 0; const go = every(2.8, 5.5, k); let bar = R(0, h);
-      const roll = () => { bands = Array.from({ length: Math.round(R(3, 7)) }, () => ({ y: R(0, h), hh: R(3, 16), off: R(-18, 18), x: R(-w * .2, w * .6), wd: R(w * .25, w * .9), noise: Math.random() < .5 })); };
+    // Analog monitor (id 'glitch', kept so saved choices still work; it was "Glitch" before the owner asked for just
+    // the calm part): faint scanlines that crawl slowly and a soft refresh bar rolling down like an old screen
+    // ("Often" rolls a second, slower bar)
+    glitch: { name: 'Analog monitor', make(w, h, P, dark, k) {
+      const bars = Array.from({ length: k > 2.5 ? 2 : 1 }, (_, i) => ({ y: R(0, h + 40), sp: i ? 17 : 28 }));
+      // 1.1.22: touching it is like holding a magnet to an old TV (the owner picked "Magnet" from three tries, then asked
+      // for it not to be a neat circle). The scanlines bend away from the pointer in a lumpy smear: the faster the mouse
+      // moves, the bigger and stronger the bend, and it stretches into a tail along the path the mouse just took, then
+      // settles back when the mouse slows down. A faint red / blue fringe shows where the lines bend most.
+      const sz = clamp(Math.min(w, h) / 280, .8, 1.5);
+      let M = null; let hot = 0; let spd = 0; let lastX = 0; let lastY = 0; let tick = 0; const trail = [];
+      const RED = dark ? '#FF4A6A' : '#D8204A'; const CYAN = dark ? '#3FE0FF' : '#1A98C8';
+      const TRAIL = .7; // seconds a bend lingers behind the pointer
       return {
-        step(dt) {
-          bar = (bar + dt * 28) % (h + 40);
-          if (burst <= 0 && go(dt)) { burst = R(.35, .75); roll(); }
-          if (burst > 0) { burst -= dt; reroll -= dt; if (reroll <= 0) { reroll = .07; roll(); } }
+        step(dt, t, m) {
+          if (m) { if (!M) M = { x: m.x, y: m.y }; const f = Math.min(1, dt * 12); M.x += (m.x - M.x) * f; M.y += (m.y - M.y) * f; }
+          hot = clamp(hot + (m ? 1 : -1) * dt * (m ? 4 : 1.8), 0, 1);
+          spd += ((m ? clamp(m.sp, 0, 1800) : 0) - spd) * Math.min(1, dt * (m ? 7 : 3));
+          for (const b of trail) b.age += dt;
+          while (trail.length && trail[0].age > TRAIL) trail.shift();
+          for (const b of bars) b.y = (b.y + dt * b.sp) % (h + 40);
+          tick += dt;
+          if (m && M && tick > .07) { tick = 0; trail.push({ x: M.x, y: M.y, age: 0, r: (36 + spd * .05) * sz, a: (9 + spd * .009) * sz }); if (trail.length > 10) trail.shift(); }
         },
         draw(c, t) {
-          c.fillStyle = P.glitchInk; c.globalAlpha = dark ? .05 : .045;
-          const shift = (t * 8) % 4; for (let y = shift; y < h; y += 4) c.fillRect(0, y, w, 1);
-          const gb = c.createLinearGradient(0, bar - 40, 0, bar); gb.addColorStop(0, 'transparent'); gb.addColorStop(1, P.glitchInk);
-          c.globalAlpha = dark ? .06 : .05; c.fillStyle = gb; c.fillRect(0, bar - 40, w, 40);
-          if (burst <= 0) return;
-          for (const b of bands) {
-            c.globalAlpha = .28; c.fillStyle = P.glitch[0]; c.fillRect(b.x + b.off - 3, b.y, b.wd, b.hh);
-            c.fillStyle = P.glitch[2]; c.fillRect(b.x + b.off + 3, b.y + 1, b.wd, b.hh);
-            c.globalAlpha = .18; c.fillStyle = P.glitch[1]; c.fillRect(b.x, b.y - 1, b.wd * .6, b.hh * .5);
-            if (b.noise) { c.fillStyle = P.glitchInk; c.globalAlpha = .5; for (let i = 0; i < 26; i++) c.fillRect(Math.round(b.x + R(0, b.wd)), Math.round(b.y + R(0, b.hh)), R(1, 4), 1.5); }
+          const shift = ((t * 8) % 4 + 4) % 4;
+          // the bends: the pointer itself (bigger and stronger the faster it goes) plus the fading smears it left behind
+          const blobs = [];
+          if (M && hot > .01) {
+            const wob = 1 + .1 * Math.sin(t * 5.3) * Math.min(1, spd / 300 + .3);
+            blobs.push({ x: M.x, y: M.y, r: (40 + spd * .055) * sz * wob, a: (10 + spd * .01) * sz * hot, ry: 1 });
+            for (const b of trail) { const k2 = 1 - b.age / TRAIL; if (k2 > .02) blobs.push({ x: b.x, y: b.y, r: b.r * (.55 + .45 * k2) * (1 + .12 * Math.sin(t * 4 + b.x * .05)), a: b.a * k2 * k2 * hot, ry: 1 }); }
           }
-        },
-      };
-    } },
-    // Black hole ("Accretion disk"): seen from the side, a tilted glowing disk spins around a black centre (the
-    // inner part faster and hotter), with a bright ring and a bent arc of light over the top; sometimes a jet
-    blackhole: { name: 'Black hole', make(w, h, P, dark, k) {
-      const S = Math.min(w, h) / 280; const cx = w / 2; const cy = h / 2; const rin = 16 * S; const rout = Math.min(w * .46, 120 * S); const tilt = .3;
-      const spawn = (q, any) => { q.r = any ? R(rin * 1.3, rout) : R(rout * .8, rout); q.a = R(0, TAU); q.in = R(3, 7) * S; };
-      const p = Array.from({ length: capped(110, k, 260) }, () => { const q = {}; spawn(q, true); return q; });
-      const jets = []; const go = every(6, 12, k);
-      const col = (r) => { const u = clamp((r - rin) / (rout - rin), 0, 1); return u < .5 ? mixHex(P.disk[2], P.disk[1], u * 2) : mixHex(P.disk[1], P.disk[0], (u - .5) * 2); };
-      const half = (c, back) => {
-        for (const q of p) {
-          const s = Math.sin(q.a); if (back ? s > 0 : s <= 0) continue;
-          const x = cx + Math.cos(q.a) * q.r; const y = cy + s * q.r * tilt; const dop = .65 + .35 * -Math.cos(q.a);
-          c.globalAlpha = clamp(dop * (.4 + .6 * (1 - (q.r - rin) / (rout - rin))), 0, 1) * (dark ? 1 : .85); c.fillStyle = col(q.r); dot(c, x, y, .8 + (1 - q.r / rout) * 1.2);
-        }
-      };
-      return {
-        step(dt) {
-          for (const q of p) { const om = 2.2 * Math.pow(rin * 2 / q.r, 1.5); q.a += om * dt; q.r -= q.in * dt * (rin * 3 / q.r); if (q.r < rin * 1.05) spawn(q, false); }
-          if (go(dt)) { const dir = Math.random() < .5 ? -1 : 1; for (let i = 0; i < 24; i++) jets.push({ x: cx + R(-2, 2), y: cy, vx: R(-10, 10), vy: dir * R(70, 150), age: 0, life: R(.9, 1.5) }); }
-          for (const j of jets) { j.x += j.vx * dt; j.y += j.vy * dt; }
-          cull(jets, dt);
-        },
-        draw(c) {
-          const halo = c.createRadialGradient(cx, cy, rin, cx, cy, rout * .9); halo.addColorStop(0, P.disk[1]); halo.addColorStop(1, 'transparent');
-          c.globalAlpha = dark ? .14 : .08; c.fillStyle = halo; c.beginPath(); c.ellipse(cx, cy, rout, rout * .55, 0, 0, TAU); c.fill();
-          half(c, true);
-          c.globalAlpha = .55; c.strokeStyle = P.ring; c.lineWidth = 2.2 * S; c.beginPath(); c.ellipse(cx, cy, rin * 1.55, rin * 1.35, 0, Math.PI, TAU); c.stroke();
-          c.globalAlpha = 1; c.fillStyle = P.hole; dot(c, cx, cy, rin);
-          c.globalAlpha = .8; c.strokeStyle = P.ring; c.lineWidth = 1.2; c.beginPath(); c.arc(cx, cy, rin * 1.06, 0, TAU); c.stroke();
-          half(c, false);
-          c.fillStyle = P.jet; for (const j of jets) { c.globalAlpha = (1 - j.age / j.life) * .85; dot(c, j.x, j.y, 1.2); }
+          let x0 = Infinity; let x1 = -Infinity; let y0 = Infinity; let y1 = -Infinity;
+          for (const b of blobs) { const e = b.r * 1.9; x0 = Math.min(x0, b.x - e); x1 = Math.max(x1, b.x + e); y0 = Math.min(y0, b.y - e); y1 = Math.max(y1, b.y + e); }
+          x0 = Math.max(0, Math.floor(x0 / 8) * 8); x1 = Math.min(w, x1); y0 = Math.max(0, y0); y1 = Math.min(h, y1);
+          const bendOn = blobs.length > 0 && x1 > x0 && y1 > y0;
+          c.fillStyle = P.scan; c.globalAlpha = dark ? .05 : .045;
+          for (let y = shift; y < h; y += 4) {
+            if (bendOn && y >= y0 && y <= y1) { if (x0 > 0) c.fillRect(0, y, x0, 1); if (x1 < w) c.fillRect(x1, y, w - x1, 1); } else c.fillRect(0, y, w, 1);
+          }
+          for (const b of bars) {
+            const gb = c.createLinearGradient(0, b.y - 40, 0, b.y); gb.addColorStop(0, 'transparent'); gb.addColorStop(1, P.scan);
+            c.globalAlpha = dark ? .06 : .05; c.fillStyle = gb; c.fillRect(0, b.y - 40, w, 40);
+          }
+          if (bendOn) { // the lines bend away from every blob
+            const lines = []; const glowL = []; const fringe = [];
+            for (let y = shift + Math.ceil((y0 - shift) / 4) * 4; y <= y1; y += 4) {
+              let px = x0; let py = y;
+              const near = []; // only the bends this line is close to
+              for (const b of blobs) { const dy = y - b.y; if (dy * dy < 4 * b.r * b.r) near.push(b, dy, dy / (Math.abs(dy) + 8), dy * dy); }
+              for (let x = x0 + 8; x <= x1 + 8; x += 8) {
+                const xx = Math.min(x, x1); let d = 0; let g = 0;
+                for (let i = 0; i < near.length; i += 4) {
+                  const b = near[i]; const dx = xx - b.x; const q = (dx * dx + near[i + 3]) / (b.r * b.r); if (q > 4) continue;
+                  const f = Math.exp(-q) * b.a; d += near[i + 2] * f; g += f / b.a;
+                }
+                d = clamp(d, -26 * sz, 26 * sz); const ny = y + d;
+                lines.push(px, py, xx, ny); if (g > .35) glowL.push(px, py, xx, ny); if (Math.abs(d) > 7 * sz) fringe.push(px, py, xx, ny); px = xx; py = ny;
+              }
+            }
+            c.strokeStyle = P.scan; c.lineWidth = 1; c.globalAlpha = dark ? .05 : .045; strokeSegs(c, lines); c.globalAlpha = .05 * hot; strokeSegs(c, glowL);
+            c.save(); c.globalAlpha = .18 * hot; c.strokeStyle = RED; c.translate(1.5, 0); strokeSegs(c, fringe); c.strokeStyle = CYAN; c.translate(-3, 0); strokeSegs(c, fringe); c.restore();
+          }
         },
       };
     } },
     // Digital ocean: a grid of dots seen in perspective, rolling like the sea; the crests catch the light
     ocean: { name: 'Digital ocean', make(w, h, P, dark, k) {
       const cols = clamp(Math.round(24 * Math.sqrt(k)), 16, 42); const rows = clamp(Math.round(14 * Math.pow(k, .3)), 10, 22); const hor = h * .2;
+      let M = null; let lift = 0;
       return {
-        step() {},
+        step(dt, t, m) { if (m) M = { x: m.x, y: m.y }; lift = clamp(lift + (m ? 1 : -1) * dt * 2.5, 0, 1); },
         draw(c, t) {
           const lo = []; const hi = [];
           for (let j = 0; j < rows; j++) {
@@ -774,8 +917,9 @@
             for (let i = 0; i < cols; i++) {
               const u = i / (cols - 1) * 2 - 1; const x = u * z;
               const y = .16 * (Math.sin(x * 2.6 + t * 1.1) + .7 * Math.sin(z * 4.2 - t * 1.6) + .45 * Math.sin((x + z) * 2.1 + t * .7));
-              const sx = w / 2 + u * w * .56; const sy = hor + (.55 - y) / z * h * .42; if (sy > h + 4) continue;
-              const near = 1 - (z - .35) / 2.05; const crest = clamp((y + .2) / .5, 0, 1);
+              const sx = w / 2 + u * w * .56; let sy = hor + (.55 - y) / z * h * .42; if (sy > h + 4) continue;
+              let bump = 0; if (M && lift > 0) { const dx = sx - M.x; const dy = sy - M.y; const d2 = dx * dx + dy * dy; if (d2 < 3600) { bump = Math.exp(-d2 / 900) * lift; sy -= bump * 14; } }
+              const near = 1 - (z - .35) / 2.05; const crest = clamp((y + .2) / .5 + bump, 0, 1);
               (crest > .75 ? hi : lo).push([sx, sy, (.5 + near * 1.6), .25 + near * .6 + crest * .2]);
             }
           }
@@ -785,17 +929,24 @@
     } },
     // Silk waves ("Flowing silk"): ribbons of glittering dots ripple across the middle, weaving over and under
     silk: { name: 'Silk waves', make(w, h, P, dark, k) {
-      const RIB = 7; const N = clamp(Math.round(60 * Math.sqrt(k)), 40, 110);
+      const RIB = 7; const N = clamp(Math.round(60 * Math.sqrt(k)), 40, 110); let M = null; let pull = 0; let mvy = 0; const sz = clamp(Math.min(w, h) / 280, .8, 1.5);
+      // 1.1.22: gentler. The ribbons used to be yanked onto the pointer; now they part softly round it, sway a little
+      // the way it moves and shine where it touches, like running a finger through silk
       return {
-        step() {},
+        step(dt, t, m) {
+          if (m) { if (!M) M = { x: m.x, y: m.y }; const f = Math.min(1, dt * 5); M.x += (m.x - M.x) * f; M.y += (m.y - M.y) * f; mvy += (clamp(m.vy, -400, 400) - mvy) * Math.min(1, dt * 3); } else mvy *= Math.pow(.2, dt);
+          pull = clamp(pull + (m ? 1 : -1) * dt * 1.2, 0, 1);
+        },
         draw(c, t) {
           const groups = [[], [], []];
           for (let j = 0; j < RIB; j++) {
             const amp = h * (.14 + .06 * Math.sin(t * .3 + j * .5)); const grp = j < 2 ? 0 : j < 5 ? 1 : 2;
             for (let i = 0; i < N; i++) {
               const x = i / (N - 1) * (w + 20) - 10; const u = x / w * TAU;
-              const y = h / 2 + amp * Math.sin(u * 1.1 + t * .8 + j * .38) + h * .06 * Math.sin(u * 2.3 - t * .6 + j * .2);
-              const sh = .5 + .5 * Math.sin(u * 3 + t * 1.5 + j); groups[grp].push([x, y, .7 + sh * .9, .2 + sh * .8]);
+              let y = h / 2 + amp * Math.sin(u * 1.1 + t * .8 + j * .38) + h * .06 * Math.sin(u * 2.3 - t * .6 + j * .2);
+              let lit = 0;
+              if (M && pull > 0) { const g = Math.exp(-(((x - M.x) / 70) ** 2)) * pull; if (g > .01) { const dy = y - M.y; y += dy / Math.sqrt(dy * dy + 120) * 13 * sz * Math.exp(-((dy / 50) ** 2)) * g + mvy * .025 * g; lit = g * Math.exp(-((dy / 60) ** 2)); } }
+              const sh = Math.min(1, .5 + .5 * Math.sin(u * 3 + t * 1.5 + j) + lit * .5); groups[grp].push([x, y, .7 + sh * .9, .2 + sh * .8]);
             }
           }
           groups.forEach((g, i) => bucketDots(c, g, P.silk[i], 4, dark ? .9 : .8));
@@ -807,8 +958,16 @@
     shards: { name: 'Glass shards', make(w, h, P, dark, k) {
       const S = Math.min(w, h) / 280;
       const f = Array.from({ length: capped(10, k, 28) }, () => ({ x: R(0, w), y: R(0, h), vx: R(-6, 6), vy: R(-8, -2), rot: R(0, TAU), vr: R(-.3, .3), th: R(0, TAU), vt: R(.5, 1.3) * (Math.random() < .5 ? -1 : 1), hue: R(0, 360), pts: shard(S) }));
+      for (const q of f) { q.bvx = q.vx; q.bvy = q.vy; q.bvt = q.vt; }
       return {
-        step(dt) { for (const q of f) { q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt; q.th += q.vt * dt; wrap(q, w, h, 20); } },
+        step(dt, t, m) {
+          const back = Math.min(1, dt * .8);
+          for (const q of f) {
+            if (m) { const u = shove(q, m, 44 * Math.max(1, S), 260, dt, .9); if (u) { q.vt += Math.sign(q.vt || 1) * u * 14 * dt; q.vr += (m.vx > 0 ? 1 : -1) * u * 3 * dt; } }
+            q.vx += (q.bvx - q.vx) * back; q.vy += (q.bvy - q.vy) * back; q.vt += (q.bvt - q.vt) * back * .6; q.vr *= 1 - back * .5;
+            q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt; q.th += q.vt * dt; wrap(q, w, h, 20);
+          }
+        },
         draw(c, t) {
           for (const q of f) {
             const cs = Math.cos(q.th); const face = Math.abs(cs);
@@ -824,90 +983,18 @@
         },
       };
     } },
-    // XP orbs: glowing orbs float around; every few seconds a collector appears, a handful of nearby orbs zoom into
-    // it one after another, and it pops with a little "+XP"
-    xp: { name: 'XP orbs', make(w, h, P, dark, k) {
-      const S = Math.min(w, h) / 280; const N = capped(14, k, 40);
-      const mk = (edge) => { const q = { x: R(0, w), y: R(0, h), c: Math.random() < .6 ? 0 : 1, r: R(2.2, 3.6) * S, ph: R(0, TAU), go: false, v: 0, wait: 0, born: 0 }; if (edge) { if (Math.random() < .5) q.x = Math.random() < .5 ? -6 : w + 6; else q.y = Math.random() < .5 ? -6 : h + 6; } return q; };
-      const f = Array.from({ length: N }, () => mk(false)); let col = null; const texts = []; const go = every(4, 7, k);
-      return {
-        step(dt, t) {
-          for (const q of f) {
-            if (q.go && q.wait <= 0 && col) { const dx = col.x - q.x; const dy = col.y - q.y; const d = Math.hypot(dx, dy) || 1; q.v = Math.min(260, q.v + 420 * dt); q.x += dx / d * q.v * dt; q.y += dy / d * q.v * dt; if (d < 6) { q.dead = true; col.got++; col.fl = 1; } }
-            else { q.wait -= dt; const a = flow(q.x, q.y, t * .5); q.x += Math.cos(a) * 9 * dt; q.y += Math.sin(a) * 9 * dt; wrap(q, w, h, 8); }
-            q.born = Math.min(1, q.born + dt * 1.5);
-          }
-          for (let i = f.length - 1; i >= 0; i--) if (f[i].dead) f.splice(i, 1);
-          if (!col && go(dt)) {
-            col = { x: R(w * .2, w * .8), y: R(h * .25, h * .75), age: 0, got: 0, fl: 0, want: 0 };
-            const near = [...f].sort((a, b) => Math.hypot(a.x - col.x, a.y - col.y) - Math.hypot(b.x - col.x, b.y - col.y)).slice(0, Math.round(R(4, 8)));
-            near.forEach((q, i) => { q.go = true; q.wait = .4 + i * .18; q.v = 0; }); col.want = near.length;
-          }
-          if (col) {
-            col.age += dt; col.fl = Math.max(0, col.fl - dt * 4);
-            if (col.got >= col.want || col.age > 5) { texts.push({ x: col.x, y: col.y, n: col.got * 5, age: 0, life: 1.3 }); for (const q of f) q.go = false; col = null; }
-          }
-          while (f.length < N) f.push(mk(true));
-          for (const tx of texts) tx.y -= 22 * dt;
-          cull(texts, dt);
-        },
-        draw(c, t) {
-          if (col) {
-            const a = clamp(col.age * 3, 0, 1); c.globalAlpha = a * .6; c.strokeStyle = P.xp[0]; c.lineWidth = 1.4;
-            c.beginPath(); c.arc(col.x, col.y, 9 * S + col.fl * 5 + Math.sin(t * 6) * 1.2, 0, TAU); c.stroke();
-            glow2(c, col.x, col.y, 4 * S, P.xp[0], P.xp[1], a * .8, .5);
-          }
-          for (const q of f) glow2(c, q.x, q.y, q.r * q.born, P.xp[q.c], P.xp[q.c], (.55 + .3 * Math.sin(t * 2.2 + q.ph)) * q.born, dark ? .5 : .35);
-          c.textAlign = 'center'; c.font = `800 ${Math.round(12 * S + 2)}px "Nunito", "Segoe UI", sans-serif`;
-          for (const tx of texts) { c.globalAlpha = 1 - tx.age / tx.life; c.fillStyle = P.xpText; c.fillText(`+${tx.n} XP`, tx.x, tx.y); }
-        },
-      };
-    } },
-    // Shape shifter (particle morphing): a swarm of dots pulls together into a heart, bursts apart and reforms as a
-    // star, a crescent moon, an infinity sign, a flower…
-    morph: { name: 'Shape shifter', make(w, h, P, dark, k) {
-      const N = capped(150, k, 260); const names = Object.keys(MORPH_SHAPES); let si = Math.floor(R(0, names.length));
-      const S = Math.min(w, h) * .36; const cx = w / 2; const cy = h / 2;
-      const p = Array.from({ length: N }, (_, i) => ({ x: R(0, w), y: R(0, h), vx: 0, vy: 0, tx: 0, ty: 0, j: R(-.035, .035), g: i % 3, ph: R(0, TAU) }));
-      const target = () => { const fn = MORPH_SHAPES[names[si]]; const order = p.map((_, i) => i).sort(() => Math.random() - .5); order.forEach((pi, i) => { const [x, y] = fn(i / N); const q = p[pi]; q.tx = cx + (x + q.j) * S; q.ty = cy + (y + q.j) * S; }); };
-      target(); let phase = 'form'; let pt = 0; const FORM = 1.9; const HOLD = 2.6; const BURST = 1;
-      return {
-        step(dt, t) {
-          pt += dt;
-          if (phase === 'form' && pt > FORM) { phase = 'hold'; pt = 0; }
-          else if (phase === 'hold' && pt > HOLD) { phase = 'burst'; pt = 0; for (const q of p) { const a = Math.atan2(q.y - cy, q.x - cx) + R(-.5, .5); const sp = R(60, 170); q.vx = Math.cos(a) * sp; q.vy = Math.sin(a) * sp; } }
-          else if (phase === 'burst' && pt > BURST) { phase = 'form'; pt = 0; si = (si + 1 + Math.floor(R(0, names.length - 1))) % names.length; target(); }
-          const damp = Math.exp(-(phase === 'burst' ? 2.2 : 6) * dt);
-          for (const q of p) {
-            if (phase !== 'burst') {
-              const kk = phase === 'hold' ? 40 : 16 * clamp(pt / .6, .2, 1);
-              const tx = q.tx + (phase === 'hold' ? Math.sin(t * 2 + q.ph) * 1.2 : 0); const ty = q.ty + (phase === 'hold' ? Math.cos(t * 1.7 + q.ph) * 1.2 : 0);
-              q.vx += (tx - q.x) * kk * dt; q.vy += (ty - q.y) * kk * dt;
-            }
-            q.vx *= damp; q.vy *= damp; q.x += q.vx * dt; q.y += q.vy * dt;
-          }
-        },
-        draw(c, t) {
-          c.globalAlpha = dark ? .9 : .85;
-          for (let g = 0; g < 3; g++) {
-            c.fillStyle = P.morph[g]; c.beginPath();
-            for (const q of p) { if (q.g !== g) continue; const r = 1.25 + .4 * Math.sin(t * 3 + q.ph); c.moveTo(q.x + r, q.y); c.arc(q.x, q.y, r, 0, TAU); }
-            c.fill();
-          }
-        },
-      };
-    } },
     // Ghost ripple ("Passing ghost"): an invisible something glides around a field of dots; they part to let it
     // through, then wobble back into place behind it, leaving a shimmering wake
     ghost: { name: 'Ghost ripple', make(w, h, P, dark, k) {
       const S = Math.min(w, h) / 280; const d = dotLattice(w, h, clamp(16 / Math.sqrt(Math.max(.4, k)), 11, 24) * Math.max(1, S * .9)); const RG = 46 * S; const ph = R(0, 50);
       const pos = (t) => [w / 2 + Math.sin(t * .23 + ph) * w * .42, h / 2 + Math.sin(t * .37 + ph * 1.3) * h * .38];
       return {
-        step(dt, t) {
+        step(dt, t, m) {
           const [gx, gy] = pos(t); const damp = Math.exp(-2.2 * dt);
           for (const q of d) {
             const dx = q.x - gx; const dy = q.y - gy; const dd = Math.hypot(dx, dy) || 1;
             if (dd < RG) { const f = (1 - dd / RG) ** 2 * 1100 * S; q.vx += dx / dd * f * dt; q.vy += dy / dd * f * dt; }
+            if (m) { const mx = q.x - m.x; const my = q.y - m.y; if (mx < RG && mx > -RG && my < RG && my > -RG) { const md = Math.hypot(mx, my) || 1; if (md < RG) { const f = (1 - md / RG) ** 2 * 1100 * S; q.vx += mx / md * f * dt; q.vy += my / md * f * dt; } } }
             q.vx += (q.bx - q.x) * 7 * dt; q.vy += (q.by - q.y) * 7 * dt; q.vx *= damp; q.vy *= damp; q.x += q.vx * dt; q.y += q.vy * dt;
             q.b = clamp(Math.hypot(q.x - q.bx, q.y - q.by) / (9 * S), 0, 1);
           }
@@ -920,143 +1007,27 @@
       };
     } },
     // Fish ("School of fish", boids): little fish swim in a loose school, split up and join again; now and then
-    // something startles them and they scatter
+    // something startles them and they scatter. 1.1.19: each fish is drawn along a short bending spine, so its body
+    // curves when it turns and a swimming wave runs down it to a forked tail that trails and flexes behind (it beats
+    // faster when the fish hurries); two little side fins paddle, and a soft sheen runs along its back
     fish: { name: 'Fish', make(w, h, P, dark, k) {
       const S = Math.min(w, h) / 280;
-      const b = Array.from({ length: capped(30, k, 70) }, (_, i) => { const a = R(0, TAU); return { x: R(30, w - 30), y: R(30, h - 30), vx: Math.cos(a) * 30, vy: Math.sin(a) * 30, g: i % 3, ph: R(0, TAU) }; });
-      let scare = null; const go = every(7, 13, k); let T = 0;
+      const b = Array.from({ length: capped(30, k, 70) }, (_, i) => fishNew(R(30, w - 30), R(30, h - 30), R(0, TAU), R(11.5, 14.5) * S, i % 3));
+      let scare = null; const go = every(7, 13, k); let T = 0; let M = null;
       const extra = (q) => {
         const a = flow(q.x, q.y, T * .5, .01); let ex = Math.cos(a) * 6; let ey = Math.sin(a) * 6;
+        if (M) { const u = near(q, M, 70 * S); if (u) { const dx = q.x - M.x; const dy = q.y - M.y; const d = Math.hypot(dx, dy) || 1; ex += dx / d * u * 700; ey += dy / d * u * 700; } }
         if (scare) { const dx = q.x - scare.x; const dy = q.y - scare.y; const d = Math.hypot(dx, dy) || 1; if (d < 80 * S) { const f = (1 - d / (80 * S)) * 900 * (1 - scare.age / scare.life); ex += dx / d * f; ey += dy / d * f; } }
         return [ex, ey];
       };
       return {
-        step(dt, t) {
-          T = t; if (!scare && go(dt)) { const q = pick(b); scare = { x: q.x + R(-10, 10), y: q.y + R(-10, 10), age: 0, life: .6 }; }
+        step(dt, t, m) {
+          T = t; M = m; if (!scare && go(dt)) { const q = pick(b); scare = { x: q.x + R(-10, 10), y: q.y + R(-10, 10), age: 0, life: .6 }; }
           if (scare) { scare.age += dt; if (scare.age > scare.life) scare = null; }
-          flockStep(b, dt, { w, h, see: 42 * S, apart: 13 * S, cohere: .8, align: 1.6, sep: 9, minS: 18 * S, maxS: (scare ? 95 : 44) * S, edge: 26 * S, extra });
+          flockStep(b, dt, { w, h, see: 42 * S, apart: 13 * S, cohere: .8, align: 1.6, sep: 9, minS: 18 * S, maxS: (scare || (m && m.sp > 30) ? 95 : 44) * S, edge: 26 * S, extra });
+          for (const q of b) fishBend(q, dt, S);
         },
-        draw(c, t) {
-          const L = 6.5 * S;
-          for (const q of b) {
-            const a = Math.atan2(q.vy, q.vx); const wig = Math.sin(t * 11 + q.ph) * .35;
-            c.save(); c.translate(q.x, q.y); c.rotate(a); c.globalAlpha = .85; c.fillStyle = P.fish[q.g];
-            c.beginPath(); c.ellipse(0, 0, L, L * .38, 0, 0, TAU); c.fill();
-            c.rotate(wig); c.beginPath(); c.moveTo(-L * .8, 0); c.lineTo(-L * 1.55, -L * .42); c.lineTo(-L * 1.55, L * .42); c.closePath(); c.fill(); c.restore();
-          }
-        },
-      };
-    } },
-    // Solar system: a glowing sun with four planets on tilted orbits (the inner ones faster, one with a moon);
-    // now and then a comet swings in, whips round the sun and flies off
-    solar: { name: 'Solar system', make(w, h, P, dark, k) {
-      const S = Math.min(w, h) / 280; const cx = w / 2; const cy = h / 2; const tilt = .42; const big = Math.min(w * .46, h * .46 / tilt);
-      const pl = [.2, .38, .6, .86].map((f, i) => ({ r: big * f, a: R(0, TAU), s: R(2, 3.6) * S, col: P.planet[i], moon: i === 1, ma: R(0, TAU) }));
-      const comets = []; const go = every(8, 14, k); const GM = 1.6e5 * S * S * S;
-      const pos = (q) => [cx + Math.cos(q.a) * q.r, cy + Math.sin(q.a) * q.r * tilt];
-      const planet = (c, q) => { const [x, y] = pos(q); c.globalAlpha = .95; c.fillStyle = q.col; dot(c, x, y, q.s); if (q.moon) { c.fillStyle = P.orbit; dot(c, x + Math.cos(q.ma) * 9 * S, y + Math.sin(q.ma) * 9 * S * tilt, 1.1); } };
-      return {
-        step(dt) {
-          for (const q of pl) { q.a += dt * 1.1 * Math.pow(big * .2 / q.r, 1.5); q.ma += dt * 3; }
-          if (go(dt) && comets.length < 2) { const a = R(0, TAU); const r = Math.hypot(w, h) * .55; const x = cx + Math.cos(a) * r; const y = cy + Math.sin(a) * r; const toward = Math.atan2(cy - y, cx - x) + R(.18, .32) * (Math.random() < .5 ? 1 : -1); const sp = R(55, 75) * S; comets.push({ x, y, vx: Math.cos(toward) * sp, vy: Math.sin(toward) * sp, age: 0 }); }
-          for (let i = comets.length - 1; i >= 0; i--) {
-            const m = comets[i]; m.age += dt; const n = 4; const hS = dt / n;
-            for (let j = 0; j < n; j++) { const dx = cx - m.x; const dy = cy - m.y; const r2 = dx * dx + dy * dy + 120 * S; const r = Math.sqrt(r2); const f = GM / r2; m.vx += dx / r * f * hS; m.vy += dy / r * f * hS; m.x += m.vx * hS; m.y += m.vy * hS; }
-            if ((m.age > 3 && (m.x < -60 || m.x > w + 60 || m.y < -60 || m.y > h + 60)) || m.age > 25) comets.splice(i, 1);
-          }
-        },
-        draw(c, t) {
-          c.strokeStyle = P.orbit; c.lineWidth = .8; c.globalAlpha = dark ? .22 : .25;
-          for (const q of pl) { c.beginPath(); c.ellipse(cx, cy, q.r, q.r * tilt, 0, 0, TAU); c.stroke(); }
-          for (const q of pl) if (Math.sin(q.a) < 0) planet(c, q);
-          const g = c.createRadialGradient(cx, cy, 0, cx, cy, 26 * S); g.addColorStop(0, P.sun); g.addColorStop(1, 'transparent');
-          c.globalAlpha = (dark ? .5 : .35) + .05 * Math.sin(t * 2); c.fillStyle = g; c.beginPath(); c.arc(cx, cy, 26 * S, 0, TAU); c.fill();
-          c.globalAlpha = 1; c.fillStyle = P.sun; dot(c, cx, cy, 6.5 * S);
-          for (const q of pl) if (Math.sin(q.a) >= 0) planet(c, q);
-          for (const m of comets) {
-            const dx = m.x - cx; const dy = m.y - cy; const d = Math.hypot(dx, dy) || 1; const L = clamp(2600 * S / d, 8, 46) * S;
-            const tx = m.x + dx / d * L; const ty = m.y + dy / d * L; const gg = c.createLinearGradient(m.x, m.y, tx, ty); gg.addColorStop(0, P.planet[0]); gg.addColorStop(1, 'transparent');
-            c.globalAlpha = .8; c.strokeStyle = gg; c.lineWidth = 2.2; c.lineCap = 'round'; c.beginPath(); c.moveTo(m.x, m.y); c.lineTo(tx, ty); c.stroke();
-            glow2(c, m.x, m.y, 2.2, P.planet[0], P.planet[0], 1, .5);
-          }
-        },
-      };
-    } },
-    // Contour map ("Living map", topographic flow): contour lines of an imaginary landscape, every fourth darker
-    // like on a hiking map; the hills and valleys slowly shift
-    topo: { name: 'Contour map', make(w, h, P, dark, k) {
-      const g = clamp(13 / Math.sqrt(Math.max(.5, k)), 9, 16); const step = .38;
-      let cache = null; let cacheT = -1;
-      return {
-        step() {},
-        draw(c, t) {
-          // the land moves slowly, so the lines are worked out at most 15 times a second
-          if (!cache || Math.abs(t - cacheT) > 1 / 15) { cache = contours(w, h, t * 3, g, step); cacheT = t; }
-          c.lineJoin = 'round'; c.strokeStyle = P.topo; c.lineWidth = .9; c.globalAlpha = .4; strokeSegs(c, cache.lines);
-          c.strokeStyle = P.topoHi; c.lineWidth = 1.4; c.globalAlpha = dark ? .55 : .5; strokeSegs(c, cache.index);
-        },
-      };
-    } },
-    // Neon tunnel ("Wireframe tunnel"): an endless neon wireframe tunnel; square rings rush toward you, it slowly
-    // bends left and right, and streaks of light zip along the walls
-    tunnel: { name: 'Neon tunnel', make(w, h, P, dark, k) {
-      const N = 12; const f = Math.min(w, h) * .55; const SP = 1.6; const HW = 1.35; const HH = 1;
-      const rings = Array.from({ length: N }, (_, i) => ({ z: .4 + i * (9 / N) }));
-      const sparks = Array.from({ length: capped(16, k, 50) }, () => ({ z: R(.5, 9), side: Math.floor(R(0, 4)), u: R(-1, 1), sp: R(2.4, 4) }));
-      let T = 0;
-      const off = (z) => [Math.sin(T * .35) * z * z * .03, Math.cos(T * .27) * z * z * .02];
-      const proj = (X, Y, z) => { const [ox, oy] = off(z); return [w / 2 + (X + ox) / z * f, h / 2 + (Y + oy) / z * f]; };
-      const wallPt = (side, u, z) => (side === 0 ? proj(u * HW, -HH, z) : side === 1 ? proj(HW, u * HH, z) : side === 2 ? proj(u * HW, HH, z) : proj(-HW, u * HH, z));
-      return {
-        step(dt, t) {
-          T = t;
-          for (const r of rings) { r.z -= SP * dt; if (r.z < .4) r.z += 9; }
-          for (const s of sparks) { s.z -= s.sp * dt; if (s.z < .45) { s.z = R(7, 9); s.side = Math.floor(R(0, 4)); s.u = R(-1, 1); } }
-        },
-        draw(c) {
-          const rs = [...rings].sort((a, b) => b.z - a.z); c.lineJoin = 'round';
-          for (const r of rs) {
-            const a = clamp((9 - r.z) / 6, 0, 1) * clamp((r.z - .4) / .6, 0, 1); c.globalAlpha = a * (dark ? .7 : .65); c.strokeStyle = P.tunnel; c.lineWidth = .8 + 1.2 / r.z;
-            const p0 = proj(-HW, -HH, r.z); const p1 = proj(HW, -HH, r.z); const p2 = proj(HW, HH, r.z); const p3 = proj(-HW, HH, r.z);
-            c.beginPath(); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); c.lineTo(p2[0], p2[1]); c.lineTo(p3[0], p3[1]); c.closePath(); c.stroke();
-          }
-          c.strokeStyle = P.tunnel; c.lineWidth = .8; c.globalAlpha = .35;
-          for (const [X, Y] of [[-HW, -HH], [HW, -HH], [HW, HH], [-HW, HH], [0, -HH], [HW, 0], [0, HH], [-HW, 0]]) {
-            c.beginPath(); for (let z = 9; z >= .45; z -= .5) { const p = proj(X, Y, z); if (z === 9) c.moveTo(p[0], p[1]); else c.lineTo(p[0], p[1]); } c.stroke();
-          }
-          c.strokeStyle = P.tunnel2; c.lineCap = 'round';
-          for (const s of sparks) { const a = clamp((9 - s.z) / 4, 0, 1); const p = wallPt(s.side, s.u, s.z); const q = wallPt(s.side, s.u, s.z + .7); c.globalAlpha = a * .9; c.lineWidth = 1 + 1.4 / s.z; c.beginPath(); c.moveTo(q[0], q[1]); c.lineTo(p[0], p[1]); c.stroke(); }
-        },
-      };
-    } },
-    // Synthwave ("Synthwave road"): a neon grid floor rolls toward you under a striped sunset sun, with wireframe
-    // mountains on the horizon and stars above
-    synthwave: { name: 'Synthwave', make(w, h, P, dark, k) {
-      const hor = h * .52; const camH = 1; const f = h * .55; let scroll = 0;
-      const stars = Array.from({ length: capped(30, k, 80) }, () => ({ x: R(0, w), y: R(0, hor * .85), ph: R(0, TAU), f: R(1, 3) }));
-      const mts = Array.from({ length: 14 }, (_, i) => [i / 13 * w, hor - R(6, 30) * Math.min(1, h / 280) * (i === 0 || i === 13 ? .2 : 1)]);
-      return {
-        step(dt) { scroll = (scroll + dt * 1.4) % 1; },
-        draw(c, t) {
-          c.fillStyle = P.tunnel2; for (const s of stars) { c.globalAlpha = .35 + .3 * Math.sin(t * s.f + s.ph); dot(c, s.x, s.y, .9); }
-          // the sun, with its stripes cut out (they slowly slide down)
-          const sr = Math.min(w, h) * .2; const sx = w / 2; const sy = hor;
-          const sg = c.createLinearGradient(0, sy - sr, 0, sy); sg.addColorStop(0, P.sunBot); sg.addColorStop(1, P.sunTop);
-          c.save(); c.beginPath(); c.arc(sx, sy, sr, Math.PI, TAU); c.closePath(); c.clip();
-          c.globalAlpha = dark ? .85 : .75; c.fillStyle = sg; c.beginPath();
-          let y0 = sy - sr;
-          for (let i = 0; i < 6; i++) { const yy = sy - sr * .55 + i * sr * .1 + ((t * 6) % (sr * .1)); if (yy > y0) c.rect(sx - sr, y0, sr * 2, yy - y0); y0 = Math.min(sy, yy + 1 + i * .7); }
-          if (y0 < sy) c.rect(sx - sr, y0, sr * 2, sy - y0);
-          c.fill(); c.restore();
-          c.globalAlpha = dark ? .7 : .6; c.strokeStyle = P.tunnel; c.lineWidth = 1; c.lineJoin = 'round'; c.beginPath(); mts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.stroke();
-          const hg = c.createLinearGradient(0, hor - 12, 0, hor + 6); hg.addColorStop(0, 'transparent'); hg.addColorStop(.7, P.horizon); hg.addColorStop(1, 'transparent');
-          c.globalAlpha = dark ? .35 : .3; c.fillStyle = hg; c.fillRect(0, hor - 12, w, 18);
-          c.strokeStyle = P.tunnel; c.lineWidth = 1;
-          for (let i = 0; i < 16; i++) { const z = 16 - i - scroll; if (z < .3) continue; const y = hor + camH / z * f; if (y > h + 2) continue; c.globalAlpha = clamp(1.2 - z / 14, .08, .85) * (dark ? 1 : .9); c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke(); }
-          c.globalAlpha = dark ? .55 : .5; c.beginPath();
-          for (let X = -12; X <= 12; X++) { c.moveTo(w / 2 + X / 16 * f, hor + camH / 16 * f); c.lineTo(w / 2 + X / .3 * f, hor + camH / .3 * f); }
-          c.stroke();
-        },
+        draw(c) { fishDraw(c, b, P, dark, S); },
       };
     } },
     // Dust in light ("Light shafts", volumetric dust): soft beams slant across the note, breathing brighter and
@@ -1067,19 +1038,323 @@
       const m = Array.from({ length: capped(55, k, 150) }, () => ({ x: R(0, w), y: R(0, h), vx: R(-3, 3), vy: R(-2, 3), z: Math.random(), ph: R(0, TAU) }));
       const ca = Math.cos(ang); const sa = Math.sin(ang);
       const inShaft = (x, y, t) => { let b = 0; for (const s of shafts) { const across = Math.abs((x - s.x) * sa - y * ca); b = Math.max(b, clamp(1 - across / s.wd, 0, 1) * (.7 + .3 * Math.sin(t * .35 + s.ph))); } return b; };
+      // 1.1.22: while the mouse plays with it, the dust in the light shows more and the dust outside it a little less;
+      // and the pointer is like a finger in the sunbeam: it casts a soft shadow down the beam, and the dust in it dims
+      let M = null; let hand = 0; const SR = 9 * clamp(S, .8, 1.5);
       return {
-        step(dt) { const damp = Math.exp(-.6 * dt); for (const q of m) { q.vx = (q.vx + R(-1, 1) * 10 * dt) * damp; q.vy = (q.vy + (R(-1, 1) * 10 + 1.2) * dt) * damp; q.x += q.vx * (.5 + q.z) * dt; q.y += q.vy * (.5 + q.z) * dt; wrap(q, w, h, 6); } },
+        step(dt, t, mp) {
+          if (mp) { M = { x: mp.x, y: mp.y }; hand = Math.min(1, hand + dt * 3); } else hand = Math.max(0, hand - dt * 1.5);
+          const damp = Math.exp(-.6 * dt);
+          for (const q of m) {
+            q.vx = (q.vx + R(-1, 1) * 10 * dt) * damp; q.vy = (q.vy + (R(-1, 1) * 10 + 1.2) * dt) * damp;
+            if (mp) { const u = shove(q, mp, 60, 40, dt, .5); if (u) { const dx = q.x - mp.x; const dy = q.y - mp.y; const d = Math.hypot(dx, dy) || 1; q.vx += -dy / d * u * 60 * dt; q.vy += dx / d * u * 60 * dt; } q.lit = Math.max(u, (q.lit || 0) - dt); } else if (q.lit) q.lit = Math.max(0, q.lit - dt);
+            const sp = Math.hypot(q.vx, q.vy); if (sp > 60) { q.vx *= 60 / sp; q.vy *= 60 / sp; }
+            q.x += q.vx * (.5 + q.z) * dt; q.y += q.vy * (.5 + q.z) * dt; wrap(q, w, h, 6);
+          }
+        },
         draw(c, t) {
           for (const s of shafts) {
             c.save(); c.translate(s.x, 0); c.rotate(ang - Math.PI / 2);
             const g = c.createLinearGradient(-s.wd, 0, s.wd, 0); g.addColorStop(0, 'transparent'); g.addColorStop(.5, P.shaft); g.addColorStop(1, 'transparent');
-            c.globalAlpha = (dark ? .07 : .3) * (.7 + .3 * Math.sin(t * .35 + s.ph)); c.fillStyle = g; c.fillRect(-s.wd, -20, s.wd * 2, Math.hypot(w, h) * 1.3); c.restore();
+            c.globalAlpha = (dark ? .07 : .3) * (.7 + .3 * Math.sin(t * .35 + s.ph)) * (1 + hand * (dark ? .6 : .25)); c.fillStyle = g; c.fillRect(-s.wd, -20, s.wd * 2, Math.hypot(w, h) * 1.3);
+            if (M && hand > 0) { // the pointer's shadow: a soft strip down the beam from where it is
+              const lx = (M.x - s.x) * sa - M.y * ca; const ly = (M.x - s.x) * ca + M.y * sa; const inB = clamp(1 - Math.abs(lx) / s.wd, 0, 1);
+              if (inB > 0) {
+                const sg = c.createLinearGradient(lx - SR, 0, lx + SR, 0); sg.addColorStop(0, 'transparent'); sg.addColorStop(.5, '#000'); sg.addColorStop(1, 'transparent');
+                c.globalCompositeOperation = 'destination-out'; c.globalAlpha = inB * hand * .75; c.fillStyle = sg; c.fillRect(lx - SR, ly, SR * 2, Math.hypot(w, h) * 1.3); c.globalCompositeOperation = 'source-over';
+              }
+            }
+            c.restore();
           }
           c.fillStyle = P.dust;
           for (const q of m) {
-            const b = inShaft(q.x, q.y, t); const tw = .7 + .3 * Math.sin(t * 2 + q.ph); const a = (.07 + b * .85 * tw) * (dark ? 1 : .9); const r = .5 + q.z * 1.5;
+            let b = inShaft(q.x, q.y, t); const lit = q.lit || 0;
+            if (M && hand > 0 && b > 0) { const dx = q.x - M.x; const dy = q.y - M.y; if (dx * ca + dy * sa > 0) { const perp = Math.abs(dx * sa - dy * ca); if (perp < SR) b *= 1 - .8 * hand * (1 - perp / SR); } }
+            const tw = .7 + .3 * Math.sin(t * 2 + q.ph);
+            const a = Math.min(1, .07 * (1 - .45 * hand) + lit * .06 + b * tw * (.85 + hand * .5 + lit * .9)) * (dark ? 1 : .9); const r = (.5 + q.z * 1.5) * (1 + b * hand * .35);
             if (q.z > .75) { c.globalAlpha = a * .35; dot(c, q.x, q.y, r * 2.2); } else { c.globalAlpha = a; dot(c, q.x, q.y, r); }
           }
+        },
+      };
+    } },
+    // ---- 1.1.18, third round: the owner's picks from the "Spell Lab" page (magic effects)
+    // Healing aura: green and gold motes and little crosses float up through a soft healing light at the bottom.
+    // 1.1.22: the bottom no longer has rings swirling out; it slowly breathes: a soft glow swells up and settles back
+    // (the owner picked "Breathing" from five versions). The pointer gathers the motes and glows softly where it is.
+    heal: { name: 'Healing aura', make(w, h, P, dark, k) {
+      const S = Math.min(w, h) / 280; const sz = clamp(S, .8, 1.5); let M = null; let hand = 0;
+      const mk = (any) => ({ x: R(w * .1, w * .9), y: any ? R(h * .2, h) : h + 6, vy: -R(14, 28), ph: R(0, TAU), c: Math.random() < .55 ? 0 : 1, cross: Math.random() < .25, s: R(.9, 1.8) * sz, top: R(0, h * .4) });
+      const f = Array.from({ length: capped(26, k, 70) }, () => mk(true));
+      const glowUp = (c, col, a, top) => { const g = c.createLinearGradient(0, h, 0, top); g.addColorStop(0, col); g.addColorStop(1, 'transparent'); c.globalAlpha = a; c.fillStyle = g; c.fillRect(0, top, w, h - top); };
+      return {
+        step(dt, t, m) {
+          if (m) { M = { x: m.x, y: m.y }; hand = Math.min(1, hand + dt * 3); } else hand = Math.max(0, hand - dt * 1.5);
+          for (let i = 0; i < f.length; i++) {
+            const q = f[i]; q.y += q.vy * dt; q.x += Math.sin(t * 1.3 + q.ph) * 6 * dt;
+            if (m) { const u = near(q, m, 90); if (u) { q.x += (m.x - q.x) * u * 1.6 * dt; q.y += (m.y - q.y) * u * 1.2 * dt; } }
+            if (q.y < q.top) f[i] = mk(false);
+          }
+        },
+        draw(c, t) {
+          const A = dark ? 1 : .65;
+          const b = .5 - .5 * Math.cos(t * TAU / 3.6); // breathing in and out, about every 3.6 s
+          glowUp(c, P.heal[0], ((dark ? .14 : .1) + .12 * b) * (dark ? 1 : .9), h * (.62 - .22 * b));
+          glowUp(c, P.heal[1], (.06 + .12 * b) * A, h * (.88 - .1 * b));
+          c.globalAlpha = (.25 + .35 * b) * A; c.fillStyle = P.healHi; c.fillRect(0, h - 1.5, w, 1.5);
+          if (M && hand > 0) { // a soft healing glow where the pointer is
+            const r = (16 + 4 * Math.sin(t * 3)) * sz; const g = c.createRadialGradient(M.x, M.y, 0, M.x, M.y, r); g.addColorStop(0, P.heal[0]); g.addColorStop(1, 'transparent');
+            c.globalAlpha = hand * (dark ? .3 : .25); c.fillStyle = g; c.beginPath(); c.arc(M.x, M.y, r, 0, TAU); c.fill();
+          }
+          const dots = [[], []];
+          for (const q of f) {
+            const a = clamp((q.y - q.top) / (h * .25), 0, 1) * (.6 + .4 * Math.sin(t * 3 + q.ph));
+            if (q.cross) { const s = q.s * 2.2; c.globalAlpha = a; c.fillStyle = P.healHi; c.fillRect(q.x - s, q.y - s * .3, s * 2, s * .6); c.fillRect(q.x - s * .3, q.y - s, s * .6, s * 2); } else dots[q.c].push([q.x, q.y, q.s, a]);
+          }
+          dots.forEach((d, i) => bucketDots(c, d, P.heal[i], 3, dark ? .95 : .85));
+        },
+      };
+    } },
+    // Lightning spell: now and then a forked bolt cracks across the note with a flash, flickers and fades; a few static
+    // sparks drift in between
+    lightning: { name: 'Lightning', make(w, h, P, dark, k) {
+      const S = Math.min(w, h) / 280; let bolt = null; const go = every(2.2, 4.5, k); let flash = 0;
+      const sparks = Array.from({ length: capped(12, k, 36) }, () => ({ x: R(0, w), y: R(0, h), ph: R(0, TAU), f: R(2, 6) }));
+      let M = null; const zaps = [];
+      // 1.1.22: every bolt picks where it strikes first; only if the pointer is close to that path does it bend
+      // to hit the pointer (a bolt on the far side of the note misses it). Second round: it hits more often (bolts
+      // like to start above the pointer, and they bend to it from further away), and a hit is a little show: a white
+      // flash at the pointer, a shock ring, three tiny crackling arcs and a few sparks. Third round (the owner wanted more
+      // hits): the zone round the pointer that a bolt bends into is wider, and seven bolts in ten come down near the
+      // pointer, so about three in four now hit it (it was about one in two); the rest start anywhere, so the side bolts stay
+      const reach = Math.max(70, Math.min(w, h) * .32);
+      const segDist = (px, py, ax, ay, bx, by) => { const vx = bx - ax; const vy = by - ay; const u = clamp(((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy || 1), 0, 1); return Math.hypot(px - ax - vx * u, py - ay - vy * u); };
+      const make = () => {
+        const x0 = M && Math.random() < .7 ? clamp(M.x + R(-w * .2, w * .2), w * .05, w * .95) : R(w * .1, w * .9); let x1 = clamp(x0 + R(-w * .35, w * .35), 0, w); let y1 = R(h * .65, h); let hit = null;
+        if (M && segDist(M.x, M.y, x0, -5, x1, y1) < reach) { x1 = M.x; y1 = M.y; hit = { x: M.x, y: M.y }; }
+        const main = []; zig(x0, -5, x1, y1, Math.min(w * .18, Math.max(12, y1 * .3)), 5, main);
+        const branches = []; for (let i = 0; i < 2; i++) { const j = Math.floor(R(4, main.length / 4 - 4)) * 4; const bx = main[j]; const by = main[j + 1]; zig(bx, by, bx + R(-60, 60) * S, by + R(30, 80) * S, 18 * S, 3, branches); }
+        if (hit) for (let i = 0; i < 5; i++) { const a = R(0, TAU); const v = R(50, 120) * S; zaps.push({ x: hit.x, y: hit.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, age: 0, life: R(.25, .5) }); }
+        return { main, branches, age: 0, life: .7, hit };
+      };
+      return {
+        step(dt, t, m) {
+          M = m; if (!bolt && go(dt)) { bolt = make(); flash = bolt.hit ? 1.4 : 1; } if (bolt) { bolt.age += dt; if (bolt.age > bolt.life) bolt = null; } flash = Math.max(0, flash - dt * 5);
+          const dr = Math.pow(.1, dt); for (const z of zaps) { z.vx *= dr; z.vy *= dr; z.x += z.vx * dt; z.y += z.vy * dt; } cull(zaps, dt);
+        },
+        draw(c, t) {
+          bucketDots(c, sparks.map((s) => [s.x + Math.sin(t * s.f + s.ph) * 2, s.y, .9, Math.max(0, Math.sin(t * s.f * 1.7 + s.ph))]), P.lightning, 3, dark ? .6 : .45);
+          const cg = c.createLinearGradient(0, 0, 0, h * .35); cg.addColorStop(0, P.lightning); cg.addColorStop(1, 'transparent'); // a stormy glow at the top
+          c.globalAlpha = (dark ? .1 : .06) * (.7 + .3 * Math.sin(t * 1.1) * Math.sin(t * 2.7)); c.fillStyle = cg; c.fillRect(0, 0, w, h * .35);
+          if (flash > 0) { c.globalAlpha = Math.min(1, flash) * (dark ? .1 : .06); c.fillStyle = P.lightning; c.fillRect(0, 0, w, h); }
+          if (zaps.length) bucketDots(c, zaps.map((z) => [z.x, z.y, 1.1, 1 - z.age / z.life]), P.lightningHi, 3, .95);
+          if (!bolt) return;
+          const u = bolt.age / bolt.life; const fl = u < .3 ? (Math.random() < .5 ? 1 : .45) : 1 - (u - .3) / .7;
+          c.lineCap = 'round'; c.lineJoin = 'round';
+          c.strokeStyle = P.lightning; c.lineWidth = 5 * clamp(S, .8, 1.5); c.globalAlpha = fl * (dark ? .25 : .16); strokeSegs(c, bolt.main);
+          c.lineWidth = 1.6 * clamp(S, .8, 1.5); c.globalAlpha = fl * .95; c.strokeStyle = P.lightningHi; strokeSegs(c, bolt.main);
+          c.lineWidth = 1; c.globalAlpha = fl * .7; strokeSegs(c, bolt.branches);
+          if (bolt.hit) { // the hit: a white flash, a shock ring and three tiny crackling arcs round the pointer
+            const H = bolt.hit; const sz = clamp(S, .8, 1.5);
+            glow2(c, H.x, H.y, (11 - u * 6) * sz, P.lightning, P.lightningHi, Math.min(1, fl * 1.2), dark ? .9 : .6);
+            c.strokeStyle = P.lightningHi; c.lineWidth = 1.4 * (1 - u); c.globalAlpha = (1 - u) * .85; c.beginPath(); c.arc(H.x, H.y, (5 + Math.sqrt(u) * 30) * sz, 0, TAU); c.stroke();
+            if (u < .45) { const arcs = []; for (let i = 0; i < 3; i++) { const a = R(0, TAU); const L = R(12, 22) * sz; zig(H.x, H.y, H.x + Math.cos(a) * L, H.y + Math.sin(a) * L, 5, 2, arcs); } c.lineWidth = 1; c.globalAlpha = fl * .9; strokeSegs(c, arcs); }
+          }
+        },
+        bolt: () => bolt, // for the tests
+      };
+    } },
+    // Cauldron: a glowing potion surface wobbles near the bottom; bubbles swell up out of it as glowing domes and
+    // burst with a splash of droplets and a puff of coloured steam; steam curls up and drifts away the whole time; now and
+    // then a bubble breaks free and floats up as a glowing orb, shimmering, until it pops into tiny stars
+    cauldron: { name: 'Cauldron', make(w, h, P, dark, k) {
+      const S = Math.min(w, h) / 280; const sz = clamp(S, .8, 1.5); const SY = h * .86; const COL = Math.floor(R(0, 2));
+      // 1.1.22: the pointer can stir the potion a little: moving sideways near the surface sends small waves the way it
+      // goes, the surface dips under it and a faint swirl turns below; it all calms down again in a second or two
+      const stir = { x: w / 2, a: 0, dir: 1, ph: 0 };
+      const surf = (x, t) => {
+        let y = SY + Math.sin(x * .045 + t * 2.1) * 2.2 * sz + Math.sin(x * .021 - t * 1.3) * 1.6 * sz;
+        if (stir.a > .01) { const dx = x - stir.x; if (dx > -160 && dx < 160) { const g = Math.exp(-((dx / 70) ** 2)); y += stir.a * sz * (2.8 * Math.sin(dx * .09 - t * 7 * stir.dir) * g + 2.4 * Math.exp(-((dx / 22) ** 2))); } }
+        return y;
+      };
+      const domes = []; const drops = []; const steam = []; const orbs = []; const stars = [];
+      const goDome = every(.35, .9, k); const goSteam = every(.12, .25); const vents = [R(.15, .35), R(.4, .6), R(.65, .85)].map((f) => f * w); const goOrb = every(4, 7, k);
+      const puff = (x, y, big) => { if (steam.length < 30) steam.push({ x, y, vx: R(-6, 6) * S, vy: -R(20, 32) * S, r: (big ? R(10, 16) : R(6, 10)) * sz, grow: R(7, 12) * sz, age: 0, life: R(3, 4.5), ph: R(0, TAU), c: big ? 0 : 1 }); };
+      return {
+        step(dt, t, m) {
+          if (m && m.y > SY - 40 * sz && Math.abs(m.vx) > 15) {
+            const f = Math.min(1, dt * 4); stir.a += (clamp(Math.abs(m.vx) / 350, .25, 1) - stir.a) * f; stir.x += (m.x - stir.x) * Math.min(1, dt * 6); stir.dir += (Math.sign(m.vx) - stir.dir) * Math.min(1, dt * 3);
+          } else stir.a *= Math.pow(.35, dt);
+          stir.ph += dt * 5 * stir.dir * stir.a;
+          if (m && m.y > SY - 45 * sz && m.sp > 30 && domes.length < 9 && Math.random() < dt * Math.min(10, 2 + m.sp * .02)) domes.push({ x: clamp(m.x + R(-10, 10), 4, w - 4), r: R(5, 10) * sz, age: 0, life: R(.5, .9), c: Math.random() < .7 ? COL : 1 - COL });
+          if (m) for (const o of orbs) if (o.mode !== 'pop' && Math.hypot(o.x - m.x, o.y - m.y) < o.r + 7) o.mode = 'pop';
+          if (goDome(dt) && domes.length < 7) domes.push({ x: R(w * .08, w * .92), r: R(5, 11) * sz, age: 0, life: R(.6, 1.1), c: Math.random() < .7 ? COL : 1 - COL });
+          if (goSteam(dt)) puff(pick(vents) + R(-14, 14) * sz, SY - 2, false);
+          if (goOrb(dt) && orbs.length < 3) orbs.push({ x: R(w * .2, w * .8), y: SY - 4, vy: -R(18, 28) * S, r: R(4, 6.5) * sz, ph: R(0, TAU), top: R(h * .15, h * .5), sink: Math.random() < .2, mode: 'up', t: 0 });
+          for (let i = domes.length - 1; i >= 0; i--) {
+            const d = domes[i]; d.age += dt;
+            if (d.age > d.life) { // burst: droplets and a puff of steam
+              for (let j = 0; j < 7; j++) { const a = -Math.PI / 2 + R(-1.1, 1.1); const v = R(40, 85) * S; drops.push({ x: d.x, y: surf(d.x, t) - d.r * .6, vx: Math.cos(a) * v, vy: Math.sin(a) * v, age: 0, life: 1.4, c: d.c }); }
+              puff(d.x, surf(d.x, t) - d.r, true); domes.splice(i, 1);
+            }
+          }
+          for (const q of drops) { q.vy += 220 * S * dt; q.x += q.vx * dt; q.y += q.vy * dt; if (q.y > surf(q.x, t) + 2) q.age = q.life; } cull(drops, dt);
+          for (const s of steam) { s.age += dt; s.x += (s.vx + Math.sin(t * 1.2 + s.ph + s.age) * 10 * S) * dt; s.y += s.vy * dt; s.r += s.grow * dt; }
+          for (let i = steam.length - 1; i >= 0; i--) if (steam[i].age > steam[i].life) steam.splice(i, 1);
+          for (let i = orbs.length - 1; i >= 0; i--) {
+            const o = orbs[i]; o.t += dt; o.x += Math.sin(t * 2 + o.ph) * 10 * dt;
+            if (o.mode === 'up') { o.y += o.vy * dt; if (o.y < o.top) { o.mode = o.sink ? 'stall' : 'pop'; o.t = 0; } }
+            else if (o.mode === 'pop') { /* touched by the pointer (1.1.21): pops below */ }
+            else if (o.mode === 'stall') { if (o.t > .8) { o.mode = 'down'; } }
+            else if (o.mode === 'down') { o.y += 30 * S * dt; if (o.y > SY) { puff(o.x, SY - 3, true); orbs.splice(i, 1); continue; } }
+            if (o.mode === 'pop') { for (let j = 0; j < 8; j++) { const a = j * TAU / 8; stars.push({ x: o.x, y: o.y, vx: Math.cos(a) * 45 * S, vy: Math.sin(a) * 45 * S, age: 0, life: .8 }); } orbs.splice(i, 1); }
+          }
+          const dr = Math.pow(.15, dt); for (const s of stars) { s.vx *= dr; s.vy *= dr; s.x += s.vx * dt; s.y += s.vy * dt; } cull(stars, dt);
+        },
+        draw(c, t) {
+          // the glow of the brew below the surface
+          const g = c.createLinearGradient(0, h, 0, SY - 30 * S); g.addColorStop(0, P.brew[COL]); g.addColorStop(1, 'transparent');
+          c.globalAlpha = (dark ? .26 : .16) + .04 * Math.sin(t * 1.8); c.fillStyle = g; c.fillRect(0, SY - 30 * S, w, h - SY + 30 * S);
+          // steam: soft puffs that rise, swell, sway and thin out
+          for (const s of steam) {
+            const u = s.age / s.life; const a = Math.sin(Math.PI * Math.min(1, u * 1.3)) * (1 - u * .8) * (dark ? .42 : .3);
+            const sg = c.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r); sg.addColorStop(0, s.c ? P.steam : P.brew[COL]); sg.addColorStop(1, 'transparent');
+            c.globalAlpha = a; c.fillStyle = sg; c.beginPath(); c.arc(s.x, s.y, s.r, 0, TAU); c.fill();
+          }
+          // the potion surface
+          c.strokeStyle = P.brew[COL]; c.lineWidth = 1.6 * sz; c.globalAlpha = dark ? .7 : .6; c.beginPath();
+          for (let x = 0; x <= w + 6; x += 6) { const y = surf(x, t); if (x) c.lineTo(x, y); else c.moveTo(x, y); } c.stroke();
+          if (stir.a > .03) { // the faint swirl the stirring leaves below the surface
+            c.strokeStyle = P.brewHi; c.lineWidth = 1.1 * sz;
+            for (const [rk, o, ak] of [[1, 0, .32], [.6, Math.PI, .24]]) { c.globalAlpha = stir.a * ak; c.beginPath(); c.ellipse(stir.x, SY + 9 * sz, 28 * sz * rk, 5 * sz * rk, 0, stir.ph + o, stir.ph + o + 1.7); c.stroke(); }
+          }
+          // domes swelling out of the surface: filled, glowing, with a bright crescent on top
+          for (const d of domes) {
+            const u = d.age / d.life; const r = d.r * (.3 + .7 * Math.sin(Math.PI / 2 * u)); const y = surf(d.x, t);
+            c.globalAlpha = .55; c.fillStyle = P.brew[d.c]; c.beginPath(); c.arc(d.x, y, r, Math.PI, TAU); c.fill();
+            c.globalAlpha = .9; c.strokeStyle = P.brewHi; c.lineWidth = 1.1 * sz; c.beginPath(); c.arc(d.x, y, r * .75, Math.PI * 1.15, Math.PI * 1.55); c.stroke();
+          }
+          bucketDots(c, drops.map((q) => [q.x, q.y, 1.5 * sz, 1 - q.age / q.life * .5]), P.brew[COL], 3, .95);
+          // orbs that broke free: a glowing core with a swirl of colour round it
+          for (const o of orbs) {
+            glow2(c, o.x, o.y, o.r, P.brew[COL], P.brewHi, .95, dark ? .6 : .45);
+            c.strokeStyle = P.brew[1 - COL]; c.lineWidth = 1.2 * sz; c.globalAlpha = .8; c.beginPath(); c.arc(o.x, o.y, o.r * 1.15, t * 4 + o.ph, t * 4 + o.ph + 2.2); c.stroke();
+          }
+          c.fillStyle = P.brewHi; for (const s of stars) { c.globalAlpha = 1 - s.age / s.life; star4(c, s.x, s.y, 2.4 * sz); }
+        },
+      };
+    } },
+    // Ghost jellyfish: faint sea-glow motes drift; every so often a ghostly jellyfish
+    // made of dots swims slowly across, its bell pulsing and tendrils trailing, leaving glowing dots behind, then dissolves
+    jelly: { name: 'Ghost jellyfish', make(w, h, P, dark, k) {
+      const S = Math.min(w, h) / 280; const sz = clamp(S, .8, 1.5); const J = Math.min(w, h) * .22;
+      const motes = Array.from({ length: capped(28, k, 70) }, () => ({ x: R(0, w), y: R(0, h), ph: R(0, TAU), vy: -R(1, 4) }));
+      const trail = []; let jelly = null; const go = every(5, 9);
+      const spawn = () => { const L = Math.random() < .5; return { x: L ? -J : w + J, y: R(h * .45, h * .75), vx: (L ? 1 : -1) * R(14, 22) * S, vy: -R(2, 6) * S, age: 0, life: (w + 2 * J) / (R(14, 22) * S), ph: R(0, TAU), drop: 0, hist: [] }; };
+      jelly = spawn(); jelly.age = jelly.life * .3; jelly.x += jelly.vx * jelly.life * .3; jelly.y += jelly.vy * jelly.life * .3;
+      // 1.1.22: touching the jellyfish no longer chases it away (the owner picked "Slingshot ghost" from three versions).
+      // It shines: from where it's first touched a wave of violet light spreads over all of it, then it all glows and
+      // slowly calms down. And the moment the pointer goes in, a violet mirage of it is left behind, once: a still copy
+      // that stays exactly where it appeared (no swimming, pulsing or swaying like the real one) and fades smoothly away
+      // from its first moment to its last. It never follows the pointer; moving round inside the jellyfish does nothing
+      // more until the pointer leaves and comes back in
+      const ALT = dark ? '#E3A6FF' : '#8A3FB8'; let M = null; let lit = 0; let away = 0;
+      let inside = false; let lastFling = -9; const twins = [];
+      // the shine starts where it's first touched and spreads over the whole jellyfish (src: that spot, from the jellyfish's middle; wave: how far it has spread)
+      let src = null; let wave = 0;
+      return {
+        step(dt, t, mp) {
+          for (const m of motes) { m.y += m.vy * dt; m.x += Math.sin(t * .5 + m.ph) * 3 * dt; if (mp) nudge(m, mp, 40, 90, dt, .3); if (m.y < -4) { m.y = h + 4; m.x = R(0, w); } }
+          let on = false; if (mp) { M = { x: mp.x, y: mp.y }; if (jelly) { const dx = mp.x - jelly.x; const dy = mp.y - jelly.y; on = Math.abs(dx) < J * .65 && dy > -J * .55 && dy < J * 1.25; } }
+          if (on && !src) { src = { x: mp.x - jelly.x, y: mp.y - jelly.y }; wave = 0; }
+          away = on ? 0 : away + dt; // the shine stays a moment after the pointer leaves (.35 s), then fades in under a second
+          lit = on ? Math.min(1, lit + dt * 4) : away < .35 ? lit : Math.max(0, lit - dt * 1.3);
+          if (src) { wave += dt * J * 2.6; if (lit <= 0) src = null; }
+          {
+            if (on && !inside && t - lastFling > .6 && twins.length < 3) { twins.push({ age: 0, life: 1.6, snap: null }); lastFling = t; } // just came in: leave a mirage behind, once (its shape is copied the first time it's drawn)
+            inside = on;
+            cull(twins, dt);
+          }
+          if (!jelly && go(dt)) jelly = spawn();
+          if (jelly) {
+            const q = jelly; q.age += dt; const sw = .6 + .4 * Math.max(0, Math.sin(t * 2.2 + q.ph)); // it swims in pushes
+            q.x += q.vx * sw * dt * 1.4; q.y += q.vy * sw * dt; q.hist.unshift([q.x, q.y]); if (q.hist.length > 40) q.hist.pop();
+            q.drop += dt; if (q.drop > .12) { q.drop = 0; trail.push({ x: q.x + R(-J * .3, J * .3), y: q.y + R(0, J * .2), age: 0, life: R(1.5, 2.8) }); }
+            if (q.age > q.life || q.y < -J * 2) jelly = null;
+          }
+          cull(trail, dt);
+        },
+        draw(c, t) {
+          const lo = []; const hi = [];
+          for (const m of motes) lo.push([m.x, m.y, .9 * sz, .25 + .2 * Math.sin(t + m.ph)]);
+          for (const d of trail) lo.push([d.x, d.y, 1.1 * sz, (1 - d.age / d.life) * .8]);
+          const alt = [];
+          if (jelly) {
+            const q = jelly; const fade = clamp(q.age / 1.5, 0, 1) * clamp((q.life - q.age) / 1.5, 0, 1); const pu = Math.sin(t * 2.2 + q.ph);
+            const bw = J * (.5 + .08 * pu); const bh = J * (.42 - .06 * pu);
+            const body = []; // [x, y, r, a, along (0 bell top … 1 tendril ends)]
+            for (let i = 0; i <= 22; i++) { const a = Math.PI + i / 22 * Math.PI; body.push([q.x + Math.cos(a) * bw, q.y + Math.sin(a) * bh, 1.4 * sz, fade * (.6 + .3 * Math.sin(t * 3 + i)), (1 + Math.sin(a)) * .15]); }
+            for (let i = 0; i < 9; i++) { const a = Math.PI * (1.15 + i * .08); body.push([q.x + Math.cos(a) * bw * .55, q.y + Math.sin(a) * bh * .55, 1 * sz, fade * .35, .1]); }
+            for (let tdl = 0; tdl < 5; tdl++) {
+              const off = (tdl / 4 - .5) * bw * 1.3;
+              for (let s = 1; s <= 9; s++) { const hp = q.hist[Math.min(q.hist.length - 1, s * 3)] || [q.x, q.y]; const lag = [hp[0] - q.x, hp[1] - q.y]; body.push([q.x + off * (1 - s * .05) + lag[0] * .6 + Math.sin(t * 2.2 - s * .6 + tdl * 1.3) * (1.5 + s * .9) * sz, q.y + s * J * .12 + lag[1] * .3, (1.1 - s * .06) * sz, fade * (.75 - s * .07), .3 + s * .078]); }
+            }
+            if (lit > .01) { // it shines: from where it was first touched, a wave of violet light spreads over every dot (a bright edge as it goes), then all of it glows, with a soft shimmer running down it
+              const sx = q.x + (src ? src.x : 0); const sy = q.y + (src ? src.y : 0); const W = src ? wave : J * 9; const spread = clamp(W / (J * 1.6), 0, 1);
+              const g = c.createRadialGradient(q.x, q.y, 0, q.x, q.y, J * 1.1); g.addColorStop(0, ALT); g.addColorStop(1, 'transparent');
+              c.globalAlpha = lit * fade * spread * (dark ? .24 : .15); c.fillStyle = g; c.beginPath(); c.arc(q.x, q.y, J * 1.1, 0, TAU); c.fill();
+              for (const d of body) {
+                const dd = Math.hypot(d[0] - sx, d[1] - sy); const got = clamp((W - dd) / (J * .35), 0, 1); const edge = Math.exp(-(((dd - W) / (J * .14)) ** 2));
+                const sh = .85 + .15 * Math.sin(d[4] * 9 - t * 6); const b = lit * got;
+                const it = [d[0], d[1], d[2] * (1 + .4 * b + .5 * edge * lit), Math.min(1, (d[3] * (1 + .7 * b) + edge * .5 * lit * fade) * (b > .5 ? sh : 1))]; (b > .4 || edge * lit > .5 ? alt : hi).push(it);
+              }
+            } else for (const d of body) hi.push(d);
+            for (const tw of twins) if (!tw.snap) tw.snap = body.map((d) => [d[0], d[1], d[2] * .9, d[3]]); // the mirage is a still copy of how the jellyfish looks right now
+          }
+          bucketDots(c, lo, P.sea[1], 4, dark ? .7 : .6); bucketDots(c, hi, P.sea[0], 4, dark ? .95 : .85); if (alt.length) bucketDots(c, alt, ALT, 4, dark ? .95 : .85);
+          for (const tw of twins) { // the mirage stays exactly where it appeared and fades smoothly, from its first moment to its last
+            if (!tw.snap) continue; const v = tw.age / tw.life;
+            bucketFade(c, tw.snap, ALT, 4, dark ? .95 : .85, .6 * Math.min(1, v * 10) * Math.pow(Math.max(0, 1 - v), 1.5));
+          }
+        },
+        where: () => (jelly ? { x: jelly.x, y: jelly.y, lit, twins: twins.length } : null), // for the tests
+      };
+    } },
+    // Fel fire (inspired by the green fel magic of MMO games): eerie green flames burn along the bottom of the note,
+    // now and then flaring up, throwing a few sparks. 1.1.22: the flames stay low (up to the lower middle at most, a
+    // flare included) and each one slows down as it rises, with flickering flame tongues under them, so it burns like a
+    // fire instead of fizzing up to the top like soda
+    fel: { name: 'Fel fire', make(w, h, P, dark, k) {
+      const S = Math.min(w, h) / 280; const sz = clamp(S, .8, 1.5); const p = []; let acc = 0; const NT = clamp(Math.round(w / (45 * S)), 4, 12);
+      const tongues = Array.from({ length: NT }, (_, i) => ({ x: (i + .5) / NT * w + R(-8, 8), ph: R(0, TAU), flare: 0 })); const go = every(3, 6, k);
+      const tall = (tg, t) => h * (.13 + .035 * Math.sin(t * 7 + tg.ph) + .025 * Math.sin(t * 12.7 + tg.ph * 2)) * (1 + tg.flare * .9);
+      return {
+        step(dt, t, m) {
+          if (go(dt)) pick(tongues).flare = 1;
+          if (m && m.y > h * .45) { let best = null; let bd = 1e9; for (const tg of tongues) { const d = Math.abs(tg.x - m.x); if (d < bd) { bd = d; best = tg; } } if (best && bd < 40 * sz) best.flare = Math.max(best.flare, clamp(1.2 - (m.y - h * .45) / (h * .55) * .2, .6, 1)); }
+          if (m) for (const q of p) { const u = near(q, m, 34 * sz); if (u) q.vx += (q.x - m.x > 0 ? 1 : -1) * u * 260 * dt + m.vx * u * .8 * dt; }
+          acc += dt * 95 * clamp(Math.sqrt(k), .5, 1.6);
+          while (acc >= 1) {
+            acc -= 1; if (p.length > 200) break; const tg = pick(tongues); const spark = Math.random() < .05;
+            const H = Math.min(h * .55, (spark ? R(1.3, 2) : R(.55, 1.05)) * tall(tg, t)); const life = R(.7, 1.1) * (1 + tg.flare * .3);
+            p.push({ x: tg.x + R(-10, 10) * sz, y: h + 2, vy: -2 * H / life, dec: 2 * H / (life * life), vx: 0, age: 0, life, tx: tg.x, spark });
+          }
+          for (const tg of tongues) tg.flare = Math.max(0, tg.flare - dt * .7);
+          for (const q of p) { q.vx += ((q.tx - q.x) * 3 + Math.sin(t * 9 + q.y * .05) * 16) * dt; if (q.spark) q.vx += R(-60, 60) * dt; q.vy = Math.min(0, q.vy + q.dec * dt); q.x += q.vx * dt; q.y += q.vy * dt; }
+          cull(p, dt);
+        },
+        draw(c, t) {
+          const g = c.createLinearGradient(0, h, 0, h * .7); g.addColorStop(0, P.fel[0]); g.addColorStop(1, 'transparent');
+          c.globalAlpha = (dark ? .22 : .12) + .05 * Math.sin(t * 5) * Math.sin(t * 2.3); c.fillStyle = g; c.fillRect(0, h * .7, w, h * .3);
+          // the flames' glow: a soft, tall glow under each tongue that flickers with it (no hard edges)
+          for (const tg of tongues) {
+            const th = tall(tg, t) * 1.1; const tw = 20 * sz * (1 + tg.flare * .3);
+            c.save(); c.translate(tg.x + Math.sin(t * 5 + tg.ph) * 3, h); c.scale(1, th / tw);
+            const fg = c.createRadialGradient(0, 0, 0, 0, 0, tw); fg.addColorStop(0, P.fel[1]); fg.addColorStop(.45, P.fel[0]); fg.addColorStop(1, 'transparent');
+            c.globalAlpha = (dark ? .34 : .24) * (.8 + .2 * Math.sin(t * 11 + tg.ph)); c.fillStyle = fg; c.beginPath(); c.arc(0, 0, tw, Math.PI, TAU); c.fill(); c.restore();
+          }
+          const core = []; const mid = []; const out = [];
+          for (const q of p) { const v = q.age / q.life; const r = (q.spark ? 1 : 3.2 * (1 - v * .8)) * sz; (v < .3 ? core : v < .65 ? mid : out).push([q.x, q.y, r, q.spark ? 1 - v * .5 : Math.sqrt(1 - v) * .85]); }
+          bucketDots(c, out, P.fel[0], 3, dark ? .7 : .6); bucketDots(c, mid, P.fel[1], 3, dark ? .85 : .75); bucketDots(c, core, P.felHi, 3, .9);
         },
       };
     } },
@@ -1087,6 +1362,10 @@
 
   // ---------------------------------------------------------------- mouse followers
   // make(w, h, P, dark, k) → { move(x, y, dist), step(dt, t), draw(ctx, t) }   (k = frequency: .35 rarely, 1 normal, 2.6 often)
+  // the followers that spawn particles by distance moved (the Layer feeds them a fast jump in small steps, see move())
+  const ALONG = new Set(['stardust', 'hearts', 'bubbles', 'ripples', 'frost', 'confetti', 'leaves', 'plankton', 'network', 'embers', 'blossom', 'nightsky', 'shards', 'dust', 'fireworks', 'warp', 'glitch', 'fel']);
+  // add a particle; when the list is full the oldest goes, so a long fast stroke keeps making them (it used to stop)
+  const room = (list, max) => { if (list.length >= max) list.shift(); };
   const FOLLOWERS = {
     stardust: { name: 'Stardust', make(w, h, P, dark, k = 1) {
       const s = []; const sp = spacer(9 / k);
@@ -1196,6 +1475,472 @@
         busy: () => s.length > 0,
       };
     } },
+    // ================================================================ 1.1.20: a follower for every background
+    // (the owner's wish: the Mouse tab lists exactly what the Background tab does, with the same names and icons, in
+    // the same order; only Pencil line is mouse-only). Each one is a small cousin of its background, made where the
+    // pointer goes. Fish, Solar system, Ghost jellyfish and Aquarium are companions: they swim or orbit along with
+    // the pointer and fade away a couple of seconds after the mouse stops (fade()).
+    plankton: { name: 'Plankton', make(w, h, P, dark, k = 1) {
+      const s = []; const sp = spacer(7 / k);
+      return {
+        move(x, y, d) { for (let n = sp(d); n > 0; n--) room(s, 120), s.push({ x: x + R(-9, 9), y: y + R(-9, 9), vx: R(-8, 8), vy: R(-8, 8), age: 0, life: R(1.2, 2), r: R(1.2, 2.3), ph: R(0, TAU) }); },
+        step(dt, t) { const dr = Math.pow(.3, dt); for (const q of s) { const a = flow(q.x, q.y, t * .6); q.vx = (q.vx + Math.cos(a) * 8 * dt) * dr; q.vy = (q.vy + Math.sin(a) * 8 * dt) * dr; q.x += q.vx * dt; q.y += q.vy * dt; } cull(s, dt); },
+        draw(c, t) {
+          const lo = []; const hi = []; const halo = [];
+          for (const q of s) { const v = q.age / q.life; const a = (1 - v) * (.75 + .25 * Math.sin(t * 6 + q.ph)); (v < .3 ? hi : lo).push([q.x, q.y, q.r * (1.5 - v * .5), a]); halo.push([q.x, q.y, q.r * 3.2, a]); }
+          bucketDots(c, halo, P.tide, 3, dark ? .22 : .14); bucketDots(c, lo, P.tide, 4, .9); bucketDots(c, hi, P.tideHi, 3, .95);
+        },
+        busy: () => s.length > 0,
+      };
+    } },
+    // stars streak away behind the pointer, as if it jumped to light speed
+    warp: { name: 'Warp speed', make(w, h, P, dark, k = 1) {
+      const s = []; const sp = spacer(6 / k); let last = null;
+      return {
+        move(x, y, d) {
+          const dx = last ? x - last.x : 0; const dy = last ? y - last.y : 0; last = { x, y };
+          const back = Math.atan2(-dy, -dx);
+          for (let n = sp(d); n > 0; n--) { room(s, 110); const a = back + R(-.55, .55); const v = R(70, 160); s.push({ x: x + R(-4, 4), y: y + R(-4, 4), vx: Math.cos(a) * v, vy: Math.sin(a) * v, age: 0, life: R(.35, .6), blue: Math.random() < .55 }); }
+        },
+        step(dt) { const f = 1 + dt * 2.5; for (const q of s) { q.vx *= f; q.vy *= f; q.x += q.vx * dt; q.y += q.vy * dt; } cull(s, dt); },
+        draw(c) {
+          const blue = []; const white = [];
+          for (const q of s) { const v = q.age / q.life; (q.blue ? blue : white).push([q.x, q.y, q.x - q.vx * .07, q.y - q.vy * .07, 1 - v]); }
+          c.lineCap = 'round'; c.lineWidth = 1.6; bucketSegs(c, blue, P.warp, 3, .9); c.lineWidth = 1.1; bucketSegs(c, white, P.star, 3, .85);
+        },
+        busy: () => s.length > 0,
+      };
+    } },
+    // points are dropped along the way and joined by thin lines, to each other and to the pointer
+    network: { name: 'Network', make(w, h, P, dark, k = 1) {
+      const p = []; const sp = spacer(24 / k); const D = 72; let cur = null; let curA = 0;
+      return {
+        move(x, y, d) { cur = { x, y }; curA = 1; for (let n = sp(d); n > 0; n--) { p.push({ x: x + R(-14, 14), y: y + R(-14, 14), vx: R(-6, 6), vy: R(-6, 6), age: 0, life: R(1.4, 2.1) }); if (p.length > 26) p.shift(); } },
+        step(dt) { curA = Math.max(0, curA - dt * 1.5); for (const q of p) { q.x += q.vx * dt; q.y += q.vy * dt; } cull(p, dt); },
+        draw(c) {
+          const segs = []; const life = (q) => Math.min(1, (1 - q.age / q.life) * 2);
+          const pts = cur && curA > 0 ? p.concat([{ x: cur.x, y: cur.y, age: 0, life: 1, me: true }]) : p;
+          for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+            const a = pts[i]; const b = pts[j]; const dx = a.x - b.x; const dy = a.y - b.y; if (Math.abs(dx) > D || Math.abs(dy) > D) continue;
+            const dd = Math.hypot(dx, dy); if (dd >= D) continue;
+            segs.push([a.x, a.y, b.x, b.y, (1 - dd / D) * Math.min(a.me ? curA : life(a), b.me ? curA : life(b))]);
+          }
+          c.lineWidth = .9; bucketSegs(c, segs, P.net, 4, dark ? .75 : .65);
+          bucketDots(c, p.map((q) => [q.x, q.y, 1.8, life(q)]), P.netNode, 3, .9);
+        },
+        busy: () => p.length > 0 || curA > 0,
+      };
+    } },
+    // sparks fly up from the pointer, wobbling on the hot air and cooling from yellow to red
+    // 1.1.22: it keeps glowing while the pointer rests on the note (a little campfire at the pointer), not only while it moves
+    embers: { name: 'Embers', make(w, h, P, dark, k = 1) {
+      const e = []; const sp = spacer(8 / k); let px = 0; let py = 0; let inside = false; let acc = 0;
+      const add = (x, y) => { room(e, 110); e.push({ x: x + R(-4, 4), y: y + R(-3, 3), vx: R(-10, 10), vy: -R(22, 46), age: 0, life: R(.9, 1.6), r: R(.9, 2), fl: R(8, 18), ph: R(0, TAU) }); };
+      return {
+        move(x, y, d) { px = x; py = y; inside = true; for (let n = sp(d); n > 0; n--) add(x, y); },
+        leave() { inside = false; },
+        step(dt, t) {
+          if (inside) { acc += dt * 7 * clamp(k, .5, 2.6); while (acc >= 1) { acc -= 1; add(px, py); } }
+          const dr = Math.pow(.5, dt); for (const q of e) { const a = flow(q.x, q.y * 1.3, t * 1.4, .02); q.vx = (q.vx + Math.cos(a) * 30 * dt) * dr; q.vy -= 6 * dt; q.x += q.vx * dt; q.y += q.vy * dt; } cull(e, dt); },
+        draw(c, t) {
+          const cols = [[], [], []]; const halo = [];
+          for (const q of e) { const v = q.age / q.life; const a = Math.pow(1 - v, .7) * (.6 + .4 * Math.sin(t * q.fl + q.ph)); cols[v < .25 ? 2 : v < .6 ? 1 : 0].push([q.x, q.y, q.r, a]); halo.push([q.x, q.y, q.r * 3, a]); }
+          bucketDots(c, halo, P.ember[1], 3, dark ? .3 : .2);
+          cols.forEach((g, i) => bucketDots(c, g, P.ember[i], 3, .95));
+        },
+        busy: () => inside || e.length > 0,
+      };
+    } },
+    // petals drop from the pointer and flutter down, flipping over
+    blossom: { name: 'Cherry blossom', make(w, h, P, dark, k = 1) {
+      const s = []; const sp = spacer(20 / k);
+      return {
+        move(x, y, d) { for (let n = sp(d); n > 0; n--) room(s, 60), s.push({ x: x + R(-5, 5), y: y + R(-4, 4), vx: R(-10, 14), vy: R(10, 20), rot: R(0, TAU), vr: R(-2, 2), fp: R(0, TAU), fs: R(2, 4), s: R(3.5, 5.5), age: 0, life: R(1.5, 2.1), col: pick(P.blossom) }); },
+        step(dt, t) { for (const q of s) { q.x += (q.vx + Math.sin(t * 2 + q.fp) * 8) * dt; q.y += q.vy * dt; q.rot += q.vr * dt; q.fp += q.fs * dt; } cull(s, dt); },
+        draw(c) {
+          for (const q of s) {
+            const cf = Math.cos(q.fp); const v = q.age / q.life;
+            c.save(); c.translate(q.x, q.y); c.rotate(q.rot); c.scale(1, cf * .9 + (cf < 0 ? -.1 : .1));
+            c.globalAlpha = .9 * Math.min(1, (1 - v) * 2.5); c.fillStyle = q.col; petal(c, q.s * Math.min(1, .5 + v * 5)); c.restore();
+          }
+        },
+        busy: () => s.length > 0,
+      };
+    } },
+    // the pointer is a shooting star: a bright head with a fading tail, leaving little stars that twinkle out
+    nightsky: { name: 'Night sky', make(w, h, P, dark, k = 1) {
+      const s = []; const tail = []; const sp = spacer(13 / k);
+      return {
+        move(x, y, d) {
+          tail.push({ x, y, age: 0, life: .32 }); if (tail.length > 40) tail.shift();
+          for (let n = sp(d); n > 0; n--) room(s, 70), s.push({ x: x + R(-10, 10), y: y + R(-10, 10), r: .5 + Math.pow(Math.random(), 2.5) * 1.4, f: R(4, 9), ph: R(0, TAU), age: 0, life: R(1, 1.9) });
+        },
+        step(dt) { cull(s, dt); cull(tail, dt); },
+        draw(c, t) {
+          c.fillStyle = P.skyStar;
+          for (const q of s) {
+            const v = q.age / q.life; const a = Math.sin(Math.PI * Math.min(1, v * 1.6 + .1)) * (.6 + .4 * Math.sin(t * q.f + q.ph)) * .9;
+            c.globalAlpha = a; dot(c, q.x, q.y, q.r);
+            if (q.r > 1.1) { c.globalAlpha = a * .5; c.fillRect(q.x - q.r * 3, q.y - .35, q.r * 6, .7); c.fillRect(q.x - .35, q.y - q.r * 3, .7, q.r * 6); }
+          }
+          if (tail.length > 1) {
+            const hd = tail[tail.length - 1]; const tl = tail[0];
+            if (Math.hypot(hd.x - tl.x, hd.y - tl.y) > 3) {
+              const g = c.createLinearGradient(hd.x, hd.y, tl.x, tl.y); g.addColorStop(0, P.shoot); g.addColorStop(1, 'transparent');
+              c.globalAlpha = .9 * (1 - hd.age / hd.life); c.strokeStyle = g; c.lineWidth = 1.6; c.lineCap = 'round'; c.lineJoin = 'round';
+              c.beginPath(); c.moveTo(tl.x, tl.y); for (const q of tail) c.lineTo(q.x, q.y); c.stroke();
+              c.globalAlpha = 1 - hd.age / hd.life; c.fillStyle = P.skyStar; dot(c, hd.x, hd.y, 1.5);
+            }
+          }
+        },
+        busy: () => s.length + tail.length > 0,
+      };
+    } },
+    // 1.1.22 (the owner picked "Phosphor pixels" from three versions; the old afterimage scanlines are gone): where the
+    // pointer passes, the screen's tiny red, green and blue phosphor stripes light up, flicker and fade, as if you'd put
+    // a magnifying glass on an old TV
+    glitch: { name: 'Analog monitor', make(w, h, P, dark, k = 1) {
+      const G = 6; const cells = new Map(); const sp = spacer(3 / k);
+      const COLS = dark ? ['#FF4A55', '#4AFF7A', '#4A8AFF'] : ['#D8202E', '#1A9A3A', '#1E50D8'];
+      return {
+        move(x, y, d) {
+          for (let n = Math.max(1, sp(d)); n > 0; n--) for (let i = 0; i < 3; i++) {
+            const cx = Math.floor((x + R(-10, 10)) / G); const cy = Math.floor((y + R(-10, 10)) / (G * 1.4)); const key = cx * 10000 + cy;
+            if (cells.size >= 260 && !cells.has(key)) cells.delete(cells.keys().next().value); cells.set(key, { cx, cy, age: 0, life: R(.7, 1.2), ph: R(0, TAU) });
+          }
+        },
+        step(dt) { for (const [key, q] of cells) { q.age += dt; if (q.age > q.life) cells.delete(key); } },
+        draw(c, t) {
+          const B = 3; const groups = COLS.map(() => Array.from({ length: B }, () => []));
+          for (const q of cells.values()) {
+            const v = q.age / q.life; const a = (1 - v) * (.75 + .25 * Math.sin(t * 30 + q.ph)); const bin = Math.min(B - 1, Math.floor(clamp(a, 0, .999) * B));
+            for (let j = 0; j < 3; j++) groups[j][bin].push([q.cx * G + j * 2, q.cy * G * 1.4]);
+          }
+          COLS.forEach((col, j) => { c.fillStyle = col; groups[j].forEach((g, i) => { if (!g.length) return; c.globalAlpha = (i + .5) / B * (dark ? .9 : .8); c.beginPath(); for (const [x, y] of g) c.rect(x, y, 1.5, G * 1.1); c.fill(); }); });
+        },
+        busy: () => cells.size > 0,
+      };
+    } },
+    // 1.1.22 (the owner picked "Surf" from three versions): a wave of dots rises behind the pointer, curls over and
+    // breaks into foam, throwing spray. (1.1.22, second round: it used to keep only the last 36 slices, so at a normal
+    // mouse speed the wave was cut off before it could curl and break; and its curl direction flickered with every tiny
+    // wobble of the mouse. Now it keeps up to 140 slices (spaced a bit wider when the mouse is fast) and takes the
+    // direction from the last 14 px of the path.)
+    ocean: { name: 'Digital ocean', make(w, h, P, dark, k = 1) {
+      const rows = []; const spray = []; let acc = 0; let anchor = null; let dir = 1;
+      return {
+        move(x, y, d) {
+          if (!anchor) anchor = { x, y };
+          const ax = x - anchor.x; if (Math.hypot(ax, y - anchor.y) > 14) { if (Math.abs(ax) > 5) dir = ax > 0 ? 1 : -1; anchor = { x, y }; }
+          const gap = (rows.length > 100 ? 11 : 7) / k; acc += d;
+          let n = 0; while (acc >= gap && n < 8) { acc -= gap; n++; } if (n === 8) acc = 0;
+          for (; n > 0; n--) { rows.push({ x, y: y + 6, s: dir, age: 0, life: R(1, 1.3), ph: R(0, TAU) }); if (rows.length > 140) rows.shift(); if (spray.length < 60 && Math.random() < .45) spray.push({ x, y: y - 6, vx: dir * R(15, 45) + R(-10, 10), vy: -R(30, 70), age: 0, life: R(.5, .8) }); }
+        },
+        step(dt) { cull(rows, dt); for (const q of spray) { q.vy += 160 * dt; q.x += q.vx * dt; q.y += q.vy * dt; } cull(spray, dt); },
+        draw(c) {
+          const lo = []; const hi = [];
+          for (const r of rows) {
+            const v = r.age / r.life; const Hh = 18 * Math.sin(Math.PI * Math.min(1, v * 1.5)); const curl = clamp((v - .2) / .45, 0, 1) * 2.8; const fall = clamp((v - .7) / .3, 0, 1);
+            for (let j = 0; j <= 4; j++) {
+              const f = j / 4; const rr = f * Hh; const th = curl * Math.pow(f, 1.4); const fo = fall * (j + 1) * 3;
+              const x = r.x + Math.sin(th) * rr * r.s + Math.sin(r.ph + j * 2.1) * fo; const y = r.y - Math.cos(th) * rr + fo * .6;
+              (j >= 3 && fall < .5 ? hi : lo).push([x, y, 1 + (1 - f) * .4, (1 - v * .7) * (.5 + .5 * f)]);
+            }
+          }
+          for (const q of spray) hi.push([q.x, q.y, .9, 1 - q.age / q.life]);
+          bucketDots(c, lo, P.wave, 4, dark ? .9 : .8); bucketDots(c, hi, P.waveHi, 3, .95);
+        },
+        busy: () => rows.length + spray.length > 0,
+      };
+    } },
+    // three ribbons of glittering dots weave along behind the pointer
+    silk: { name: 'Silk waves', make(w, h, P, dark, k = 1) {
+      const pts = []; let last = null; const life = .7 + .35 * clamp(k, .35, 2.6);
+      return {
+        move(x, y) {
+          if (last) { const n = Math.min(8, Math.floor(Math.hypot(x - last.x, y - last.y) / 4)); for (let i = 1; i < n; i++) pts.push({ x: last.x + (x - last.x) * i / n, y: last.y + (y - last.y) * i / n, age: 0, life }); }
+          pts.push({ x, y, age: 0, life }); last = { x, y }; while (pts.length > 90) pts.shift();
+        },
+        step(dt) { cull(pts, dt); if (!pts.length) last = null; },
+        draw(c, t) {
+          const groups = [[], [], []];
+          for (let i = 1; i < pts.length - 1; i++) {
+            const a = pts[i - 1]; const b = pts[i + 1]; const q = pts[i]; let nx = -(b.y - a.y); let ny = b.x - a.x; const L = Math.hypot(nx, ny) || 1; nx /= L; ny /= L;
+            const v = q.age / q.life;
+            for (let j = 0; j < 3; j++) {
+              const off = Math.sin(i * .35 - t * 5 + j * 2.1) * 7 * (1 - v * .5); const sh = .5 + .5 * Math.sin(i * .6 + t * 4 + j);
+              groups[j].push([q.x + nx * off, q.y + ny * off, .7 + sh * .9, (1 - v) * (.25 + .75 * sh)]);
+            }
+          }
+          groups.forEach((g, i) => bucketDots(c, g, P.silk[i], 4, dark ? .9 : .8));
+        },
+        busy: () => pts.length > 0,
+      };
+    } },
+    // little pieces of coloured glass fall from the pointer, turning in 3D and flashing when they face you
+    shards: { name: 'Glass shards', make(w, h, P, dark, k = 1) {
+      const s = []; const sp = spacer(26 / k);
+      return {
+        move(x, y, d) { for (let n = sp(d); n > 0; n--) room(s, 28), s.push({ x, y, vx: R(-18, 18), vy: R(-14, 4), rot: R(0, TAU), vr: R(-2, 2), th: R(0, TAU), vt: R(2.5, 5) * (Math.random() < .5 ? -1 : 1), hue: R(0, 360), pts: shard(.65), age: 0, life: R(1.1, 1.7) }); },
+        step(dt) { for (const q of s) { q.vy += 40 * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.vr * dt; q.th += q.vt * dt; } cull(s, dt); },
+        draw(c, t) {
+          for (const q of s) {
+            const cs = Math.cos(q.th); const face = Math.abs(cs); const fade = Math.min(1, (1 - q.age / q.life) * 2.5);
+            c.save(); c.translate(q.x, q.y); c.rotate(q.rot); c.scale(cs || .01, 1);
+            c.beginPath(); q.pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath();
+            const hue = q.hue + q.th * 50 + t * 12; const r = 9;
+            const g = c.createLinearGradient(-r, -r, r, r); g.addColorStop(0, hsla(hue, P.shardS, P.shardL, 1)); g.addColorStop(1, hsla(hue + 150, P.shardS, P.shardL, 1));
+            c.globalAlpha = (dark ? .45 : .5) * (.5 + face * .5) * fade; c.fillStyle = g; c.fill();
+            c.globalAlpha = .7 * fade; c.strokeStyle = face > .9 ? P.shardGlint : P.shardEdge; c.lineWidth = .8 / Math.max(.2, face); c.stroke();
+            c.restore();
+          }
+        },
+        busy: () => s.length > 0,
+      };
+    } },
+    // the pointer is the invisible something: a field of dots shows up around it, parts to let it through and
+    // wobbles back into place behind it
+    ghost: { name: 'Ghost ripple', make(w, h, P, dark, k = 1) {
+      const d = dotLattice(w, h, clamp(15 / Math.sqrt(Math.max(.35, k)), 10, 22)); const RG = 30; const SEE = 95;
+      let gx = -999; let gy = -999; let heat = 0; let live = 0;
+      return {
+        move(x, y) { gx = x; gy = y; heat = 1; },
+        step(dt) {
+          heat = Math.max(0, heat - dt * .8); const damp = Math.exp(-2.4 * dt); live = 0;
+          for (const q of d) {
+            const dx = q.x - gx; const dy = q.y - gy; const dd = Math.hypot(dx, dy) || 1; q.near = dd < SEE ? (1 - dd / SEE) * heat : 0;
+            if (dd < RG && heat > .5) { const f = (1 - dd / RG) ** 2 * 1100; q.vx += dx / dd * f * dt; q.vy += dy / dd * f * dt; }
+            if (q.b > .01 || q.vx || q.vy) { q.vx += (q.bx - q.x) * 7 * dt; q.vy += (q.by - q.y) * 7 * dt; q.vx *= damp; q.vy *= damp; q.x += q.vx * dt; q.y += q.vy * dt; if (Math.abs(q.vx) + Math.abs(q.vy) < .02 && Math.abs(q.x - q.bx) + Math.abs(q.y - q.by) < .05) { q.vx = 0; q.vy = 0; q.x = q.bx; q.y = q.by; } }
+            q.b = clamp(Math.hypot(q.x - q.bx, q.y - q.by) / 9, 0, 1); if (q.b > .02) live++;
+          }
+        },
+        draw(c) {
+          const lo = []; const hi = [];
+          for (const q of d) { const a = Math.min(1, q.near * .8 + q.b); if (a < .03) continue; (q.b > .45 ? hi : lo).push([q.x, q.y, 1.05 + q.b * .9, a]); }
+          bucketDots(c, lo, P.ripple, 4, dark ? .8 : .75); bucketDots(c, hi, P.rippleHi, 3, dark ? .95 : .9);
+        },
+        busy: () => heat > 0 || live > 0,
+      };
+    } },
+    // a little school swims along with the pointer, circling it, and drifts away when the mouse rests
+    fish: { name: 'Fish', make(w, h, P, dark, k = 1) {
+      const pr = presence(); let tx = w / 2; let ty = h / 2;
+      const b = Array.from({ length: clamp(Math.round(4 * k), 2, 9) }, (_, i) => Object.assign(fishNew(tx, ty, R(0, TAU), R(10, 12.5), i % 3), { or: R(14, 34), oa: R(0, TAU), od: Math.random() < .5 ? 1 : -1 }));
+      return {
+        move(x, y) {
+          tx = x; ty = y;
+          if (pr.moved()) for (const q of b) { const a = R(0, TAU); const r = R(25, 45); Object.assign(q, fishNew(x + Math.cos(a) * r, y + Math.sin(a) * r, a + Math.PI / 2 * q.od, q.BL, q.g)); }
+        },
+        step(dt) {
+          pr.step(dt);
+          for (const q of b) {
+            q.oa += q.od * dt * .9;
+            const gx = tx + Math.cos(q.oa) * q.or; const gy = ty + Math.sin(q.oa) * q.or * .7;
+            let ax = (gx - q.x) * 4 - q.vx * 1.6; let ay = (gy - q.y) * 4 - q.vy * 1.6;
+            for (const r of b) { if (r === q) continue; const dx = q.x - r.x; const dy = q.y - r.y; const d2 = dx * dx + dy * dy; if (d2 < 144 && d2 > 0) { const dd = Math.sqrt(d2); ax += dx / dd * (12 - dd) * 25; ay += dy / dd * (12 - dd) * 25; } }
+            q.vx += ax * dt; q.vy += ay * dt;
+            const sp = Math.hypot(q.vx, q.vy); if (sp > 160) { q.vx *= 160 / sp; q.vy *= 160 / sp; }
+            q.x += q.vx * dt; q.y += q.vy * dt; fishBend(q, dt, 1);
+          }
+        },
+        draw(c) { if (pr.vis > 0) fishDraw(c, b, P, dark, 1); },
+        fade: () => pr.vis,
+        busy: pr.busy,
+      };
+    } },
+    // a soft beam of light follows the pointer; dust it stirs up floats about and sparkles when it's in the beam
+    dust: { name: 'Dust in light', make(w, h, P, dark, k = 1) {
+      // 1.1.22: only the dust now (no beam of light): specks swirl up off the pointer, drift and twinkle out
+      const m = []; const sp = spacer(6 / k);
+      return {
+        move(x, y, d) { for (let n = sp(d); n > 0; n--) room(m, 110), m.push({ x: x + R(-12, 12), y: y + R(-12, 12), vx: R(-8, 8), vy: R(-8, 6), z: Math.random(), ph: R(0, TAU), age: 0, life: R(1.5, 2.6) }); },
+        step(dt) { const damp = Math.exp(-1.2 * dt); for (const q of m) { q.vx = (q.vx + R(-1, 1) * 12 * dt) * damp; q.vy = (q.vy + (R(-1, 1) * 12 - 3) * dt) * damp; q.x += q.vx * dt; q.y += q.vy * dt; } cull(m, dt); },
+        draw(c, t) {
+          c.fillStyle = P.dust;
+          for (const q of m) {
+            const v = q.age / q.life; const tw = .6 + .4 * Math.sin(t * 3 + q.ph); const a = Math.min(1, (1 - v) * 2) * (dark ? .75 : .7) * tw; const r = .6 + q.z * 1.4;
+            if (q.z > .8) { c.globalAlpha = a * .35; dot(c, q.x, q.y, r * 2.2); } c.globalAlpha = a; dot(c, q.x, q.y, r);
+          }
+        },
+        busy: () => m.length > 0,
+      };
+    } },
+    // 1.1.22: just floating heals: little green and gold crosses drift up from the pointer, sway, softly glow and fade
+    // (second round: a steady stream by time while the mouse moves, not by distance with a cap, which came in bursts and gaps)
+    heal: { name: 'Healing aura', make(w, h, P, dark, k = 1) {
+      const f = []; let px = 0; let py = 0; let still = 9; let acc = 0;
+      return {
+        move(x, y, d) { px = x; py = y; if (d > 0) still = 0; },
+        step(dt, t) {
+          still += dt;
+          if (still < .25) { acc += dt * 9 * clamp(k, .35, 2.6); while (acc >= 1) { acc -= 1; if (f.length < 60) f.push({ x: px + R(-8, 8), y: py + R(-5, 5), vy: R(16, 30), ph: R(0, TAU), c: Math.random() < .6 ? 0 : 1, s: R(2.2, 3.6), age: 0, life: R(1.1, 1.7) }); } } else acc = 0;
+          for (const q of f) { q.y -= q.vy * dt; q.x += Math.sin(t * 2 + q.ph) * 9 * dt; } cull(f, dt);
+        },
+        draw(c, t) {
+          for (const q of f) {
+            const v = q.age / q.life; const a = Math.min(1, v * 6, (1 - v) * 2.2) * (.75 + .25 * Math.sin(t * 3 + q.ph)); const s = q.s * (.7 + .3 * Math.min(1, v * 4)); const col = P.heal[q.c];
+            c.globalAlpha = a * (dark ? .3 : .22); c.fillStyle = col; const g = s * 1.9; c.fillRect(q.x - g, q.y - g * .38, g * 2, g * .76); c.fillRect(q.x - g * .38, q.y - g, g * .76, g * 2);
+            c.globalAlpha = a; c.fillRect(q.x - s, q.y - s * .3, s * 2, s * .6); c.fillRect(q.x - s * .3, q.y - s, s * .6, s * 2);
+            c.globalAlpha = a * .8; c.fillStyle = P.healHi; c.fillRect(q.x - s * .55, q.y - s * .1, s * 1.1, s * .2); c.fillRect(q.x - s * .1, q.y - s * .55, s * .2, s * 1.1);
+          }
+        },
+        busy: () => still < .25 || f.length > 0,
+      };
+    } },
+    // 1.1.22: the pointer builds a lightning bolt as it goes. A faint, flickering, jagged "leader" (one single line, as
+    // long as the path, no forks) grows along behind it, and the pointer's tip glows brighter as it charges; 1.5 seconds
+    // after it started, the bolt strikes: a bright stroke races back along it from the far end to the pointer, flashes,
+    // flickers and goes out. Half a second later (it was a second) the next one can start building.
+    lightning: { name: 'Lightning', make(w, h, P, dark, k = 1) {
+      const CHARGE = 1.5; const GAP = 7; const MAXP = 2000; const REST = .5; // MAXP: only a safety net, so the line is as long as the path
+      let lead = null; let strike = null; let rest = 0; const sparks = []; const ss = spacer(12 / k); let tip = null;
+      const toStrike = (L) => {
+        const pts = []; for (let i = 0; i < L.pts.length; i++) { const q = L.pts[i]; pts.push([q.x, q.y]); const z = L.pts[i + 1]; if (z) { const mx = (q.x + z.x) / 2; const my = (q.y + z.y) / 2; const dx = z.x - q.x; const dy = z.y - q.y; const d = Math.hypot(dx, dy) || 1; const o = R(-3, 3); pts.push([mx - dy / d * o, my + dx / d * o]); } }
+        let len = 0; const cum = [0]; for (let i = 1; i < pts.length; i++) { len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); cum.push(len); }
+        return { pts, cum, len, age: 0, life: .8 };
+      };
+      const leadLen = (L) => { let n = 0; for (let i = 1; i < L.pts.length; i++) n += Math.hypot(L.pts[i].x - L.pts[i - 1].x, L.pts[i].y - L.pts[i - 1].y); return n; };
+      const poly = (c, pts, upto) => { c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < upto; i++) c.lineTo(pts[i][0], pts[i][1]); c.stroke(); };
+      return {
+        move(x, y, d) {
+          tip = { x, y };
+          if (rest > 0) return; // resting after a strike
+          if (!lead) lead = { pts: [{ x, y }], age: 0 };
+          const L = lead.pts; const last = L[L.length - 1]; const dx = x - last.x; const dy = y - last.y; const dd = Math.hypot(dx, dy);
+          if (dd >= GAP) {
+            const n = Math.min(8, Math.floor(dd / GAP)); const nx = -dy / dd; const ny = dx / dd;
+            for (let i = 1; i <= n; i++) { const j = i === n ? 0 : R(-4.5, 4.5); L.push({ x: last.x + dx * i / n + nx * j, y: last.y + dy * i / n + ny * j }); }
+            while (L.length > MAXP) L.shift();
+          }
+          for (let m = ss(d); m > 0; m--) if (sparks.length < 24) sparks.push({ x: x + R(-12, 12), y: y + R(-12, 12), age: 0, life: R(.2, .45) });
+        },
+        step(dt) {
+          if (lead) {
+            lead.age += dt;
+            if (lead.age > CHARGE) { if (lead.pts.length > 3 && leadLen(lead) > 40) { strike = toStrike(lead); lead = null; rest = REST + strike.life; } else if (lead.age > CHARGE + 1.5) lead = null; }
+          }
+          if (strike) { strike.age += dt; if (strike.age > strike.life) strike = null; }
+          rest = Math.max(0, rest - dt);
+          cull(sparks, dt);
+        },
+        draw(c) {
+          c.lineCap = 'round'; c.lineJoin = 'round';
+          bucketDots(c, sparks.map((s) => [s.x, s.y, .9, (1 - s.age / s.life) * (Math.random() < .5 ? 1 : .4)]), P.lightningHi, 3, .9);
+          if (lead && lead.pts.length > 1) { // the leader: faint and restless
+            const ch = clamp(lead.age / CHARGE, 0, 1); const fl = .22 + Math.random() * .25 + ch * .15;
+            const pts = lead.pts.map((q) => [q.x + R(-.8, .8), q.y + R(-.8, .8)]);
+            c.strokeStyle = P.lightning; c.lineWidth = 3; c.globalAlpha = fl * (dark ? .3 : .2); poly(c, pts, pts.length);
+            c.strokeStyle = P.lightningHi; c.lineWidth = 1; c.globalAlpha = fl; poly(c, pts, pts.length);
+            if (tip) glow2(c, tip.x, tip.y, 2.5 + ch * 3, P.lightning, P.lightningHi, .35 + ch * .6, dark ? .6 : .45); // the tip charges up
+          }
+          if (strike) {
+            const u = strike.age; const RUN = .11; // the stroke races from the far end to the pointer, then flashes and flickers out
+            const reach = clamp(u / RUN, 0, 1) * strike.len; let upto = 1; while (upto < strike.pts.length && strike.cum[upto] <= reach) upto++;
+            const fl = u < RUN ? 1 : u < .4 ? (Math.random() < .55 ? 1 : .4) : 1 - (u - .4) / (strike.life - .4);
+            c.strokeStyle = P.lightning; c.lineWidth = 6; c.globalAlpha = fl * (dark ? .3 : .2); poly(c, strike.pts, upto);
+            c.strokeStyle = P.lightningHi; c.lineWidth = 1.8; c.globalAlpha = fl; poly(c, strike.pts, upto);
+            if (u >= RUN) {
+              const e = strike.pts[strike.pts.length - 1]; glow2(c, e[0], e[1], 7, P.lightning, P.lightningHi, fl, dark ? .7 : .5);
+            } else { const e = strike.pts[upto - 1]; glow2(c, e[0], e[1], 4, P.lightning, P.lightningHi, 1, .6); }
+          }
+        },
+        busy: () => !!lead || !!strike || rest > 0 || sparks.length > 0,
+      };
+    } },
+    // potion bubbles rise from the pointer and burst into droplets and little stars, with a puff of coloured steam.
+    // 1.1.22: a steady stream (by time, not by distance, so it never comes in bursts and gaps), a little potion glow at
+    // the pointer, and it bubbles on for a moment after the mouse stops, then calms down
+    cauldron: { name: 'Cauldron', make(w, h, P, dark, k = 1) {
+      const COL = Math.floor(R(0, 2)); const bub = []; const drops = []; const stars = []; const steam = [];
+      let px = 0; let py = 0; let still = 9; let act = 0; let acc = 0; let moved = 0; let spd = 0;
+      return {
+        move(x, y, d) { px = x; py = y; if (d > 0) { still = 0; moved += d; } },
+        step(dt, t) {
+          still += dt; spd += (moved / Math.max(dt, .001) - spd) * Math.min(1, dt * 5); moved = 0;
+          act = still < .3 ? Math.min(1, act + dt * 4) : Math.max(0, act - dt * .9);
+          acc += dt * act * (5 + Math.min(7, spd / 70)) * clamp(k, .35, 2.6);
+          while (acc >= 1) { acc -= 1; if (bub.length < 36) bub.push({ x: px + R(-6, 6), y: py + R(-3, 3), r: R(2.4, 5), vy: R(14, 26), ph: R(0, TAU), age: 0, life: R(.7, 1.2), c: Math.random() < .7 ? COL : 1 - COL }); }
+          for (let i = bub.length - 1; i >= 0; i--) {
+            const q = bub[i]; q.age += dt; q.y -= q.vy * dt; q.x += Math.sin(t * 4 + q.ph) * 8 * dt;
+            if (q.age > q.life) {
+              for (let j = 0; j < 5; j++) { const a = -Math.PI / 2 + R(-1.3, 1.3); const v = R(25, 55); if (drops.length < 60) drops.push({ x: q.x, y: q.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, age: 0, life: R(.4, .7), c: q.c }); }
+              if (Math.random() < .45 && stars.length < 30) for (let j = 0; j < 4; j++) { const a = j * TAU / 4 + R(-.3, .3); stars.push({ x: q.x, y: q.y, vx: Math.cos(a) * 32, vy: Math.sin(a) * 32, age: 0, life: .6 }); }
+              if (steam.length < 8 && Math.random() < .35) steam.push({ x: q.x, y: q.y, r: R(5, 8), age: 0, life: R(.8, 1.2) });
+              bub.splice(i, 1);
+            }
+          }
+          for (const q of drops) { q.vy += 160 * dt; q.x += q.vx * dt; q.y += q.vy * dt; } cull(drops, dt);
+          const dr = Math.pow(.15, dt); for (const s of stars) { s.vx *= dr; s.vy *= dr; s.x += s.vx * dt; s.y += s.vy * dt; } cull(stars, dt);
+          for (const s of steam) { s.y -= 18 * dt; s.r += 9 * dt; } cull(steam, dt);
+        },
+        draw(c, t) {
+          if (act > 0) glow2(c, px, py + 3, 5, P.brew[COL], P.brewHi, act * (.35 + .1 * Math.sin(t * 6)), dark ? .7 : .5);
+          for (const s of steam) {
+            const u = s.age / s.life; const g = c.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r); g.addColorStop(0, P.brew[COL]); g.addColorStop(1, 'transparent');
+            c.globalAlpha = Math.sin(Math.PI * u) * (dark ? .4 : .3); c.fillStyle = g; c.beginPath(); c.arc(s.x, s.y, s.r, 0, TAU); c.fill();
+          }
+          for (const q of bub) {
+            const u = q.age / q.life; const r = q.r * (.4 + .6 * Math.min(1, u * 2.5)); const a = Math.min(1, u * 6);
+            c.globalAlpha = .5 * a; c.fillStyle = P.brew[q.c]; dot(c, q.x, q.y, r);
+            c.globalAlpha = .9 * a; c.strokeStyle = P.brewHi; c.lineWidth = 1; c.beginPath(); c.arc(q.x, q.y, r * .7, Math.PI * 1.15, Math.PI * 1.6); c.stroke();
+          }
+          bucketDots(c, drops.map((q) => [q.x, q.y, 1.3, 1 - q.age / q.life]), P.brew[COL], 3, .95);
+          c.fillStyle = P.brewHi; for (const s of stars) { c.globalAlpha = 1 - s.age / s.life; star4(c, s.x, s.y, 2.2); }
+        },
+        busy: () => act > 0 || bub.length + drops.length + stars.length + steam.length > 0,
+      };
+    } },
+    // a little ghost jellyfish made of dots follows the pointer in pushes, tendrils trailing, leaving glowing dots
+    jelly: { name: 'Ghost jellyfish', make(w, h, P, dark, k = 1) {
+      const pr = presence(); const J = 24; let tx = w / 2; let ty = h / 2; const q = { x: tx, y: ty, hist: [] }; const trail = []; let drop = 0; const ph = R(0, TAU);
+      return {
+        move(x, y) { tx = x; ty = y + J * .2; if (pr.moved()) { q.x = tx; q.y = ty + 20; q.hist = []; } },
+        step(dt, t) {
+          pr.step(dt);
+          const push = .45 + .55 * Math.max(0, Math.sin(t * 3 + ph)); const f = Math.min(1, dt * 3.5 * push);
+          const ox = q.x; const oy = q.y; q.x += (tx - q.x) * f; q.y += (ty - q.y) * f;
+          q.hist.unshift([q.x, q.y]); if (q.hist.length > 30) q.hist.pop();
+          drop += Math.hypot(q.x - ox, q.y - oy) * clamp(k, .35, 2.6); if (drop > 9 && trail.length < 50) { drop = 0; trail.push({ x: q.x + R(-J * .3, J * .3), y: q.y + R(0, J * .2), age: 0, life: R(1, 1.8) }); }
+          cull(trail, dt);
+        },
+        draw(c, t) {
+          const lo = []; const hi = [];
+          for (const d of trail) lo.push([d.x, d.y, 1.1, (1 - d.age / d.life) * .8]);
+          if (pr.vis > 0) {
+            const pu = Math.sin(t * 3 + ph); const bw = J * (.5 + .08 * pu); const bh = J * (.42 - .06 * pu);
+            for (let i = 0; i <= 16; i++) { const a = Math.PI + i / 16 * Math.PI; hi.push([q.x + Math.cos(a) * bw, q.y + Math.sin(a) * bh, 1.3, .65 + .3 * Math.sin(t * 3 + i)]); }
+            for (let i = 0; i < 6; i++) { const a = Math.PI * (1.18 + i * .11); hi.push([q.x + Math.cos(a) * bw * .55, q.y + Math.sin(a) * bh * .55, .9, .35]); }
+            for (let tdl = 0; tdl < 4; tdl++) {
+              const off = (tdl / 3 - .5) * bw * 1.2;
+              for (let s = 1; s <= 7; s++) { const hp = q.hist[Math.min(q.hist.length - 1, s * 3)] || [q.x, q.y]; hi.push([q.x + off * (1 - s * .05) + (hp[0] - q.x) * .6 + Math.sin(t * 3 - s * .6 + tdl * 1.3) * (1.2 + s * .7), q.y + s * J * .13 + (hp[1] - q.y) * .3, 1.05 - s * .06, .75 - s * .08]); }
+            }
+          }
+          bucketDots(c, lo, P.sea[1], 4, dark ? .75 : .65); bucketDots(c, hi, P.sea[0], 4, dark ? .95 : .85);
+        },
+        fade: () => pr.vis,
+        busy: pr.busy,
+      };
+    } },
+    // eerie green flames lick up from the pointer, throwing a few sparks. 1.1.22: it burns the whole time the pointer is
+    // on the note, also while it rests (a little green flame at the pointer); moving it trails more flames
+    fel: { name: 'Fel fire', make(w, h, P, dark, k = 1) {
+      const p = []; const sp = spacer(3.5 / k); let px = 0; let py = 0; let inside = false; let acc = 0;
+      const add = (x, y, still) => { room(p, 170); p.push({ x: x + R(-5, 5), y: y + R(-2, 4), vx: 0, vy: -R(40, 70) * (still ? .7 : 1), tx: x, age: 0, life: R(.4, .8) * (still ? .85 : 1), spark: Math.random() < .07 }); };
+      return {
+        move(x, y, d) { px = x; py = y; inside = true; for (let n = sp(d); n > 0; n--) add(x, y, false); },
+        leave() { inside = false; },
+        step(dt, t) {
+          if (inside) { acc += dt * 40 * clamp(k, .5, 2); while (acc >= 1) { acc -= 1; add(px, py, true); } }
+          for (const q of p) { q.vx += ((q.tx - q.x) * 2.2 + Math.sin(t * 9 + q.y * .05) * 18) * dt; if (q.spark) q.vx += R(-60, 60) * dt; q.x += q.vx * dt; q.y += q.vy * dt; } cull(p, dt);
+        },
+        draw(c) {
+          const core = []; const mid = []; const out = [];
+          for (const q of p) { const v = q.age / q.life; const r = q.spark ? .9 : 3 * (1 - v * .75); (v < .3 ? core : v < .65 ? mid : out).push([q.x, q.y, r, q.spark ? 1 : Math.sqrt(1 - v) * .9]); }
+          bucketDots(c, out, P.fel[0], 3, dark ? .75 : .65); bucketDots(c, mid, P.fel[1], 3, dark ? .9 : .8); bucketDots(c, core, P.felHi, 3, .92);
+        },
+        busy: () => inside || p.length > 0,
+      };
+    } },
     pencil: { name: 'Pencil line', make(w, h, P, dark, k = 1) {
       const pts = [];
       return {
@@ -1241,12 +1986,16 @@
   const EFFECT_IDS = Object.keys(EFFECTS);
   // the order in the pickers: each follower in the same place as its background effect, with the same name and
   // icon (snow = 'frost', rain = 'ripples': older ids, kept so saved choices stay); the pencil line last (the old 'comet' = Rainbow line is the Rainbow follower again)
-  const FOLLOWER_IDS = ['frost', 'fireworks', 'stardust', 'fireflies', 'bubbles', 'leaves', 'hearts', 'ripples', 'confetti', 'matrix', 'rainbow', 'pencil'];
+  // 1.1.20: every background has its follower now (the owner's wish: both tabs list the same things), so the order
+  // is simply the backgrounds' order, then the pencil line
+  const FOLLOWER_OF = { snow: 'frost', rain: 'ripples' };
+  const FOLLOWER_IDS = [...EFFECT_IDS.map((e) => FOLLOWER_OF[e] || e), 'pencil'];
 
   // Which effect and follower a note shows now, and how much of it. Settings: fxEffect / fxFollower = the choice
   // for all notes, fxEffectAmount / fxFollowerAmount = how much ('low' | 'mid' | 'high'), fxForceAll = use them on
   // every note (each note's own choice is kept for when it's switched off), fxPaused = pause every effect.
-  // noteFx = { e, f, ea, fa, eo, fo } (null = same as all notes; e / f may be 'none' = nothing on this note).
+  // noteFx = { e, f, ea, fa, eo, fo, mi } (null = same as all notes; e / f may be 'none' = nothing on this note).
+  // 1.1.21: fxInteract (settings) / mi (a note: true, false or null) = the mouse plays with the background.
   // 1.1.17: fxEffectOpacity / fxFollowerOpacity (settings) and eo / fo (a note) = how see-through: 0.1 – 1.
   const AMOUNTS = { low: .35, mid: 1, high: 2.6 }; // Frequency: Rarely / Normal / Often, for mouse followers
   // backgrounds get a bigger spread: Rarely = a few flakes, Often = lots (1.1.16, second round)
@@ -1266,7 +2015,9 @@
     let followerAmount = amountOf(s.fxFollowerAmount);
     let effectOpacity = opacityOf(s.fxEffectOpacity) ?? 1;
     let followerOpacity = opacityOf(s.fxFollowerOpacity) ?? 1;
+    let interact = s.fxInteract !== false; // 1.1.21: the mouse plays with the background (on unless switched off)
     if (!s.fxForceAll) {
+      if (typeof n.mi === 'boolean') interact = n.mi;
       if (n.e === 'none' || EFFECTS[n.e]) effect = n.e;
       if (n.f === 'none' || FOLLOWERS[n.f]) follower = n.f;
       if (AMOUNTS[n.ea]) effectAmount = n.ea;
@@ -1274,7 +2025,7 @@
       if (opacityOf(n.eo) !== null) effectOpacity = opacityOf(n.eo);
       if (opacityOf(n.fo) !== null) followerOpacity = opacityOf(n.fo);
     }
-    return { effect, follower, effectAmount, followerAmount, effectOpacity, followerOpacity, paused: !!notePaused || (!!s.fxPaused && !notePlay) };
+    return { effect, follower, effectAmount, followerAmount, effectOpacity, followerOpacity, interact, paused: !!notePaused || (!!s.fxPaused && !notePlay) };
   }
 
   // ---------------------------------------------------------------- one shared loop (30 frames a second, sleeps when idle)
@@ -1331,6 +2082,8 @@
     let eff = null; let fol = null;
     let t = Math.random() * 5;
     let mouse = null; let lastMove = -1e9;
+    // 1.1.21: where the pointer is and how fast it goes, for a background that plays with the mouse (interact)
+    let interact = true; const ptr = { x: 0, y: 0, vx: 0, vy: 0, sp: 0, on: false, t: 0 };
     let paused = false; let visible = true;
     let bw = 0; let bh = 0; let rebuildTimer = null; // the size the effect was made for
     // 1.1.16: the background and the follower are made separately, so picking another mouse follower (or its
@@ -1355,11 +2108,12 @@
       ctx.clearRect(0, 0, w, h);
       if (!visible) return;
       if (eff) { setMul(eOp); ctx.globalAlpha = 1; ctx.save(); eff.draw(ctx, t); ctx.restore(); }
-      if (fol) { setMul(fOp); ctx.globalAlpha = 1; ctx.save(); fol.draw(ctx, t); ctx.restore(); }
+      if (fol) { setMul(fOp * (fol.fade ? clamp(fol.fade(), 0, 1) : 1)); ctx.globalAlpha = 1; ctx.save(); fol.draw(ctx, t); ctx.restore(); } // 1.1.20: companions fade out (fade())
       setMul(1); ctx.globalAlpha = 1;
     }
     const L = {
-      set({ effect = 'none', follower = 'none', dark: dk = false, effectAmount = 'mid', followerAmount = 'mid', effectOpacity = 1, followerOpacity = 1 } = {}) {
+      set({ effect = 'none', follower = 'none', dark: dk = false, effectAmount = 'mid', followerAmount = 'mid', effectOpacity = 1, followerOpacity = 1, interact: mi = true } = {}) {
+        interact = mi !== false; if (!interact) ptr.on = false;
         const ea = amountOf(effectAmount); const fa = amountOf(followerAmount);
         // opacity only changes how it's drawn: nothing is made again, so moving the slider never restarts anything
         const eo = opacityOf(effectOpacity) ?? 1; const fo = opacityOf(followerOpacity) ?? 1;
@@ -1395,14 +2149,25 @@
       },
       // the mouse moved, at x, y inside the canvas
       move(x, y) {
-        if (!fol || paused || !visible) return;
+        if (paused || !visible) return;
+        if (eff && interact) {
+          const now = performance.now();
+          if (ptr.on) { const s = Math.max(.012, (now - ptr.t) / 1000); const k = Math.min(1, s * 12); ptr.vx += ((x - ptr.x) / s - ptr.vx) * k; ptr.vy += ((y - ptr.y) / s - ptr.vy) * k; }
+          else { ptr.vx = 0; ptr.vy = 0; }
+          ptr.x = x; ptr.y = y; ptr.t = now; ptr.on = true; ptr.sp = Math.hypot(ptr.vx, ptr.vy);
+        }
+        if (!fol) return;
         const d = mouse ? Math.hypot(x - mouse.x, y - mouse.y) : 0;
-        mouse = { x, y };
-        fol.move(x, y, d);
+        const from = mouse; mouse = { x, y };
+        // 1.1.22: a fast mouse jumps 30–60 px between two events, so a follower that spawns by distance dropped its
+        // particles in clumps at the end of each jump. Those followers now get the jump in small steps along the path.
+        const parts = ALONG.has(fId) && from && d > 10 && d < 500 ? Math.min(40, Math.ceil(d / 10)) : 1;
+        if (parts > 1) { for (let i = 1; i <= parts; i++) fol.move(from.x + (x - from.x) * i / parts, from.y + (y - from.y) * i / parts, d / parts); }
+        else fol.move(x, y, d);
         lastMove = performance.now();
         loop.wake();
       },
-      leave() { mouse = null; },
+      leave() { mouse = null; ptr.on = false; if (fol && fol.leave) fol.leave(); }, // 1.1.22: a follower that burns while the pointer rests (fel, embers) goes out
       setPaused(p) { paused = !!p; draw(); loop.wake(); },
       setVisible(v) { visible = !!v; draw(); loop.wake(); },
       // does it need frames right now?
@@ -1411,7 +2176,12 @@
         if (eff) return true;
         return !!fol && (now - lastMove < 400 || (fol.busy ? fol.busy() : now - lastMove < 2500));
       },
-      tick(dt) { t += dt; if (eff) eff.step(dt, t); if (fol) fol.step(dt, t); draw(); },
+      tick(dt) {
+        t += dt;
+        if (ptr.on && performance.now() - ptr.t > 50) { const f = Math.pow(.02, dt); ptr.vx *= f; ptr.vy *= f; ptr.sp = Math.hypot(ptr.vx, ptr.vy); } // the mouse rests: it slows down
+        if (eff) eff.step(dt, t, interact && ptr.on ? ptr : null);
+        if (fol) fol.step(dt, t); draw();
+      },
       active: () => !!(eff || fol),
       destroy() { clearTimeout(rebuildTimer); loop.remove(L); },
     };
@@ -1438,26 +2208,22 @@
 
       // 1.1.18
       plankton: ['#0E9C98', '<circle cx="5" cy="14" r="1.4" class="f"/><circle cx="9.5" cy="10" r="2" class="f"/><circle cx="15" cy="12.5" r="1.6" class="f"/><circle cx="19.5" cy="8" r="1.2" class="f"/><path d="M3 19c3-2 6-2 9 0s6 2 9 0" stroke-opacity=".6"/>'],
-      fairy: ['#E0608E', '<path class="f" d="M17 3c.4 2.3 1.4 3.3 3.7 3.7-2.3.4-3.3 1.4-3.7 3.7-.4-2.3-1.4-3.3-3.7-3.7 2.3-.4 3.3-1.4 3.7-3.7z"/><path d="M13 11.5c-3 1-5 3-6.2 6" stroke-dasharray="1.5 2.5"/><circle cx="5.5" cy="19.5" r="1.2" class="f"/><circle cx="9.5" cy="18" r=".9" class="f"/>'],
       warp: ['#3A6FD8', '<path d="M9.2 9.6 4.5 5.8M14.8 9.6l4.7-3.8M9.2 14.4l-4.7 3.8M14.8 14.4l4.7 3.8M12 8.2V3M12 15.8V21M8.2 12H3M15.8 12H21"/>'],
       network: ['#4A6290', '<path d="M5 7l7-3 7 5-4 9-8-1zM12 4l3 14M5 7l10 11" stroke-opacity=".6" stroke-width="1.4"/><circle cx="5" cy="7" r="1.7" class="f"/><circle cx="12" cy="4" r="1.7" class="f"/><circle cx="19" cy="9" r="1.7" class="f"/><circle cx="15" cy="18" r="1.7" class="f"/><circle cx="7" cy="17" r="1.7" class="f"/>'],
       embers: ['#E0700A', '<circle cx="8" cy="16.5" r="1.7" class="f"/><circle cx="14.5" cy="12" r="1.4" class="f"/><circle cx="10" cy="7.5" r="1.1" class="f"/><circle cx="17" cy="5" r=".9" class="f"/><path d="M4 21c4-1.6 12-1.6 16 0"/>'],
-      lorenz: ['#8E5BD8', '<path d="M12 12C10 7.5 3.5 6.5 3.5 11s6.5 4.5 8.5 1c2-3.5 8.5-3.5 8.5 1s-6.5 4-8.5-1z"/><circle cx="20.5" cy="13" r="1.4" class="f"/>'],
       blossom: ['#E0608E', '<circle cx="12" cy="6.8" r="3" class="f"/><circle cx="16.9" cy="10.4" r="3" class="f"/><circle cx="15" cy="16.2" r="3" class="f"/><circle cx="9" cy="16.2" r="3" class="f"/><circle cx="7.1" cy="10.4" r="3" class="f"/><circle cx="12" cy="12" r="1.7" fill="#FFF3B0" stroke="none"/>'],
       nightsky: ['#4A5A8C', '<path class="f" d="M15 4a7.5 7.5 0 1 0 5.5 12.6A6.5 6.5 0 0 1 15 4z"/><path class="f" d="M6 3.5l.6 1.7 1.7.6-1.7.6L6 8.1l-.6-1.7-1.7-.6 1.7-.6z"/><path d="M3 15.5 7.5 13"/>'],
-      glitch: ['#E5484D', '<path d="M4 6h10M8 10h12M3 14h9M10 18h10"/><path d="M4 10h2M15 14h5M3 18h4" stroke="#3A8DDE"/>'],
-      blackhole: ['#E0700A', '<ellipse cx="12" cy="12" rx="9.5" ry="3.6"/><circle cx="12" cy="12" r="3.9" fill="#221E2A"/>'],
+      glitch: ['#5A6A95', '<rect x="3" y="4" width="18" height="13" rx="2.5"/><path d="M9 21h6M12 17v4"/><path d="M6.5 8h11M6.5 11h11" stroke-opacity=".4"/><path d="M6.5 14h11"/>'],
       ocean: ['#2C63B8', '<path d="M3 9c3-3 6 3 9 0s6-3 9 0M3 15c3-3 6 3 9 0s6-3 9 0" stroke-dasharray=".1 3" stroke-width="2.4"/>'],
       silk: ['#8E5BD8', '<path d="M2 12c4-6 8 6 12 0s6-4 8-2M2 9c4 6 8-6 12 0s6 5 8 2" />'],
       shards: ['#3A8DDE', '<path d="M4 9l6-5 3 7zM13 14l7-2-3 8zM5 16l4 1-2 4z"/>'],
-      xp: ['#1F9A50', '<circle cx="10" cy="13.5" r="6"/><circle cx="10" cy="13.5" r="2.5" class="f"/><path d="M18 3v5M15.5 5.5h5"/>'],
-      morph: ['#E0608E', '<path d="M12 20C6 16.4 3 13.3 3 9.6 3 7 5 5 7.5 5c1.9 0 3.5 1.1 4.5 2.7C13 6.1 14.6 5 16.5 5 19 5 21 7 21 9.6c0 3.7-3 6.8-9 10.4z" stroke-dasharray=".1 2.7" stroke-width="2.4"/>'],
       ghost: ['#3A6FD8', '<path d="M4 4h.01M9 4h.01M15 4h.01M20 4h.01M4 9.5h.01M20 9.5h.01M4 14.5h.01M20 14.5h.01M4 20h.01M9 20h.01M15 20h.01M20 20h.01" stroke-width="2.6"/><circle cx="12" cy="12" r="4.5" stroke-dasharray="1.5 2"/>'],
       fish: ['#2A7FD0', '<path class="f" d="M2.5 12c3-4 8-5 12-2l5.5-3.5v11L14.5 14c-4 3-9 2-12-2z"/><circle cx="7" cy="11.2" r="1" fill="#fff" stroke="none"/>'],
-      solar: ['#E08A00', '<circle cx="12" cy="12" r="3" class="f"/><ellipse cx="12" cy="12" rx="9.5" ry="4.5"/><circle cx="19.6" cy="9.3" r="1.7" class="f"/>'],
-      topo: ['#8A7040', '<path d="M12 3.5c5 0 8.5 3.5 8.5 7.5s-4 9.5-9 9.5-8-4-8-8 3.5-9 8.5-9z"/><path d="M12 8c3 0 4.5 1.5 4.5 3.5S14 16 11.5 16 8 14 8 12s1.5-4 4-4z"/><circle cx="12" cy="12" r="1" class="f"/>'],
-      tunnel: ['#8E3AD8', '<rect x="3" y="4" width="18" height="16"/><rect x="8" y="8.5" width="8" height="7"/><path d="M3 4l5 4.5M21 4l-5 4.5M3 20l5-4.5M21 20l-5-4.5"/>'],
-      synthwave: ['#E0507E', '<path class="f" d="M6.5 11a5.5 5.5 0 0 1 11 0z"/><path d="M2 13.5h20M3 17h18M1.5 21h21M12 13.5V21M8 13.5 5 21M16 13.5l3 7.5"/>'],
+      heal: ['#1F9A50', '<path d="M12 7v10M7 12h10" stroke-width="2.2"/><ellipse cx="12" cy="19.5" rx="8" ry="2" stroke-opacity=".55"/><circle cx="5" cy="6" r="1" class="f"/><circle cx="19" cy="8" r="1.2" class="f"/>'],
+      lightning: ['#3A5FD0', '<path d="M13.5 2.5 7 13h4.5L9.5 21.5 17 10h-4.5z" class="f"/>'],
+      cauldron: ['#0E8A86', '<path d="M4 11h16c0 5-3.5 8.5-8 8.5S4 16 4 11z" class="f"/><path d="M3 11h18"/><path d="M9 7.5c-1-1.2 0-2.4-.5-3.5M14.5 7.5c-1-1.2 0-2.4-.5-3.5" stroke-opacity=".6"/>'],
+      jelly: ['#0E8A86', '<path d="M5 11a7 6 0 0 1 14 0z" class="f"/><path d="M7.5 11c0 3-1 5-.5 9M10.5 11c0 3 1 5 .5 9M13.5 11c0 3-1 5-.5 9M16.5 11c0 3 1 5 .5 9" stroke-dasharray=".1 2.4" stroke-width="2"/>'],
+      fel: ['#4E9A06', '<path d="M8 21c-3-2-3-6 0-9 0 2 1 3 2 3-1-4 1-8 4-10-1 3 0 5 2 7 2 2 2 6-1 9z" class="f"/>'],
       dust: ['#B08A30', '<path d="M5 3l5.5 18M11 3l7 18" stroke-opacity=".45"/><circle cx="9" cy="10" r="1.1" class="f"/><circle cx="12.5" cy="15" r="1.4" class="f"/><circle cx="14" cy="7.5" r=".8" class="f"/><circle cx="18.5" cy="13.5" r=".8" class="f"/><circle cx="5.5" cy="16" r=".7" class="f"/>'],
     },
     follower: {
@@ -1475,7 +2241,7 @@
   };
 
   // a follower that goes with a background has the same icon (and the same name, above)
-  const PAIRS = { frost: 'snow', fireworks: 'fireworks', stardust: 'stardust', fireflies: 'fireflies', bubbles: 'bubbles', leaves: 'leaves', hearts: 'hearts', ripples: 'rain', confetti: 'confetti', matrix: 'matrix', rainbow: 'rainbow' };
+  const PAIRS = Object.fromEntries(EFFECT_IDS.map((e) => [FOLLOWER_OF[e] || e, e])); // follower id → background id (all of them since 1.1.20)
   for (const [f, e] of Object.entries(PAIRS)) if (ICONS.effect[e]) ICONS.follower[f] = ICONS.effect[e];
   window.COSMO_FX = { EFFECTS, FOLLOWERS, EFFECT_IDS, FOLLOWER_IDS, resolve, Layer, ICONS, AMOUNTS, EFFECT_AMOUNTS, PAIRS, opacityOf, PALETTES: { light: LIGHT, dark: DARK } };
 })();

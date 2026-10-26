@@ -257,26 +257,54 @@
     <div class="erow"><b>Background of a note</b><div class="fxlist" id="fxAllEffects"></div><div class="fxamt" id="fxAllEAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div><div class="fxop" id="fxAllEOp"><span>Opacity</span><input type="range" class="srange" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div></div>
     <div class="erow"><b>Follows your mouse</b><div class="fxlist" id="fxAllFollowers"></div><div class="fxamt" id="fxAllFAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div><div class="fxop" id="fxAllFOp"><span>Opacity</span><input type="range" class="srange" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div></div>
     <label class="row toggle">
+      <span><b>Mouse can interact with the background</b><small>Bubbles pop when you touch them, rain splashes off the pointer, fish dart away… Each note can change this in its Effects.</small></span>
+      <input type="checkbox" id="fxInteractAll"><i></i>
+    </label>
+    <label class="row toggle">
       <span><b>Use these on every note</b><small>Even on notes that chose their own. Their own choice is kept, and comes back when you switch this off.</small></span>
       <input type="checkbox" id="fxForceAll"><i></i>
     </label>
     <div class="ebtns"><small>Changes show straight away</small><button type="submit" class="pill">Done</button></div>
   </form>
 </div>
-<!-- 1.1.15: right-click a note → Edit… (title and colour). Saves as you type; an open note window follows. -->
+<!-- 1.1.15: right-click a note → Edit… (title and colour). Saves as you type; an open note window follows.
+     1.1.20: "Edit design": also see-through and the note's own effects (previewed live on the paper) -->
 <div class="modal esheet" id="editSheet" hidden>
   <form class="ebox" id="editBox" autocomplete="off">
     <div class="ehead">
-      <h3>Edit note</h3>
+      <h3>Edit design</h3>
       <button type="button" class="qclear" id="editX" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div class="erow">
       <b>Title</b>
-      <div class="epaper" id="editPaper" data-color="yellow"><input class="etitle" id="editTitle" maxlength="120" placeholder="(optional)" spellcheck="false"></div>
+      <div class="epaper" id="editPaper" data-color="yellow"><canvas class="fxc" id="editFxCanvas" aria-hidden="true"></canvas><input class="etitle" id="editTitle" maxlength="120" placeholder="(optional)" spellcheck="false"></div>
     </div>
     <div class="erow">
       <span class="oprow"><b>Colour</b><em id="editColorName"></em></span>
       <div class="swstrip wide"><div class="swatches" id="editColors"></div></div>
+    </div>
+    <div class="erow">
+      <span class="oprow"><b>See-through</b><em id="editOpVal">Solid</em></span>
+      <input type="range" class="srange" id="editOpacity" min="25" max="100" step="5" value="100" aria-label="See-through">
+    </div>
+    <div class="erow">
+      <b>Effects</b>
+      <p class="ehint" id="editFxForce" hidden>Settings uses the same effects on every note right now, so this note shows those. What you pick here is kept for when that’s switched off.</p>
+      <div class="seg fxtabs" id="editFxTabs"><button type="button" data-t="e" class="on">Background</button><button type="button" data-t="f">Mouse</button></div>
+      <div class="efxsec" data-t="e">
+        <div class="fxlist" id="editFxEffects"></div>
+        <div class="fxamt" id="editFxEAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div>
+        <div class="fxop" id="editFxEOp"><span>Opacity</span><input type="range" class="srange" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div>
+      </div>
+      <div class="efxsec" data-t="f" hidden>
+        <div class="fxlist" id="editFxFollowers"></div>
+        <div class="fxamt" id="editFxFAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div>
+        <div class="fxop" id="editFxFOp"><span>Opacity</span><input type="range" class="srange" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div>
+      </div>
+      <label class="row toggle" id="editFxInteractRow">
+        <span><b>Mouse can interact with the background</b></span>
+        <input type="checkbox" id="editFxInteract"><i></i>
+      </label>
     </div>
     <div class="ebtns">
       <small id="editSaved">Changes save as you type</small>

@@ -236,7 +236,7 @@
     if (!fxLayer || !note) return;
     const r = FX.resolve(note.fx, settings, note.fxPaused, note.fxPlay);
     fxLayer.resize();
-    fxLayer.set({ effect: r.effect, follower: r.follower, effectAmount: r.effectAmount, followerAmount: r.followerAmount, effectOpacity: r.effectOpacity, followerOpacity: r.followerOpacity, dark: DARK_PAPERS.includes(note.color) });
+    fxLayer.set({ effect: r.effect, follower: r.follower, effectAmount: r.effectAmount, followerAmount: r.followerAmount, effectOpacity: r.effectOpacity, followerOpacity: r.followerOpacity, interact: r.interact, dark: DARK_PAPERS.includes(note.color) });
     fxLayer.setPaused(r.paused);
     fxLayer.setVisible(!note.rolled);
     const any = r.effect !== 'none' || r.follower !== 'none';
@@ -307,18 +307,23 @@
     }
     // how much: what this note shows now (its own, or all notes' amount)
     const r = FX.resolve(note.fx, settings, note.fxPaused, note.fxPlay);
+    // 1.1.22: with "None", frequency and opacity are greyed out (switched off), not hidden
     for (const [id, cur, kindOn] of [['#fxEAmt', r.effectAmount, r.effect !== 'none'], ['#fxFAmt', r.followerAmount, r.follower !== 'none']]) {
-      $(id).hidden = !kindOn;
-      $$(`${id} button`).forEach((b) => b.classList.toggle('on', b.dataset.a === cur));
+      $(id).classList.toggle('off', !kindOn);
+      $$(`${id} button`).forEach((b) => { b.classList.toggle('on', b.dataset.a === cur); b.disabled = !kindOn; });
     }
     for (const [id, op, kindOn] of [['#fxEOp', r.effectOpacity, r.effect !== 'none'], ['#fxFOp', r.followerOpacity, r.follower !== 'none']]) {
       const pct = Math.round(op * 100);
-      $(id).hidden = !kindOn;
+      $(id).classList.toggle('off', !kindOn);
       $(`${id} input`).value = String(pct);
-      $(`${id} input`).disabled = !!settings.fxForceAll; // Settings uses the same on every note: its opacity shows
+      $(`${id} input`).disabled = !kindOn || !!settings.fxForceAll; // Settings uses the same on every note: its opacity shows
       $(`${id} em`).textContent = `${pct}%`;
     }
     $('#fxForce').hidden = !settings.fxForceAll;
+    // 1.1.21: the mouse plays with the background (only when there is one)
+    $('#fxInteractRow').classList.toggle('off', r.effect === 'none');
+    $('#fxInteract').checked = r.interact;
+    $('#fxInteract').disabled = r.effect === 'none' || !!settings.fxForceAll;
     $('#fxPause').checked = r.paused;
     $('#fxPause').disabled = false;
   }
@@ -329,8 +334,9 @@
   }
   $$('#fxTabs button').forEach((b) => b.addEventListener('click', () => fxTab(b.dataset.t)));
   $('#miFx').addEventListener('click', () => { openPop('#fxPop'); requestAnimationFrame(paintFxPop); });
-  $('#fxX').addEventListener('click', () => closePops());
+  $('#fxX').addEventListener('click', () => closePop('#fxPop'));
   $('#fxPause').addEventListener('change', (e) => setFxPlaying(!e.target.checked));
+  $('#fxInteract').addEventListener('change', (e) => setProp({ fx: { ...(note.fx || { e: null, f: null }), mi: e.target.checked } }));
   // 1.1.16: this note's own pause wins over "pause all": playing it while all effects are paused sets fxPlay
   // (it keeps playing until it's paused here again); pausing it sets fxPaused
   function setFxPlaying(play) {
@@ -507,33 +513,62 @@
   });
 
   // ================================================================ popovers
-  let openPopId = null;
   // 1.1.16: the ⋯ menu and the Effects pop-up can be dragged (by their grip) and out of the note, like the
   // toolbars: id → { out: barOut(…), move: movable(…) } (filled in further down, next to the toolbars)
   const popOuts = {};
+  // 1.1.20 (the owner's wish): the editing menus (⋯, Effects, Add) no longer close each other: opening one leaves
+  // the others open, the newest on top (clicking one brings it to the front). Each closes with its own button (or X),
+  // and the "close all" button in the top bar (shown when two or more are open, text toolbar included) or Esc
+  // closes them all. The small dialogs (password, link, questions) still replace each other.
+  const EDIT_POPS = ['#menu', '#fxPop', '#insert'];
+  const DIALOGS = ['#pwPop', '#linkPop', '#askPop'];
+  function closePop(id) {
+    const p = $(id);
+    if (!p) return;
+    if (id === '#askPop' && askResolve) { const r = askResolve; askResolve = null; r(false); }
+    p.hidden = true;
+    const po = popOuts[id];
+    if (po) po.out.stop();
+    syncPops();
+  }
   // keepOut: a click in the note leaves a pop-up that's outside the note open (it closes with its X or Esc)
   function closePops(keepOut = false) {
     if (askResolve) { const r = askResolve; askResolve = null; r(false); }
-    $$('.pop:not(#textPop)').forEach((p) => { // the text toolbar only closes by A or its X
+    $$('.pop:not(#textPop)').forEach((p) => { // the text toolbar only closes by A or its X (or "close all")
       const po = popOuts[`#${p.id}`];
       if (keepOut && po && po.out.isOut() && !p.hidden) return;
       p.hidden = true;
       if (po) po.out.stop();
     });
-    body.classList.remove('pop-open');
-    openPopId = null;
+    syncPops();
+  }
+  function closeAllPops() { closePops(); if (!$('#textPop').hidden) closeText(); syncPops(); }
+  let popTop = null;
+  function toFront(el) {
+    if (popTop === el) return;
+    for (const id of [...EDIT_POPS, '#textPop']) { const p = $(id); if (p) p.style.zIndex = ''; }
+    el.style.zIndex = '21';
+    popTop = el;
+  }
+  function syncPops() {
+    const open = EDIT_POPS.concat(DIALOGS).some((id) => $(id) && !$(id).hidden);
+    body.classList.toggle('pop-open', open);
+    const many = [...EDIT_POPS, '#textPop'].filter((id) => $(id) && !$(id).hidden).length;
+    const b = $('#btnCloseAll');
+    if (b) b.hidden = many < 2;
   }
   function openPop(id) {
-    closePops();
+    for (const d of DIALOGS) if (d !== id && !$(d).hidden) closePop(d);
+    if (DIALOGS.includes(id)) for (const e of EDIT_POPS) if (!$(e).hidden && !(popOuts[e] && popOuts[e].out.isOut())) closePop(e); // a dialog needs the room
     hideCtx();
     $(id).hidden = false;
-    body.classList.add('pop-open');
-    openPopId = id;
+    toFront($(id));
+    syncPops();
     if (popOuts[id]) { popOuts[id].out.start(); popOuts[id].move.place(); }
     if (id === '#menu') colorStrip.reveal($('#colors .sw.on'));
   }
   function togglePop(id) {
-    if (!$(id).hidden) closePops();
+    if (!$(id).hidden) closePop(id);
     else { saveSel(); openPop(id); }
   }
   document.addEventListener('mousedown', (e) => {
@@ -541,15 +576,35 @@
     if (!e.target.closest('.pop, #btnMenu, #btnInsert, #btnText')) closePops(true);
     if (!e.target.closest('.ctx')) hideCtx();
   });
+  // 1.1.20: switches one after another are grouped, so each sits right after its text and they still line up
+  function groupSwitches(root, sel) {
+    const seen = new Set();
+    for (const el of root.querySelectorAll(sel)) {
+      if (seen.has(el)) continue;
+      const run = [el];
+      for (let n = el.nextElementSibling; n && n.matches(sel); n = n.nextElementSibling) run.push(n);
+      run.forEach((x) => seen.add(x));
+      if (run.length < 2 || el.parentElement.classList.contains('switches')) continue;
+      const box = document.createElement('div');
+      box.className = 'switches';
+      el.before(box);
+      box.append(...run);
+    }
+  }
+  groupSwitches(document, '.check.switch');
   // Buttons inside popovers should not steal the text selection.
   $$('.pop button, .ctx').forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault()));
+  // 1.1.20: clicking a menu brings it to the front; the top bar's button closes them all
+  for (const id of [...EDIT_POPS, '#textPop']) $(id).addEventListener('pointerdown', (e) => toFront(e.currentTarget), true);
+  $('#btnCloseAll').addEventListener('mousedown', (e) => e.preventDefault());
+  $('#btnCloseAll').addEventListener('click', closeAllPops);
 
   // ---------- header
   $('#btnNew').addEventListener('click', () => { saveNow(); api.newNote(); });
   $('#btnClose').addEventListener('click', () => { saveNow(); api.close(); });
   $('#btnPin').addEventListener('click', () => setProp({ pinned: !note.pinned }));
   $('#btnMenu').addEventListener('click', () => togglePop('#menu'));
-  $('#menuX').addEventListener('click', () => closePops());
+  $('#menuX').addEventListener('click', () => closePop('#menu'));
   // 1.1.13: minimise and maximise (double-clicking the top bar maximises too: Windows does that for the drag area)
   $('#btnMin').addEventListener('click', () => { closePops(); saveNow(); api.minimize(); });
   $('#btnMax').addEventListener('click', () => api.maximize());
@@ -577,6 +632,8 @@
     saveSel();
     body.classList.add('text-fresh'); // full strength until you type or click in the note again (1.1.14)
     $('#textPop').hidden = false;
+    toFront($('#textPop'));
+    syncPops();
     body.classList.add('text-open');
     textOut.start(); // its own window, ready for dragging it out (or straight outside, where it was last time; 1.1.16)
     textMove.place();
@@ -584,6 +641,7 @@
   }
   function closeText() {
     $('#textPop').hidden = true;
+    syncPops();
     body.classList.remove('text-open');
     textOut.stop();
   }
@@ -594,10 +652,12 @@
   $$('#colors .sw').forEach((b) => b.addEventListener('click', () => setProp({ color: b.dataset.color })));
   const colorStrip = swatchStrip($('#colors'));
 
+  // see-through, in the ⋯ menu (1.1.22: no longer also in the Effects pop-up, at the owner's request)
+  const opText = (v) => (v >= 1 ? 'Solid' : `${Math.round(v * 100)}%`);
   $('#opacity').addEventListener('input', (e) => {
     const v = Number(e.target.value) / 100;
     note.opacity = v;
-    $('#opVal').textContent = v >= 1 ? 'Solid' : `${Math.round(v * 100)}%`;
+    $('#opVal').textContent = opText(v);
     api.update({ opacity: v });
   });
   $('#solidHover').addEventListener('change', (e) => setProp({ solidOnHover: e.target.checked }));
@@ -609,7 +669,7 @@
     clearTimeout(titleTimer);
     titleTimer = setTimeout(() => api.update({ title: note.title }).then(gotDates), 300);
   });
-  $('#titleInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); closePops(); } });
+  $('#titleInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); closePop('#menu'); } });
   $('#miLock').addEventListener('click', toggleLock);
   $('#miDuplicate').addEventListener('click', async () => {
     closePops();
@@ -740,7 +800,7 @@
   $('#btnRedo').addEventListener('click', redoAny);
 
   async function doInsert(act) {
-    closePops();
+    closePop('#insert');
     switch (act) {
       case 'photo': {
         const urls = await api.pickImages();
@@ -783,13 +843,13 @@
     openPop('#linkPop');
     setTimeout(() => ($('#linkText').value ? $('#linkUrl') : $('#linkText')).focus(), 20);
   }
-  $('#linkCancel').addEventListener('click', () => { closePops(); restoreSel(); });
+  $('#linkCancel').addEventListener('click', () => { closePop('#linkPop'); restoreSel(); });
   $('#linkPop').addEventListener('submit', (e) => {
     e.preventDefault();
     const url = normUrl($('#linkUrl').value);
     if (!url) { $('#linkUrl').focus(); return; }
     const text = $('#linkText').value.trim() || $('#linkUrl').value.trim();
-    closePops();
+    closePop('#linkPop');
     if (editingLink && editor.contains(editingLink)) {
       editingLink.setAttribute('href', url);
       editingLink.textContent = text;
@@ -1823,7 +1883,7 @@
     $('#askYes').textContent = okLabel;
     return new Promise((resolve) => { askResolve = resolve; });
   }
-  const answerAsk = (v) => { const r = askResolve; askResolve = null; closePops(); if (r) r(v); };
+  const answerAsk = (v) => { const r = askResolve; askResolve = null; closePop('#askPop'); if (r) r(v); };
   $('#askYes').addEventListener('click', () => answerAsk(true));
   $('#askNo').addEventListener('click', () => answerAsk(false));
 
@@ -2408,7 +2468,7 @@
   for (const [id, kind, frame, title] of [['#menu', 'menu', 'cosmoMenuBar', 'Note settings'], ['#fxPop', 'fx', 'cosmoFxBar', 'Effects']]) {
     const el = $(id);
     const po = { out: null, move: null };
-    po.out = barOut({ el, kind, frame, title, key: `${kind}PopOut`, mover: () => po.move, onEsc: () => closePops() });
+    po.out = barOut({ el, kind, frame, title, key: `${kind}PopOut`, mover: () => po.move, onEsc: () => closePop(id) });
     po.move = movable(el, { key: `${kind}PopPos`, out: po.out, handle: '.igrip', top: true });
     popOuts[id] = po;
   }

@@ -1293,7 +1293,7 @@
   function noteMenu(n, e) {
     showCtx(e, [
       { label: n.open ? 'Bring to front' : 'Open on desktop', icon: ICON.open, run: () => S.list.openNote(n.id) },
-      { label: 'Edit…', icon: ICON.edit, run: () => openEdit(n) },
+      { label: 'Edit design…', icon: ICON.edit, run: () => openEdit(n) },
       n.open ? { label: 'Close note', icon: ICON.hide, run: () => S.list.closeNote(n.id) } : null,
       { label: 'Duplicate note', icon: ICON.copy, run: async () => { await S.list.duplicate(n.id); toast('Note duplicated'); } },
       n.favorite
@@ -1367,7 +1367,7 @@
       }
       keep.add(card);
       L.resize();
-      L.set({ effect: r.effect, follower: r.follower, effectAmount: r.effectAmount, followerAmount: r.followerAmount, effectOpacity: r.effectOpacity, followerOpacity: r.followerOpacity, dark: DARK_COLORS.includes(n.color) });
+      L.set({ effect: r.effect, follower: r.follower, effectAmount: r.effectAmount, followerAmount: r.followerAmount, effectOpacity: r.effectOpacity, followerOpacity: r.followerOpacity, interact: r.interact, dark: DARK_COLORS.includes(n.color) });
       L.setPaused(r.paused);
     }
     for (const [card, L] of fxLayers) if (!keep.has(card)) { L.destroy(); fxLayers.delete(card); }
@@ -1407,16 +1407,17 @@
       for (const b of box.children) { const on = b.dataset.v === cur; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); }
     }
     for (const [id, cur, kindOn] of [['#fxAllEAmt', s.fxEffectAmount || 'mid', (s.fxEffect || 'none') !== 'none'], ['#fxAllFAmt', s.fxFollowerAmount || 'mid', (s.fxFollower || 'none') !== 'none']]) {
-      $(id).hidden = !kindOn;
-      $$(`${id} button`).forEach((b) => b.classList.toggle('on', b.dataset.a === cur));
+      $(id).classList.toggle('off', !kindOn); // 1.1.22: greyed out with None, not hidden
+      $$(`${id} button`).forEach((b) => { b.classList.toggle('on', b.dataset.a === cur); b.disabled = !kindOn; });
     }
     for (const [id, o, kindOn] of [['#fxAllEOp', s.fxEffectOpacity, (s.fxEffect || 'none') !== 'none'], ['#fxAllFOp', s.fxFollowerOpacity, (s.fxFollower || 'none') !== 'none']]) {
       const pct = Math.round((FX.opacityOf(o) ?? 1) * 100);
-      $(id).hidden = !kindOn;
-      $(`${id} input`).value = String(pct);
+      $(id).classList.toggle('off', !kindOn);
+      $(`${id} input`).value = String(pct); $(`${id} input`).disabled = !kindOn;
       $(`${id} em`).textContent = `${pct}%`;
     }
     $('#fxForceAll').checked = !!s.fxForceAll;
+    $('#fxInteractAll').checked = s.fxInteract !== false; // 1.1.21
     $('#sFxNow').textContent = fxSummary();
   }
   for (const [id, key] of [['#fxAllEAmt', 'fxEffectAmount'], ['#fxAllFAmt', 'fxFollowerAmount']]) {
@@ -1444,6 +1445,7 @@
   $('#fxBox').addEventListener('submit', (e) => { e.preventDefault(); closeFxSheet(); });
   $('#fxSheet').addEventListener('mousedown', (e) => { if (e.target === $('#fxSheet')) closeFxSheet(); });
   $('#fxForceAll').addEventListener('change', (e) => { state.settings.fxForceAll = e.target.checked; paintFxSheet(); S.settings.set({ fxForceAll: e.target.checked }); });
+  $('#fxInteractAll').addEventListener('change', (e) => { state.settings.fxInteract = e.target.checked; paintFxSheet(); paintFx(); S.settings.set({ fxInteract: e.target.checked }); });
   $('#sFxPause').addEventListener('change', (e) => S.settings.set({ fxPaused: e.target.checked }));
   // the pause button left of Settings (1.1.16): pause / play every effect
   function paintFxPause() {
@@ -1462,21 +1464,101 @@
     toast(p ? 'Effects paused' : 'Effects playing again');
   });
 
-  // ================================================================ Edit sheet (1.1.15)
-  // Right-click a note → Edit…: its title and colour, right here in the list. The title saves as you type
-  // (350 ms after you stop), the colour at once, and an open window of the note changes along with it
-  // (main.js 'list:edit'). A change made in the note's own window shows here too (editRefresh).
-  const ed = { id: null, color: 'yellow', title: '', timer: null, pending: null };
+  // 1.1.20: switches one after another are grouped, so each sits right after its text and they still line up
+  function groupSwitches(root, sel) {
+    const seen = new Set();
+    for (const el of root.querySelectorAll(sel)) {
+      if (seen.has(el)) continue;
+      const run = [el];
+      for (let n = el.nextElementSibling; n && n.matches(sel); n = n.nextElementSibling) run.push(n);
+      run.forEach((x) => seen.add(x));
+      if (run.length < 2 || el.parentElement.classList.contains('switches')) continue;
+      const box = document.createElement('div');
+      box.className = 'switches';
+      el.before(box);
+      box.append(...run);
+    }
+  }
+  groupSwitches(document, '.row.toggle');
+
+  // ================================================================ Edit design (1.1.15 "Edit…", 1.1.20 "Edit design")
+  // Right-click a note → Edit design…: its title, colour, see-through and (1.1.20) its own effects, right here in the
+  // list. The paper at the top previews the colour and the effects live (move the mouse over it to see the
+  // follower). The title saves as you type (350 ms after you stop), the rest at once (sliders: 120 ms after they
+  // stop moving), and an open window of the note changes along with it (main.js 'list:edit'). A change made in the
+  // note's own window shows here too (editRefresh).
+  const ed = { id: null, color: 'yellow', title: '', opacity: 1, fx: null, timer: null, pending: null, tab: 'e' };
   for (const c of COLORS) {
     $('#editColors').append(h('button', {
       type: 'button', class: 'sw', 'data-color': c, title: COLOR_NAMES[c], style: `background:${SWATCH[c]}`,
       onclick: () => editSet({ color: c }),
     }));
   }
+  const edFxLayer = FX ? FX.Layer($('#editFxCanvas')) : null;
+  const blankFx = () => ({ e: null, f: null, ea: null, fa: null, eo: null, fo: null, mi: null });
+  function editFxList(box, kind) {
+    const key = kind === 'effect' ? 'e' : 'f';
+    const ids = kind === 'effect' ? FX.EFFECT_IDS : FX.FOLLOWER_IDS;
+    const add = (v, label, icon) => {
+      const b = h('button', { type: 'button', class: 'fxi', 'data-v': v === null ? '' : v, html: `${fxIcon(icon)}<span class="nm"></span>${CHECK}` });
+      b.querySelector('.nm').textContent = label;
+      if (v === null) b.querySelector('.nm').append(h('small', { class: 'allname' }));
+      b.addEventListener('click', () => editSet({ fx: { ...ed.fx, [key]: v } }));
+      box.append(b);
+    };
+    add(null, 'Same as all notes', FX.ICONS.all);
+    add('none', 'None', FX.ICONS.none);
+    for (const id of ids) add(id, FX[kind === 'effect' ? 'EFFECTS' : 'FOLLOWERS'][id].name, FX.ICONS[kind][id]);
+  }
+  if (FX) { editFxList($('#editFxEffects'), 'effect'); editFxList($('#editFxFollowers'), 'follower'); }
+  function editTab(t) {
+    ed.tab = t;
+    for (const b of $$('#editFxTabs button')) { b.classList.toggle('on', b.dataset.t === t); b.setAttribute('aria-pressed', String(b.dataset.t === t)); }
+    for (const sec of $$('#editSheet .efxsec')) sec.hidden = sec.dataset.t !== t;
+  }
+  $$('#editFxTabs button').forEach((b) => b.addEventListener('click', () => editTab(b.dataset.t)));
+  function editFxPreview() {
+    if (!edFxLayer || !ed.id) return;
+    const n = state.notes.find((x) => x.id === ed.id) || {};
+    const r = FX.resolve(ed.fx, state.settings, n.fxPaused, n.fxPlay);
+    edFxLayer.resize();
+    edFxLayer.set({ effect: r.effect, follower: r.follower, effectAmount: r.effectAmount, followerAmount: r.followerAmount, effectOpacity: r.effectOpacity, followerOpacity: r.followerOpacity, interact: r.interact, dark: DARK_COLORS.includes(ed.color) });
+    edFxLayer.setPaused(!!state.settings.fxPaused && !n.fxPlay);
+    return r;
+  }
   function editPaint() {
     $('#editPaper').dataset.color = ed.color;
     for (const b of $('#editColors').children) b.classList.toggle('on', b.dataset.color === ed.color);
     $('#editColorName').textContent = COLOR_NAMES[ed.color] || '';
+    const pct = Math.round(ed.opacity * 100);
+    if (document.activeElement !== $('#editOpacity')) $('#editOpacity').value = String(pct);
+    $('#editOpVal').textContent = pct >= 100 ? 'Solid' : `${pct}%`;
+    if (!FX) return;
+    const s = state.settings; const mine = ed.fx || blankFx();
+    for (const [box, kind, key, all] of [[$('#editFxEffects'), 'effect', 'e', s.fxEffect], [$('#editFxFollowers'), 'follower', 'f', s.fxFollower]]) {
+      for (const b of box.children) {
+        const v = b.dataset.v === '' ? null : b.dataset.v;
+        const on = (mine[key] ?? null) === v;
+        b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+        if (v === null) b.querySelector('.allname').textContent = all && all !== 'none' ? fxName(kind, all) : 'None';
+      }
+    }
+    const r = editFxPreview() || FX.resolve(ed.fx, s);
+    for (const [id, cur, kindOn] of [['#editFxEAmt', r.effectAmount, r.effect !== 'none'], ['#editFxFAmt', r.followerAmount, r.follower !== 'none']]) {
+      $(id).classList.toggle('off', !kindOn); // 1.1.22: greyed out with None, not hidden
+      $$(`${id} button`).forEach((b) => { b.classList.toggle('on', b.dataset.a === cur); b.disabled = !kindOn; });
+    }
+    for (const [id, op, kindOn] of [['#editFxEOp', r.effectOpacity, r.effect !== 'none'], ['#editFxFOp', r.followerOpacity, r.follower !== 'none']]) {
+      const pct2 = Math.round(op * 100); const range = $(`${id} input`);
+      $(id).classList.toggle('off', !kindOn);
+      if (document.activeElement !== range) range.value = String(pct2);
+      range.disabled = !kindOn || !!s.fxForceAll;
+      $(`${id} em`).textContent = `${pct2}%`;
+    }
+    $('#editFxForce').hidden = !s.fxForceAll;
+    $('#editFxInteractRow').classList.toggle('off', r.effect === 'none');
+    $('#editFxInteract').checked = r.interact;
+    $('#editFxInteract').disabled = r.effect === 'none' || !!s.fxForceAll;
   }
   function openEdit(n) {
     hideCtx();
@@ -1485,20 +1567,24 @@
     ed.pending = null;
     ed.color = n.color;
     ed.title = n.title || '';
+    ed.opacity = Number(n.opacity) || 1;
+    ed.fx = { ...blankFx(), ...(n.fx || {}) };
     $('#editTitle').value = ed.title;
-    editPaint();
     $('#editSheet').hidden = false;
+    editTab(ed.tab);
+    editPaint();
     requestAnimationFrame(() => {
+      editFxPreview();
       const t = $('#editTitle');
       t.focus();
       t.setSelectionRange(t.value.length, t.value.length);
     });
   }
-  function editQueue(patch, now = false) {
+  function editQueue(patch, now = false, wait = 350) {
     if (!ed.id) return;
     ed.pending = { ...(ed.pending || {}), ...patch };
     clearTimeout(ed.timer);
-    if (now) editFlush(); else ed.timer = setTimeout(editFlush, 350);
+    if (now) editFlush(); else ed.timer = setTimeout(editFlush, wait);
   }
   async function editFlush() {
     clearTimeout(ed.timer);
@@ -1519,6 +1605,7 @@
     editFlush();
     ed.id = null;
     $('#editSheet').hidden = true;
+    if (edFxLayer) edFxLayer.set({}); // nothing plays while the sheet is closed
   }
   // the note changed somewhere else (its window, the selection bar…) while the sheet is open
   function editRefresh() {
@@ -1526,12 +1613,42 @@
     const n = state.notes.find((x) => x.id === ed.id);
     if (!n || n.deletedAt) { ed.pending = null; closeEdit(); return; }
     if (ed.pending) return; // our own change is on its way
-    if (n.color !== ed.color) { ed.color = n.color; editPaint(); }
+    let changed = false;
+    if (n.color !== ed.color) { ed.color = n.color; changed = true; }
+    if (Number.isFinite(Number(n.opacity)) && Number(n.opacity) !== ed.opacity && document.activeElement !== $('#editOpacity')) { ed.opacity = Number(n.opacity); changed = true; }
+    if (n.fx && JSON.stringify({ ...blankFx(), ...n.fx }) !== JSON.stringify(ed.fx)) { ed.fx = { ...blankFx(), ...n.fx }; changed = true; }
+    editPaint(); // also when only Settings changed ("Same as all notes" shows its name)
     const typingHere = document.hasFocus() && document.activeElement === $('#editTitle');
     if ((n.title || '') !== ed.title && !typingHere) { ed.title = n.title || ''; $('#editTitle').value = ed.title; }
+    return changed;
   }
   $('#editTitle').addEventListener('input', () => { ed.title = $('#editTitle').value; editQueue({ title: ed.title }); });
   $('#editTitle').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); closeEdit(); } });
+  // see-through: the open note window follows while dragging (saved 120 ms after the slider stops)
+  $('#editOpacity').addEventListener('input', (e) => {
+    ed.opacity = Number(e.target.value) / 100;
+    $('#editOpVal').textContent = ed.opacity >= 1 ? 'Solid' : `${e.target.value}%`;
+    editQueue({ opacity: ed.opacity }, false, 120);
+  });
+  $('#editOpacity').addEventListener('change', () => editFlush());
+  for (const [id, key] of [['#editFxEAmt', 'ea'], ['#editFxFAmt', 'fa']]) {
+    $$(`${id} button`).forEach((b) => b.addEventListener('click', () => editSet({ fx: { ...ed.fx, [key]: b.dataset.a } })));
+  }
+  for (const [id, key] of [['#editFxEOp', 'eo'], ['#editFxFOp', 'fo']]) {
+    const range = $(`${id} input`);
+    range.addEventListener('input', () => {
+      ed.fx = { ...ed.fx, [key]: Number(range.value) / 100 };
+      $(`${id} em`).textContent = `${range.value}%`;
+      editFxPreview();
+      editQueue({ fx: ed.fx }, false, 120);
+    });
+    range.addEventListener('change', () => editFlush());
+  }
+  $('#editFxInteract').addEventListener('change', (e) => editSet({ fx: { ...ed.fx, mi: e.target.checked } }));
+  // the follower plays when the mouse moves over the paper
+  $('#editPaper').addEventListener('pointermove', (e) => { if (!edFxLayer) return; const r = $('#editFxCanvas').getBoundingClientRect(); edFxLayer.move(e.clientX - r.left, e.clientY - r.top); });
+  $('#editPaper').addEventListener('pointerleave', () => { if (edFxLayer) edFxLayer.leave(); });
+  if (FX && window.ResizeObserver) new ResizeObserver(() => { if (ed.id) edFxLayer.resize(); }).observe($('#editPaper'));
   $('#editBox').addEventListener('submit', (e) => { e.preventDefault(); closeEdit(); });
   $('#editX').addEventListener('click', () => closeEdit());
   $('#editSheet').addEventListener('mousedown', (e) => { if (e.target === $('#editSheet')) closeEdit(); });

@@ -167,12 +167,12 @@ const noteWins = () => E.__all.filter((x) => x.file && x.file.endsWith('note.htm
   w.setSize(340, 150);
   assert.ok(child.bounds.y + 8 >= 200, 'still level with the note');
   // close to the top: sticks there
-  L['ink:drag'](ev(w), { x: 120 - 6, y: 200 - 30 - 154 - 8, px: 200, py: 150, ...size });
+  L['ink:drag'](ev(w), { x: 120 - 6, y: 200 - 10 - 154 - 8, px: 200, py: 150, ...size }); // 1.1.20: it sticks only within 12 px
   assert.equal(w.inkState.side, 'top');
   assert.equal(child.bounds.y + 8 + 154, 200 - 4, 'just above the note');
   // left side
   w.setPosition(600, 200);
-  L['ink:drag'](ev(w), { x: 600 - 20 - 290, y: 210, px: 550, py: 230, ...size });
+  L['ink:drag'](ev(w), { x: 600 - 10 - 290, y: 210, px: 550, py: 230, ...size });
   assert.equal(w.inkState.side, 'left');
   assert.equal(child.bounds.x + 6 + 290, 600 - 4, 'just left of the note');
   // at the screen's left edge there's no room on the left: it comes over the note instead of off the screen
@@ -189,7 +189,7 @@ const noteWins = () => E.__all.filter((x) => x.file && x.file.endsWith('note.htm
   L['ink:drag'](ev(w), { x: 1900, y: 1000, px: 1950, py: 1030, ...size });
   assert.ok(child.bounds.x + 6 + 290 <= 1920 && child.bounds.y + 8 + 154 <= 1040, 'always on the screen');
   // stuck again, then the note rolls up: hidden; unrolled: back
-  L['ink:drag'](ev(w), { x: 150 + 340 + 8, y: 230, px: 600, py: 250, ...size });
+  L['ink:drag'](ev(w), { x: 150 + 340 + 2, y: 230, px: 600, py: 250, ...size });
   dropped = await H['ink:drop'](ev(w), { px: 600, py: 250 });
   assert.equal(dropped.state.mode, 'dock'); assert.equal(dropped.state.side, 'right');
   await H['note:update'](ev(w), { rolled: true });

@@ -26,8 +26,15 @@ const DARK_COLORS = ['charcoal', 'night', 'midnight', 'forest', 'plum'];
 // 1.1.16: note effects and mouse followers (the same ids as src/fx.js: keep both lists the same)
 const FX_EFFECTS = ['snow', 'fireworks', 'stardust', 'fireflies', 'bubbles', 'leaves', 'hearts', 'rain', 'confetti', 'matrix', 'rainbow',
   // 1.1.18: the owner's picks from the Effect Lab
-  'plankton', 'fairy', 'warp', 'network', 'embers', 'lorenz', 'blossom', 'nightsky', 'glitch', 'blackhole', 'ocean', 'silk', 'shards', 'xp', 'morph', 'ghost', 'fish', 'solar', 'topo', 'tunnel', 'synthwave', 'dust'];
-const FX_FOLLOWERS = ['frost', 'fireworks', 'stardust', 'fireflies', 'bubbles', 'leaves', 'hearts', 'ripples', 'confetti', 'matrix', 'rainbow', 'pencil'];
+  // (1.1.20: Fairy dust, XP orbs, Neon tunnel and Synthwave were taken out again, at the owner's request)
+  'plankton', 'warp', 'network', 'embers', 'blossom', 'nightsky', 'glitch', 'ocean', 'silk', 'shards', 'ghost', 'fish', 'dust',
+  // 1.1.18, third round: the owner's picks from the Spell Lab
+  'heal', 'lightning', 'cauldron', 'jelly', 'fel'];
+  // (1.1.22: Solar system and Aquarium (1.1.19) were taken out, at the owner's request; a note that had one goes back to "same as all notes")
+// 1.1.20: a follower for every background (the same order, with 'frost' = Snow and 'ripples' = Rain), then the pencil line
+const FX_FOLLOWERS = ['frost', 'fireworks', 'stardust', 'fireflies', 'bubbles', 'leaves', 'hearts', 'ripples', 'confetti', 'matrix', 'rainbow',
+  'plankton', 'warp', 'network', 'embers', 'blossom', 'nightsky', 'glitch', 'ocean', 'silk', 'shards', 'ghost', 'fish', 'dust',
+  'heal', 'lightning', 'cauldron', 'jelly', 'fel', 'pencil'];
 // a note's own choice: null = same as all notes (Settings), 'none' = nothing on this note, or an id
 const cleanFxId = (v, ids) => { if (v === 'comet') v = 'rainbow'; return v === 'none' || ids.includes(v) ? v : null; }; // 'comet' (Rainbow line) was folded into Rainbow
 const FX_AMOUNTS = ['low', 'mid', 'high']; // how much: less, normal, more
@@ -41,7 +48,8 @@ const cleanFxOpacity = (v) => {
 function cleanFx(fx) {
   const o = fx && typeof fx === 'object' ? fx : {};
   // ea / fa: how much of the effect / follower on this note, eo / fo: its opacity (1.1.17) (null = same as all notes)
-  return { e: cleanFxId(o.e, FX_EFFECTS), f: cleanFxId(o.f, FX_FOLLOWERS), ea: cleanFxAmount(o.ea), fa: cleanFxAmount(o.fa), eo: cleanFxOpacity(o.eo), fo: cleanFxOpacity(o.fo) };
+  // mi (1.1.21): the mouse plays with this note's background (true / false; null = same as all notes)
+  return { e: cleanFxId(o.e, FX_EFFECTS), f: cleanFxId(o.f, FX_FOLLOWERS), ea: cleanFxAmount(o.ea), fa: cleanFxAmount(o.fa), eo: cleanFxOpacity(o.eo), fo: cleanFxOpacity(o.fo), mi: typeof o.mi === 'boolean' ? o.mi : null };
 }
 // what "random" meant before 1.1.15: one of the 7 original pastel papers
 const OLD_RANDOM = ['yellow', 'pink', 'green', 'blue', 'purple', 'orange', 'mint'];
@@ -78,6 +86,7 @@ const DEFAULT_SETTINGS = {
   fxFollowerAmount: 'mid',
   fxEffectOpacity: 1, // 1.1.17: how see-through the background effect is (0.1 – 1; 1 = as drawn)
   fxFollowerOpacity: 1, // and the mouse follower
+  fxInteract: true, // 1.1.21: the mouse plays with the background effect (bubbles pop, rain hits it, fish dart away…)
   fxForceAll: false, // true: every note shows fxEffect / fxFollower, even ones with their own choice (kept for later)
   fxPaused: false, // pause every effect and follower
   listTheme: 'cream', // colours of the notes list window (see THEMES in list.js; night, midnight, forest, plum are dark)

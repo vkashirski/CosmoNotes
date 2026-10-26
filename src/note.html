@@ -23,6 +23,8 @@
   <button class="hb" id="btnFx" title="Pause effects on this note" aria-pressed="false" hidden><svg viewBox="0 0 24 24"><path d="M12 3c.6 3.6 2.4 5.4 6 6-3.6.6-5.4 2.4-6 6-.6-3.6-2.4-5.4-6-6 3.6-.6 5.4-2.4 6-6z"/><path d="M18.5 15c.3 1.6 1 2.3 2.5 2.5-1.5.3-2.2 1-2.5 2.5-.3-1.5-1-2.2-2.5-2.5 1.5-.2 2.2-.9 2.5-2.5z"/></svg></button>
   <button class="hb" id="btnPin" title="Pin on top of other windows" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
   <button class="hb" id="btnRoll" title="Roll up to just the top bar"><svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></button>
+  <!-- 1.1.20: menus no longer close each other; this closes every open one at once (shows when two or more are open) -->
+  <button class="hb" id="btnCloseAll" title="Close all open menus (Esc)" hidden><svg viewBox="0 0 24 24"><rect x="8" y="3" width="13" height="13" rx="2.5"/><path d="M5 8H4.5A1.5 1.5 0 0 0 3 9.5v10A1.5 1.5 0 0 0 4.5 21h10a1.5 1.5 0 0 0 1.5-1.5V19"/><path d="m12 7 5 5M17 7l-5 5"/></svg></button>
   <button class="hb" id="btnMenu" title="Title, colour, see-through, lock and more"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg></button>
   <span class="hsep"></span>
   <button class="hb" id="btnMin" title="Minimise (even a pinned note stays down until you bring it back)"><svg viewBox="0 0 24 24"><path d="M6 17h12"/></svg></button>
@@ -127,6 +129,7 @@
   <div class="fxamt" id="fxFAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div>
   <div class="fxop" id="fxFOp"><span>Opacity</span><input type="range" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div>
   </div>
+  <label class="check switch" id="fxInteractRow"><span>Mouse can interact with the background</span><input type="checkbox" id="fxInteract"><i></i></label>
   <label class="check switch"><span>Pause effects on this note</span><input type="checkbox" id="fxPause"><i></i></label>
 </div>
 

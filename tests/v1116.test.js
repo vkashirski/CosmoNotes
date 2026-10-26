@@ -98,24 +98,24 @@ const FX = sandbox.window.COSMO_FX;
   await tick(20);
   await H['note:update'](ev(w), { fx: { e: 'rain', f: 'none' } });
   let n = await noteOf(id);
-  assert.deepEqual(n.fx, { e: 'rain', f: 'none', ea: null, fa: null, eo: null, fo: null }, 'the list gets it (for the card)');
+  assert.deepEqual(n.fx, { e: 'rain', f: 'none', ea: null, fa: null, eo: null, fo: null, mi: null }, 'the list gets it (for the card)');
   assert.equal(n.updatedAt, before, 'choosing an effect is not an edit');
   await H['note:update'](ev(w), { fx: { e: 'lasers', f: 'hearts' } });
-  assert.deepEqual((await noteOf(id)).fx, { e: null, f: 'hearts', ea: null, fa: null, eo: null, fo: null }, 'unknown ids become “same as all notes”');
+  assert.deepEqual((await noteOf(id)).fx, { e: null, f: 'hearts', ea: null, fa: null, eo: null, fo: null, mi: null }, 'unknown ids become “same as all notes”');
   await H['note:update'](ev(w), { fx: { e: 'rain', f: 'none', ea: 'high', fa: 'loads' } });
-  assert.deepEqual((await noteOf(id)).fx, { e: 'rain', f: 'none', ea: 'high', fa: null, eo: null, fo: null }, 'how much: low / mid / high only');
+  assert.deepEqual((await noteOf(id)).fx, { e: 'rain', f: 'none', ea: 'high', fa: null, eo: null, fo: null, mi: null }, 'how much: low / mid / high only');
   await H['note:update'](ev(w), { fx: { e: 'rain', f: 'none', ea: 'high' }, fxPaused: true });
   n = await noteOf(id);
   assert.equal(n.fxPaused, true, 'paused on this note');
   const copyId = await H['list:duplicate'](null, id);
-  assert.deepEqual((await noteOf(copyId)).fx, { e: 'rain', f: 'none', ea: 'high', fa: null, eo: null, fo: null }, 'a copy keeps the effect');
+  assert.deepEqual((await noteOf(copyId)).fx, { e: 'rain', f: 'none', ea: 'high', fa: null, eo: null, fo: null, mi: null }, 'a copy keeps the effect');
 
   // ---- use on every note: the notes keep their own choice
   await H['settings:set'](null, { fxForceAll: true });
   assert.equal((await get()).settings.fxForceAll, true);
-  assert.deepEqual((await noteOf(id)).fx, { e: 'rain', f: 'none', ea: 'high', fa: null, eo: null, fo: null }, 'own choice kept while forced');
+  assert.deepEqual((await noteOf(id)).fx, { e: 'rain', f: 'none', ea: 'high', fa: null, eo: null, fo: null, mi: null }, 'own choice kept while forced');
   await H['settings:set'](null, { fxForceAll: false });
-  assert.deepEqual((await noteOf(id)).fx, { e: 'rain', f: 'none', ea: 'high', fa: null, eo: null, fo: null }, 'and still there after');
+  assert.deepEqual((await noteOf(id)).fx, { e: 'rain', f: 'none', ea: 'high', fa: null, eo: null, fo: null, mi: null }, 'and still there after');
 
   // ---- pause all: Settings and the tray
   const trayItem = () => E.__tray.menu.t.find((x) => x.label === 'Pause effects');

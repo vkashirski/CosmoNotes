@@ -37,8 +37,8 @@ const FX = sandbox.window.COSMO_FX;
     assert.equal(cleanFxOpacity(v), want, `store: ${v}`);
     assert.equal(FX.opacityOf(v), want, `fx.js: ${v}`);
   }
-  assert.deepEqual(cleanFx({ e: 'snow', eo: 0.5, fo: 'loads' }), { e: 'snow', f: null, ea: null, fa: null, eo: 0.5, fo: null });
-  assert.deepEqual(cleanFx(null), { e: null, f: null, ea: null, fa: null, eo: null, fo: null }, 'old notes: same as all notes');
+  assert.deepEqual(cleanFx({ e: 'snow', eo: 0.5, fo: 'loads' }), { e: 'snow', f: null, ea: null, fa: null, eo: 0.5, fo: null, mi: null });
+  assert.deepEqual(cleanFx(null), { e: null, f: null, ea: null, fa: null, eo: null, fo: null, mi: null }, 'old notes: same as all notes');
 
   // ---- which opacity a note shows
   const all = { fxEffect: 'snow', fxFollower: 'stardust' };

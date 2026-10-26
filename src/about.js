@@ -12,7 +12,7 @@
  *   4. "Last updated" + version in ai-context/CONTEXT.md
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-10-25',
+  LAST_UPDATED: '2026-10-27',
 
   FEATURES: [
     {
@@ -76,9 +76,10 @@ window.COSMO_ABOUT = {
       title: 'Effects',
       items: [
         'Little moving effects in the background of a note: snow, fireworks, stardust, fireflies, bubbles, autumn leaves, hearts, rain, confetti, the Matrix’s digital rain and a rainbow (it draws itself in across the note, from a different side each time, then fades; once in a while it’s a double rainbow).',
-        'And since 1.1.18: plankton that lights up as a wave rolls by, fairy dust, warp speed, a network of dots, campfire embers, the Lorenz butterfly, cherry blossom whirls, a night sky with shooting stars, a glitch, a black hole, a digital ocean, silk waves, glass shards, XP orbs, a shape shifter, a ghost ripple, a school of fish, a solar system, a contour map, a neon tunnel, synthwave and dust in light.',
-        'Mouse followers that trail your pointer over a note, with the same names and icons as the backgrounds, in the same order: snow, fireworks, stardust, fireflies, bubbles, autumn leaves, hearts, rain, confetti, Matrix and rainbow (the thin line that changes colour as you move), plus a pencil line.',
-        'Pick them for all notes in Settings → Effects → Choose…, or for one note in its ⋯ menu → Effects…, each with a frequency (Rarely, Normal or Often) and an opacity (how see-through it is, 10 % to 100 %). A note’s own choice wins, unless Settings says to use the same on every note (each note’s own choice comes back when you switch that off).',
+        'Since 1.1.18: plankton that lights up as a wave rolls by, warp speed (a slow cruise, then a jump to light speed every half minute), a network of dots, campfire embers, cherry blossom whirls, a night sky with shooting stars, an analog monitor, a digital ocean, silk waves, glass shards, a ghost ripple, a school of fish and dust in light; and some magic: a healing aura, lightning, a steaming cauldron, a ghost jellyfish and fel fire.',
+        'Mouse followers that trail your pointer over a note: one for every background, with the same name and icon, in the same order (since 1.1.20), plus a pencil line. Some swim or float along with the pointer (fish, the ghost jellyfish) and drift away when the mouse rests.',
+        'The mouse can interact with the background (since 1.1.21, on unless you switch it off): bubbles pop when you touch them, rain splashes off the pointer, snow and leaves blow aside, fish dart away, the ghost ripple parts around it, warp speed steers towards it, lightning strikes you when you’re near where it hits, you can stir the cauldron, the ghost jellyfish lights up, and every other background reacts in its own way.',
+        'Pick them for all notes in Settings → Effects → Choose…, or for one note in its ⋯ menu → Effects… or with right-click → Edit design… in the notes list, each with a frequency (Rarely, Normal or Often) and an opacity (how see-through it is, 10 % to 100 %). A note’s own choice wins, unless Settings says to use the same on every note (each note’s own choice comes back when you switch that off).',
         'Pause a note’s effects with the sparkle button on its top bar, or all of them with the sparkle button left of Settings in the notes list, in Settings, or in the menu of the CosmoNotes icon by the clock. Playing a note’s effects while all are paused keeps that note playing.',
         'Pop-ups and toolbars on a note use the colours of the app’s theme (Settings → General).',
         'Cards in the notes list show their note’s effect too.',
@@ -114,7 +115,7 @@ window.COSMO_ABOUT = {
         'Nine colour themes for this window in Settings: Cream, Rose, Mint, Sky and Lilac, and the dark Night, Midnight, Forest and Plum.',
         'Click Settings again to go back to Notes or the Bin, wherever you were.',
         'Right-click any note or group for quick actions: open, close, duplicate, favourite, lock, move, ungroup and Bin.',
-        'Right-click a note → Edit… to change its title and colour right in the list. An open note changes along with it (and what you type in a note shows in the list too).',
+        'Right-click a note → Edit design… to change its title, colour, see-through and effects right in the list (the paper at the top shows the effects as you pick them). An open note changes along with it (and what you type in a note shows in the list too).',
         'The Locked tab (next to Favourites) shows every locked note and group. Locked notes never show their words, and searching doesn’t look inside them; “Unlock all” (with your PIN or password) uncovers them all in the list so you can read and search them, and “Lock again” covers them again.',
         'Favourites: point at a note or group and click the star in its corner. The Favourites tab shows all of them, wherever they are. The lock button next to the star locks or unlocks it.',
         'Pick several notes and groups with Ctrl+click (Shift+click for a whole row, Ctrl+A for all). A bar at the bottom opens, closes, stars, recolours, groups, locks or bins them all at once, and dragging one of them moves them all.',
@@ -141,10 +142,53 @@ window.COSMO_ABOUT = {
   // Short, plain-language highlights for the in-app history (the full details are in CHANGELOG.md)
   VERSIONS: [
     {
+      version: '1.1.22',
+      date: '2026-10-26',
+      changes: [
+        'Menus and toolbars dragged out of a note no longer jump to its edge from far away: they only stick when they are within a few pixels of it.',
+        'The switch is now called “Mouse can interact with the background”. Lightning mostly hits you when you’re near where it strikes (with a flash, a shock ring and crackles), you can stir the cauldron a little, the ghost jellyfish lights up instead of swimming away (and a still violet mirage of it is left behind and fades away), the silk waves part gently, and the dust shows more in the light (your pointer even casts a shadow in it).',
+        'Fel fire burns low along the bottom instead of fizzing up like soda; the healing aura’s bottom pulses instead of swirling.',
+        'Snowflakes you touch shatter into little bits, and fireflies close to your pointer drift over for a few seconds before they lose interest.',
+        'Mouse effects that make particles as you move (glass shards, plankton, stardust, blossom, dust and more) now keep making them evenly along your path however fast you move the mouse, instead of in clumps with gaps.',
+        'Touching the Analog monitor is like holding a magnet to an old TV: the scanlines bend away from your pointer in a lumpy smear that gets bigger the faster you move, and leaves a fading tail behind your path.',
+        'Solar system and Aquarium were taken out (backgrounds and mouse effects).',
+        'In Effects, the note’s colour and see-through are gone again, and with “None” the frequency and opacity are greyed out instead of disappearing.',
+        'Mouse effects: lightning now builds a single line along your path and strikes back to the pointer after 1.5 seconds, then rests half a second; healing is a steady stream of floating crosses; dust in light is just the dust; fel fire and embers keep burning while the pointer rests; the cauldron bubbles steadily; a new digital ocean (a wave of dots that curls over and breaks into spray) and a new analog monitor (tiny red, green and blue phosphor stripes light up where you pass).',
+      ],
+    },
+    {
+      version: '1.1.21',
+      date: '2026-10-26',
+      changes: [
+        'New switch in Effects: “Mouse plays with the background”. Bubbles pop when you touch them, rain splashes off the pointer, fish dart away, the ghost ripple parts around it, lightning strikes at it, and every background reacts in its own way. For one note in its Effects, for all notes in Settings → Effects → Choose….',
+      ],
+    },
+    {
+      version: '1.1.20',
+      date: '2026-10-26',
+      changes: [
+        'Every background now has a matching mouse follower, so the Background and Mouse tabs list the same effects (plus the pencil line).',
+        'Fairy dust, XP orbs, Neon tunnel and Synthwave are gone.',
+        'The Effects pop-up also has the note’s colour and see-through, to mix and match.',
+        'In the notes list, right-click → Edit design… (was Edit…) also changes see-through and the note’s effects.',
+        'Menus on a note stay open when you open another one; a new button on the top bar closes them all.',
+        'Toolbars and menus dragged out of a note only stick to its side when they’re really close.',
+        'Switches sit right next to their text.',
+      ],
+    },
+    {
+      version: '1.1.19',
+      date: '2026-10-25',
+      changes: [
+        'A new background effect, Aquarium: clownfish, an angelfish, a blue tang and a group of neon tetras swim to and fro, with swaying seaweed and bubbles.',
+        'The Fish background looks more like real fish: their bodies bend as they swim and turn, with a forked tail that follows smoothly behind, little side fins and eyes.',
+      ],
+    },
+    {
       version: '1.1.18',
       date: '2026-10-25',
       changes: [
-        '22 new background effects, picked in the Effect Lab: Plankton, Fairy dust, Warp speed, Network, Embers, Lorenz, Cherry blossom, Night sky, Glitch, Black hole, Digital ocean, Silk waves, Glass shards, XP orbs, Shape shifter, Ghost ripple, Fish, Solar system, Contour map, Neon tunnel, Synthwave and Dust in light.',
+        '23 new background effects, picked in the Effect Lab and the Spell Lab: Plankton, Fairy dust, Warp speed, Network, Embers, Cherry blossom, Night sky, Analog monitor, Digital ocean, Silk waves, Glass shards, XP orbs, Ghost ripple, Fish, Solar system, Neon tunnel, Synthwave, Dust in light, Healing aura, Lightning, Cauldron, Ghost jellyfish and Fel fire.',
       ],
     },
     {

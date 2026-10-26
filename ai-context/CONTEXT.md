@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 25 October 2026 · App version 1.1.18**
+**Last updated: 27 October 2026 · App version 1.1.22**
 
 Read this before changing anything. Keep it up to date: when you add or change a feature, update the
 relevant section here, `src/about.js` (the in-app feature list and version history) and `CHANGELOG.md`.
@@ -48,7 +48,7 @@ preload.js         Safe bridge: exposes window.sticky.* to both windows (context
 src/note.html/.css/.js   One sticky-note window (the editor)
 src/list.html/.css/.js   The "All notes" window: Notes / Bin / Settings tabs, groups, sorting
 src/about.js       In-app feature list + version history (window.COSMO_ABOUT) + LAST_UPDATED date
-src/fx.js          Note effects + mouse followers (window.COSMO_FX), used by both windows (1.1.16; 22 more backgrounds in 1.1.18)
+src/fx.js          Note effects + mouse followers (window.COSMO_FX), used by both windows (1.1.16; 23 more backgrounds in 1.1.18; Aquarium + a redrawn Fish in 1.1.19; 4 removed + a follower for every background in 1.1.20; the mouse plays with the background in 1.1.21)
 assets/            icon.ico/png (windows), tray.ico/png
 build/             icon.ico/png for the installer/shortcuts; afterPack.js is an unused stub (see §6 Smart App Control)
 build.bat          One-click: (private Node if needed) + npm install + electron-builder → dist/CosmoNotes Setup <ver>.exe
@@ -83,7 +83,7 @@ referenced from HTML as `../node_modules/@fontsource/...`, so they work offline 
     (1.1.15: the drawing toolbar's own window, see §6)
   - list window: `list:get`, `list:new`, `list:duplicate`, `list:open-note`, `list:close-note`, `list:trash`,
     `list:restore`, `list:destroy`, `list:empty-bin`, `list:bring-front`, `list:set-locked`, `list:favorite`, `list:apply`,
-    `list:edit` (1.1.15, the Edit sheet: title + colour), `list:unlock-all` / `list:lock-all` (1.1.15, the Locked tab),
+    `list:edit` (1.1.15, the Edit sheet: title + colour; 1.1.20 "Edit design": also `opacity` and `fx`, neither an edit), `list:unlock-all` / `list:lock-all` (1.1.15, the Locked tab),
     `groups:make`, `groups:move-up`, `groups:move-to`, `groups:ungroup` (= move-up for a note),
     `groups:make-from`, `groups:dissolve`, `groups:rename`, `groups:update` (name/style/color), `groups:apply` (mass edit
     colour/font), `groups:trash`, `groups:set-locked`, `groups:reveal`, `groups:hide`, `settings:set`,
@@ -135,7 +135,7 @@ locked text layout), opacity (0.25–1), solidOnHover, pinned, open
 (window open → reopens at start), rolled, zoom (0.5–3, Ctrl + wheel in the note; not an edit), locked, favorite (starred in the list; not an edit), spell (null = follow Settings | true | false),
 groupId, bounds {x,y,width,height} (unrolled height), createdAt, updatedAt, deletedAt (null or in Bin),
 restoredFrom, fx ({ e, f, ea, fa, eo, fo }: the note's own effect / mouse follower, null = same as all notes, 'none' = nothing; ea /
-fa = how much, low | mid | high or null; eo / fo = opacity 0.1–1 in 5 % steps or null (1.1.17, `cleanFxOpacity`); not an edit; 1.1.16), fxPaused (effects paused on this note; not an edit)`.
+fa = how much, low | mid | high or null; eo / fo = opacity 0.1–1 in 5 % steps or null (1.1.17, `cleanFxOpacity`); mi = the mouse plays with the background, true / false / null (1.1.21); not an edit; 1.1.16), fxPaused (effects paused on this note; not an edit)`.
 
 **Draw-over ink** (`note.ink`): `{ s: [ { t: pen|hl|line|arrow|rect|ellipse, c: '#rrggbb', w: 1–40, l: 'a'|'b',
 d: 'dash'|'dot' (optional, 1.1.13; missing = solid), o: dash offset in px (1.1.14, only on pieces left by the partial eraser, so
@@ -167,7 +167,7 @@ defaultColors (1.1.15: the colours new notes pick from at random, never empty, `
 defaultColor "random" → the 7 original pastels), defaultColor (kept = the first of defaultColors, for older versions),
 newColorNoRepeat (1.1.15, true: with several colours, never the same colour as the last new note), lastNewColor (that colour),
 fxEffect / fxFollower (1.1.16: effect and mouse follower for all notes, 'none' or an id), fxEffectAmount / fxFollowerAmount (how
-much: low | mid | high), fxEffectOpacity / fxFollowerOpacity (1.1.17: 0.1–1, default 1), fxForceAll (use them on every note;
+much: low | mid | high), fxEffectOpacity / fxFollowerOpacity (1.1.17: 0.1–1, default 1), fxInteract (1.1.21: the mouse plays with the background, default true), fxForceAll (use them on every note;
 each note's own choice is kept), fxPaused (pause all effects; also the tray's "Pause effects"),
 defaultOpacity (0.25–1: see-through of new notes), defaultSolidOnHover (true: new notes turn solid on hover),
 listTheme (cream|rose|mint|sky|lilac, dark: night|midnight|forest|plum: colours of the list window; doesn't trigger a reload either),
@@ -268,9 +268,9 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
 | New notes: colours (several = random one), font, see-through, solid on hover (Settings → its own "For new notes" section, after General) | list.js `renderSettings`, `paintNewColors`, `setNewColors`, `#sColors`, `#sOpacity`, `#sSolidHover`; store.js `create`, `newNoteColor`, `cleanColors` (`defaultColors`, `defaultOpacity`, `defaultSolidOnHover`) |
 | Colour rows that scroll sideways (note ⋯ menu: 8 circles visible, same size as before; group panel and selection bar 8). Settings and the Edit sheet don't scroll: every colour shows, wrapping to a second line when narrow (`.swstrip.wide`) | `swatchStrip` (the same in note.js and list.js), `.swstrip`, `.swarr` |
 | Paper colours (17), shown in `COLORS` order (each colour next to its light version, dark ones last; note.html's buttons follow it too) | store.js `COLORS`/`DARK_COLORS`; main.js `PAPER`; note.css `body[data-color]` + `.sw`; list.css `.card`/`.epaper`/`.sheet`/`.paper`; list.js `COLORS`, `SWATCH`, `COLOR_NAMES`. Dark-paper rules use `:is([data-color="charcoal"],…)` with all five dark colours: add a new dark colour there too |
-| Edit a note's title and colour from the list (right-click → Edit…), synced with its open window (`note:look`) | list.html `#editSheet`; list.js "Edit sheet" (`openEdit`, `editQueue`, `editFlush`, `editRefresh`); main.js `list:edit` |
+| Edit a note's title, colour, see-through and effects from the list (right-click → Edit design…, 1.1.20; was Edit…), synced with its open window (`note:look`), effects previewed on the paper | list.html `#editSheet`; list.js "Edit design" (`openEdit`, `editPaint`, `editFxPreview`, `editQueue`, `editFlush`, `editRefresh`); main.js `list:edit` |
 | Locked tab: all locked notes/groups; "Unlock all" uncovers them in the list (and in notes opened from it) until "Lock again" or the list closes | list.js `lockedOnes`, `paintLockBar`, `tab = 'locks'`, `cardsTabNow`; list.html `#lockBar`, `#cLocks`; main.js `listUnlockedAll` (used by `hiddenInList`, `groupOpenInList`, `list:open-note`), `list:unlock-all`, `list:lock-all` |
-| Note effects + mouse followers (1.1.16): choosing rules `COSMO_FX.resolve`; one shared 30 fps loop that sleeps | src/fx.js; note.js "effects" (`applyFx`, `#fxCanvas`, `#btnFx`, `#fxPop`, `paintFxPop`); list.js "effects" (`paintFx`, `.fxc`, `#fxSheet`, `paintFxSheet`, Settings `#sFxNow`/`#sFxChoose`/`#sFxPause`, `#btnFxPause` left of Settings); pickers = `.fxlist` of `.fxi` (icons `COSMO_FX.ICONS`) + `.fxamt` Frequency Rarely/Normal/Often + `.fxop` Opacity slider (1.1.17: note `#fxEOp`/`#fxFOp`, list `#fxAllEOp`/`#fxAllFOp`; shows live while dragging, saved on release or 300 ms after it stops); note pop-up has tabs (`#fxTabs`); follower order = background order (`FOLLOWER_IDS`); store.js `FX_EFFECTS`/`FX_FOLLOWERS`/`cleanFx` (ids must match fx.js); main.js `fxSettings`, `setFxPaused`, tray "Pause effects" |
+| Note effects + mouse followers (1.1.16): choosing rules `COSMO_FX.resolve`; one shared 30 fps loop that sleeps | src/fx.js; note.js "effects" (`applyFx`, `#fxCanvas`, `#btnFx`, `#fxPop`, `paintFxPop`); list.js "effects" (`paintFx`, `.fxc`, `#fxSheet`, `paintFxSheet`, Settings `#sFxNow`/`#sFxChoose`/`#sFxPause`, `#btnFxPause` left of Settings); pickers = `.fxlist` of `.fxi` (icons `COSMO_FX.ICONS`) + `.fxamt` Frequency Rarely/Normal/Often + `.fxop` Opacity slider (1.1.17: note `#fxEOp`/`#fxFOp`, list `#fxAllEOp`/`#fxAllFOp`; shows live while dragging, saved on release or 300 ms after it stops); note pop-up has tabs (`#fxTabs`), the note's colour + see-through at the top (`.fxlook`: `#fxColors`, `#fxOpacity`, 1.1.20) and switches `#fxInteract` (1.1.21) + `#fxPause`; follower order = background order (`FOLLOWER_IDS`, worked out from `EFFECT_IDS`, pencil last); list right-click → Edit design (`openEdit`, `#editSheet`, live preview `#editFxCanvas`, 1.1.20); store.js `FX_EFFECTS`/`FX_FOLLOWERS`/`cleanFx` (ids must match fx.js); main.js `fxSettings`, `setFxPaused`, tray "Pause effects" |
 | Drawing and text toolbars outside the note (stick to a side and follow the note; text toolbar 1.1.16) | note.js `barOut` (`inkOut`, `textOut`), `movable(…, { out })`, `outDocs`; note.css `body.inkbar-out`; main.js `inkBarOptions`, `watchInkBar`, `snapInk`, `inkSpot`, `placeInk`, `showInk`, `ink:*` |
 
 ---
@@ -326,6 +326,15 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
   catcher sits inside the scroller.
 - **Pop-up colours (1.1.16):** everything on a note's pop-ups/toolbars uses `--pop-*` variables, set per app theme by
   `body[data-apptheme]` (note.css end; `appTheme` = `listTheme`, in `noteSettings()`). Don't hard-code colours there.
+- **Menus don't close each other (1.1.20, the owner's wish):** `openPop` leaves the other editing menus (`EDIT_POPS`: ⋯, Effects, Add)
+  open, newest / clicked on top (`toFront`); each closes alone (`closePop(id)`: its X, its button, Enter in the title);
+  Esc, a click in the note, rolling up, locking, drawing… close them all (`closePops`). `#btnCloseAll` (top bar, shown
+  by `syncPops` when 2+ of ⋯ / Effects / Add / text toolbar are open) closes all, text toolbar included. Dialogs
+  (`DIALOGS`: password, link, questions) still replace each other. Toolbars/menus dragged outside stick to a side only
+  within `INK_SNAP` = 12 px (was 40).
+- **Switches (1.1.20):** a sliding switch sits right after its text (grid, text column `fit-content`), and switches one
+  after another are wrapped in `.switches` at start-up (`groupSwitches` in note.js and list.js; CSS subgrid) so they
+  line up. A new switch needs nothing extra; keep the `<span>` text + hidden `<input>` + `<i>` structure.
 - **⋯ menu and Effects pop-up outside the note (1.1.16):** like the toolbars (`barOut` kinds `menu`, `fx`), dragged only
   by their `.igrip`, placed from the top (`movable(…, { handle, top })`). The menu's window is focusable (title field).
 - **CSS gotcha:** a block of declarations without a selector makes the browser drop the NEXT rule too (that hid
@@ -350,10 +359,22 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
 - **Padlock icons** (note lock screen, list cards): the shackle path reaches down into the body; `#lockClip` (note.html and
   list.html) only draws it above y 11, the middle of the body's top line, so no sliver of it ever shows inside the body
   (1.1.15). Keep that if the icon changes.
-- **Effects (1.1.16) must stay light.** The first eleven are a few dozen shapes each; the 22 added in 1.1.18 (picked by the
-  owner from the "CosmoNotes Effect Lab" preview page, two versions per idea) go up to ~150–260 dots, always with a hard
-  cap (`capped(n, k, max)`), and each measured well under 1 ms a frame in Chromium. Draw many lines/dots in a few calls
-  (`strokeSegs`, `bucketDots`) and don't use `Path2D`: the tests run fx.js against a fake canvas without it. All drawn on a canvas by fx.js's one shared
+- **Effects (1.1.16) must stay light.** The first eleven are a few dozen shapes each; the 23 added in 1.1.18 (picked by the
+  owner from the "CosmoNotes Effect Lab" preview page, two versions per idea; Lorenz, Shape shifter, Contour map and Black hole were dropped again; the last five, magic ones, came from a second preview page, "Spell Lab") go up to ~150–260 dots, always with a hard
+  cap (`capped(n, k, max)`), and each measured well under 1 ms a frame in Chromium.
+  Heavier ideas were dropped for being too much for the engine (the owner's call in 1.1.18: Contour map, an Interstellar-style black hole, then the black hole altogether).
+  1.1.19 (removed again in 1.1.22): `aquarium` (Aquarium, the owner's pick from the "Fish Picks" preview, where Koi pond, Silver shoal and Doodle fish were not picked) is added at the end of the list; `fish` keeps its flocking but each fish is now drawn along a 4-segment bending spine (tapered body, forked tail that lags a beat, side fins, sheen, eyes), still 7 fills a frame (~0.15–0.18 ms on a normal note).
+  1.1.20: `fairy`, `xp`, `tunnel`, `synthwave` removed (owner's request). **Every background has a mouse follower** with
+  the same id (except `frost` = snow, `ripples` = rain), name and icon; the Mouse tab = the Background tab + Pencil line.
+  Followers draw a small cousin of their background where the pointer goes (0.01–0.5 ms a frame). Companions (fish,
+  solar, jelly, aquarium; 1.1.22: only fish and jelly are left) use `presence()` and expose `fade()`: the Layer multiplies the follower's opacity by it, and
+  they fade 2.5 s after the mouse stops so `busy()` turns false. Fish drawing is shared (`fishDraw`…; `aqKit` went with Aquarium in 1.1.22).
+  **1.1.21: the mouse plays with the background.** `step(dt, t, m)`: m = `{ x, y, vx, vy, sp }` (px, px/s) while the
+  switch is on (`resolve(...).interact`, settings `fxInteract`, note `fx.mi`) and the mouse is over the canvas, else
+  null; every effect reacts in its own way (see CHANGELOG 1.1.21). Helpers `near`, `shove`, `nudge`. A new background
+  should do something with `m` too (and must work with `m === null`).
+  Draw many lines/dots in a few calls
+  (`strokeSegs`, `bucketDots`; `bucketFade` when something must fade smoothly all the way to nothing: `bucketDots` always draws its faintest group at about 12 %) and don't use `Path2D`: the tests run fx.js against a fake canvas without it. All drawn on a canvas by fx.js's one shared
   loop (`requestAnimationFrame`, at most 30 frames a second). The loop stops by itself when no layer `wants()` a frame:
   paused, rolled up, off screen (list cards: `IntersectionObserver`), no effect, or only a follower and the mouse is still
   (followers report `busy()` while their trail is still fading). Don't add per-element DOM particles or CSS animations for
@@ -437,7 +458,12 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
   - `v1116.test.js`: effects: ids match in fx.js and store.js, `resolve` rules (own choice, none, use on every note,
     paused), every effect and follower runs, settings + `settings:changed`, a note's choice is not an edit and is copied by
     Duplicate, pause from Settings and the tray (fx.js is run in a `vm` sandbox).
-  - `v1118.test.js`: the 22 new backgrounds: each has a name and an icon, runs on light and dark paper, on a small card and a
+  - `v1120.test.js`: the four removed effects, a follower for every background (order, names, icons), every follower
+    on three sizes / frequencies / papers, companions fade, Edit design's `list:edit` (opacity, fx), the 12 px snap.
+  - `v1121.test.js`: "mouse plays with the background": `resolve` rules, `fxInteract` saved and sent, `fx.mi` not an
+    edit and duplicated, the Layer passes the pointer (with its speed) only while on, every background with a moving
+    pointer, bubbles pop, rain splashes.
+  - `v1118.test.js`: the 23 new backgrounds (fewer since 1.1.20): each has a name and an icon, runs on light and dark paper, on a small card and a
     big note at "Often", and never draws at NaN.
   - `v1117.test.js`: effect / follower opacity: cleaning (store.js and fx.js agree), `resolve` rules, the layer multiplies
     every alpha it draws (fake 2D context with a real `globalAlpha` getter/setter), settings + `settings:changed`, a note's
@@ -476,3 +502,6 @@ crumbs. (The separate drop strip was removed in 1.1.6: it pushed the cards down 
 - **Not wanted (for now):** a "Check for updates" button (GitHub Releases + electron-updater) was discussed after
   1.1.5; the owner decided against it. If it comes back: the repo is public, the installer is unsigned (Smart App
   Control may treat a downloaded copy differently), and checking would be the app's only other network use.
+
+- **1.1.22 (effects):** The owner picked from the "CosmoNotes 1.1.22 Picks" preview: Analog monitor follower = Phosphor pixels, Healing aura bottom = Breathing, Ghost jellyfish touch = Slingshot ghost (shine spreads from the touch; a still violet mirage of the jellyfish is left behind once when the pointer goes in, fading smoothly, never moving or following it), Digital ocean follower = Surf; the other versions and `COSMO_FX.PICK` were removed. Third round: Solar system and Aquarium removed; Effects pop-up lost the colour / see-through again and greys out frequency / opacity / interact with None (`.off`); `COSMO_FX.PICK` is gone: Analog monitor touch = the Magnet (the owner's pick), made non-circular on request: the bend grows with pointer speed and leaves a fading tail along the path (a few overlapping bends, about 0.7 s). Followers that spawn by distance (the `ALONG` list in fx.js) get a fast mouse jump in ≤10 px steps from `Layer.move`, and their particle limits drop the oldest instead of refusing new ones (`room()`), so a fast stroke stays even. Snow flakes shatter when touched; fireflies within 70 px of the pointer drift over to it for 2–3 s, gently, and let go once it is over 110 px away, then ignore it for 4–16 s. Lightning: the mouse one rests 0.5 s between strikes; the background one hits the pointer about three bolts in four (fourth round, 27 Oct). Followers may have `leave()` (Layer.leave calls it): fel and embers burn while the pointer rests on the note. Switch renamed "Mouse can interact with the background". Details in CHANGELOG 1.1.22.
+- **1.1.22:** `snapInk` docks a toolbar/menu only when its edge is within `INK_SNAP` (12 px) of the note's edge, either side (before: overlap of up to half its width still docked).
