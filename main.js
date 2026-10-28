@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { pathToFileURL } = require('url');
-const { Store, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity, cleanFx } = require('./store');
+const { Store, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity, cleanFx, checklistMarks } = require('./store');
 
 const APP_NAME = 'CosmoNotes';
 const OLD_DATA_DIR = 'Sticky Pins'; // where notes lived before the rename
@@ -958,6 +958,7 @@ function registerIpc() {
         id: n.id,
         title: n.title,
         text: hiddenInList(n) ? '' : n.text.slice(0, 600),
+        checks: hiddenInList(n) ? '' : checklistMarks(n.html, n.text.slice(0, 600)), // 1.1.22: which lines are checklist boxes (o) / ticked (x)
         firstImage: hiddenInList(n) ? null : n.firstImage,
         locked: hiddenInList(n), // shown as a locked card
         ownLock: n.locked, // the note's own lock (vs. a locked group)

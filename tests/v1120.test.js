@@ -45,7 +45,7 @@ function recorder() {
     assert.equal(FX.ICONS.follower[f], FX.ICONS.effect[e], `${f}: same icon`);
   });
   assert.equal(FX.FOLLOWER_IDS[FX.FOLLOWER_IDS.length - 1], 'pencil', 'Pencil line last, mouse only');
-  assert.equal(FX.FOLLOWER_IDS[0], 'frost'); assert.equal(FX.FOLLOWER_IDS[7], 'ripples', 'old ids kept (saved choices)');
+  assert.ok(FX.FOLLOWER_IDS.includes('frost') && FX.FOLLOWER_IDS.includes('ripples'), 'old ids kept (saved choices)'); // (1.1.22: no longer first and eighth, the order is by theme)
 
   // every follower: small card / note / big note, Rarely … Often, light and dark: no NaN, and it goes quiet when the mouse rests
   for (const id of FX.FOLLOWER_IDS) {

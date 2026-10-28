@@ -706,17 +706,32 @@
       };
     } },
     // Network ("Living web"): points wander and thin lines join any two that come close
+    // 1.1.22, fifth round (the owner: "after a while all the nodes end up scrunched into a single piece"): they all used to
+    // drift on the same "wind" (flow) with nothing keeping them apart, and that wind has spots where it gathers, so over
+    // minutes to hours they piled up there (and the pointer pulled the ones near it into one dot); measured after an hour:
+    // 30 nodes in 4–5 of 36 cells, ~2–12 px apart. Now each node also has its own slowly turning heading, nodes closer
+    // than ~half a link push each other apart, the edges push softly inwards instead of piling nodes against them, and a
+    // node never quite stops. The pointer still draws the near ones in, but they gather round it instead of on it.
     network: { name: 'Network', make(w, h, P, dark, k) {
-      const N = capped(30, k, 70); const D = clamp(Math.sqrt(w * h / N) * 1.25, 60, 95);
-      const p = Array.from({ length: N }, () => ({ x: R(0, w), y: R(0, h), vx: R(-9, 9), vy: R(-9, 9), ph: R(0, TAU) }));
+      const N = capped(30, k, 70); const D = clamp(Math.sqrt(w * h / N) * 1.25, 60, 95); const SEP = D * .55; const EDGE = 18;
+      const p = Array.from({ length: N }, () => ({ x: R(0, w), y: R(0, h), vx: R(-9, 9), vy: R(-9, 9), ph: R(0, TAU), hd: R(0, TAU), tw: R(.15, .45) * (Math.random() < .5 ? -1 : 1) }));
       const B = 5; let M = null;
       return {
         step(dt, t, m) {
           M = m;
+          for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) { // keep a little room between them
+            const a = p[i]; const b = p[j]; const dx = a.x - b.x; const dy = a.y - b.y; if (dx > SEP || dx < -SEP || dy > SEP || dy < -SEP) continue;
+            const d = Math.hypot(dx, dy); if (d >= SEP) continue;
+            const u = d > .01 ? 1 / d : 0; const ux = u ? dx * u : Math.cos(a.ph); const uy = u ? dy * u : Math.sin(a.ph); const f = (1 - d / SEP) ** 2 * 26 * dt;
+            a.vx += ux * f; a.vy += uy * f; b.vx -= ux * f; b.vy -= uy * f;
+          }
           for (const q of p) {
-            const a = flow(q.x, q.y, t * .5); q.vx += Math.cos(a) * 3 * dt; q.vy += Math.sin(a) * 3 * dt;
+            q.hd += (q.tw + Math.sin(t * .21 + q.ph) * .35) * dt; // its own wandering
+            const a = flow(q.x, q.y, t * .5); q.vx += (Math.cos(a) * 1.2 + Math.cos(q.hd) * 3.2) * dt; q.vy += (Math.sin(a) * 1.2 + Math.sin(q.hd) * 3.2) * dt;
             if (m) { const u = near(q, m, D * 1.3); if (u > .25) { q.vx += (m.x - q.x) * u * .9 * dt; q.vy += (m.y - q.y) * u * .9 * dt; } }
-            const sp = Math.hypot(q.vx, q.vy); if (sp > 12) { q.vx *= 12 / sp; q.vy *= 12 / sp; }
+            if (q.x < EDGE) q.vx += (1 - q.x / EDGE) * 14 * dt; else if (q.x > w - EDGE) q.vx -= (1 - (w - q.x) / EDGE) * 14 * dt;
+            if (q.y < EDGE) q.vy += (1 - q.y / EDGE) * 14 * dt; else if (q.y > h - EDGE) q.vy -= (1 - (h - q.y) / EDGE) * 14 * dt;
+            const sp = Math.hypot(q.vx, q.vy); if (sp > 12) { q.vx *= 12 / sp; q.vy *= 12 / sp; } else if (sp < 3) { const g = sp > .01 ? 3 / sp : 0; q.vx = g ? q.vx * g : Math.cos(q.hd) * 3; q.vy = g ? q.vy * g : Math.sin(q.hd) * 3; }
             q.x += q.vx * dt; q.y += q.vy * dt;
             if (q.x < 0) { q.x = 0; q.vx = Math.abs(q.vx); } if (q.x > w) { q.x = w; q.vx = -Math.abs(q.vx); }
             if (q.y < 0) { q.y = 0; q.vy = Math.abs(q.vy); } if (q.y > h) { q.y = h; q.vy = -Math.abs(q.vy); }
@@ -838,68 +853,64 @@
       };
     } },
     // Analog monitor (id 'glitch', kept so saved choices still work; it was "Glitch" before the owner asked for just
-    // the calm part): faint scanlines that crawl slowly and a soft refresh bar rolling down like an old screen
-    // ("Often" rolls a second, slower bar)
+    // the calm part): faint scanlines that crawl slowly, and ONE bright scan line that sweeps down the screen now and
+    // then. 1.1.22, fifth round (the owner: "more similar to Ghost ripple", "a single line scanning the monitor, not
+    // multiple in different speeds"): every scanline is a row of springy points, like the dots of Ghost ripple. The scan
+    // line is the invisible something: the lines part to let it through and wobble back into place behind it. The
+    // pointer does the same while it MOVES (a resting pointer leaves the lines alone, so there's no fixed lump or
+    // ellipse; the lines part by up to ~10 px and wobble back in about 2–3 s). No second bar, no red / cyan fringe, no blobs.
+    // Frequency = how often the line sweeps (cycle = 16 s / k: "Rarely" about once a minute, "Normal" every ~16 s,
+    // "Often" every ~5 s, where it also sweeps quicker).
     glitch: { name: 'Analog monitor', make(w, h, P, dark, k) {
-      const bars = Array.from({ length: k > 2.5 ? 2 : 1 }, (_, i) => ({ y: R(0, h + 40), sp: i ? 17 : 28 }));
-      // 1.1.22: touching it is like holding a magnet to an old TV (the owner picked "Magnet" from three tries, then asked
-      // for it not to be a neat circle). The scanlines bend away from the pointer in a lumpy smear: the faster the mouse
-      // moves, the bigger and stronger the bend, and it stretches into a tail along the path the mouse just took, then
-      // settles back when the mouse slows down. A faint red / blue fringe shows where the lines bend most.
-      const sz = clamp(Math.min(w, h) / 280, .8, 1.5);
-      let M = null; let hot = 0; let spd = 0; let lastX = 0; let lastY = 0; let tick = 0; const trail = [];
-      const RED = dark ? '#FF4A6A' : '#D8204A'; const CYAN = dark ? '#3FE0FF' : '#1A98C8';
-      const TRAIL = .7; // seconds a bend lingers behind the pointer
+      const S = clamp(Math.min(w, h) / 280, .8, 1.5);
+      const GAP = 4; const COL = 8; const cols = Math.ceil(w / COL) + 1; const rows = Math.ceil(h / GAP) + 2;
+      const dy = new Float32Array(rows * cols); const vy = new Float32Array(rows * cols); const amp = new Float32Array(rows);
+      const f = clamp(k || 1, .2, 4); const cycle = clamp(16 / f, 5, 60); const dur = clamp(cycle * .45, 4, 9);
+      const SPEED = (h + 80) / dur; const RS = 30 * S; const RP = 34 * S; const FS = 260 * S * Math.pow(SPEED / 50, 1.5); const FP = 2600 * S;
+      let off = 0; let sy = -40; let moving = false; let wait = R(.5, 1.5);
       return {
         step(dt, t, m) {
-          if (m) { if (!M) M = { x: m.x, y: m.y }; const f = Math.min(1, dt * 12); M.x += (m.x - M.x) * f; M.y += (m.y - M.y) * f; }
-          hot = clamp(hot + (m ? 1 : -1) * dt * (m ? 4 : 1.8), 0, 1);
-          spd += ((m ? clamp(m.sp, 0, 1800) : 0) - spd) * Math.min(1, dt * (m ? 7 : 3));
-          for (const b of trail) b.age += dt;
-          while (trail.length && trail[0].age > TRAIL) trail.shift();
-          for (const b of bars) b.y = (b.y + dt * b.sp) % (h + 40);
-          tick += dt;
-          if (m && M && tick > .07) { tick = 0; trail.push({ x: M.x, y: M.y, age: 0, r: (36 + spd * .05) * sz, a: (9 + spd * .009) * sz }); if (trail.length > 10) trail.shift(); }
-        },
-        draw(c, t) {
-          const shift = ((t * 8) % 4 + 4) % 4;
-          // the bends: the pointer itself (bigger and stronger the faster it goes) plus the fading smears it left behind
-          const blobs = [];
-          if (M && hot > .01) {
-            const wob = 1 + .1 * Math.sin(t * 5.3) * Math.min(1, spd / 300 + .3);
-            blobs.push({ x: M.x, y: M.y, r: (40 + spd * .055) * sz * wob, a: (10 + spd * .01) * sz * hot, ry: 1 });
-            for (const b of trail) { const k2 = 1 - b.age / TRAIL; if (k2 > .02) blobs.push({ x: b.x, y: b.y, r: b.r * (.55 + .45 * k2) * (1 + .12 * Math.sin(t * 4 + b.x * .05)), a: b.a * k2 * k2 * hot, ry: 1 }); }
-          }
-          let x0 = Infinity; let x1 = -Infinity; let y0 = Infinity; let y1 = -Infinity;
-          for (const b of blobs) { const e = b.r * 1.9; x0 = Math.min(x0, b.x - e); x1 = Math.max(x1, b.x + e); y0 = Math.min(y0, b.y - e); y1 = Math.max(y1, b.y + e); }
-          x0 = Math.max(0, Math.floor(x0 / 8) * 8); x1 = Math.min(w, x1); y0 = Math.max(0, y0); y1 = Math.min(h, y1);
-          const bendOn = blobs.length > 0 && x1 > x0 && y1 > y0;
-          c.fillStyle = P.scan; c.globalAlpha = dark ? .05 : .045;
-          for (let y = shift; y < h; y += 4) {
-            if (bendOn && y >= y0 && y <= y1) { if (x0 > 0) c.fillRect(0, y, x0, 1); if (x1 < w) c.fillRect(x1, y, w - x1, 1); } else c.fillRect(0, y, w, 1);
-          }
-          for (const b of bars) {
-            const gb = c.createLinearGradient(0, b.y - 40, 0, b.y); gb.addColorStop(0, 'transparent'); gb.addColorStop(1, P.scan);
-            c.globalAlpha = dark ? .06 : .05; c.fillStyle = gb; c.fillRect(0, b.y - 40, w, 40);
-          }
-          if (bendOn) { // the lines bend away from every blob
-            const lines = []; const glowL = []; const fringe = [];
-            for (let y = shift + Math.ceil((y0 - shift) / 4) * 4; y <= y1; y += 4) {
-              let px = x0; let py = y;
-              const near = []; // only the bends this line is close to
-              for (const b of blobs) { const dy = y - b.y; if (dy * dy < 4 * b.r * b.r) near.push(b, dy, dy / (Math.abs(dy) + 8), dy * dy); }
-              for (let x = x0 + 8; x <= x1 + 8; x += 8) {
-                const xx = Math.min(x, x1); let d = 0; let g = 0;
-                for (let i = 0; i < near.length; i += 4) {
-                  const b = near[i]; const dx = xx - b.x; const q = (dx * dx + near[i + 3]) / (b.r * b.r); if (q > 4) continue;
-                  const f = Math.exp(-q) * b.a; d += near[i + 2] * f; g += f / b.a;
-                }
-                d = clamp(d, -26 * sz, 26 * sz); const ny = y + d;
-                lines.push(px, py, xx, ny); if (g > .35) glowL.push(px, py, xx, ny); if (Math.abs(d) > 7 * sz) fringe.push(px, py, xx, ny); px = xx; py = ny;
-              }
+          off += dt * 8;
+          while (off >= GAP) { off -= GAP; dy.copyWithin(cols, 0, dy.length - cols); vy.copyWithin(cols, 0, vy.length - cols); amp.copyWithin(1, 0, rows - 1); dy.fill(0, 0, cols); vy.fill(0, 0, cols); amp[0] = 0; } // the lines crawl down a row
+          if (moving) { sy += SPEED * dt; if (sy > h + 40) { moving = false; wait = Math.max(.5, cycle - dur) * R(.8, 1.2); } }
+          else { wait -= dt; if (wait <= 0) { moving = true; sy = -40; } }
+          const pm = m && m.sp > 25 ? clamp(m.sp / 500, 0, 1.4) : 0; // only a moving pointer disturbs the lines
+          const h2 = Math.min(dt, .066); const damp = Math.exp(-3 * h2);
+          for (let r = 0; r < rows; r++) {
+            const yb = (r - 1) * GAP + off;
+            const nearScan = moving && Math.abs(yb - sy) < RS + 24; const nearPtr = pm > 0 && Math.abs(yb - m.y) < RP + 24;
+            if (!nearScan && !nearPtr && amp[r] === 0) continue;
+            const base = r * cols; let mx = 0;
+            for (let j = 0; j < cols; j++) {
+              const i = base + j; let v = vy[i]; let d = dy[i]; const yn = yb + d;
+              if (nearScan) { const dd = yn - sy; const ad = Math.abs(dd); if (ad < RS) { const q = 1 - ad / RS; v += dd / (ad + 4) * q * q * FS * h2; } }
+              if (nearPtr) { const dd = yn - m.y; const dx = j * COL - m.x; const dist = Math.hypot(dx, dd); if (dist < RP) { const q = 1 - dist / RP; v += dd / (dist + 3) * q * q * FP * pm * h2; } }
+              v -= d * 7 * h2; v *= damp; d += v * h2;
+              if (Math.abs(d) < .02 && Math.abs(v) < .05) { d = 0; v = 0; }
+              dy[i] = d; vy[i] = v; const a = Math.abs(d) + Math.abs(v) * .15; if (a > mx) mx = a;
             }
-            c.strokeStyle = P.scan; c.lineWidth = 1; c.globalAlpha = dark ? .05 : .045; strokeSegs(c, lines); c.globalAlpha = .05 * hot; strokeSegs(c, glowL);
-            c.save(); c.globalAlpha = .18 * hot; c.strokeStyle = RED; c.translate(1.5, 0); strokeSegs(c, fringe); c.strokeStyle = CYAN; c.translate(-3, 0); strokeSegs(c, fringe); c.restore();
+            amp[r] = mx;
+          }
+        },
+        draw(c) {
+          const A = dark ? .05 : .045; const lo = []; const mid = []; const hi = [];
+          c.fillStyle = P.scan; c.globalAlpha = A; c.beginPath();
+          for (let r = 0; r < rows; r++) {
+            const yb = (r - 1) * GAP + off; if (yb < -1 || yb > h) continue;
+            if (amp[r] < .2) { c.rect(0, yb, w, 1); continue; }
+            const base = r * cols;
+            for (let j = 0; j < cols - 1; j++) {
+              const a = dy[base + j]; const b = dy[base + j + 1]; const m = Math.max(Math.abs(a), Math.abs(b));
+              (m < .6 ? lo : m < 4 ? mid : hi).push(j * COL, yb + .5 + a, Math.min(w, (j + 1) * COL), yb + .5 + b);
+            }
+          }
+          c.fill();
+          c.strokeStyle = P.scan; c.lineWidth = 1;
+          c.globalAlpha = A; strokeSegs(c, lo); c.globalAlpha = A * 1.9; strokeSegs(c, mid); c.globalAlpha = A * 3.4; strokeSegs(c, hi); // lines that are out of place shine a little more
+          if (moving) { // the scan line, with a soft glow trailing behind it
+            const gb = c.createLinearGradient(0, sy - 36, 0, sy); gb.addColorStop(0, 'transparent'); gb.addColorStop(1, P.scan);
+            c.globalAlpha = dark ? .075 : .06; c.fillStyle = gb; c.fillRect(0, sy - 36, w, 36);
+            c.globalAlpha = dark ? .22 : .17; c.fillStyle = P.scan; c.fillRect(0, sy - .75, w, 1.5);
           }
         },
       };
@@ -1751,7 +1762,9 @@
     // a soft beam of light follows the pointer; dust it stirs up floats about and sparkles when it's in the beam
     dust: { name: 'Dust in light', make(w, h, P, dark, k = 1) {
       // 1.1.22: only the dust now (no beam of light): specks swirl up off the pointer, drift and twinkle out
-      const m = []; const sp = spacer(6 / k);
+      // 1.1.22, fifth round (the owner: "less frequency, the Rarely should be the Often"): the whole scale moved down, so the old
+      // "Rarely" amount (k .35) is now "Often", "Normal" is about 1/7 of what it was and "Rarely" about 1/21
+      const m = []; const sp = spacer(6 / (k * (.35 / 2.6)));
       return {
         move(x, y, d) { for (let n = sp(d); n > 0; n--) room(m, 110), m.push({ x: x + R(-12, 12), y: y + R(-12, 12), vx: R(-8, 8), vy: R(-8, 6), z: Math.random(), ph: R(0, TAU), age: 0, life: R(1.5, 2.6) }); },
         step(dt) { const damp = Math.exp(-1.2 * dt); for (const q of m) { q.vx = (q.vx + R(-1, 1) * 12 * dt) * damp; q.vy = (q.vy + (R(-1, 1) * 12 - 3) * dt) * damp; q.x += q.vx * dt; q.y += q.vy * dt; } cull(m, dt); },
@@ -1983,7 +1996,12 @@
       };
     } },
   };
-  const EFFECT_IDS = Object.keys(EFFECTS);
+  // 1.1.22, fifth round (the owner picked "Option A", then moved a few): the pickers list the effects grouped by theme, so alike
+  // ones sit next to each other (weather with Rainbow after Rain; leaves and blossom; party; bubbles and fish; glass shards;
+  // plankton; glowing things; sky; water, network and ghost ripple; screens; magic).
+  // Only the order changed: the ids are the same, so saved choices stay. Keep store.js (FX_EFFECTS / FX_FOLLOWERS) in the same order.
+  const ORDER = ['snow', 'rain', 'rainbow', 'lightning', 'leaves', 'blossom', 'fireworks', 'confetti', 'hearts', 'bubbles', 'fish', 'shards', 'plankton', 'fireflies', 'dust', 'embers', 'nightsky', 'stardust', 'warp', 'ocean', 'silk', 'network', 'ghost', 'matrix', 'glitch', 'heal', 'cauldron', 'fel', 'jelly'];
+  const EFFECT_IDS = [...ORDER.filter((id) => EFFECTS[id]), ...Object.keys(EFFECTS).filter((id) => !ORDER.includes(id))]; // an effect missing from ORDER still shows, at the end
   // the order in the pickers: each follower in the same place as its background effect, with the same name and
   // icon (snow = 'frost', rain = 'ripples': older ids, kept so saved choices stay); the pencil line last (the old 'comet' = Rainbow line is the Rainbow follower again)
   // 1.1.20: every background has its follower now (the owner's wish: both tabs list the same things), so the order

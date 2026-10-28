@@ -415,6 +415,21 @@ body.is-dragging .backbtn { background: #F1EDFF; color: #5B3AA8; box-shadow: 0 0
   overflow-wrap: anywhere;
 }
 .card[data-font="hand"] .txt { font: 400 19px/1.12 var(--hand); -webkit-line-clamp: 5; }
+/* 1.1.22: checklist lines show their box, ticked or not, like in the note (the card's accent colour) */
+.card .txt .cb {
+  display: inline-block; width: .8em; height: .8em; margin-right: .32em; vertical-align: -.06em;
+  border: 1.6px solid var(--accent); border-radius: .22em;
+  background: rgba(255,255,255,.4) center / 80% no-repeat; opacity: .8;
+}
+.card .txt .cb.done {
+  opacity: 1; background-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+}
+.card:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .txt .cb:not(.done) { background-color: transparent; }
+.card:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .txt .cb.done {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232B2A30' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+}
+.card .txt .ck.done { text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: .55; }
 .card[data-font="hand"] .t1 { font-weight: 600; }
 .card[data-font="hand"] .t1.tt { font-weight: 700; font-size: 1.1em; }
 .sheet[data-font="hand"] .t1 { font-weight: 600; }
@@ -987,16 +1002,46 @@ body.dark .fxi .ic { color: color-mix(in srgb, var(--ic, var(--mute)) 70%, #fff)
 #fxSheet .ebox { max-width: 560px; }
 #fxSheet .row.toggle { padding: 4px 0; }
 /* 1.1.20: Edit design: the paper previews the note's effects; effect lists in two tabs, like in a note */
-#editSheet .ebox { max-width: 560px; }
-#editSheet .epaper { position: relative; isolation: isolate; min-height: 86px; overflow: hidden; display: flex; align-items: flex-start; }
+/* 1.1.22 (fifth round): Edit design is a small pop-up beside the note (tabs: Colour / Background / Mouse), not a sheet
+   over the whole list. No dimming or blur behind it, so the notes stay visible; click outside or Esc closes it. */
+#editSheet { display: block; padding: 0; background: transparent; backdrop-filter: none; animation: none; }
+body.dark #editSheet { background: transparent; }
+#editSheet[hidden] { display: none; }
+#editSheet .ebox {
+  position: fixed; width: 352px; max-width: calc(100vw - 20px); max-height: calc(100vh - 20px);
+  gap: 10px; padding: 12px 14px 12px; border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(60,40,10,.28), 0 1px 3px rgba(0,0,0,.12), 0 0 0 1px rgba(80,60,20,.06);
+}
+#editSheet .ehead h3 { font-size: 22px; }
+#editSheet .ehead .qclear { width: 28px; height: 28px; }
+#editSheet .epaper { position: relative; isolation: isolate; flex: none; height: 54px; overflow: hidden; display: flex; align-items: flex-start; }
 #editSheet .epaper > .fxc { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
 #editSheet .epaper .etitle { position: relative; }
-#editSheet .fxtabs { max-width: 320px; }
-.efxsec { display: flex; flex-direction: column; gap: 4px; }
-.efxsec[hidden] { display: none; }
-#editSheet .fxlist { max-height: 210px; overflow: auto; padding-right: 4px; }
+.etabs { flex: none; }
+/* the panes keep one height, so switching tabs doesn't make the pop-up jump; a long effect list scrolls inside */
+.epanes { flex: 1 1 auto; height: 262px; min-height: 120px; overflow: auto; margin: 0 -6px; padding: 2px 6px; }
+.epane { display: flex; flex-direction: column; gap: 8px; }
+.epane[hidden] { display: none; }
+.epane .oprow b { font-weight: 800; font-size: 13px; }
+#editSheet .swstrip.wide > .swatches { gap: 7px; row-gap: 9px; }
+#editSheet .sw { width: 28px; height: 28px; }
+#editSheet .fxlist { grid-template-columns: 1fr 1fr; gap: 3px 5px; }
+#editSheet .fxi { min-height: 36px; padding: 4px 8px 4px 4px; font-size: 12.5px; gap: 7px; }
+#editSheet .fxi .ic { width: 26px; height: 26px; }
 #editSheet .fxi .nm small { display: block; font: 700 11px var(--ui); color: var(--mute); }
-#editSheet .row.toggle { padding: 2px 0; }
+#editSheet .fxamt, #editSheet .fxop { margin-top: 2px; }
+#editSheet .row.toggle { padding: 2px 0; column-gap: 12px; }
+#editSheet .ebtns small { font-size: 11px; }
+/* the note being edited gets an outline in the list */
+.card.editing { outline: 2.5px solid var(--ink); outline-offset: 3px; }
+/* 1.1.22 (fifth round): what's picked stands out like in Settings (window colours, backups): a white button with a
+   dark ring, not just a slightly darker beige (the owner couldn't tell what was picked) */
+.esheet .fxi.on { background: var(--card); box-shadow: 0 0 0 2px var(--ink); }
+.esheet .fxi.on .ic { background: var(--soft); }
+.esheet .fxi:not(.on):hover { background: var(--soft); }
+.esheet .seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 0 0 2px var(--ink); }
+.esheet .seg.etabs button.on { background: var(--ink); color: var(--pillfg); box-shadow: none; }
+.esheet .fxamt.off .seg button.on { box-shadow: 0 0 0 2px var(--mute); }
 .ehint { margin: 0; font: 700 12px/1.4 var(--ui); color: var(--mute); }
 /* the star in a card's top-right corner: an outline while you point at the card, filled (soft yellow) once starred */
 .card > .fav {

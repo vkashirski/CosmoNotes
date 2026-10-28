@@ -12,7 +12,7 @@
  *   4. "Last updated" + version in ai-context/CONTEXT.md
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-10-27',
+  LAST_UPDATED: '2026-10-28',
 
   FEATURES: [
     {
@@ -150,7 +150,11 @@ window.COSMO_ABOUT = {
         'Fel fire burns low along the bottom instead of fizzing up like soda; the healing aura’s bottom pulses instead of swirling.',
         'Snowflakes you touch shatter into little bits, and fireflies close to your pointer drift over for a few seconds before they lose interest.',
         'Mouse effects that make particles as you move (glass shards, plankton, stardust, blossom, dust and more) now keep making them evenly along your path however fast you move the mouse, instead of in clumps with gaps.',
-        'Touching the Analog monitor is like holding a magnet to an old TV: the scanlines bend away from your pointer in a lumpy smear that gets bigger the faster you move, and leaves a fading tail behind your path.',
+        'The Analog monitor now has one bright line that sweeps down the screen now and then; the scanlines part around it and wobble back like the ghost ripple, and they do the same when you move your pointer over them. Frequency sets how often the line sweeps. The dust that follows your mouse is now much less frequent.',
+        'The effects are listed in a better order, with alike ones together (weather, leaves and blossom, glowing things, sea life, water and network, magic…).',
+        'Checklists now show their boxes (ticked or not) on the cards in the notes list.',
+        'The Network background no longer bunches all its dots into one clump after a while.',
+        'Edit design is now a small pop-up next to the note with Colour, Background and Mouse tabs, so the list stays visible, and what’s picked is much easier to see.',
         'Solar system and Aquarium were taken out (backgrounds and mouse effects).',
         'In Effects, the note’s colour and see-through are gone again, and with “None” the frequency and opacity are greyed out instead of disappearing.',
         'Mouse effects: lightning now builds a single line along your path and strikes back to the pointer after 1.5 seconds, then rests half a second; healing is a steady stream of floating crosses; dust in light is just the dust; fel fire and embers keep burning while the pointer rests; the cauldron bubbles steadily; a new digital ocean (a wave of dots that curls over and breaks into spray) and a new analog monitor (tiny red, green and blue phosphor stripes light up where you pass).',

@@ -25,9 +25,8 @@ function recorder() {
   return { ctx, bad };
 }
 
-// the old ones stay first and in the same order (saved choices keep their place); the new ones follow
-assert.deepEqual(FX_EFFECTS.slice(0, 11), ['snow', 'fireworks', 'stardust', 'fireflies', 'bubbles', 'leaves', 'hearts', 'rain', 'confetti', 'matrix', 'rainbow']);
-assert.deepEqual(FX_EFFECTS.slice(11, 11 + NEW.length), NEW, 'the new ids, in the picker order'); // (1.1.19 adds more after them)
+// 1.1.22 (fifth round): the order is by theme now; check the same ids are all there (v1122.test.js checks the order itself)
+assert.deepEqual([...FX_EFFECTS].sort(), ['snow', 'fireworks', 'stardust', 'fireflies', 'bubbles', 'leaves', 'hearts', 'rain', 'confetti', 'matrix', 'rainbow', ...NEW].sort(), 'the same effects as before, whatever the order');
 assert.deepEqual([...FX.EFFECT_IDS], FX_EFFECTS, 'fx.js and store.js agree');
 
 for (const id of NEW) {

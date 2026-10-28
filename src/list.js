@@ -349,13 +349,21 @@
       return body;
     }
     const lines = (n.text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    // 1.1.22: checklist lines get their box (ticked or not) like in the note; `checks` has one letter per line (main.js)
+    const marks = typeof n.checks === 'string' ? n.checks : '';
+    const line = (i, cls) => {
+      const mk = marks[i]; const box = mk === 'o' || mk === 'x' ? h('span', { class: 'cb' + (mk === 'x' ? ' done' : ''), 'aria-hidden': 'true' }) : null;
+      const txt = box ? h('span', { class: 'ck' + (mk === 'x' ? ' done' : '') }, lines[i]) : lines[i];
+      return cls ? h('span', { class: cls }, box, txt) : [box, txt];
+    };
+    const rest = (from) => lines.slice(from).flatMap((_, k) => ['\n', ...[].concat(line(from + k))]); // flat: h() only flattens one level
     // A note that is just a picture or drawing gets the stand-in text "🖼️ Photo" / "✏️ Drawing" (for search and
     // the window title). The card already shows the picture, so it doesn't repeat that line.
     if (n.firstImage && lines.length === 1 && PICTURE_ONLY.includes(lines[0])) lines.length = 0;
     if (title) {
-      body.append(h('div', { class: 'txt' }, h('span', { class: 't1 tt' }, title), lines.length ? '\n' + lines.join('\n') : ''));
+      body.append(h('div', { class: 'txt' }, h('span', { class: 't1 tt' }, title), rest(0)));
     } else if (lines.length) {
-      body.append(h('div', { class: 'txt' }, h('span', { class: 't1' }, lines[0]), lines.length > 1 ? '\n' + lines.slice(1).join('\n') : ''));
+      body.append(h('div', { class: 'txt' }, line(0, 't1'), rest(1)));
     } else if (!n.firstImage) {
       body.append(h('div', { class: 'txt empty' }, 'Empty note'));
     }
@@ -1264,12 +1272,14 @@
 
   // ---------- right-click menu
   // the card that was right-clicked gets a faint outline while its menu is open (1.1.16)
+  let ctxCard = null;
   function hideCtx() { $('#ctx').hidden = true; document.querySelectorAll('.card.ctxon').forEach((c) => c.classList.remove('ctxon')); }
   function showCtx(e, items) {
     const ctx = $('#ctx');
     document.querySelectorAll('.card.ctxon').forEach((c) => c.classList.remove('ctxon'));
     const card = e.target && e.target.closest ? e.target.closest('.card') : null;
     if (card) card.classList.add('ctxon');
+    ctxCard = card; // 1.1.22: Edit design opens next to it (the menu item runs after hideCtx)
     ctx.innerHTML = '';
     for (const it of items) {
       if (!it) continue;
@@ -1487,7 +1497,7 @@
   // follower). The title saves as you type (350 ms after you stop), the rest at once (sliders: 120 ms after they
   // stop moving), and an open window of the note changes along with it (main.js 'list:edit'). A change made in the
   // note's own window shows here too (editRefresh).
-  const ed = { id: null, color: 'yellow', title: '', opacity: 1, fx: null, timer: null, pending: null, tab: 'e' };
+  const ed = { id: null, color: 'yellow', title: '', opacity: 1, fx: null, timer: null, pending: null, tab: 'look', anchor: null };
   for (const c of COLORS) {
     $('#editColors').append(h('button', {
       type: 'button', class: 'sw', 'data-color': c, title: COLOR_NAMES[c], style: `background:${SWATCH[c]}`,
@@ -1511,12 +1521,30 @@
     for (const id of ids) add(id, FX[kind === 'effect' ? 'EFFECTS' : 'FOLLOWERS'][id].name, FX.ICONS[kind][id]);
   }
   if (FX) { editFxList($('#editFxEffects'), 'effect'); editFxList($('#editFxFollowers'), 'follower'); }
+  // 1.1.22 (fifth round): three tabs, Colour / Background / Mouse (was one long sheet with Background / Mouse inside it)
   function editTab(t) {
+    if (!['look', 'e', 'f'].includes(t)) t = 'look';
     ed.tab = t;
-    for (const b of $$('#editFxTabs button')) { b.classList.toggle('on', b.dataset.t === t); b.setAttribute('aria-pressed', String(b.dataset.t === t)); }
-    for (const sec of $$('#editSheet .efxsec')) sec.hidden = sec.dataset.t !== t;
+    for (const b of $$('#editTabs button')) { const on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); }
+    for (const sec of $$('#editSheet .epane')) sec.hidden = sec.dataset.tab !== t;
   }
-  $$('#editFxTabs button').forEach((b) => b.addEventListener('click', () => editTab(b.dataset.t)));
+  $$('#editTabs button').forEach((b) => b.addEventListener('click', () => editTab(b.dataset.tab)));
+  // next to the note that was right-clicked (right of it if there's room, else left, else over the list's middle),
+  // always fully inside the window; the list behind stays as it is
+  function editPlace() {
+    const box = $('#editBox'); const M = 10; const W = innerWidth; const H = innerHeight;
+    box.style.left = '0px'; box.style.top = '0px';
+    const bw = box.offsetWidth; const bh = box.offsetHeight;
+    const a = ed.anchor && ed.anchor.isConnected ? ed.anchor.getBoundingClientRect() : null;
+    let x; let y;
+    if (a && a.right + 12 + bw <= W - M) x = a.right + 12;
+    else if (a && a.left - 12 - bw >= M) x = a.left - 12 - bw;
+    else x = (W - bw) / 2;
+    y = a ? a.top - 8 : (H - bh) / 2;
+    box.style.left = `${Math.round(Math.max(M, Math.min(x, W - bw - M)))}px`;
+    box.style.top = `${Math.round(Math.max(M, Math.min(y, H - bh - M)))}px`;
+  }
+  window.addEventListener('resize', () => { if (ed.id) editPlace(); });
   function editFxPreview() {
     if (!edFxLayer || !ed.id) return;
     const n = state.notes.find((x) => x.id === ed.id) || {};
@@ -1555,12 +1583,13 @@
       range.disabled = !kindOn || !!s.fxForceAll;
       $(`${id} em`).textContent = `${pct2}%`;
     }
-    $('#editFxForce').hidden = !s.fxForceAll;
+    for (const el of $$('#editSheet .editFxForce')) el.hidden = !s.fxForceAll;
     $('#editFxInteractRow').classList.toggle('off', r.effect === 'none');
     $('#editFxInteract').checked = r.interact;
     $('#editFxInteract').disabled = r.effect === 'none' || !!s.fxForceAll;
   }
   function openEdit(n) {
+    const anchor = ctxCard && ctxCard.isConnected ? ctxCard : null; // the card that was right-clicked
     hideCtx();
     if (ed.id) closeEdit();
     ed.id = n.id;
@@ -1571,8 +1600,10 @@
     ed.fx = { ...blankFx(), ...(n.fx || {}) };
     $('#editTitle').value = ed.title;
     $('#editSheet').hidden = false;
+    ed.anchor = anchor; if (anchor) anchor.classList.add('editing');
     editTab(ed.tab);
     editPaint();
+    editPlace();
     requestAnimationFrame(() => {
       editFxPreview();
       const t = $('#editTitle');
@@ -1605,6 +1636,7 @@
     editFlush();
     ed.id = null;
     $('#editSheet').hidden = true;
+    document.querySelectorAll('.card.editing').forEach((c) => c.classList.remove('editing')); ed.anchor = null;
     if (edFxLayer) edFxLayer.set({}); // nothing plays while the sheet is closed
   }
   // the note changed somewhere else (its window, the selection bar…) while the sheet is open

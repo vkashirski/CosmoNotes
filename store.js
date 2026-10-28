@@ -24,17 +24,13 @@ const COLORS = ['yellow', 'cream', 'orange', 'pink', 'rose', 'purple', 'lavender
   'charcoal', 'night', 'plum', 'midnight', 'forest'];
 const DARK_COLORS = ['charcoal', 'night', 'midnight', 'forest', 'plum'];
 // 1.1.16: note effects and mouse followers (the same ids as src/fx.js: keep both lists the same)
-const FX_EFFECTS = ['snow', 'fireworks', 'stardust', 'fireflies', 'bubbles', 'leaves', 'hearts', 'rain', 'confetti', 'matrix', 'rainbow',
-  // 1.1.18: the owner's picks from the Effect Lab
-  // (1.1.20: Fairy dust, XP orbs, Neon tunnel and Synthwave were taken out again, at the owner's request)
-  'plankton', 'warp', 'network', 'embers', 'blossom', 'nightsky', 'glitch', 'ocean', 'silk', 'shards', 'ghost', 'fish', 'dust',
-  // 1.1.18, third round: the owner's picks from the Spell Lab
-  'heal', 'lightning', 'cauldron', 'jelly', 'fel'];
-  // (1.1.22: Solar system and Aquarium (1.1.19) were taken out, at the owner's request; a note that had one goes back to "same as all notes")
+const FX_EFFECTS = ['snow', 'rain', 'rainbow', 'lightning', 'leaves', 'blossom', 'fireworks', 'confetti', 'hearts', 'bubbles', 'fish', 'shards', 'plankton', 'fireflies', 'dust', 'embers', 'nightsky', 'stardust', 'warp', 'ocean', 'silk', 'network', 'ghost', 'matrix', 'glitch', 'heal', 'cauldron', 'fel', 'jelly'];
+// 1.1.22, fifth round: the order is by theme (weather, leaves and blossom, glowing things, sky, sea life, water and network, screens,
+// magic, party), the owner's pick "Option A"; the ids did not change. Keep it the same as ORDER in src/fx.js.
+// (history: 1.1.18 added the Effect Lab picks and the Spell Lab picks; 1.1.20 removed Fairy dust, XP orbs, Neon tunnel and Synthwave;
+// 1.1.22 removed Solar system and Aquarium: a note that had one goes back to "same as all notes")
 // 1.1.20: a follower for every background (the same order, with 'frost' = Snow and 'ripples' = Rain), then the pencil line
-const FX_FOLLOWERS = ['frost', 'fireworks', 'stardust', 'fireflies', 'bubbles', 'leaves', 'hearts', 'ripples', 'confetti', 'matrix', 'rainbow',
-  'plankton', 'warp', 'network', 'embers', 'blossom', 'nightsky', 'glitch', 'ocean', 'silk', 'shards', 'ghost', 'fish', 'dust',
-  'heal', 'lightning', 'cauldron', 'jelly', 'fel', 'pencil'];
+const FX_FOLLOWERS = ['frost', 'ripples', 'rainbow', 'lightning', 'leaves', 'blossom', 'fireworks', 'confetti', 'hearts', 'bubbles', 'fish', 'shards', 'plankton', 'fireflies', 'dust', 'embers', 'nightsky', 'stardust', 'warp', 'ocean', 'silk', 'network', 'ghost', 'matrix', 'glitch', 'heal', 'cauldron', 'fel', 'jelly', 'pencil'];
 // a note's own choice: null = same as all notes (Settings), 'none' = nothing on this note, or an id
 const cleanFxId = (v, ids) => { if (v === 'comet') v = 'rainbow'; return v === 'none' || ids.includes(v) ? v : null; }; // 'comet' (Rainbow line) was folded into Rainbow
 const FX_AMOUNTS = ['low', 'mid', 'high']; // how much: less, normal, more
@@ -190,6 +186,46 @@ function normalizeGroup(x) {
     locked: !!x.locked,
     favorite: !!x.favorite, // starred in the notes list (1.1.13)
   };
+}
+
+// 1.1.22 (fifth round): the notes list only gets a note's plain text, so its checklist boxes didn't show on the cards.
+// This reads the note's html (no browser needed) and says, for each non-empty line of `text` (the same lines the card
+// shows: split on new lines, trimmed, empty ones left out), whether it is a checklist item: 'o' = a box, 'x' = a ticked
+// box, '.' = an ordinary line. Returns '' when there are none. Any <li> inside a <ul class="checklist"> has a box (the
+// same rule as the note's CSS); its box sits on its first line. The items are matched to the lines by their words, in
+// order, so a line that doesn't match simply gets no box (nothing can go wrong, it just looks like before).
+const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'" };
+const decodeEnt = (t) => t.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+|#39);/gi, (m, e) => {
+  if (e[0] === '#') { const n = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10); try { return String.fromCodePoint(n); } catch { return m; } }
+  return ENT[e.toLowerCase()] ?? m;
+});
+const normLine = (t) => t.replace(/[ \s]+/g, ' ').trim();
+function checklistMarks(html, text) {
+  if (typeof html !== 'string' || typeof text !== 'string' || !/checklist/.test(html)) return '';
+  const items = []; const lis = []; const uls = []; let checkDepth = 0; let m;
+  const re = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*)>|([^<]+)/g;
+  while ((m = re.exec(html))) {
+    if (m[4] !== undefined) { const it = lis[lis.length - 1]; if (it && it.open) it.t += decodeEnt(m[4]); continue; }
+    const close = m[1] === '/'; const tag = m[2].toLowerCase(); const attrs = m[3] || '';
+    const cls = (/\bclass\s*=\s*("([^"]*)"|'([^']*)')/i.exec(attrs) || [])[2] || (/\bclass\s*=\s*'([^']*)'/i.exec(attrs) || [])[1] || '';
+    if (tag === 'ul' || tag === 'ol') {
+      if (close) { const was = uls.pop(); if (was) checkDepth--; } else if (!/\/\s*$/.test(attrs)) { const ck = tag === 'ul' && /(^|\s)checklist(\s|$)/.test(cls); uls.push(ck); if (ck) checkDepth++; }
+    } else if (tag === 'li') {
+      if (close) lis.pop();
+      else { const up = lis[lis.length - 1]; if (up) up.open = false; const it = checkDepth > 0 ? { t: '', done: /(^|\s)done(\s|$)/.test(cls), open: true } : { t: '', open: false, plain: true }; if (!it.plain) items.push(it); lis.push(it); }
+    } else if (!close && (tag === 'br' || tag === 'div' || tag === 'p')) { const it = lis[lis.length - 1]; if (it && it.open && (tag === 'br' || normLine(it.t))) it.open = false; }
+  }
+  const want = items.map((it) => ({ t: normLine(it.t), done: it.done })).filter((it) => it.t);
+  if (!want.length) return '';
+  const lines = text.split('\n').map((x) => x.trim()).filter(Boolean);
+  let j = 0; let any = false; let out = '';
+  for (const line of lines) {
+    const l = normLine(line); let hit = -1;
+    for (let k = j; k < Math.min(want.length, j + 4); k++) if (want[k].t === l) { hit = k; break; }
+    if (hit < 0) { out += '.'; continue; }
+    out += want[hit].done ? 'x' : 'o'; any = true; j = hit + 1;
+  }
+  return any ? out : '';
 }
 
 function normalize(n) {
@@ -683,4 +719,4 @@ function backupDayName(name) {
   return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-module.exports = { backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };
+module.exports = { checklistMarks, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };
