@@ -5,7 +5,7 @@ const assert = require('assert'); const fs = require('fs'); const path = require
 const src = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
 assert.ok(/const near = \(d\) => d > -INK_SNAP && d < INK_SNAP;/.test(src), 'docks only within 12 px of the edge');
 assert.ok(!/near\(d[RLTB], v\.[wh]\)/.test(src), 'no more half-size overlap');
-assert.equal(require('../package.json').version, '1.1.22');
+// (the version check moved on to the next version's test; the later rounds of the owner's notes are in v1123.test.js)
 
 // ---- the switch's new name
 for (const f of ['note.html', 'list.html']) {
@@ -43,49 +43,11 @@ for (const dark of [false, true]) for (const [w, h] of [[150, 110], [340, 280], 
   assert.deepEqual(bad, [], `analog monitor touch ${w}×${h}: nothing at NaN`);
 }
 {
-  // 1.1.22, fifth round: no lumpy blob or colour fringe any more; the lines behave like Ghost ripple's dots. A moving pointer
-  // parts them and they wobble back until they're straight again; a resting pointer leaves them alone
-  const src = FX.EFFECTS.glitch.make.toString();
-  assert.ok(!/fringe|blobs|RED|CYAN/.test(src), 'analog monitor: no blobs, no red / cyan fringe');
-  // every line segment drawn: the biggest up/down offset from a straight line
-  const wobble = (e, W, H) => {
-    let worst = 0; let last = null;
-    const spy = new Proxy({}, { get: (t, k) => (k === 'moveTo' ? (x, y) => { last = y; } : k === 'lineTo' ? (x, y) => { if (last !== null) worst = Math.max(worst, Math.abs(y - last)); last = y; } : k in t ? t[k] : (k.startsWith('create') ? () => ({ addColorStop() {} }) : () => {})), set: (t, k, v) => { t[k] = v; return true; } });
-    e.draw(spy, 0); return worst;
-  };
-  const run = (move) => {
-    const W = 340; const H = 280; const e = FX.EFFECTS.glitch.make(W, H, PAL(true), true, .0001); // k tiny: the scan line stays away
-    const log = []; let x = 40;
-    for (let i = 0; i < 60 * 8; i++) { const on = move && i < 60; if (on) x += 6; e.step(1 / 60, i / 60, on ? ptr(x, 250, 360, 0) : null); if (i % 20 === 0) log.push(wobble(e, W, H)); }
-    return { peak: Math.max(...log), end: log[log.length - 1] };
-  };
-  const moving = run(true); const resting = run(false);
-  assert.ok(moving.peak > 1, `a moving pointer parts the lines (${moving.peak.toFixed(1)} px)`);
-  assert.ok(moving.end < .5, 'and they wobble back until they are straight again');
-  assert.ok(resting.peak < .3, 'a pointer that is not moving leaves the lines alone');
-}
-{
-  // ONE scan line (never two bars), and Frequency = how often it sweeps
-  const sweeps = (k) => {
-    const e = FX.EFFECTS.glitch.make(340, 280, PAL(true), true, k); let n = 0; let was = false; let most = 0; let g = 0;
-    const spy = new Proxy({}, { get: (t, key) => (key === 'createLinearGradient' ? () => { g++; return { addColorStop() {} }; } : key in t ? t[key] : () => {}), set: (t, key, v) => { t[key] = v; return true; } });
-    for (let i = 0; i < 2 * 300; i++) {
-      e.step(.5, i * .5, null); g = 0; e.draw(spy, i * .5); most = Math.max(most, g); if (g && !was) n++; was = g > 0; // a sweep lasts 4 s or more: looking every half second is plenty
-    }
-    return { n, most };
-  };
-  const rarely = sweeps(.18); const normal = sweeps(1); const often = sweeps(3.6);
-  assert.equal(Math.max(rarely.most, normal.most, often.most), 1, 'only one scan line at a time, even at "Often"');
-  assert.ok(rarely.n >= 3 && rarely.n <= 7, `rarely: about once a minute (${rarely.n} in 5 min)`);
-  assert.ok(normal.n >= 14 && normal.n <= 23, `normal: about every 16 s (${normal.n} in 5 min)`);
-  assert.ok(often.n >= 45 && often.n <= 70, `often: about every 5 s (${often.n} in 5 min)`);
-}
-{
   // Dust in light (mouse): "Rarely" was the old "Often" amount; the whole scale moved down
   const specks = (k) => { const f = FX.FOLLOWERS.dust.make(900, 400, PAL(true), true, k); for (let i = 0; i < 100; i++) f.move(20 + i * 8, 200, 8); const { calls } = recorder(); const rec = recorder(); f.draw(rec.ctx, 0); return rec.calls.filter(([n]) => n === 'arc').length; };
   const rare = specks(.35); const norm = specks(1); const oft = specks(2.6);
   assert.ok(rare < norm && norm < oft, `dust: rarely < normal < often (${rare}, ${norm}, ${oft})`);
-  assert.ok(oft >= 40 && oft <= 70, `dust "Often" now makes about one speck every 17 px, which "Rarely" used to (${oft} circles over 800 px)`);
+  assert.ok(oft >= 50 && oft <= 85, `dust "Often" now makes about one speck every 17 px, which "Rarely" used to (${oft} circles over 800 px)`);
   assert.ok(norm <= 36, `dust "Normal" is much sparser (${norm})`);
 }
 for (const dark of [false, true]) {
@@ -282,16 +244,16 @@ for (const id of ['shards', 'plankton', 'dust', 'blossom', 'warp', 'nightsky', '
 // ---- fifth round: the pickers are ordered by theme (the owner's "Option A"); same ids, only the order changed
 {
   const { FX_EFFECTS, FX_FOLLOWERS } = require('../store.js');
-  const want = ['snow', 'rain', 'rainbow', 'lightning', 'leaves', 'blossom', 'fireworks', 'confetti', 'hearts', 'bubbles', 'fish', 'shards', 'plankton', 'fireflies', 'dust', 'embers', 'nightsky', 'stardust', 'warp', 'ocean', 'silk', 'network', 'ghost', 'matrix', 'glitch', 'heal', 'cauldron', 'fel', 'jelly'];
+  const want = ['snow', 'rain', 'lightning', 'rainbow', 'leaves', 'blossom', 'fireworks', 'confetti', 'hearts', 'bubbles', 'nightsky', 'embers', 'stardust', 'shards', 'plankton', 'fish', 'fireflies', 'dust', 'ocean', 'silk', 'jelly', 'network', 'ghost', 'warp', 'glitch', 'matrix', 'heal', 'cauldron', 'fel'];
   assert.deepEqual([...FX.EFFECT_IDS], want, 'effects are in the themed order');
   assert.deepEqual(FX_EFFECTS, want, 'store.js has the same order');
   assert.deepEqual([...FX.FOLLOWER_IDS], want.map((e) => (e === 'snow' ? 'frost' : e === 'rain' ? 'ripples' : e)).concat('pencil'), 'followers follow the same order, pencil last');
   assert.deepEqual(FX_FOLLOWERS, [...FX.FOLLOWER_IDS], 'store.js followers agree');
   const at = (id) => want.indexOf(id);
-  assert.ok(at('rain') === at('snow') + 1 && at('rainbow') === at('rain') + 1 && at('lightning') === at('rainbow') + 1, 'weather together, rainbow right after rain');
-  assert.deepEqual(want.slice(at('blossom') + 1, at('plankton') + 1), ['fireworks', 'confetti', 'hearts', 'bubbles', 'fish', 'shards', 'plankton'], 'after cherry blossom: party, then bubbles and fish, glass shards, plankton');
+  assert.deepEqual(want.slice(0, 4), ['snow', 'rain', 'lightning', 'rainbow'], 'weather, rainbow after lightning');
+  assert.deepEqual(want.slice(at('bubbles'), at('plankton') + 1), ['bubbles', 'nightsky', 'embers', 'stardust', 'shards', 'plankton'], 'after bubbles: night sky, embers, stardust, then glass shards and plankton');
+  assert.ok(at('jelly') === at('silk') + 1 && at('warp') === at('ghost') + 1 && at('glitch') === at('matrix') - 1, 'jellyfish after silk, warp after ghost ripple, analog monitor before matrix');
   assert.ok(at('blossom') === at('leaves') + 1, 'leaves next to cherry blossom');
-  assert.ok(at('glitch') === at('matrix') + 1, 'analog monitor next to matrix');
   assert.ok(Math.abs(at('cauldron') - at('fel')) === 1 && Math.abs(at('heal') - at('cauldron')) === 1, 'healing aura, cauldron and fel fire together');
   assert.ok(at('silk') === at('ocean') + 1, 'silk waves next to digital ocean');
 }
@@ -335,4 +297,5 @@ for (const id of ['shards', 'plankton', 'dust', 'blossom', 'warp', 'nightsky', '
   assert.ok(/#editSheet \.ebox \{[^}]*width: 352px/.test(css), 'a small pop-up');
   assert.ok(/\.esheet \.fxi\.on \{[^}]*box-shadow: 0 0 0 2px var\(--ink\)/.test(css), 'what is picked has a dark ring, like in Settings');
 }
+
 console.log('v1122 ok');

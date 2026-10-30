@@ -24,13 +24,13 @@ const COLORS = ['yellow', 'cream', 'orange', 'pink', 'rose', 'purple', 'lavender
   'charcoal', 'night', 'plum', 'midnight', 'forest'];
 const DARK_COLORS = ['charcoal', 'night', 'midnight', 'forest', 'plum'];
 // 1.1.16: note effects and mouse followers (the same ids as src/fx.js: keep both lists the same)
-const FX_EFFECTS = ['snow', 'rain', 'rainbow', 'lightning', 'leaves', 'blossom', 'fireworks', 'confetti', 'hearts', 'bubbles', 'fish', 'shards', 'plankton', 'fireflies', 'dust', 'embers', 'nightsky', 'stardust', 'warp', 'ocean', 'silk', 'network', 'ghost', 'matrix', 'glitch', 'heal', 'cauldron', 'fel', 'jelly'];
+const FX_EFFECTS = ['snow', 'rain', 'lightning', 'rainbow', 'leaves', 'blossom', 'fireworks', 'confetti', 'hearts', 'bubbles', 'nightsky', 'embers', 'stardust', 'shards', 'plankton', 'fish', 'fireflies', 'dust', 'ocean', 'silk', 'jelly', 'network', 'ghost', 'warp', 'glitch', 'matrix', 'heal', 'cauldron', 'fel'];
 // 1.1.22, fifth round: the order is by theme (weather, leaves and blossom, glowing things, sky, sea life, water and network, screens,
 // magic, party), the owner's pick "Option A"; the ids did not change. Keep it the same as ORDER in src/fx.js.
 // (history: 1.1.18 added the Effect Lab picks and the Spell Lab picks; 1.1.20 removed Fairy dust, XP orbs, Neon tunnel and Synthwave;
 // 1.1.22 removed Solar system and Aquarium: a note that had one goes back to "same as all notes")
 // 1.1.20: a follower for every background (the same order, with 'frost' = Snow and 'ripples' = Rain), then the pencil line
-const FX_FOLLOWERS = ['frost', 'ripples', 'rainbow', 'lightning', 'leaves', 'blossom', 'fireworks', 'confetti', 'hearts', 'bubbles', 'fish', 'shards', 'plankton', 'fireflies', 'dust', 'embers', 'nightsky', 'stardust', 'warp', 'ocean', 'silk', 'network', 'ghost', 'matrix', 'glitch', 'heal', 'cauldron', 'fel', 'jelly', 'pencil'];
+const FX_FOLLOWERS = ['frost', 'ripples', 'lightning', 'rainbow', 'leaves', 'blossom', 'fireworks', 'confetti', 'hearts', 'bubbles', 'nightsky', 'embers', 'stardust', 'shards', 'plankton', 'fish', 'fireflies', 'dust', 'ocean', 'silk', 'jelly', 'network', 'ghost', 'warp', 'glitch', 'matrix', 'heal', 'cauldron', 'fel', 'pencil'];
 // a note's own choice: null = same as all notes (Settings), 'none' = nothing on this note, or an id
 const cleanFxId = (v, ids) => { if (v === 'comet') v = 'rainbow'; return v === 'none' || ids.includes(v) ? v : null; }; // 'comet' (Rainbow line) was folded into Rainbow
 const FX_AMOUNTS = ['low', 'mid', 'high']; // how much: less, normal, more
@@ -228,6 +228,13 @@ function checklistMarks(html, text) {
   return any ? out : '';
 }
 
+// 1.1.23: the descriptions of a note's pictures (their alt text), one per line, for the notes list's search
+function pictureWords(html) {
+  if (typeof html !== 'string' || !/<img/i.test(html)) return '';
+  const out = [];
+  for (const m of html.matchAll(/<img\b[^>]*?\balt\s*=\s*("([^"]*)"|'([^']*)')/gi)) { const t = decodeEnt(m[2] ?? m[3] ?? '').trim(); if (t) out.push(t); }
+  return out.join('\n').slice(0, 2000);
+}
 function normalize(n) {
   const now = Date.now();
   return {
@@ -719,4 +726,4 @@ function backupDayName(name) {
   return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-module.exports = { checklistMarks, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };
+module.exports = { checklistMarks, pictureWords, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };

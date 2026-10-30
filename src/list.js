@@ -340,6 +340,11 @@
   }
 
   const PICTURE_ONLY = ['\u{1F5BC}\uFE0F Photo', '\u270F\uFE0F Drawing']; // must match collect() in note.js
+  function fitThumb(img) {
+    const bw = img.clientWidth; const bh = img.clientHeight;
+    if (bw && bh && (img.naturalWidth < bw || img.naturalHeight < bh)) { img.style.maxHeight = `${bh}px`; img.classList.add('small'); } // never taller than the box was
+    img.classList.remove('wait');
+  }
   function cardBody(n) {
     const body = h('div', { class: 'body' });
     const title = (n.title || '').trim();
@@ -368,7 +373,9 @@
       body.append(h('div', { class: 'txt empty' }, 'Empty note'));
     }
     if (n.firstImage) {
-      body.append(h('img', { class: 'thumb' + (lines.length || title ? '' : ' only'), src: n.firstImage, alt: '', draggable: 'false', onerror: (e) => e.target.remove() }));
+      // 1.1.22 (sixth round): a picture smaller than the card's picture box is shown at its own size, not blown up and
+      // cropped to fill the box (a small screenshot took the whole card, blurry)
+      body.append(h('img', { class: 'thumb wait' + (lines.length || title ? '' : ' only'), src: n.firstImage, alt: '', draggable: 'false', onerror: (e) => e.target.remove(), onload: (e) => fitThumb(e.target) }));
     }
     return body;
   }
@@ -618,7 +625,7 @@
         ...f.groups.map((fg) => ({ kind: 'group', group: fg, notes: notesInTree(fg.id) })),
         ...f.notes.map((n) => ({ kind: 'note', note: n })),
       ];
-      if (q) items = items.filter((it) => (it.kind === 'group' ? (it.group.name || '') : `${it.note.title || ''}\n${it.note.text || ''}`).toLowerCase().includes(q));
+      if (q) items = items.filter((it) => (it.kind === 'group' ? (it.group.name || '') : `${it.note.title || ''}\n${it.note.text || ''}\n${it.note.pics || ''}`).toLowerCase().includes(q));
       if (!items.length) {
         els.push(q
           ? emptyState('Nothing found', `No favourite contains “${query.trim()}”.`)
@@ -639,7 +646,7 @@
         ...f.groups.map((fg) => ({ kind: 'group', group: fg, notes: notesInTree(fg.id) })),
         ...f.notes.map((n) => ({ kind: 'note', note: n })),
       ];
-      if (q) items = items.filter((it) => (it.kind === 'group' ? (it.group.name || '') : `${it.note.title || ''}\n${it.note.text || ''}`).toLowerCase().includes(q));
+      if (q) items = items.filter((it) => (it.kind === 'group' ? (it.group.name || '') : `${it.note.title || ''}\n${it.note.text || ''}\n${it.note.pics || ''}`).toLowerCase().includes(q));
       if (!items.length) {
         els.push(q
           ? emptyState('Nothing found', state.settings.unlockedAll ? `No locked note contains “${query.trim()}”.` : `No locked note’s title has “${query.trim()}”. Unlock all to search their words too.`)
@@ -655,7 +662,7 @@
     // search: one flat list of every matching note (only inside the open group, when one is open)
     if (q) {
       const pool = g ? notesInTree(g.id) : liveNotes;
-      const found = pool.filter((n) => `${n.title || ''}\n${n.text || ''}`.toLowerCase().includes(q));
+      const found = pool.filter((n) => `${n.title || ''}\n${n.text || ''}\n${n.pics || ''}`.toLowerCase().includes(q));
       const items = sortItems(found.map((n) => ({ kind: 'note', note: n })));
       if (!items.length) els.push(emptyState('Nothing found', `No note${g ? ' in this group' : ''} contains “${query.trim()}”.`));
       items.forEach((it, i) => els.push(noteEl(it.note, i, !!it.note.groupId, used)));
@@ -979,7 +986,7 @@
       return;
     }
     const q = binQuery.trim().toLowerCase();
-    const shown = q ? binned.filter((n) => `${n.title || ''}\n${n.text || ''}`.toLowerCase().includes(q)) : binned;
+    const shown = q ? binned.filter((n) => `${n.title || ''}\n${n.text || ''}\n${n.pics || ''}`.toLowerCase().includes(q)) : binned;
     if (!shown.length) {
       box.append(emptyState('Nothing found', `No deleted note contains “${binQuery.trim()}”.`));
       return;
@@ -1302,13 +1309,14 @@
 
   function noteMenu(n, e) {
     showCtx(e, [
-      { label: n.open ? 'Bring to front' : 'Open on desktop', icon: ICON.open, run: () => S.list.openNote(n.id) },
-      { label: 'Edit design…', icon: ICON.edit, run: () => openEdit(n) },
-      n.open ? { label: 'Close note', icon: ICON.hide, run: () => S.list.closeNote(n.id) } : null,
-      { label: 'Duplicate note', icon: ICON.copy, run: async () => { await S.list.duplicate(n.id); toast('Note duplicated'); } },
+      // 1.1.22 (sixth round, the owner's order): favourites first, then Edit design; "Open on desktop" / "Bring to front"
+      // is gone (clicking the card opens it)
       n.favorite
         ? { label: 'Remove from favourites', icon: ICON.star, run: () => setFav([`n:${n.id}`], false) }
         : { label: 'Add to favourites', icon: ICON.star, run: () => setFav([`n:${n.id}`], true) },
+      { label: 'Edit design…', icon: ICON.edit, run: () => openEdit(n) },
+      n.open ? { label: 'Close note', icon: ICON.hide, run: () => S.list.closeNote(n.id) } : null,
+      { label: 'Duplicate note', icon: ICON.copy, run: async () => { await S.list.duplicate(n.id); toast('Note duplicated'); } },
       { label: 'Select (Ctrl+click)', icon: ICON.check, run: () => { sel.add(`n:${n.id}`); selAnchor = `n:${n.id}`; paintCards(); } },
       '-',
       n.ownLock
@@ -1377,7 +1385,7 @@
       }
       keep.add(card);
       L.resize();
-      L.set({ effect: r.effect, follower: r.follower, effectAmount: r.effectAmount, followerAmount: r.followerAmount, effectOpacity: r.effectOpacity, followerOpacity: r.followerOpacity, interact: r.interact, dark: DARK_COLORS.includes(n.color) });
+      L.set({ paper: n.color, effect: r.effect, follower: r.follower, effectAmount: r.effectAmount, followerAmount: r.followerAmount, effectOpacity: r.effectOpacity, followerOpacity: r.followerOpacity, interact: r.interact, dark: DARK_COLORS.includes(n.color) });
       L.setPaused(r.paused);
     }
     for (const [card, L] of fxLayers) if (!keep.has(card)) { L.destroy(); fxLayers.delete(card); }
@@ -1510,13 +1518,13 @@
     const key = kind === 'effect' ? 'e' : 'f';
     const ids = kind === 'effect' ? FX.EFFECT_IDS : FX.FOLLOWER_IDS;
     const add = (v, label, icon) => {
-      const b = h('button', { type: 'button', class: 'fxi', 'data-v': v === null ? '' : v, html: `${fxIcon(icon)}<span class="nm"></span>${CHECK}` });
-      b.querySelector('.nm').textContent = label;
-      if (v === null) b.querySelector('.nm').append(h('small', { class: 'allname' }));
+      const b = h('button', { type: 'button', class: 'fxi', 'data-v': v === null ? '' : v, html: `${fxIcon(icon)}<span class="nm"><span class="nt"></span></span>${CHECK}` });
+      b.querySelector('.nt').textContent = label;
+      if (v === null) { b.querySelector('.nm').append(h('small', { class: 'allname' })); b.title = 'Same as all notes (Settings → Effects)'; }
       b.addEventListener('click', () => editSet({ fx: { ...ed.fx, [key]: v } }));
       box.append(b);
     };
-    add(null, 'Same as all notes', FX.ICONS.all);
+    add(null, 'Same as all', FX.ICONS.all); // 1.1.22: shorter, so every choice is the same height
     add('none', 'None', FX.ICONS.none);
     for (const id of ids) add(id, FX[kind === 'effect' ? 'EFFECTS' : 'FOLLOWERS'][id].name, FX.ICONS[kind][id]);
   }
@@ -1550,7 +1558,7 @@
     const n = state.notes.find((x) => x.id === ed.id) || {};
     const r = FX.resolve(ed.fx, state.settings, n.fxPaused, n.fxPlay);
     edFxLayer.resize();
-    edFxLayer.set({ effect: r.effect, follower: r.follower, effectAmount: r.effectAmount, followerAmount: r.followerAmount, effectOpacity: r.effectOpacity, followerOpacity: r.followerOpacity, interact: r.interact, dark: DARK_COLORS.includes(ed.color) });
+    edFxLayer.set({ paper: ed.color, effect: r.effect, follower: r.follower, effectAmount: r.effectAmount, followerAmount: r.followerAmount, effectOpacity: r.effectOpacity, followerOpacity: r.followerOpacity, interact: r.interact, dark: DARK_COLORS.includes(ed.color) });
     edFxLayer.setPaused(!!state.settings.fxPaused && !n.fxPlay);
     return r;
   }

@@ -77,10 +77,25 @@
     c.bezierCurveTo(x + s * .55, y - s * .95, x + s * 1.1, y - s * .15, x, y + s * .55); c.fill();
   }
   function dot(c, x, y, r) { c.beginPath(); c.arc(x, y, Math.max(.1, r), 0, TAU); c.fill(); }
+  // 1.1.23 (speed): a soft round glow is made once per colour as a little picture and then just stamped, instead of
+  // building a new gradient (and reading its colours again) for every glowing particle in every frame. Same look.
+  const SPR = 128; const sprites = new Map();
+  function glowSprite(stops) { // stops: [[offset, colour], …] from the middle to the edge
+    const key = stops.map((s2) => s2.join(':')).join('|'); let cv = sprites.get(key);
+    if (!cv) {
+      cv = document.createElement('canvas'); cv.width = SPR; cv.height = SPR; const x = cv.getContext('2d');
+      if (!x || typeof x.createRadialGradient !== 'function') return cv; // (a stand-in canvas in the tests)
+      const g = x.createRadialGradient(SPR / 2, SPR / 2, 0, SPR / 2, SPR / 2, SPR / 2); for (const [o, col] of stops) g.addColorStop(o, col);
+      x.fillStyle = g; x.beginPath(); x.arc(SPR / 2, SPR / 2, SPR / 2, 0, TAU); x.fill();
+      if (sprites.size > 300) sprites.clear(); sprites.set(key, cv);
+    }
+    return cv;
+  }
+  const halo = (col) => glowSprite([[0, col], [.35, col], [1, 'transparent']]); // a glow with a solid middle
+  const soft = (col) => glowSprite([[0, col], [1, 'transparent']]); // a glow that fades from the very middle
+  const stamp = (c, spr, x, y, r) => { if (r > 0) c.drawImage(spr, x - r, y - r, r * 2, r * 2); };
   function glowDot(c, x, y, r, col, a) {
-    const g = c.createRadialGradient(x, y, 0, x, y, r * 3);
-    g.addColorStop(0, col); g.addColorStop(.35, col); g.addColorStop(1, 'transparent');
-    c.globalAlpha = a * .35; c.fillStyle = g; c.beginPath(); c.arc(x, y, r * 3, 0, TAU); c.fill();
+    c.globalAlpha = a * .35; stamp(c, halo(col), x, y, r * 3);
     c.globalAlpha = a; c.fillStyle = col; dot(c, x, y, r * .55);
   }
   function flake(c, x, y, s, rot) {
@@ -99,11 +114,9 @@
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const capped = (n, k, max) => Math.min(max, count(n, k)); // never more than `max` shapes, however big the note or "Often"
   // a soft halo in one colour and a small bright core in another
-  function glow2(c, x, y, r, halo, core, a, haloK = .35) {
+  function glow2(c, x, y, r, haloCol, core, a, haloK = .35) {
     a = clamp(a, 0, 1); if (a <= .01) return;
-    const g = c.createRadialGradient(x, y, 0, x, y, r * 3);
-    g.addColorStop(0, halo); g.addColorStop(.35, halo); g.addColorStop(1, 'transparent');
-    c.globalAlpha = a * haloK; c.fillStyle = g; c.beginPath(); c.arc(x, y, r * 3, 0, TAU); c.fill();
+    c.globalAlpha = a * haloK; stamp(c, halo(haloCol), x, y, r * 3);
     c.globalAlpha = a; c.fillStyle = core; dot(c, x, y, r * .55);
   }
   // a smooth, slowly changing "wind direction" at x, y (a cheap stand-in for a noise field)
@@ -431,9 +444,7 @@
         draw(c) {
           for (const q of s) {
             const v = Math.min(1, Math.sin(q.t * Math.PI) + (q.g || 0) * .8) * (1 + (q.g || 0) * .45); if (v <= 0) continue;
-            const g = c.createRadialGradient(q.x, q.y, 0, q.x, q.y, q.r * 2.6);
-            g.addColorStop(0, P.gold); g.addColorStop(1, 'transparent');
-            c.globalAlpha = v * (dark ? .45 : .35); c.fillStyle = g; c.beginPath(); c.arc(q.x, q.y, q.r * 2.6, 0, TAU); c.fill();
+            c.globalAlpha = v * (dark ? .45 : .35); stamp(c, soft(P.gold), q.x, q.y, q.r * 2.6);
             c.globalAlpha = v * .6; c.strokeStyle = P.gold; c.lineWidth = .8; c.beginPath();
             const L = q.r * 2 * v; c.moveTo(q.x - L, q.y); c.lineTo(q.x + L, q.y); c.moveTo(q.x, q.y - L); c.lineTo(q.x, q.y + L); c.stroke();
             c.globalAlpha = Math.min(1, v * 1.15); c.fillStyle = P.gold; star4(c, q.x, q.y, q.r * v);
@@ -565,8 +576,7 @@
     // corner (never hangs from the top), high or low, steep or flat; its ends always melt away. Now and then
     // (1 in 20) it's a double rainbow: a fainter second arc above, colours the other way round.
     rainbow: { name: 'Rainbow', make(w, h, P, dark, k) {
-      const off = document.createElement('canvas'); off.width = Math.max(1, Math.round(w)); off.height = Math.max(1, Math.round(h));
-      const o = off.getContext('2d');
+      const OW = Math.max(1, Math.round(w)); const OH = Math.max(1, Math.round(h)); // the bands are drawn at note size first
       const band = Math.max(4, w / 71); // about 20% wider than the preview
       const N = 120;
       const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
@@ -593,27 +603,60 @@
       // its strength along the arc is applied in one go with a soft mask: the ends fade in slowly and stay faint,
       // and the front of the part drawn so far is a long soft edge. `strength` is the see-through-ness of the whole bow.
       const FRONT = .2;
-      const sc = document.createElement('canvas'); sc.width = off.width; sc.height = off.height;
+      const sc = document.createElement('canvas'); sc.width = OW; sc.height = OH;
       const s2 = sc.getContext('2d');
-      function bow(g, rOuter, reverse, prog, strength) {
+      // 1.1.23 (speed): the bands never change while a rainbow is up, so they are drawn and blurred ONCE per rainbow, at
+      // screen resolution (`solid`); each frame only the soft mask that draws it in is laid over them, and once it has
+      // fully drawn in, the finished picture is simply reused (only its see-through-ness changes as it fades). It used
+      // to repaint all the bands, rebuild the mask and blur the whole note every frame: ~44 ms a frame on a big note
+      // without a graphics card, more than a frame has. Same picture (the bows never overlap, so blurring each bow
+      // before masking it is the same as blurring both after).
+      // the part of the note a bow covers (note px), with room for its blur; all the work below stays inside it
+      function bowBox(g, rOuter) {
+        const lo = Math.min(g.aS, g.aS + g.d); const hi = Math.max(g.aS, g.aS + g.d); const rIn = rOuter - 6.5 * band; const rOut = rOuter + band;
+        let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+        for (let k = 0; k <= 64; k++) { const a = lo + (hi - lo) * k / 64; for (const r of [rIn, rOut]) { const x = g.cx + Math.cos(a) * r; const y = g.cy + Math.sin(a) * r; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } }
+        const pad = band + 6; x0 = clamp(x0 - pad, 0, w); y0 = clamp(y0 - pad, 0, h); x1 = clamp(x1 + pad, 0, w); y1 = clamp(y1 + pad, 0, h);
+        return [x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0)];
+      }
+      const devBox = ([x, y, bw, bh], sx) => { const X = Math.max(0, Math.floor(x * sx)); const Y = Math.max(0, Math.floor(y * sx)); return [X, Y, Math.ceil((x + bw) * sx) - X, Math.ceil((y + bh) * sx) - Y]; };
+      function solidBow(g, rOuter, reverse, sx, W, H) {
         const list = reverse ? [...RAINBOW_HUES].reverse() : RAINBOW_HUES;
-        const lo = Math.min(g.aS, g.aS + g.d); const hi = Math.max(g.aS, g.aS + g.d); const start = lo - .05;
-        const at = (u) => Math.pow(smooth(Math.min(u, 1 - u) / .38), 1.6) * smooth((prog - u) / FRONT) * strength;
+        const lo = Math.min(g.aS, g.aS + g.d); const hi = Math.max(g.aS, g.aS + g.d);
         s2.clearRect(0, 0, sc.width, sc.height);
         s2.lineCap = 'butt'; s2.lineWidth = band + 1.2;
         list.forEach((hue, i) => {
           s2.strokeStyle = `hsl(${hue}, ${dark ? 92 : 85}%, ${dark ? 66 : 57}%)`;
           s2.beginPath(); s2.arc(g.cx, g.cy, rOuter - i * band, lo, hi); s2.stroke();
         });
-        const grad = s2.createConicGradient(start, g.cx, g.cy);
+        const box = bowBox(g, rOuter); const [bx, by, bw, bh] = box; const dev = devBox(box, sx);
+        // only as big as the bow's box (a full-screen canvas per bow would take a lot of memory on a big note)
+        const cv = document.createElement('canvas'); cv.width = Math.max(1, dev[2]); cv.height = Math.max(1, dev[3]); const x = cv.getContext('2d');
+        x.setTransform(sx, 0, 0, sx, -dev[0], -dev[1]); x.filter = 'blur(1.6px)';
+        x.drawImage(sc, bx, by, bw, bh, bx, by, bw, bh);
+        return { cv, box, dev };
+      }
+      // lay the drawing-in mask over a blurred bow (into `into`, at screen resolution, only inside the bow's box)
+      function maskBow(into, bow, g, prog, strength, sx, add) {
+        const [X, Y, BW, BH] = bow.dev;
+        if (add && (!spare || spare.width !== into.width || spare.height !== into.height)) { spare = document.createElement('canvas'); spare.width = into.width; spare.height = into.height; } // only a double rainbow needs it
+        const tmp = add ? spare : into; const y = tmp.getContext('2d');
+        y.setTransform(1, 0, 0, 1, 0, 0); y.globalCompositeOperation = 'source-over';
+        if (add) y.clearRect(X, Y, BW, BH);
+        y.drawImage(bow.cv, X, Y);
+        const lo = Math.min(g.aS, g.aS + g.d); const start = lo - .05;
+        const at = (u) => Math.pow(smooth(Math.min(u, 1 - u) / .38), 1.6) * smooth((prog - u) / FRONT) * strength;
+        y.setTransform(sx, 0, 0, sx, 0, 0);
+        const grad = y.createConicGradient(start, g.cx, g.cy);
         const stops = [];
         for (let j = 0; j <= N; j++) { const u = j / N; stops.push([(g.aS + g.d * u - start) / TAU, at(u)]); }
-        stops.sort((x, y) => x[0] - y[0]);
+        stops.sort((p1, p2) => p1[0] - p2[0]);
         for (const [of, a] of stops) grad.addColorStop(Math.max(0, Math.min(1, of)), `rgba(0,0,0,${a.toFixed(4)})`);
-        s2.globalCompositeOperation = 'destination-in'; s2.fillStyle = grad; s2.fillRect(0, 0, sc.width, sc.height);
-        s2.globalCompositeOperation = 'source-over';
-        o.drawImage(sc, 0, 0);
+        y.globalCompositeOperation = 'destination-in'; y.fillStyle = grad; y.fillRect(X / sx, Y / sx, BW / sx, BH / sx);
+        y.globalCompositeOperation = 'source-over'; y.setTransform(1, 0, 0, 1, 0, 0);
+        if (add) into.getContext('2d').drawImage(tmp, X, Y, BW, BH, X, Y, BW, BH);
       }
+      let pic = null; let spare = null; // the picture shown (screen resolution) and a spare for the second bow
       const GROW = 4.8; const STAY = 3; const FADE = 2.6; const WAIT = 1.6 / Math.max(.15, k); // "Often" comes back sooner
       let cur = null; let first = true; const glints = [];
       return {
@@ -637,11 +680,28 @@
           const t = cur.age; const prog = ease(t / GROW) * (1 + FRONT);
           const alpha = (dark ? .62 : .78) * (t < GROW + STAY ? 1 : 1 - smooth((t - GROW - STAY) / FADE));
           if (alpha <= .01 || prog <= 0) return;
-          o.clearRect(0, 0, off.width, off.height);
-          bow(cur.g, cur.g.r, false, prog, 1);
-          // a double rainbow: the second bow is just as wide and solid, a little fainter, colours the other way round
-          if (cur.g.double) bow(cur.g, cur.g.r + band * 9, true, ease((t - GROW * .3) / GROW) * (1 + FRONT), .62);
-          c.save(); c.filter = 'blur(1.6px)'; c.globalAlpha = alpha; c.drawImage(off, 0, 0, w, h); c.restore();
+          const T = typeof c.getTransform === 'function' ? c.getTransform() : null; const sx = T && T.a > 0 ? T.a : 1;
+          const W = Math.max(1, Math.round(w * sx)); const H = Math.max(1, Math.round(h * sx));
+          if (!cur.solid || cur.sx !== sx) { // a new rainbow (or the note moved to a screen with another scale)
+            cur.sx = sx; cur.solid = [solidBow(cur.g, cur.g.r, false, sx, W, H)];
+            // a double rainbow: the second bow is just as wide and solid, a little fainter, colours the other way round
+            if (cur.g.double) cur.solid.push(solidBow(cur.g, cur.g.r + band * 9, true, sx, W, H));
+            cur.key = '';
+            if (!pic || pic.width !== W || pic.height !== H) { pic = document.createElement('canvas'); pic.width = W; pic.height = H; }
+            else pic.getContext('2d').clearRect(0, 0, W, H);
+          }
+          const prog2 = cur.g.double ? ease((t - GROW * .3) / GROW) * (1 + FRONT) : 0;
+          const key = `${prog.toFixed(5)}|${prog2.toFixed(5)}`;
+          if (key !== cur.key) { // still drawing in: lay the mask again (once it's fully in, nothing to do)
+            cur.key = key;
+            const px = pic.getContext('2d'); px.setTransform(1, 0, 0, 1, 0, 0);
+            for (const bw of cur.solid) px.clearRect(...bw.dev);
+            maskBow(pic, cur.solid[0], cur.g, prog, 1, sx, false);
+            if (cur.g.double) maskBow(pic, cur.solid[1], cur.g, prog2, .62, sx, true);
+          }
+          c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = alpha;
+          let [X, Y, BW, BH] = cur.solid[0].dev; if (cur.solid[1]) { const [X2, Y2, BW2, BH2] = cur.solid[1].dev; const R2 = Math.max(X + BW, X2 + BW2); const B2 = Math.max(Y + BH, Y2 + BH2); X = Math.min(X, X2); Y = Math.min(Y, Y2); BW = R2 - X; BH = B2 - Y; }
+          c.drawImage(pic, X, Y, BW, BH, X, Y, BW, BH); c.restore();
           for (const q of glints) { const v = q.age / q.life; c.globalAlpha = Math.sin(Math.PI * v) * .95; c.fillStyle = `hsl(${q.hue} ${dark ? 95 : 85}% ${dark ? 78 : 62}%)`; star4(c, q.x, q.y, 3.2 * (1 - v * .4)); }
         },
       };
@@ -686,18 +746,25 @@
       const ease = (x) => .5 - .5 * Math.cos(Math.PI * clamp(x, 0, 1));
       let tm = R(0, CRUISE); let speed = .1; let flash = 0;
       const speedAt = (x) => (x < CRUISE ? .1 : x < CRUISE + SPOOL ? .1 + 1.5 * ease((x - CRUISE) / SPOOL) : x < CRUISE + SPOOL + WARP ? 1.6 : 1.6 - 1.5 * ease((x - CRUISE - SPOOL - WARP) / DROP));
+      // 1.1.22 (ninth round, the owner): the pointer no longer steers where the stars come from. Instead, while it is in
+      // the middle of the note (a box round the centre that is 10 % of the note: 31.6 % of its width and height), it's
+      // hyperdrive the whole time, almost twice as fast as the normal jump (3 instead of 1.6), spooling up in about a
+      // second with a flash; leaving the middle drops back to the normal cycle
+      const HYPER = 3; const BOX = .12; let hyper = 0; // (10th round: a little closer to the centre: 24 % of the width / height, was 31.6 %)
       return {
         step(dt, t, m) {
-          const tx = m ? m.x : w / 2; const ty = m ? m.y : h / 2; const f = Math.min(1, dt * 1.6); sf.vp.x += (tx - sf.vp.x) * f; sf.vp.y += (ty - sf.vp.y) * f;
-          const before = tm; tm = (tm + dt) % CYCLE; speed = speedAt(tm);
-          if (before < CRUISE + SPOOL && tm >= CRUISE + SPOOL) flash = 1;
+          const mid = !!m && Math.abs(m.x - w / 2) < w * BOX && Math.abs(m.y - h / 2) < h * BOX;
+          const was = hyper; hyper = clamp(hyper + (mid ? dt * 1.1 : -dt * .8), 0, 1);
+          if (was < .5 && hyper >= .5) flash = 1;
+          const before = tm; tm = (tm + dt) % CYCLE; const e = ease(hyper); speed = speedAt(tm) * (1 - e) + HYPER * e;
+          if (before < CRUISE + SPOOL && tm >= CRUISE + SPOOL && hyper < .5) flash = 1;
           flash = Math.max(0, flash - dt * 1.6);
           sf.move(dt, speed);
         },
         draw(c) {
-          const fast = clamp((speed - .1) / 1.5, 0, 1);
-          if (fast > .05) sf.draw(c, P.warp, speed, .22, 1 + fast * .8);
-          sf.draw(c, P.star, speed, .22 * (1 - fast * .4), .7);
+          const fast = clamp((speed - .1) / 1.5, 0, 1); const len = speed > 1.6 ? .22 * 1.6 / speed * (1 + (speed - 1.6) * .25) : .22; // hyperdrive: faster, the streaks only a little longer
+          if (fast > .05) sf.draw(c, P.warp, speed, len, 1 + fast * .8);
+          sf.draw(c, P.star, speed, len * (1 - fast * .4), .7);
           if (flash > 0) {
             const r = Math.max(w, h) * (.2 + (1 - flash) * .5); const g = c.createRadialGradient(sf.vp.x, sf.vp.y, 0, sf.vp.x, sf.vp.y, r);
             g.addColorStop(0, P.warp); g.addColorStop(1, 'transparent'); c.globalAlpha = flash * (dark ? .45 : .3); c.fillStyle = g; c.fillRect(0, 0, w, h);
@@ -853,64 +920,43 @@
       };
     } },
     // Analog monitor (id 'glitch', kept so saved choices still work; it was "Glitch" before the owner asked for just
-    // the calm part): faint scanlines that crawl slowly, and ONE bright scan line that sweeps down the screen now and
-    // then. 1.1.22, fifth round (the owner: "more similar to Ghost ripple", "a single line scanning the monitor, not
-    // multiple in different speeds"): every scanline is a row of springy points, like the dots of Ghost ripple. The scan
-    // line is the invisible something: the lines part to let it through and wobble back into place behind it. The
-    // pointer does the same while it MOVES (a resting pointer leaves the lines alone, so there's no fixed lump or
-    // ellipse; the lines part by up to ~10 px and wobble back in about 2–3 s). No second bar, no red / cyan fringe, no blobs.
-    // Frequency = how often the line sweeps (cycle = 16 s / k: "Rarely" about once a minute, "Normal" every ~16 s,
-    // "Often" every ~5 s, where it also sweeps quicker).
+    // the calm part): faint scanlines that crawl slowly, and now and then one soft scan line sweeps slowly down.
+    // 1.1.22, seventh round (the owner: the lines moved too fast, there were too many, and "where the mouse is, it should
+    // just make a gap between the horizontal lines"): lines every 6 px (was 4) crawling at 3 px/s (was 8); the scan line
+    // takes 8 s to cross and no longer shakes the lines (the springy Ghost-ripple lines are gone). The pointer opens a
+    // smooth gap in the lines where it is (also when it rests); the lines bend round it and close again when it leaves.
+    // Frequency = how often the scan line comes: every clamp(24 s / k, 12 s, 75 s) from start to start.
     glitch: { name: 'Analog monitor', make(w, h, P, dark, k) {
       const S = clamp(Math.min(w, h) / 280, .8, 1.5);
-      const GAP = 4; const COL = 8; const cols = Math.ceil(w / COL) + 1; const rows = Math.ceil(h / GAP) + 2;
-      const dy = new Float32Array(rows * cols); const vy = new Float32Array(rows * cols); const amp = new Float32Array(rows);
-      const f = clamp(k || 1, .2, 4); const cycle = clamp(16 / f, 5, 60); const dur = clamp(cycle * .45, 4, 9);
-      const SPEED = (h + 80) / dur; const RS = 30 * S; const RP = 34 * S; const FS = 260 * S * Math.pow(SPEED / 50, 1.5); const FP = 2600 * S;
-      let off = 0; let sy = -40; let moving = false; let wait = R(.5, 1.5);
+      const GAP = 6; const SPD = 3; const G = 9 * S; const RX = 44 * S; const RY = 24 * S; // gap: half height, reach sideways / up-down
+      const f = clamp(k || 1, .2, 6); const cycle = clamp(24 / f, 12, 75); const DUR = 8;
+      let sy = -40; let moving = false; let wait = R(1, 4); let gx = 0; let gy = 0; let ga = 0; let off = 0;
+      const bend = (x, y) => { const dy = y - gy; if (dy > RY * 2.6 || dy < -RY * 2.6) return 0; const dx = (x - gx) / RX; return (dy < 0 ? -1 : 1) * G * ga * Math.exp(-dx * dx) * Math.exp(-((dy / RY) ** 2)); };
       return {
         step(dt, t, m) {
-          off += dt * 8;
-          while (off >= GAP) { off -= GAP; dy.copyWithin(cols, 0, dy.length - cols); vy.copyWithin(cols, 0, vy.length - cols); amp.copyWithin(1, 0, rows - 1); dy.fill(0, 0, cols); vy.fill(0, 0, cols); amp[0] = 0; } // the lines crawl down a row
-          if (moving) { sy += SPEED * dt; if (sy > h + 40) { moving = false; wait = Math.max(.5, cycle - dur) * R(.8, 1.2); } }
+          off = (off + dt * SPD) % GAP;
+          if (moving) { sy += (h + 80) / DUR * dt; if (sy > h + 40) { moving = false; wait = Math.max(1, cycle - DUR) * R(.85, 1.15); } }
           else { wait -= dt; if (wait <= 0) { moving = true; sy = -40; } }
-          const pm = m && m.sp > 25 ? clamp(m.sp / 500, 0, 1.4) : 0; // only a moving pointer disturbs the lines
-          const h2 = Math.min(dt, .066); const damp = Math.exp(-3 * h2);
-          for (let r = 0; r < rows; r++) {
-            const yb = (r - 1) * GAP + off;
-            const nearScan = moving && Math.abs(yb - sy) < RS + 24; const nearPtr = pm > 0 && Math.abs(yb - m.y) < RP + 24;
-            if (!nearScan && !nearPtr && amp[r] === 0) continue;
-            const base = r * cols; let mx = 0;
-            for (let j = 0; j < cols; j++) {
-              const i = base + j; let v = vy[i]; let d = dy[i]; const yn = yb + d;
-              if (nearScan) { const dd = yn - sy; const ad = Math.abs(dd); if (ad < RS) { const q = 1 - ad / RS; v += dd / (ad + 4) * q * q * FS * h2; } }
-              if (nearPtr) { const dd = yn - m.y; const dx = j * COL - m.x; const dist = Math.hypot(dx, dd); if (dist < RP) { const q = 1 - dist / RP; v += dd / (dist + 3) * q * q * FP * pm * h2; } }
-              v -= d * 7 * h2; v *= damp; d += v * h2;
-              if (Math.abs(d) < .02 && Math.abs(v) < .05) { d = 0; v = 0; }
-              dy[i] = d; vy[i] = v; const a = Math.abs(d) + Math.abs(v) * .15; if (a > mx) mx = a;
-            }
-            amp[r] = mx;
-          }
+          if (m) { if (ga < .01) { gx = m.x; gy = m.y; } const e = Math.min(1, dt * 12); gx += (m.x - gx) * e; gy += (m.y - gy) * e; }
+          ga = clamp(ga + (m ? dt * 5 : -dt * 3), 0, 1); // opens in ~0.2 s, closes in ~0.3 s
         },
         draw(c) {
-          const A = dark ? .05 : .045; const lo = []; const mid = []; const hi = [];
+          const A = dark ? .05 : .045; const segs = [];
           c.fillStyle = P.scan; c.globalAlpha = A; c.beginPath();
-          for (let r = 0; r < rows; r++) {
-            const yb = (r - 1) * GAP + off; if (yb < -1 || yb > h) continue;
-            if (amp[r] < .2) { c.rect(0, yb, w, 1); continue; }
-            const base = r * cols;
-            for (let j = 0; j < cols - 1; j++) {
-              const a = dy[base + j]; const b = dy[base + j + 1]; const m = Math.max(Math.abs(a), Math.abs(b));
-              (m < .6 ? lo : m < 4 ? mid : hi).push(j * COL, yb + .5 + a, Math.min(w, (j + 1) * COL), yb + .5 + b);
-            }
+          const x0 = Math.max(0, Math.floor((gx - RX * 2.2) / 8) * 8); const x1 = Math.min(w, gx + RX * 2.2);
+          for (let y = off - GAP; y < h; y += GAP) {
+            if (ga > .01 && Math.abs(y - gy) < RY * 2.6 && x1 > x0) { // this line bends round the gap
+              if (x0 > 0) c.rect(0, y, x0, 1); if (x1 < w) c.rect(x1, y, w - x1, 1);
+              let px = x0; let py = y + .5 + bend(x0, y);
+              for (let x = x0 + 8; x <= x1 + 7.99; x += 8) { const xx = Math.min(x, x1); const ny = y + .5 + bend(xx, y); segs.push(px, py, xx, ny); px = xx; py = ny; }
+            } else c.rect(0, y, w, 1);
           }
           c.fill();
-          c.strokeStyle = P.scan; c.lineWidth = 1;
-          c.globalAlpha = A; strokeSegs(c, lo); c.globalAlpha = A * 1.9; strokeSegs(c, mid); c.globalAlpha = A * 3.4; strokeSegs(c, hi); // lines that are out of place shine a little more
-          if (moving) { // the scan line, with a soft glow trailing behind it
+          if (segs.length) { c.strokeStyle = P.scan; c.lineWidth = 1; strokeSegs(c, segs); }
+          if (moving) { // the scan line, with a soft glow trailing it
             const gb = c.createLinearGradient(0, sy - 36, 0, sy); gb.addColorStop(0, 'transparent'); gb.addColorStop(1, P.scan);
-            c.globalAlpha = dark ? .075 : .06; c.fillStyle = gb; c.fillRect(0, sy - 36, w, 36);
-            c.globalAlpha = dark ? .22 : .17; c.fillStyle = P.scan; c.fillRect(0, sy - .75, w, 1.5);
+            c.globalAlpha = dark ? .07 : .055; c.fillStyle = gb; c.fillRect(0, sy - 36, w, 36);
+            c.globalAlpha = dark ? .16 : .13; c.fillStyle = P.scan; c.fillRect(0, sy - .75, w, 1.5);
           }
         },
       };
@@ -1179,12 +1225,13 @@
     // then a bubble breaks free and floats up as a glowing orb, shimmering, until it pops into tiny stars
     cauldron: { name: 'Cauldron', make(w, h, P, dark, k) {
       const S = Math.min(w, h) / 280; const sz = clamp(S, .8, 1.5); const SY = h * .86; const COL = Math.floor(R(0, 2));
-      // 1.1.22: the pointer can stir the potion a little: moving sideways near the surface sends small waves the way it
-      // goes, the surface dips under it and a faint swirl turns below; it all calms down again in a second or two
-      const stir = { x: w / 2, a: 0, dir: 1, ph: 0 };
+      // 1.1.22: the pointer stirs the potion. Seventh round (the owner found the quick sideways wave too wobbly and picked
+      // the "smushy" dip of pick B, without its whirlpool): near the surface the pointer presses a smooth, soft dip into it
+      // that drifts after the pointer with a little lag, stays while it rests there and fades out when it leaves
+      const stir = { x: w / 2, a: 0 };
       const surf = (x, t) => {
         let y = SY + Math.sin(x * .045 + t * 2.1) * 2.2 * sz + Math.sin(x * .021 - t * 1.3) * 1.6 * sz;
-        if (stir.a > .01) { const dx = x - stir.x; if (dx > -160 && dx < 160) { const g = Math.exp(-((dx / 70) ** 2)); y += stir.a * sz * (2.8 * Math.sin(dx * .09 - t * 7 * stir.dir) * g + 2.4 * Math.exp(-((dx / 22) ** 2))); } }
+        if (stir.a > .01) { const dx = x - stir.x; if (dx > -130 && dx < 130) y += stir.a * sz * 4.5 * Math.exp(-((dx / (30 * sz)) ** 2)); }
         return y;
       };
       const domes = []; const drops = []; const steam = []; const orbs = []; const stars = [];
@@ -1192,11 +1239,8 @@
       const puff = (x, y, big) => { if (steam.length < 30) steam.push({ x, y, vx: R(-6, 6) * S, vy: -R(20, 32) * S, r: (big ? R(10, 16) : R(6, 10)) * sz, grow: R(7, 12) * sz, age: 0, life: R(3, 4.5), ph: R(0, TAU), c: big ? 0 : 1 }); };
       return {
         step(dt, t, m) {
-          if (m && m.y > SY - 40 * sz && Math.abs(m.vx) > 15) {
-            const f = Math.min(1, dt * 4); stir.a += (clamp(Math.abs(m.vx) / 350, .25, 1) - stir.a) * f; stir.x += (m.x - stir.x) * Math.min(1, dt * 6); stir.dir += (Math.sign(m.vx) - stir.dir) * Math.min(1, dt * 3);
-          } else stir.a *= Math.pow(.35, dt);
-          stir.ph += dt * 5 * stir.dir * stir.a;
-          if (m && m.y > SY - 45 * sz && m.sp > 30 && domes.length < 9 && Math.random() < dt * Math.min(10, 2 + m.sp * .02)) domes.push({ x: clamp(m.x + R(-10, 10), 4, w - 4), r: R(5, 10) * sz, age: 0, life: R(.5, .9), c: Math.random() < .7 ? COL : 1 - COL });
+          if (m && m.y > SY - 40 * sz) { if (stir.a < .01) stir.x = m.x; stir.a = Math.min(1, stir.a + dt * 1.4); stir.x += (m.x - stir.x) * Math.min(1, dt * 2.2); }
+          else stir.a = Math.max(0, stir.a - dt * .8);
           if (m) for (const o of orbs) if (o.mode !== 'pop' && Math.hypot(o.x - m.x, o.y - m.y) < o.r + 7) o.mode = 'pop';
           if (goDome(dt) && domes.length < 7) domes.push({ x: R(w * .08, w * .92), r: R(5, 11) * sz, age: 0, life: R(.6, 1.1), c: Math.random() < .7 ? COL : 1 - COL });
           if (goSteam(dt)) puff(pick(vents) + R(-14, 14) * sz, SY - 2, false);
@@ -1228,16 +1272,11 @@
           // steam: soft puffs that rise, swell, sway and thin out
           for (const s of steam) {
             const u = s.age / s.life; const a = Math.sin(Math.PI * Math.min(1, u * 1.3)) * (1 - u * .8) * (dark ? .42 : .3);
-            const sg = c.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r); sg.addColorStop(0, s.c ? P.steam : P.brew[COL]); sg.addColorStop(1, 'transparent');
-            c.globalAlpha = a; c.fillStyle = sg; c.beginPath(); c.arc(s.x, s.y, s.r, 0, TAU); c.fill();
+            c.globalAlpha = a; stamp(c, soft(s.c ? P.steam : P.brew[COL]), s.x, s.y, s.r);
           }
           // the potion surface
           c.strokeStyle = P.brew[COL]; c.lineWidth = 1.6 * sz; c.globalAlpha = dark ? .7 : .6; c.beginPath();
           for (let x = 0; x <= w + 6; x += 6) { const y = surf(x, t); if (x) c.lineTo(x, y); else c.moveTo(x, y); } c.stroke();
-          if (stir.a > .03) { // the faint swirl the stirring leaves below the surface
-            c.strokeStyle = P.brewHi; c.lineWidth = 1.1 * sz;
-            for (const [rk, o, ak] of [[1, 0, .32], [.6, Math.PI, .24]]) { c.globalAlpha = stir.a * ak; c.beginPath(); c.ellipse(stir.x, SY + 9 * sz, 28 * sz * rk, 5 * sz * rk, 0, stir.ph + o, stir.ph + o + 1.7); c.stroke(); }
-          }
           // domes swelling out of the surface: filled, glowing, with a bright crescent on top
           for (const d of domes) {
             const u = d.age / d.life; const r = d.r * (.3 + .7 * Math.sin(Math.PI / 2 * u)); const y = surf(d.x, t);
@@ -1311,8 +1350,7 @@
             }
             if (lit > .01) { // it shines: from where it was first touched, a wave of violet light spreads over every dot (a bright edge as it goes), then all of it glows, with a soft shimmer running down it
               const sx = q.x + (src ? src.x : 0); const sy = q.y + (src ? src.y : 0); const W = src ? wave : J * 9; const spread = clamp(W / (J * 1.6), 0, 1);
-              const g = c.createRadialGradient(q.x, q.y, 0, q.x, q.y, J * 1.1); g.addColorStop(0, ALT); g.addColorStop(1, 'transparent');
-              c.globalAlpha = lit * fade * spread * (dark ? .24 : .15); c.fillStyle = g; c.beginPath(); c.arc(q.x, q.y, J * 1.1, 0, TAU); c.fill();
+              c.globalAlpha = lit * fade * spread * (dark ? .24 : .15); stamp(c, soft(ALT), q.x, q.y, J * 1.1);
               for (const d of body) {
                 const dd = Math.hypot(d[0] - sx, d[1] - sy); const got = clamp((W - dd) / (J * .35), 0, 1); const edge = Math.exp(-(((dd - W) / (J * .14)) ** 2));
                 const sh = .85 + .15 * Math.sin(d[4] * 9 - t * 6); const b = lit * got;
@@ -1360,8 +1398,8 @@
           for (const tg of tongues) {
             const th = tall(tg, t) * 1.1; const tw = 20 * sz * (1 + tg.flare * .3);
             c.save(); c.translate(tg.x + Math.sin(t * 5 + tg.ph) * 3, h); c.scale(1, th / tw);
-            const fg = c.createRadialGradient(0, 0, 0, 0, 0, tw); fg.addColorStop(0, P.fel[1]); fg.addColorStop(.45, P.fel[0]); fg.addColorStop(1, 'transparent');
-            c.globalAlpha = (dark ? .34 : .24) * (.8 + .2 * Math.sin(t * 11 + tg.ph)); c.fillStyle = fg; c.beginPath(); c.arc(0, 0, tw, Math.PI, TAU); c.fill(); c.restore();
+            c.globalAlpha = (dark ? .34 : .24) * (.8 + .2 * Math.sin(t * 11 + tg.ph));
+            c.drawImage(glowSprite([[0, P.fel[1]], [.45, P.fel[0]], [1, 'transparent']]), 0, 0, SPR, SPR / 2, -tw, -tw, tw * 2, tw); c.restore(); // its top half
           }
           const core = []; const mid = []; const out = [];
           for (const q of p) { const v = q.age / q.life; const r = (q.spark ? 1 : 3.2 * (1 - v * .8)) * sz; (v < .3 ? core : v < .65 ? mid : out).push([q.x, q.y, r, q.spark ? 1 - v * .5 : Math.sqrt(1 - v) * .85]); }
@@ -1764,7 +1802,7 @@
       // 1.1.22: only the dust now (no beam of light): specks swirl up off the pointer, drift and twinkle out
       // 1.1.22, fifth round (the owner: "less frequency, the Rarely should be the Often"): the whole scale moved down, so the old
       // "Rarely" amount (k .35) is now "Often", "Normal" is about 1/7 of what it was and "Rarely" about 1/21
-      const m = []; const sp = spacer(6 / (k * (.35 / 2.6)));
+      const m = []; const sp = spacer(6 / (k * (.35 / 2.6) * 1.2)); // (sixth round: 20 % more at every setting)
       return {
         move(x, y, d) { for (let n = sp(d); n > 0; n--) room(m, 110), m.push({ x: x + R(-12, 12), y: y + R(-12, 12), vx: R(-8, 8), vy: R(-8, 6), z: Math.random(), ph: R(0, TAU), age: 0, life: R(1.5, 2.6) }); },
         step(dt) { const damp = Math.exp(-1.2 * dt); for (const q of m) { q.vx = (q.vx + R(-1, 1) * 12 * dt) * damp; q.vy = (q.vy + (R(-1, 1) * 12 - 3) * dt) * damp; q.x += q.vx * dt; q.y += q.vy * dt; } cull(m, dt); },
@@ -1889,8 +1927,8 @@
         draw(c, t) {
           if (act > 0) glow2(c, px, py + 3, 5, P.brew[COL], P.brewHi, act * (.35 + .1 * Math.sin(t * 6)), dark ? .7 : .5);
           for (const s of steam) {
-            const u = s.age / s.life; const g = c.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r); g.addColorStop(0, P.brew[COL]); g.addColorStop(1, 'transparent');
-            c.globalAlpha = Math.sin(Math.PI * u) * (dark ? .4 : .3); c.fillStyle = g; c.beginPath(); c.arc(s.x, s.y, s.r, 0, TAU); c.fill();
+            const u = s.age / s.life;
+            c.globalAlpha = Math.sin(Math.PI * u) * (dark ? .4 : .3); stamp(c, soft(P.brew[COL]), s.x, s.y, s.r);
           }
           for (const q of bub) {
             const u = q.age / q.life; const r = q.r * (.4 + .6 * Math.min(1, u * 2.5)); const a = Math.min(1, u * 6);
@@ -2000,7 +2038,7 @@
   // ones sit next to each other (weather with Rainbow after Rain; leaves and blossom; party; bubbles and fish; glass shards;
   // plankton; glowing things; sky; water, network and ghost ripple; screens; magic).
   // Only the order changed: the ids are the same, so saved choices stay. Keep store.js (FX_EFFECTS / FX_FOLLOWERS) in the same order.
-  const ORDER = ['snow', 'rain', 'rainbow', 'lightning', 'leaves', 'blossom', 'fireworks', 'confetti', 'hearts', 'bubbles', 'fish', 'shards', 'plankton', 'fireflies', 'dust', 'embers', 'nightsky', 'stardust', 'warp', 'ocean', 'silk', 'network', 'ghost', 'matrix', 'glitch', 'heal', 'cauldron', 'fel', 'jelly'];
+  const ORDER = ['snow', 'rain', 'lightning', 'rainbow', 'leaves', 'blossom', 'fireworks', 'confetti', 'hearts', 'bubbles', 'nightsky', 'embers', 'stardust', 'shards', 'plankton', 'fish', 'fireflies', 'dust', 'ocean', 'silk', 'jelly', 'network', 'ghost', 'warp', 'glitch', 'matrix', 'heal', 'cauldron', 'fel'];
   const EFFECT_IDS = [...ORDER.filter((id) => EFFECTS[id]), ...Object.keys(EFFECTS).filter((id) => !ORDER.includes(id))]; // an effect missing from ORDER still shows, at the end
   // the order in the pickers: each follower in the same place as its background effect, with the same name and
   // icon (snow = 'frost', rain = 'ripples': older ids, kept so saved choices stay); the pencil line last (the old 'comet' = Rainbow line is the Rainbow follower again)
@@ -2047,29 +2085,43 @@
   }
 
   // ---------------------------------------------------------------- one shared loop (30 frames a second, sleeps when idle)
+  // 1.1.23 (speed): on a machine that can't keep up (no graphics card, an older work laptop…), the effects step a little
+  // less often instead of eating the time typing needs: it watches how long the effects take per step (a running
+  // average) and goes from 30 steps a second to 20, or 15 if it's very slow, and back up when there's room again.
+  // Movement stays the same speed (each step moves further); on an ordinary computer it simply stays at 30.
+  const PACE = [1 / 30, 1 / 20, 1 / 15]; const SLOWER = [11, 18]; const FASTER = [6, 9]; // ms per step
   const loop = (() => {
     const layers = new Set();
     let running = false;
     let last = 0;
     let acc = 0;
+    let cost = 0; let level = 0;
     function frame(now) {
       const dt = Math.min(.1, (now - last) / 1000);
       last = now;
       let any = false;
       if (!document.hidden) {
         acc += dt;
-        const go = acc >= 1 / 30;
+        const go = acc >= PACE[level] - .002;
+        const t0 = go ? performance.now() : 0; let ticked = false;
         for (const L of layers) {
           if (!L.wants(now)) continue;
           any = true;
-          if (go) L.tick(Math.min(acc, .1));
+          if (go) { L.tick(Math.min(acc, .1)); ticked = true; }
         }
-        if (go) acc = 0;
+        if (go) {
+          acc = 0;
+          if (ticked) {
+            cost += ((performance.now() - t0) - cost) * .1;
+            if (level < 2 && cost > SLOWER[level]) { level++; cost *= .7; } else if (level > 0 && cost < FASTER[level - 1]) level--;
+          }
+        }
       } else any = true; // hidden: check again when it shows (the browser hardly runs frames meanwhile)
       if (any) requestAnimationFrame(frame); else running = false;
     }
     return {
       add(L) { layers.add(L); this.wake(); },
+      get pace() { return 1 / PACE[level]; }, // steps a second right now (for the tests)
       remove(L) { layers.delete(L); },
       wake() { if (running) return; running = true; last = performance.now(); acc = 0; requestAnimationFrame(frame); },
     };
@@ -2091,11 +2143,46 @@
     });
     return (m) => { mul = m; };
   }
+
+  // 1.1.23: each note's effects take a little of its paper's colour. Every coloured ink in the palette turns 12 % of the way
+  // round the colour wheel towards the paper's hue (lightness and strength stay, so it reads the same; greys and whites
+  // don't change; charcoal has no hue, so nothing changes there). Cached per paper.
+  const PAPER_HUE = { yellow: 50, cream: 40, orange: 28, pink: 335, rose: 345, purple: 265, lavender: 255, blue: 210, mist: 212, mint: 165, sage: 145, green: 100, night: 252, plum: 290, midnight: 225, forest: 150 };
+  const TINT = .12;
+  function hexHsl(hex) {
+    let x = hex.slice(1); if (x.length === 3) x = [...x].map((c) => c + c).join('');
+    const r = parseInt(x.slice(0, 2), 16) / 255; const g = parseInt(x.slice(2, 4), 16) / 255; const b = parseInt(x.slice(4, 6), 16) / 255;
+    const mx = Math.max(r, g, b); const mn = Math.min(r, g, b); const l = (mx + mn) / 2; const d = mx - mn;
+    if (!d) return [0, 0, l];
+    const sat = d / (1 - Math.abs(2 * l - 1)); let hu = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    hu *= 60; if (hu < 0) hu += 360; return [hu, sat, l];
+  }
+  function hslHex(hu, sat, l) {
+    const c = (1 - Math.abs(2 * l - 1)) * sat; const x = c * (1 - Math.abs(((hu / 60) % 2) - 1)); const m = l - c / 2;
+    const [r, g, b] = hu < 60 ? [c, x, 0] : hu < 120 ? [x, c, 0] : hu < 180 ? [0, c, x] : hu < 240 ? [0, x, c] : hu < 300 ? [x, 0, c] : [c, 0, x];
+    return '#' + [r, g, b].map((v) => Math.round(clamp(v + m, 0, 1) * 255).toString(16).padStart(2, '0')).join('').toUpperCase();
+  }
+  function tintInk(v, hue) {
+    if (typeof v === 'string') {
+      if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) return v;
+      const [hu, sat, l] = hexHsl(v); if (sat < .12 || l > .96 || l < .04) return v;
+      const diff = ((hue - hu + 540) % 360) - 180; return hslHex((hu + diff * TINT + 360) % 360, sat, l);
+    }
+    return Array.isArray(v) ? v.map((x) => tintInk(x, hue)) : v;
+  }
+  const paperCache = new Map();
+  function paperPalette(dark, paper) {
+    const base = dark ? DARK : LIGHT; const hue = PAPER_HUE[paper];
+    if (hue === undefined) return base;
+    const key = `${dark ? 1 : 0}|${paper}`;
+    if (!paperCache.has(key)) paperCache.set(key, Object.fromEntries(Object.entries(base).map(([k, v]) => [k, tintInk(v, hue)])));
+    return paperCache.get(key);
+  }
   function Layer(canvas) {
     const ctx = canvas.getContext('2d');
     const setMul = fadeable(ctx);
     let w = 0; let h = 0; let dpr = 1;
-    let eId = 'none'; let fId = 'none'; let dark = false; let eAmt = 'mid'; let fAmt = 'mid';
+    let eId = 'none'; let fId = 'none'; let dark = false; let eAmt = 'mid'; let fAmt = 'mid'; let paper = null; // the note's colour (1.1.23 tint)
     let eOp = 1; let fOp = 1; // 1.1.17: how see-through the background / the follower is
     let eff = null; let fol = null;
     let t = Math.random() * 5;
@@ -2107,13 +2194,13 @@
     // 1.1.16: the background and the follower are made separately, so picking another mouse follower (or its
     // frequency) doesn't restart the background, and the other way round
     function makeEffect() {
-      const P = dark ? DARK : LIGHT;
+      const P = paperPalette(dark, paper);
       const k = Math.min(2.5, Math.max(.3, (w * h) / BASE_AREA)) * EFFECT_AMOUNTS[eAmt]; // bigger notes and "Often" get more
       eff = w && h && EFFECTS[eId] ? EFFECTS[eId].make(w, h, P, dark, k) : null;
       if (eff) for (let i = 0; i < 40; i++) { t += .05; eff.step(.05, t); } // start mid-way, never from an empty note
     }
     function makeFollower() {
-      fol = w && h && FOLLOWERS[fId] ? FOLLOWERS[fId].make(w, h, dark ? DARK : LIGHT, dark, AMOUNTS[fAmt]) : null;
+      fol = w && h && FOLLOWERS[fId] ? FOLLOWERS[fId].make(w, h, paperPalette(dark, paper), dark, AMOUNTS[fAmt]) : null;
       mouse = null;
     }
     function build() {
@@ -2130,16 +2217,17 @@
       setMul(1); ctx.globalAlpha = 1;
     }
     const L = {
-      set({ effect = 'none', follower = 'none', dark: dk = false, effectAmount = 'mid', followerAmount = 'mid', effectOpacity = 1, followerOpacity = 1, interact: mi = true } = {}) {
+      set({ paper: pp = null, effect = 'none', follower = 'none', dark: dk = false, effectAmount = 'mid', followerAmount = 'mid', effectOpacity = 1, followerOpacity = 1, interact: mi = true } = {}) {
         interact = mi !== false; if (!interact) ptr.on = false;
         const ea = amountOf(effectAmount); const fa = amountOf(followerAmount);
         // opacity only changes how it's drawn: nothing is made again, so moving the slider never restarts anything
         const eo = opacityOf(effectOpacity) ?? 1; const fo = opacityOf(followerOpacity) ?? 1;
         const opChanged = eo !== eOp || fo !== fOp;
         eOp = eo; fOp = fo;
-        const effChanged = effect !== eId || dk !== dark || ea !== eAmt;
-        const folChanged = follower !== fId || dk !== dark || fa !== fAmt;
-        eId = effect; fId = follower; dark = dk; eAmt = ea; fAmt = fa;
+        const pc = (pp || null) !== paper;
+        const effChanged = effect !== eId || dk !== dark || ea !== eAmt || pc;
+        const folChanged = follower !== fId || dk !== dark || fa !== fAmt || pc;
+        eId = effect; fId = follower; dark = dk; eAmt = ea; fAmt = fa; paper = pp || null;
         if (effChanged && folChanged) build();
         else if (effChanged) { makeEffect(); draw(); }
         else if (folChanged) { makeFollower(); draw(); }
@@ -2261,5 +2349,5 @@
   // a follower that goes with a background has the same icon (and the same name, above)
   const PAIRS = Object.fromEntries(EFFECT_IDS.map((e) => [FOLLOWER_OF[e] || e, e])); // follower id → background id (all of them since 1.1.20)
   for (const [f, e] of Object.entries(PAIRS)) if (ICONS.effect[e]) ICONS.follower[f] = ICONS.effect[e];
-  window.COSMO_FX = { EFFECTS, FOLLOWERS, EFFECT_IDS, FOLLOWER_IDS, resolve, Layer, ICONS, AMOUNTS, EFFECT_AMOUNTS, PAIRS, opacityOf, PALETTES: { light: LIGHT, dark: DARK } };
+  window.COSMO_FX = { EFFECTS, FOLLOWERS, EFFECT_IDS, FOLLOWER_IDS, resolve, Layer, ICONS, AMOUNTS, EFFECT_AMOUNTS, PAIRS, opacityOf, paperPalette, loopPace: () => loop.pace, PALETTES: { light: LIGHT, dark: DARK } };
 })();

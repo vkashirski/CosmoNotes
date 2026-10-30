@@ -42,6 +42,17 @@
   </div>
 </main>
 
+<!-- 1.1.22 (ninth round): Ctrl+F finds text in the note; marks beside the scrollbar show where the matches are -->
+<div id="find" role="search" hidden>
+  <svg class="fi" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+  <input id="findQ" type="text" placeholder="Find in note" spellcheck="false" autocomplete="off" aria-label="Find in note">
+  <span id="findN" aria-live="polite"></span>
+  <button type="button" class="fb" id="findPrev" title="Previous (Shift+Enter)" aria-label="Previous match"><svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></button>
+  <button type="button" class="fb" id="findNext" title="Next (Enter)" aria-label="Next match"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+  <button type="button" class="fb" id="findX" title="Close (Esc)" aria-label="Close find"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+</div>
+<div id="findMarks" aria-hidden="true" hidden></div>
+
 <!-- shown instead of the note when it is locked -->
 <div id="lockScreen" hidden>
   <form id="unlockForm" autocomplete="off">
@@ -213,6 +224,13 @@
   <label class="fld"><span>Text to show</span><input id="linkText" placeholder="e.g. Recipe"></label>
   <label class="fld"><span>Web address</span><input id="linkUrl" placeholder="e.g. example.com"></label>
   <div class="btns"><button type="button" class="btn ghost" id="linkCancel">Cancel</button><button type="submit" class="btn">Save link</button></div>
+</form>
+
+<!-- 1.1.23: a picture's description (right-click a picture → Add description…) -->
+<form class="pop" id="descPop" hidden autocomplete="off">
+  <h4 id="descTitle">Describe this picture</h4>
+  <label class="fld"><span>Words to find it by. They don’t show in the note; Ctrl+F and the notes list’s search find the picture by them.</span><textarea id="descText" rows="3" maxlength="500" placeholder="e.g. plumber’s receipt, March"></textarea></label>
+  <div class="btns"><button type="button" class="btn ghost" id="descCancel">Cancel</button><button type="submit" class="btn">Save</button></div>
 </form>
 
 <!-- recording bar -->

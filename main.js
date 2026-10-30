@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { pathToFileURL } = require('url');
-const { Store, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity, cleanFx, checklistMarks } = require('./store');
+const { Store, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity, cleanFx, checklistMarks, pictureWords } = require('./store');
 
 const APP_NAME = 'CosmoNotes';
 const OLD_DATA_DIR = 'Sticky Pins'; // where notes lived before the rename
@@ -307,6 +307,8 @@ function watchInkBar(win) {
     child.setAlwaysOnTop(!!(n && n.pinned), 'screen-saver');
     child.on('closed', () => { if (win[`${k}Win`] === child) { win[`${k}Win`] = null; win[`${k}Out`] = false; } });
     if (win[`${k}Out`]) placeInk(win, k);
+    // 1.1.23: making this window could take the focus (and with it the note's text selection) from the note: give it back
+    if (win.isFocused()) setTimeout(() => { if (!win.isDestroyed()) win.webContents.focus(); }, 0);
   });
   const follow = () => { for (const k of BAR_KINDS) if (win[`${k}Out`] && win[`${k}State`] && win[`${k}State`].mode === 'dock') placeInk(win, k); };
   win.on('move', follow);
@@ -958,6 +960,7 @@ function registerIpc() {
         id: n.id,
         title: n.title,
         text: hiddenInList(n) ? '' : n.text.slice(0, 600),
+        pics: hiddenInList(n) ? '' : pictureWords(n.html), // 1.1.23: picture descriptions, so the search finds them
         checks: hiddenInList(n) ? '' : checklistMarks(n.html, n.text.slice(0, 600)), // 1.1.22: which lines are checklist boxes (o) / ticked (x)
         firstImage: hiddenInList(n) ? null : n.firstImage,
         locked: hiddenInList(n), // shown as a locked card

@@ -12,7 +12,7 @@
  *   4. "Last updated" + version in ai-context/CONTEXT.md
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-10-28',
+  LAST_UPDATED: '2026-10-30',
 
   FEATURES: [
     {
@@ -45,7 +45,7 @@ window.COSMO_ABOUT = {
     {
       title: 'Writing',
       items: [
-        'Bold, italic, underline, strikethrough, bullet lists and tickable checklists.',
+        'Bold, italic, underline, strikethrough, bullet lists and tickable checklists. Ctrl+F finds words in a note.',
         'The A button opens a small text toolbar: font, colour, highlight, size and clear formatting, with undo. It changes the selected text; with nothing selected, it changes what you type next and leaves the rest of the note as it is (it says which). Colours include black. It stays open while you select text, and you can drag it anywhere.',
         'Spelling check that you can turn on or off for each note. Off by default, and Cyrillic words are not underlined.',
         'Word wrap on or off for each note (the button next to spelling). With word wrap off, lines keep their width and a narrower note scrolls sideways. Pictures still shrink to fit, unless you right-click one and choose “Keep size”.',
@@ -142,6 +142,22 @@ window.COSMO_ABOUT = {
   // Short, plain-language highlights for the in-app history (the full details are in CHANGELOG.md)
   VERSIONS: [
     {
+      version: '1.1.23',
+      date: '2026-10-30',
+      changes: [
+        'Right-click a picture → Add description: words to find it by. They don’t show in the note, but Ctrl+F and the notes list’s search find the picture by them, and they show when you point at it.',
+        'Each note’s effects take on a touch of its paper’s colour.',
+        'Effects are lighter and faster, especially on slower computers: the Rainbow takes about a quarter of the work it did, glows are quicker to draw, and a computer that can’t keep up draws a little less often instead of slowing your typing down.',
+        'Press Ctrl+F in a note to find words in it: every match lights up, Enter and Shift+Enter go to the next and previous one, and little marks next to the scrollbar show where they are.',
+        'Checklist boxes now match the size of the text next to them and sit centred on it; pressing Backspace at the start of a checklist line takes its box away.',
+        'Delete just before a picture (or Backspace just after one) now removes it, and right-click a picture → Copy image. Pictures in a ticked line are crossed out too.',
+        'Every effect choice is the same size, small pictures on cards in the notes list keep their size, and the card’s right-click menu starts with Add to favourites and Edit design.',
+        'The Analog monitor is calm: fewer, slower lines and one slow scan line now and then (Frequency sets how often), and your pointer opens a gap in the lines where it is.',
+        'Your pointer now presses a soft dip into the Cauldron’s potion instead of making it wobble.',
+        'Hold your pointer in the middle of Warp speed and it goes into hyperdrive, faster than ever, for as long as you stay there (its other mouse reaction is gone).',
+      ],
+    },
+    {
       version: '1.1.22',
       date: '2026-10-26',
       changes: [
@@ -150,7 +166,7 @@ window.COSMO_ABOUT = {
         'Fel fire burns low along the bottom instead of fizzing up like soda; the healing aura’s bottom pulses instead of swirling.',
         'Snowflakes you touch shatter into little bits, and fireflies close to your pointer drift over for a few seconds before they lose interest.',
         'Mouse effects that make particles as you move (glass shards, plankton, stardust, blossom, dust and more) now keep making them evenly along your path however fast you move the mouse, instead of in clumps with gaps.',
-        'The Analog monitor now has one bright line that sweeps down the screen now and then; the scanlines part around it and wobble back like the ghost ripple, and they do the same when you move your pointer over them. Frequency sets how often the line sweeps. The dust that follows your mouse is now much less frequent.',
+        'The dust that follows your mouse in Dust in light is much less frequent.',
         'The effects are listed in a better order, with alike ones together (weather, leaves and blossom, glowing things, sea life, water and network, magic…).',
         'Checklists now show their boxes (ticked or not) on the cards in the notes list.',
         'The Network background no longer bunches all its dots into one clump after a while.',
