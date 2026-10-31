@@ -90,7 +90,7 @@ Open this when working in `src/note.*` or `src/list.*`. Effects have their own f
   list.html) only draws it above y 11, the middle of the body's top line, so no sliver of it ever shows inside the body
   (1.1.15). Keep that if the icon changes.
 
-## Added in 1.1.22 – 1.1.23 (details also in CHANGELOG.md)
+## Added in 1.1.22 – 1.1.23 (details in CHANGELOG.md and CHANGELOG-archive.md)
 
 - **Ctrl+F in notes (1.1.23):** `#find`, `findHits` over the editor's text nodes → Ranges, shown with `CSS.highlights` `cn-find` / `cn-find-cur`, scrollbar marks `#findMarks`; Enter/F3 next, Shift prev, Esc closes and selects the match; nothing saved.
 - **Picture descriptions (1.1.23):** right-click → Add description…, stored as the picture's `alt` / `title`; Ctrl+F finds and outlines the picture; the list's search looks in `pics` = `pictureWords(html)` from store.js, sent by `list:get`.

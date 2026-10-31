@@ -3,7 +3,7 @@
 Windows sticky-notes app (Electron 39, plain JavaScript, no framework or bundler). Notes are stored locally only.
 The owner is not a programmer: explain changes in plain language, and edit files in this folder in place.
 Keep each file's existing line endings: they are mixed (`main.js`, `preload.js`, `src/note.*`, `build.bat` are CRLF;
-`store.js`, `src/list.*`, `src/fx.js`, `src/about.js`, `package.json`, `CHANGELOG.md` and `ai-context/*.md` are LF).
+`store.js`, `src/list.*`, `src/fx/*.js`, `src/about.js`, `package.json`, `CHANGELOG.md` and `ai-context/*.md` are LF).
 
 ## Commands
 - `npm test`: all tests under plain Node (`tests/fake-electron` stands in for Electron). Run it before saying a change is done.
@@ -21,7 +21,7 @@ Keep each file's existing line endings: they are mixed (`main.js`, `preload.js`,
 - **Saves into the owner's folder can silently keep the OLD file** (seen in 1.1.23). After writing through the folder bridge (`device_commit_files`), stage the file back and compare its sha256 or size with what you meant to save. Tell the owner if a write did not land.
 - **Hidden locked notes:** never send their `html` / `text` / `firstImage` to a window or the list, and a hidden window must never save. See `architecture.md`.
 - **Zoom:** anything that turns mouse or screen pixels into sizes inside a note must divide by `zoomNow()`. Don't use Electron's page zoom.
-- **Effects:** a new effect or follower needs its id in both `src/fx.js` and `store.js`. Draw on the shared canvas loop: no `Path2D`, no per-particle DOM or CSS animation, no per-frame `createRadialGradient` / `filter`, and it must also work with `m === null`. See `effects.md`.
+- **Effects:** a new effect or follower needs its id in both `src/fx/` (its `effects-*` / `followers-*` file and `ORDER` in `engine.js`) and `store.js`. Draw on the shared canvas loop: no `Path2D`, no per-particle DOM or CSS animation, no per-frame `createRadialGradient` / `filter`, and it must also work with `m === null`. See `effects.md`.
 - **Ink:** never thin out or re-smooth saved points; drawings drift ("dance") a little more on every pass.
 - **Pop-up colours:** use the `--pop-*` variables, never hard-coded colours.
 - **Tests:** only the newest `tests/v<version>.test.js` asserts the version. Move that check when you bump it (`ai-context/testing.md`).
@@ -37,7 +37,7 @@ Keep each file's existing line endings: they are mixed (`main.js`, `preload.js`,
 7. If files go into the owner's folder through the desktop app, verify each one on the device (see Pitfalls). If his build then stops with `EBUSY ... app.asar`, the app is still running (`build-and-release.md`).
 
 ## Saving tokens (these files are big)
-- **Never read a big file whole:** `src/fx.js` (~180 KB), `src/note.js` (~165 KB), `src/list.js` (~115 KB), `CHANGELOG-archive.md` (~85 KB), `src/note.css`, `src/list.css`, `main.js` (60–75 KB). Grep for the name first (`ai-context/feature-map.md` lists them), then read only those lines. Each file is split into sections by comment headers (`// ----…` in JS, `/* ---------- name ---------- */` in CSS): grep them for an outline. For `src/fx.js` use the map in `ai-context/effects.md`.
+- **Never read a big file whole:** `src/note.js` (~165 KB), `src/list.js` (~115 KB), `CHANGELOG-archive.md` (~85 KB), `src/note.css`, `src/list.css`, `main.js` (60–75 KB). Grep for the name first (`ai-context/feature-map.md` lists them), then read only those lines. Each file is split into sections by comment headers (`// ----…` in JS, `/* ---------- name ---------- */` in CSS): grep them for an outline. The effects are split into `src/fx/*.js` (9–34 KB each): `ai-context/effects.md` says which file holds what; open only that one.
 - **Never list the folder recursively** (it walks `node_modules`): list the one folder you need.
 - **Adding a version entry:** read only the top of `CHANGELOG.md` and the start of `VERSIONS` in `src/about.js` (around line 143), and insert the new entry there. Don't open `CHANGELOG-archive.md` unless you need old history.
 - **Tests:** put a new version's tests in its own `tests/v<version>.test.js` and don't grow the old files. Open an old test only when it fails.
@@ -46,8 +46,8 @@ Keep each file's existing line endings: they are mixed (`main.js`, `preload.js`,
 ## Where to read more (open only what the task needs)
 `ai-context/CONTEXT.md` is the map: what the app is, the folder layout, and which file to open for which job.
 `architecture.md` (processes, IPC, security, locks) · `data-model.md` (files on disk, note fields, settings, groups) ·
-`feature-map.md` (feature → code) · `ui-gotchas.md` (editor, toolbars, list) · `effects.md` (`src/fx.js`) ·
-`build-and-release.md` (build, Smart App Control, saving files) · `testing.md`.
+`feature-map.md` (feature → code) · `ui-gotchas.md` (editor, toolbars, list) · `effects.md` (`src/fx/`) ·
+`build-and-release.md` (build, Smart App Control, saving files) · `testing.md` · `splitting-code.md` (before splitting a big file).
 
 ## Keeping these docs useful
 Write down what the code does not make obvious: where something lives, a rule, a trap, a decision of the owner's.

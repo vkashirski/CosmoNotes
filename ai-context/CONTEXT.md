@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 30 October 2026 · App version 1.1.23**
+**Last updated: 31 October 2026 · App version 1.1.25**
 
 Start with `CLAUDE.md` (rules, commands, pitfalls, release checklist). This file is the map: what the app is,
 how the folder is laid out, and which `ai-context/` file to open for the job in hand. Open only the files your
@@ -49,7 +49,8 @@ preload.js         Safe bridge: exposes window.sticky.* to both windows (context
 src/note.html/.css/.js   One sticky-note window (the editor)
 src/list.html/.css/.js   The "All notes" window: Notes / Bin / Settings tabs, groups, sorting
 src/about.js       In-app feature list + version history (window.COSMO_ABOUT) + LAST_UPDATED date
-src/fx.js          Note effects + mouse followers (window.COSMO_FX), used by both windows (see effects.md)
+src/fx/            Note effects + mouse followers (window.COSMO_FX), used by both windows: 8 files loaded in order (see effects.md)
+src/fx.js          Not used since 1.1.24: only a note saying the code moved to src/fx/ (can be deleted)
 assets/            icon.ico/png (windows), tray.ico/png
 build/             icon.ico/png for the installer/shortcuts; afterPack.js is an unused stub (see build-and-release.md, Smart App Control)
 build.bat          One-click: (private Node if needed) + npm install + electron-builder → dist/CosmoNotes Setup <ver>.exe
@@ -57,7 +58,7 @@ HOW TO INSTALL.txt Plain-language guide for the owner (install, data folder, for
 test-run.bat       Runs CosmoNotes from this folder with Electron's original exe (no build needed)
 build/installer.nsh  Installer addition: shortcuts get the CosmoNotes icon (exe stays untouched, see build-and-release.md)
 CHANGELOG.md       Version history, the two newest versions (mirror of src/about.js VERSIONS)
-CHANGELOG-archive.md  Older versions (1.1.21 back to 1.0.0); nothing reads it
+CHANGELOG-archive.md  Older versions (1.1.23 back to 1.0.0); nothing reads it
 tests/             npm test – Node tests using tests/fake-electron (no Electron/Windows needed)
 CLAUDE.md         Short rules every AI session reads first (rules, commands, pitfalls, release checklist)
 ai-context/        Docs for AI assistants: this map + one file per topic (table below)
@@ -77,9 +78,10 @@ referenced from HTML as `../node_modules/@fontsource/...`, so they work offline 
 | Adding or changing a note field, a setting, backups, the Bin, groups or ink data | `ai-context/data-model.md` |
 | Looking for where a feature lives (function, element id, CSS) | `ai-context/feature-map.md` |
 | Working on the note editor, toolbars, pop-ups, drawing, the notes list or its cards | `ai-context/ui-gotchas.md` |
-| Touching effects or mouse followers (`src/fx.js`) | `ai-context/effects.md` |
+| Touching effects or mouse followers (`src/fx/`) | `ai-context/effects.md` |
 | Building or packaging: `build.bat`, Node / Electron version, Smart App Control, build errors, saving files into the owner's folder | `ai-context/build-and-release.md` |
 | Writing or running tests, or checking the UI | `ai-context/testing.md` |
+| Splitting a big file (`note.js`, `list.js`, `main.js`, a CSS file) into smaller ones | `ai-context/splitting-code.md` |
 
 ---
 

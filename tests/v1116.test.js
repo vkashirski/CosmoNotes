@@ -14,7 +14,7 @@ const noteWins = () => E.__all.filter((x) => x.file && x.file.endsWith('note.htm
 // fx.js runs in the windows; load it here with just enough of a browser around it
 const fakeCanvas = () => ({ width: 0, height: 0, getContext: () => new Proxy({}, { get: () => () => ({ addColorStop() {} }), set: () => true }) });
 const sandbox = { window: {}, document: { hidden: false, createElement: fakeCanvas }, performance: { now: () => Date.now() }, requestAnimationFrame: () => 0, setTimeout, clearTimeout, Math, Object, Array, JSON };
-vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'fx.js'), 'utf8'), sandbox);
+vm.runInNewContext(require('./fx-source')(), sandbox); // 1.1.24: the parts in src/fx/, as note.html loads them
 const FX = sandbox.window.COSMO_FX;
 
 (async () => {

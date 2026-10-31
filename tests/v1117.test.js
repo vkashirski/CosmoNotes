@@ -23,7 +23,7 @@ class Ctx2D {
 for (const k of ['setTransform', 'clearRect', 'beginPath', 'moveTo', 'lineTo', 'arc', 'quadraticCurveTo', 'bezierCurveTo', 'translate', 'rotate', 'scale']) Ctx2D.prototype[k] = function () {};
 const canvas = (w, h) => { const ctx = new Ctx2D(); return { width: 0, height: 0, clientWidth: w, clientHeight: h, ctx, getContext: () => ctx }; };
 const sandbox = { window: { devicePixelRatio: 1 }, document: { hidden: false, createElement: () => canvas(10, 10) }, performance: { now: () => Date.now() }, requestAnimationFrame: () => 0, setTimeout, clearTimeout, Math, Object, Array, JSON, Number };
-vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'fx.js'), 'utf8'), sandbox);
+vm.runInNewContext(require('./fx-source')(), sandbox); // 1.1.24: the parts in src/fx/, as note.html loads them
 const FX = sandbox.window.COSMO_FX;
 
 (async () => {

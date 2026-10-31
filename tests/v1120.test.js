@@ -11,7 +11,7 @@ const { FX_EFFECTS, FX_FOLLOWERS, cleanFx } = require(path.join(__dirname, '..',
 const tick = (ms = 50) => new Promise((r) => setTimeout(r, ms));
 
 const sandbox = { window: {}, document: { hidden: false, createElement: () => ({ width: 0, height: 0, getContext: () => ({}) }) }, performance: { now: () => Date.now() }, requestAnimationFrame: () => 0, setTimeout, clearTimeout, Math, Object, Array, JSON, Number, Float32Array };
-vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'fx.js'), 'utf8'), sandbox);
+vm.runInNewContext(require('./fx-source')(), sandbox); // 1.1.24: the parts in src/fx/, as note.html loads them
 const FX = sandbox.window.COSMO_FX;
 function recorder() {
   const bad = [];

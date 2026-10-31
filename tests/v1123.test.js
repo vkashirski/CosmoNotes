@@ -3,12 +3,12 @@
 // a calm Analog monitor whose lines part round the pointer, the Cauldron's soft dip, Ctrl+F, Warp speed's hyperdrive in
 // the middle, a light paper tint on effects and picture descriptions.
 const assert = require('assert'); const fs = require('fs'); const path = require('path'); const vm = require('vm');
-assert.equal(require('../package.json').version, '1.1.23');
+// (the version check moved on to the next version's test: v1124.test.js)
 
 // ---- the effects
 const fakeCtx = () => new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => ({ addColorStop() {} })), set: (t, k, v) => { t[k] = v; return true; } });
 const sandbox = { window: { devicePixelRatio: 1 }, document: { hidden: false, createElement: () => ({ width: 0, height: 0, getContext: fakeCtx }) }, performance: { now: () => 0 }, requestAnimationFrame: () => 0, setTimeout, clearTimeout, Math, Object, Array, JSON, Number, Float32Array };
-vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'fx.js'), 'utf8'), sandbox);
+vm.runInNewContext(require('./fx-source')(), sandbox); // 1.1.24: the parts in src/fx/, as note.html loads them
 const FX = sandbox.window.COSMO_FX;
 function recorder() {
   const bad = []; const calls = [];
@@ -174,7 +174,7 @@ const ptr = (x, y, vx = 0, vy = 0) => ({ x, y, vx, vy, sp: Math.hypot(vx, vy) })
   const rb = FX.EFFECTS.rainbow.make.toString();
   assert.ok(!/c\.filter = 'blur/.test(rb), 'rainbow: no longer blurs the whole note every frame');
   assert.ok(/cur\.key/.test(rb) && /solidBow/.test(rb), 'rainbow: bands drawn and blurred once, the mask only laid again while it draws in');
-  const fxsrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'fx.js'), 'utf8');
+  const fxsrc = require('./fx-source')(); // 1.1.24: all the parts of src/fx/
   const glowDotSrc = fxsrc.slice(fxsrc.indexOf('function glowDot('), fxsrc.indexOf('function flake('));
   assert.ok(!/createRadialGradient/.test(glowDotSrc) && /stamp\(c, halo\(col\)/.test(glowDotSrc), 'glows are stamped from a ready picture');
   assert.equal((fxsrc.match(/createRadialGradient/g) || []).length, 4, 'gradients left: the glow picture itself, the warp flash, the healing pointer glow and the cauldron brew (one each a frame at most)');

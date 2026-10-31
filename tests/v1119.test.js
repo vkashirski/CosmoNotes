@@ -3,7 +3,7 @@ const assert = require('assert'); const path = require('path'); const fs = requi
 const { FX_EFFECTS, cleanFx } = require(path.join(__dirname, '..', 'store.js'));
 
 const sandbox = { window: {}, document: { hidden: false, createElement: () => ({ width: 0, height: 0, getContext: () => ({}) }) }, performance: { now: () => Date.now() }, requestAnimationFrame: () => 0, setTimeout, clearTimeout, Math, Object, Array, JSON, Number, Float32Array };
-vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'fx.js'), 'utf8'), sandbox);
+vm.runInNewContext(require('./fx-source')(), sandbox); // 1.1.24: the parts in src/fx/, as note.html loads them
 const FX = sandbox.window.COSMO_FX;
 
 // a fake 2D context that records any number that isn't a real number, and counts the fills

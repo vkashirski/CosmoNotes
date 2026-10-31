@@ -1,4 +1,4 @@
-# Effects and mouse followers (`src/fx.js`)
+# Effects and mouse followers (`src/fx/`)
 
 Open this when adding or changing a background effect or mouse follower, or the Layer / loop behind them.
 
@@ -6,25 +6,36 @@ Open this when adding or changing a background effect or mouse follower, or the 
 
 **Removed at the owner's request (don't bring back unless asked):** Lorenz (`lorenz`), Shape shifter (`morph`), Contour map (`topo`, too processing-hungry), Black hole (`blackhole`, an Interstellar-style redo was too heavy), Fairy dust (`fairy`), XP orbs (`xp`), Neon tunnel (`tunnel`), Synthwave (`synthwave`), Solar system (`solar`), Aquarium (`aquarium`). Old saved choices of a removed id fall back to "same as all notes".
 
-## Finding your way in `src/fx.js` (don't read it whole)
+## The files in `src/fx/` (1.1.24; before that one 180 KB file, `src/fx.js`)
 
-It is one block (`(() => { … })()`) of about 2,350 lines. Grep for these landmarks, then read only the part you need:
+`note.html` and `list.html` load them in this order (the tests too, through `tests/fx-source.js`, which reads the list
+from `note.html`). Each file is its own closed block. They share names through `window.COSMO_FX_KIT`: `kit.js` makes it,
+every other part takes what it needs on its first line (`const { … } = window.COSMO_FX_KIT;`) and adds what later parts
+need at its end. `engine.js` puts the finished API on `window.COSMO_FX`.
 
-| Part | Grep for |
+| File | What's in it |
 |---|---|
-| Colours for light / dark papers | `^  const LIGHT = {`, `^  const DARK = {` |
-| Shared helpers (`R`, `clamp`, `near`, `shove`, `bucketDots`, `bucketFade`, `strokeSegs`, `glowSprite`…) | `tiny helpers`, `1.1.18 helpers` (a section of ~250 lines: grep the one helper you need) |
-| Backgrounds | `^  const EFFECTS = {` |
-| Mouse followers | `^  const FOLLOWERS = {` |
-| Order in the pickers | `^  const ORDER = ` (must match `FX_EFFECTS` / `FX_FOLLOWERS` in store.js) |
-| Choosing rules | `^  function resolve(` |
-| The shared loop (30 fps, `PACE`) | `^  const loop = ` |
-| The canvas Layer (`set`, `move`, `leave`, `resize`) | `^  function Layer(` |
-| Picker icons, `PAIRS`, `window.COSMO_FX` | `^  const ICONS = {`, then the end of the file |
+| `kit.js` | colours for light / dark papers (`LIGHT`, `DARK`), shared helpers (`R`, `clamp`, `near`, `shove`, `nudge`, `bucketDots`, `bucketFade`, `strokeSegs`, `glowSprite`, `presence`…), fish drawing (`fishDraw`…), Matrix glyphs; makes the empty `EFFECTS` / `FOLLOWERS` lists |
+| `effects-classic.js` | backgrounds, the first eleven: Snow, Fireworks, Stardust, Fireflies, Bubbles, Autumn leaves, Hearts, Rain, Confetti, Matrix, Rainbow |
+| `effects-lab.js` | backgrounds from the Effect Lab: Plankton, Warp speed, Network, Embers, Cherry blossom, Night sky, Analog monitor, Digital ocean, Silk waves, Glass shards, Ghost ripple, Fish, Dust in light |
+| `effects-magic.js` | backgrounds from the Spell Lab: Healing aura, Lightning, Cauldron, Ghost jellyfish, Fel fire |
+| `followers-classic.js` | follower rules (`ALONG`, `room`) and the followers Stardust, Rainbow, Hearts, Bubbles, Fireflies, Rain (`ripples`), Fireworks, Snow (`frost`), Confetti, Autumn leaves |
+| `followers-lab.js` | the followers for the Effect Lab backgrounds |
+| `followers-magic.js` | the followers for the Spell Lab backgrounds, Pencil line (`pencil`, mouse-only) and Matrix |
+| `engine.js` | `ORDER`, `EFFECT_IDS` / `FOLLOWER_IDS`, `resolve`, the shared loop (`PACE`), `fadeable`, the paper tint (`paperPalette`), `Layer`, `ICONS`, `PAIRS`, `window.COSMO_FX` |
 
-**One effect:** `grep -n "^    <id>: {" src/fx.js` gives two hits: the background (inside `EFFECTS`) and its mouse follower (inside `FOLLOWERS`). Read from that line to the next `^    [a-z]+: {` line (20–130 lines). Two followers have their own ids: `frost` = Snow, `ripples` = Rain; `pencil` (Pencil line) is mouse-only.
+**One effect:** `grep -n "^    <id>: {" src/fx/*.js` gives two hits: the background (an `effects-*` file) and its mouse
+follower (a `followers-*` file). Read from that line to the next `^    [a-z]+: {` line (20–130 lines).
 
-**Splitting fx.js into one file per effect was considered and not done (30 Oct 2026):** both windows load it with one `<script>`, nine test files load it with `vm.runInNewContext`, `v1123.test.js` also checks its source text, and all effects share the helpers above inside one closure. The risk of breaking the app is not worth it when reading one effect this way costs about the same.
+**Adding or changing an effect:** put it in the matching file. If it needs a helper from `kit.js`, add the name to the
+`const { … }` line at the top of that file: a missing name only fails (ReferenceError) when the effect runs, so run
+`npm test`, which runs every effect. A new shared helper goes in `kit.js` and in the `window.COSMO_FX_KIT = { … }` list
+at its end. Add the id to `ORDER` in `engine.js` and to `FX_EFFECTS` / `FX_FOLLOWERS` in store.js. A new part file must be
+added to both HTML files in the same place (`v1124.test.js` checks).
+
+**The Layer draws once before the first step** (when an effect or follower is switched on). Anything `draw()` reads
+must already have a value then: the Ghost ripple follower read `near` before `step()` set it and threw (fixed in
+1.1.25). `v1125.test.js` switches every effect and follower on and draws before anything moves.
 
 ## Lab names → app ids
 
@@ -47,12 +58,12 @@ The owner may name an effect by its preview-page name. From the "CosmoNotes Effe
   null; every effect reacts in its own way (see `CHANGELOG-archive.md`, 1.1.21). Helpers `near`, `shove`, `nudge`. A new background
   should do something with `m` too (and must work with `m === null`).
   Draw many lines/dots in a few calls
-  (`strokeSegs`, `bucketDots`; `bucketFade` when something must fade smoothly all the way to nothing: `bucketDots` always draws its faintest group at about 12 %) and don't use `Path2D`: the tests run fx.js against a fake canvas without it. All drawn on a canvas by fx.js's one shared
+  (`strokeSegs`, `bucketDots`; `bucketFade` when something must fade smoothly all the way to nothing: `bucketDots` always draws its faintest group at about 12 %) and don't use `Path2D`: the tests run the src/fx/ parts against a fake canvas without it. All drawn on a canvas by the effects' one shared
   loop (`requestAnimationFrame`, at most 30 frames a second). The loop stops by itself when no layer `wants()` a frame:
   paused, rolled up, off screen (list cards: `IntersectionObserver`), no effect, or only a follower and the mouse is still
   (followers report `busy()` while their trail is still fading). Don't add per-element DOM particles or CSS animations for
-  these. A new effect or follower needs its id in both fx.js and store.js (`FX_EFFECTS` / `FX_FOLLOWERS`; a test checks). The old follower id `comet` (Rainbow line) was folded into `rainbow`: `resolve` and store `cleanFxId` map it, so saved choices keep working. The Rainbow background paints each bow solid and masks it once (no seams).
-  **Opacity (1.1.17)** is a multiplier, not an extra canvas: `fadeable(ctx)` in fx.js wraps the context's `globalAlpha` so
+  these. A new effect or follower needs its id in both src/fx/ and store.js (`FX_EFFECTS` / `FX_FOLLOWERS`; a test checks). The old follower id `comet` (Rainbow line) was folded into `rainbow`: `resolve` and store `cleanFxId` map it, so saved choices keep working. The Rainbow background paints each bow solid and masks it once (no seams).
+  **Opacity (1.1.17)** is a multiplier, not an extra canvas: `fadeable(ctx)` in engine.js wraps the context's `globalAlpha` so
   whatever an effect sets is multiplied by the layer's `eOp` / `fOp` (effects don't need to know). Changing it only redraws
   (`Layer.set` → `opChanged`), never remakes the effect. `resolve` returns `effectOpacity` / `followerOpacity` (`opacityOf`,
   same rule as store.js `cleanFxOpacity`).
@@ -63,7 +74,7 @@ The owner may name an effect by its preview-page name. From the "CosmoNotes Effe
 
 ## Mouse followers – more rules (1.1.22)
 
-- Followers that spawn by distance (the `ALONG` list in fx.js) get a fast mouse jump in ≤10 px steps from `Layer.move`, and their particle limits drop the oldest instead of refusing new ones (`room()`), so a fast stroke stays even.
+- Followers that spawn by distance (the `ALONG` list in followers-classic.js) get a fast mouse jump in ≤10 px steps from `Layer.move`, and their particle limits drop the oldest instead of refusing new ones (`room()`), so a fast stroke stays even.
 - Followers may have `leave()` (`Layer.leave` calls it): fel and embers burn while the pointer rests on the note.
 - Snow flakes shatter when touched; fireflies within 70 px of the pointer drift over to it for 2–3 s, gently, and let go once it is over 110 px away, then ignore it for 4–16 s.
 - Lightning: the mouse one rests 0.5 s between strikes; the background one hits the pointer about three bolts in four, while side bolts still strike elsewhere.
@@ -79,9 +90,9 @@ The owner may name an effect by its preview-page name. From the "CosmoNotes Effe
 ## 1.1.23 changes (details also in CHANGELOG.md)
 
 - **Speed:** Rainbow draws and blurs its bands once per rainbow (`solidBow` / `bowBox` / `maskBow`, cached picture reused once fully drawn in; never `c.filter` per frame); soft glows are stamped from cached pictures (`glowSprite`, `halo`, `soft`, `stamp`; don't add per-particle `createRadialGradient` again); the shared loop slows effects to 20 / 15 steps a second when a step averages over 11 / 18 ms (`PACE`, `COSMO_FX.loopPace()`). Benchmarks and pixel comparisons were done in headless Chromium with `--disable-gpu` (and CPU throttled 6× for a weak laptop).
-- **Paper tint:** a touch of the paper's colour on effects (`paperPalette(dark, paper)` in fx.js turns coloured inks 12 % towards the paper's hue; `Layer.set({ paper })`).
+- **Paper tint:** a touch of the paper's colour on effects (`paperPalette(dark, paper)` in engine.js turns coloured inks 12 % towards the paper's hue; `Layer.set({ paper })`).
 - **Warp speed:** the pointer no longer steers. While it is in the centre box (24 % of the width and height, `BOX = .12`) the jump is constant hyperdrive at speed 3 (`HYPER`).
 - **Analog monitor:** calm 6 px scanlines crawling at 3 px/s, and one slow soft scan line (8 s to cross, every `clamp(24 / k, 12, 75)` s, so frequency = how often it sweeps); the pointer opens a smooth gap in the lines where it is (no springs).
 - **Pickers and order:** effect choices have a fixed height and "Same as all"; dust +20 %; the order changed again.
-- **Order of the effects** is by theme (the owner's Option A, adjusted): `ORDER` in fx.js (builds `EFFECT_IDS` / `FOLLOWER_IDS`) and `FX_EFFECTS` / `FX_FOLLOWERS` in store.js must stay the same list; ids unchanged. (1.1.22 tweak: Rainbow after Rain; Fireworks, Confetti, Hearts after Cherry blossom, then Bubbles, Fish, Glass shards, Plankton.)
+- **Order of the effects** is by theme (the owner's Option A, adjusted): `ORDER` in engine.js (builds `EFFECT_IDS` / `FOLLOWER_IDS`) and `FX_EFFECTS` / `FX_FOLLOWERS` in store.js must stay the same list; ids unchanged. (1.1.22 tweak: Rainbow after Rain; Fireworks, Confetti, Hearts after Cherry blossom, then Bubbles, Fish, Glass shards, Plankton.)
 - Tests: `v1122.test.js`, `v1123.test.js`.

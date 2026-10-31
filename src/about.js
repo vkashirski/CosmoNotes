@@ -12,7 +12,7 @@
  *   4. "Last updated" + version in ai-context/CONTEXT.md
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-10-30',
+  LAST_UPDATED: '2026-10-31',
 
   FEATURES: [
     {
@@ -141,6 +141,20 @@ window.COSMO_ABOUT = {
 
   // Short, plain-language highlights for the in-app history (the full details are in CHANGELOG.md)
   VERSIONS: [
+    {
+      version: '1.1.25',
+      date: '2026-10-31',
+      changes: [
+        'Fixed: choosing Ghost ripple as the mouse effect could stop the effects of the notes after it in the notes list, and in its own note a paused or rolled-up note’s effects could keep running.',
+      ],
+    },
+    {
+      version: '1.1.24',
+      date: '2026-10-30',
+      changes: [
+        'Behind the scenes: the effects are now kept in smaller files, so future changes to one effect are quicker and safer. Nothing you see has changed.',
+      ],
+    },
     {
       version: '1.1.23',
       date: '2026-10-30',

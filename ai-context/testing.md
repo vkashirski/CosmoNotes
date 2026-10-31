@@ -30,7 +30,7 @@ Open this when writing or running tests, or checking the UI.
     pinned, dropped back inside).
   - `v1116.test.js`: effects: ids match in fx.js and store.js, `resolve` rules (own choice, none, use on every note,
     paused), every effect and follower runs, settings + `settings:changed`, a note's choice is not an edit and is copied by
-    Duplicate, pause from Settings and the tray (fx.js is run in a `vm` sandbox).
+    Duplicate, pause from Settings and the tray (the effects run in a `vm` sandbox: `tests/fx-source.js` joins the `src/fx/` parts in the order note.html loads them).
   - `v1120.test.js`: the four removed effects, a follower for every background (order, names, icons), every follower
     on three sizes / frequencies / papers, companions fade, Edit design's `list:edit` (opacity, fx), the 12 px snap.
   - `v1121.test.js`: "mouse plays with the background": `resolve` rules, `fxInteract` saved and sent, `fx.mi` not an
@@ -47,7 +47,11 @@ Open this when writing or running tests, or checking the UI.
   - `v1119.test.js`: the 1.1.19 Fish redraw (still drawn in a handful of fills however many fish there are, no NaN) and that the removed Aquarium stays gone (a note that had it goes back to "same as all notes").
   - `v1122.test.js`: menus dock only within 12 px of the edge, and the owner's 1.1.22 effect changes (his picks, Analog monitor, Silk waves, Dust in light, Healing aura, Lightning, Cauldron, Ghost jellyfish, Fel fire, Embers, Digital ocean follower, the renamed switch).
   - `v1123.test.js`: the owner's notes after 1.1.22 (28–30 Oct 2026): checklist boxes, Backspace / Delete fixes, Copy image, struck-through ticked pictures, uniform effect choices, small card pictures, card menu order, Analog monitor, Cauldron, Ctrl+F, Warp speed hyperdrive, paper tint, picture descriptions, and speed.
-- **One test file per version.** A change that alters behaviour usually adds `tests/v<version>.test.js`; `tests/run.js` picks up every `*.test.js` by itself. **Only the newest file asserts `package.json`'s version** (now `v1123.test.js`, line 6): when you raise the version, move that check into the new version's test, as `v1122.test.js` did, or the old one fails. Don't grow old test files, and open one only when it fails: they are 3–24 KB each.
+  - `v1124.test.js`: the effects split into `src/fx/`: both windows load the same parts in the same order, every part is
+    loaded, each part makes no globals but `COSMO_FX_KIT` (and `COSMO_FX` at the end), together they match store.js.
+  - `v1125.test.js`: every background and every follower can be switched on and drawn before anything has moved
+    (the Ghost ripple follower threw there), on light and dark paper, without NaN.
+- **One test file per version.** A change that alters behaviour usually adds `tests/v<version>.test.js`; `tests/run.js` picks up every `*.test.js` by itself. **Only the newest file asserts `package.json`'s version** (now `v1125.test.js`, line 6): when you raise the version, move that check into the new version's test, as `v1122.test.js` did, or the old one fails. Don't grow old test files, and open one only when it fails: they are 3–24 KB each.
 - **UI checks** (done during development): load `src/note.html` / `src/list.html` in Chromium (e.g.
   Playwright) with a mock `window.sticky` object injected before load, then click through and screenshot.
   The mock must implement every `window.sticky.*` method from preload.js. Playwright hides scrollbars by default
