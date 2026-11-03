@@ -11,7 +11,11 @@
 <link rel="stylesheet" href="../node_modules/@fontsource/nunito/600.css">
 <link rel="stylesheet" href="../node_modules/@fontsource/nunito/700.css">
 <link rel="stylesheet" href="../node_modules/@fontsource/nunito/800.css">
-<link rel="stylesheet" href="list.css">
+<link rel="stylesheet" href="css/list-base.css">
+<link rel="stylesheet" href="css/list-cards.css">
+<link rel="stylesheet" href="css/list-groups-menus.css">
+<link rel="stylesheet" href="css/list-settings-fx.css">
+<link rel="stylesheet" href="css/list-picking-edit.css">
 </head>
 <body data-theme="cream">
 <header class="titlebar">
@@ -89,7 +93,7 @@
       <div class="swatches" id="gColors"></div>
       <h4>Change every note inside</h4>
       <div class="row2"><span>Paper</span><div class="swstrip small"><div class="swatches small" id="gNoteColors"></div></div></div>
-      <div class="row2"><span>Font</span><div class="seg" id="gFont"><button data-font="hand" class="hand">Handwritten</button><button data-font="round">Rounded</button></div></div>
+      <div class="row2"><span>Font</span><div class="seg" id="gFont"><button data-font="hand" class="hand">Handwritten</button><button data-font="round">Rounded</button><button data-font="medieval" class="med">Medieval</button></div></div>
       <label class="check"><input type="checkbox" id="gInner" checked> <span>Also the notes in groups inside this one</span></label>
       <p class="gmixed" id="gMixed"></p>
       <div class="gpbtns">
@@ -112,7 +116,7 @@
     </label>
     <button class="pill danger" id="btnEmpty">Empty bin</button>
   </div>
-  <p class="bintip">Deleted notes wait here until you delete them for good.</p>
+  <p class="bintip">You can restore these notes, or delete them for good.</p>
   <div class="cards" id="binCards"></div>
 </section>
 
@@ -120,18 +124,18 @@
   <div class="panel">
     <h3>General</h3>
     <label class="row toggle">
-      <span><b>Start with Windows</b><small>Your open notes come back when you turn on the laptop.</small></span>
+      <span><b>Start with Windows</b></span>
       <input type="checkbox" id="sStartup"><i></i>
     </label>
     <div class="row col">
-      <span><b>Colours of this window</b><small>Only changes this notes list, not your notes.</small></span>
+      <span><b>Colour Theme</b></span>
       <div class="themes" id="sTheme"></div>
     </div>
   </div>
 
   <div class="panel">
     <h3>For new notes</h3>
-    <p class="muted">Notes you make from now on start like this. Notes you already have keep their own look.</p>
+    <p class="muted">New notes start like this. Your other notes keep their look.</p>
     <div class="row col">
       <span class="oprow"><b>Colour</b><em id="sColorsCount"></em></span>
       <div class="swstrip wide"><div class="swatches" id="sColors"></div></div>
@@ -144,7 +148,7 @@
       </div>
     </div>
     <label class="row toggle">
-      <span><b>Never the same colour twice in a row</b><small>A new note never gets the colour of the note made just before it. Only when you’ve picked more than one colour.</small></span>
+      <span><b>Never the same colour twice in a row</b><small>Only when you pick more than one colour.</small></span>
       <input type="checkbox" id="sNoRepeat"><i></i>
     </label>
     <div class="row col">
@@ -152,6 +156,7 @@
       <div class="seg" id="sFont">
         <button data-font="hand" class="hand">Handwritten</button>
         <button data-font="round">Rounded</button>
+        <button data-font="medieval" class="med">Medieval</button>
       </div>
     </div>
     <div class="row col">
@@ -159,7 +164,7 @@
       <input type="range" class="srange" id="sOpacity" min="25" max="100" step="5" value="100">
     </div>
     <label class="row toggle">
-      <span><b>Turn solid when my mouse is over it</b><small>See-through notes become solid while you point at them. Each note can still change this in its own ••• menu.</small></span>
+      <span><b>Turn solid when my mouse is over it</b><small>See-through notes turn solid while you point at them. Each note can change this in its ⋯ menu.</small></span>
       <input type="checkbox" id="sSolidHover"><i></i>
     </label>
   </div>
@@ -167,13 +172,13 @@
   <!-- 1.1.16 -->
   <div class="panel">
     <h3>Effects</h3>
-    <p class="muted">Little moving pictures in the background of your notes, and a trail that follows your mouse over a note. Each note can also choose its own: ⋯ menu → Effects…</p>
+    <p class="muted">Moving pictures behind your notes, and a trail behind your mouse. Each note can pick its own in ⋯ → Effects…</p>
     <div class="row">
       <span><b>For all notes</b><small id="sFxNow"></small></span>
       <button class="pill ghost small" id="sFxChoose">Choose…</button>
     </div>
     <label class="row toggle">
-      <span><b>Pause all effects</b><small>Also with the sparkle button left of Settings, and in the menu of the CosmoNotes icon by the clock.</small></span>
+      <span><b>Pause all effects</b><small>Also with the sparkle button, or the CosmoNotes icon.</small></span>
       <input type="checkbox" id="sFxPause"><i></i>
     </label>
   </div>
@@ -181,7 +186,7 @@
   <div class="panel">
     <h3>Spelling</h3>
     <label class="row toggle">
-      <span><b>Check spelling</b><small>Off means spelling is ignored. Each note can still turn it on or off with its own button.</small></span>
+      <span><b>Check spelling</b><small>Each note can still turn it on or off.</small></span>
       <input type="checkbox" id="sSpell"><i></i>
     </label>
     <label class="row toggle">
@@ -194,11 +199,22 @@
     <h3>Locked notes</h3>
     <p class="muted" id="lockInfo"></p>
     <div class="btnrow"><button class="pill" id="pwSave"></button></div>
+    <!-- 1.1.30: encryption of locked notes (painted by paintCrypt in list/actions-locks.js) -->
+    <div class="cryptbox" id="cryptBox" hidden>
+      <p class="muted cryptinfo" id="cryptInfo"></p>
+      <p class="muted pinwarn" id="pinWarn" hidden></p>
+      <div class="btnrow">
+        <button class="pill ghost" id="cryptNow" hidden>Encrypt now</button>
+        <button class="pill ghost" id="cryptKey"></button>
+        <button class="pill ghost" id="cryptForgot">Forgot it? Use the recovery key</button>
+        <button class="pill danger" id="cryptToggle"></button>
+      </div>
+    </div>
   </div>
 
   <div class="panel">
     <h3>Backups</h3>
-    <p class="muted">A copy of all your notes is saved automatically once a day. The last 30 days are kept. Restoring never removes anything: the notes come back in a new group.</p>
+    <p class="muted">All your notes are backed up once a day. The last 30 days are kept. Restoring adds the notes in a new group and replaces nothing.</p>
     <p class="bklast" id="backups"></p>
     <div class="btnrow">
       <button class="pill" id="btnRestorePick">Restore from a backup…</button>
@@ -209,7 +225,7 @@
 
   <div class="panel">
     <h3>Where your notes live</h3>
-    <p class="muted">Only on this computer, nothing goes to the cloud.</p>
+    <p class="muted">Only on this computer. Nothing goes to the cloud.</p>
     <code id="dataPath"></code>
     <div class="btnrow"><button class="pill ghost" id="btnDataFolder">Open notes folder</button></div>
   </div>
@@ -221,10 +237,6 @@
     <details class="fold" id="foldFeatures">
       <summary>Everything CosmoNotes can do</summary>
       <div id="features"></div>
-    </details>
-    <details class="fold" id="foldVersions">
-      <summary>Version history</summary>
-      <div id="versions"></div>
     </details>
   </div>
 
@@ -257,11 +269,11 @@
     <div class="erow"><b>Background of a note</b><div class="fxlist" id="fxAllEffects"></div><div class="fxamt" id="fxAllEAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div><div class="fxop" id="fxAllEOp"><span>Opacity</span><input type="range" class="srange" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div></div>
     <div class="erow"><b>Follows your mouse</b><div class="fxlist" id="fxAllFollowers"></div><div class="fxamt" id="fxAllFAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div><div class="fxop" id="fxAllFOp"><span>Opacity</span><input type="range" class="srange" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div></div>
     <label class="row toggle">
-      <span><b>Mouse can interact with the background</b><small>Bubbles pop when you touch them, rain splashes off the pointer, fish dart away… Each note can change this in its Effects.</small></span>
+      <span><b>Mouse can interact with the background</b><small>Bubbles pop, rain splashes, fish dart away… Each note can change this.</small></span>
       <input type="checkbox" id="fxInteractAll"><i></i>
     </label>
     <label class="row toggle">
-      <span><b>Use these on every note</b><small>Even on notes that chose their own. Their own choice is kept, and comes back when you switch this off.</small></span>
+      <span><b>Use these on every note</b><small>Also on notes with their own. Theirs comes back when you switch this off.</small></span>
       <input type="checkbox" id="fxForceAll"><i></i>
     </label>
     <div class="ebtns"><small>Changes show straight away</small><button type="submit" class="pill">Done</button></div>
@@ -282,13 +294,17 @@
     <div class="seg etabs" id="editTabs" role="tablist"><button type="button" data-tab="look" class="on">Colour</button><button type="button" data-tab="e">Background</button><button type="button" data-tab="f">Mouse</button></div>
     <div class="epanes">
       <div class="epane" data-tab="look">
+        <!-- 1.1.30: a locked note shows this instead of its title while it's locked -->
+        <label class="ecover" id="editCoverRow" hidden><span class="oprow"><b>Title while locked</b><em>shown instead of the title</em></span><input class="minput" id="editCover" maxlength="120" placeholder="e.g. Bank stuff" spellcheck="false"></label>
         <span class="oprow"><b>Colour</b><em id="editColorName"></em></span>
         <div class="swstrip wide"><div class="swatches" id="editColors"></div></div>
         <span class="oprow"><b>See-through</b><em id="editOpVal">Solid</em></span>
         <input type="range" class="srange" id="editOpacity" min="25" max="100" step="5" value="100" aria-label="See-through">
+        <!-- 1.2.2: only when several notes are edited at once (one note's font is set in the note itself) -->
+        <div id="editFontRow" hidden><span class="oprow"><b>Font</b><em id="editFontName"></em></span><div class="seg" id="editFonts"><button type="button" data-font="hand" class="hand">Handwritten</button><button type="button" data-font="round">Rounded</button><button type="button" data-font="medieval" class="med">Medieval</button></div></div>
       </div>
       <div class="epane" data-tab="e" hidden>
-        <p class="ehint editFxForce" hidden>Settings uses the same effects on every note right now, so this note shows those. What you pick here is kept for when that’s switched off.</p>
+        <p class="ehint editFxForce" hidden>Settings uses the same effects on every note. Your pick here is kept for later.</p>
         <div class="fxlist" id="editFxEffects"></div>
         <div class="fxamt" id="editFxEAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div>
         <div class="fxop" id="editFxEOp"><span>Opacity</span><input type="range" class="srange" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div>
@@ -298,7 +314,7 @@
         </label>
       </div>
       <div class="epane" data-tab="f" hidden>
-        <p class="ehint editFxForce" hidden>Settings uses the same effects on every note right now, so this note shows those. What you pick here is kept for when that’s switched off.</p>
+        <p class="ehint editFxForce" hidden>Settings uses the same effects on every note. Your pick here is kept for later.</p>
         <div class="fxlist" id="editFxFollowers"></div>
         <div class="fxamt" id="editFxFAmt"><span>Frequency</span><div class="seg"><button type="button" data-a="low">Rarely</button><button type="button" data-a="mid">Normal</button><button type="button" data-a="high">Often</button></div></div>
         <div class="fxop" id="editFxFOp"><span>Opacity</span><input type="range" class="srange" min="10" max="100" step="5" value="100" aria-label="Opacity"><em>100%</em></div>
@@ -323,6 +339,13 @@
 <script src="fx/followers-lab.js"></script>
 <script src="fx/followers-magic.js"></script>
 <script src="fx/engine.js"></script>
-<script src="list.js"></script>
+<!-- this window's own code (1.1.28: list.js split into src/list/, in this order; see ai-context/splitting-code.md) -->
+<script src="list/base.js"></script>
+<script src="list/cards.js"></script>
+<script src="list/picking.js"></script>
+<script src="list/settings-menus.js"></script>
+<script src="list/effects-design.js"></script>
+<script src="list/actions-locks.js"></script>
+<script src="list/events.js"></script>
 </body>
 </html>

@@ -1,6 +1,14 @@
 # Architecture, security and locks
 
-Open this when changing `main.js`, `preload.js`, IPC, windows, the tray, or anything about locking.
+Open this when changing `main.js`, `main/`, `preload.js`, IPC, windows, the tray, or anything about locking.
+
+**Since 1.1.27 `main.js` is only the entry** (start-up and the app lifecycle); the main process code is in `main/` (what each
+file holds: `CONTEXT.md`). Where this file says "main.js `name`", grep `main/` for the name. The four variables that were
+shared by the whole old file are properties of one object, `S` in `main/state.js`: `S.store`, `S.listWin`, `S.quitting`,
+`S.listUnlockedAll` (plus the `wins` map, exported next to it). **Always write `S.store` etc.; never copy one into a local
+variable or destructure it** (`const { store } = S` would keep the old value forever once it changes). Files only
+`require()` files below them (no circles): `code-structure.test.js` checks that, that every `main/` file is loaded, and that
+no loose `store` / `listWin` / `quitting` / `listUnlockedAll` is left.
 
 ## Architecture
 
@@ -19,7 +27,7 @@ Open this when changing `main.js`, `preload.js`, IPC, windows, the tray, or anyt
     (1.1.15: the drawing toolbar's own window, see §6)
   - list window: `list:get`, `list:new`, `list:duplicate`, `list:open-note`, `list:close-note`, `list:trash`,
     `list:restore`, `list:destroy`, `list:empty-bin`, `list:bring-front`, `list:set-locked`, `list:favorite`, `list:apply`,
-    `list:edit` (1.1.15, the Edit sheet: title + colour; 1.1.20 "Edit design": also `opacity` and `fx`, neither an edit), `list:unlock-all` / `list:lock-all` (1.1.15, the Locked tab),
+    `list:edit` (1.1.15, the Edit sheet: title + colour; 1.1.20 "Edit design": also `opacity` and `fx`, neither an edit; 1.2.2: `fxKeys` changes only those effect settings), `list:unlock-all` / `list:lock-all` (1.1.15, the Locked tab),
     `groups:make`, `groups:move-up`, `groups:move-to`, `groups:ungroup` (= move-up for a note),
     `groups:make-from`, `groups:dissolve`, `groups:rename`, `groups:update` (name/style/color), `groups:apply` (mass edit
     colour/font), `groups:trash`, `groups:set-locked`, `groups:reveal`, `groups:hide`, `settings:set`,
@@ -50,9 +58,36 @@ Open this when changing `main.js`, `preload.js`, IPC, windows, the tray, or anyt
 
 ## Locks and hidden notes
 
-- The lock is a **privacy screen, not encryption**, a deliberate choice so a forgotten password can't
-  lose data. The reset is documented in HOW TO INSTALL.txt (set `"lock": null` in settings.json).
-  If encryption is ever added, it needs a recovery story first.
+- **Encryption (1.1.30, the owner's wish; before that the lock was only a privacy screen).** `main/crypt.js` explains it at
+  the top. Rules that aren't obvious from the code:
+  - The **recovery key** is the recovery story: without the PIN and without it, encrypted notes are gone. Never add a
+    "reset by editing settings.json" for encrypted notes, and never weaken `KDF_N_PW` (it is what makes PIN guessing slow).
+  - While `settings.crypt` exists, `settings.lock` is the marker `'encrypted'` (`install` puts it back): the PIN is checked
+    by opening the key (`checkPassword` is **async**: always `await` it). No quick hash may sit next to the keys.
+  - The store writes every note through `S.store.sealer` (`diskForm`): writeNow **and** backups. Anything new that writes a
+    note to disk must go through `diskForm` too, or locked notes leak in plain text.
+  - In memory a note is sealed (`n.enc` set, secret fields empty) until the PIN is typed (`openAll`). A sealed note counts as
+    locked (`isLocked`, `hiddenInList`), is written back unchanged, and must never be "saved" from its empty fields.
+  - `SECRET` (constants.js) = what is hidden from windows **and** what is sealed: title, html, text, firstImage, ink. A new
+    field with note contents belongs in both `SECRET` and `SECRET_FIELDS` (crypt.js).
+  - Photos / drawings / voice of a locked note are sealed files; `note.encAtt` lists them so `sweepAttachments` keeps them.
+    Read attachment bytes only through `attachmentBytes` / `openableCopy` (a sealed file is useless otherwise).
+  - `syncSeals` (start-up and every `notifyList`) seals or opens files whose lock changed; only those are written.
+  - "Turn off" keeps the keys (old encrypted backups must stay openable) and only stops sealing (`crypt.off`).
+    If encryption is off and both the PIN and recovery key are lost, deleting `"crypt"` and setting `"lock": null` in
+    settings.json resets it; only backups made while it was on are then lost.
+  - **Backups (1.1.31, the owner's wish):** copies in `backups/` of a note that is locked now, or was locked when that
+    backup was made (its own lock or a locked group in that backup's `groups.json`), are sealed where they are
+    (`sealBackups`): one full pass (`crypt.backupsSealed`, again after turning encryption back on), then only a note that
+    just became locked (`backupsDone` in `syncSeals`). New backups are sealed by `diskForm` anyway.
+  - **Setting up tries everything first (1.1.31, `makeKeys`)**: seal + open a test note, the key locked and opened again
+    with the PIN and the recovery key. If anything throws, nothing is saved, `lastError` goes to the list (`status().error`),
+    and `lock:set` falls back to the old `salt:hash` so the PIN still works. Reason: the owner's PC never got encrypted in
+    1.1.30, and this cloud workspace can't run Electron's own crypto library (BoringSSL) to check; only his PC can.
+  - **Notes locked before 1.1.30 wait for the PIN** (the private key needs it). `status().needPin` makes main open the list
+    at start (`ipc-crypt.js`) and the list ask for the PIN (`showKeyIfNeeded`).
+  - Format versions: `enc.v` / file magic 2 (`CNSEAL2`) = AES key from SHA-256 (1.1.31); 1 (`CNSEAL1`, HKDF) = 1.1.30, still
+    read. The temp copies for "Open" are deleted at start and on quit.
 - **Locks: what "locked" means.** A note is locked if `note.locked` is set or any group in its chain is
   locked (`isLocked`, `lockedBy` = 'note' | 'group' in main.js). Note windows have `win.revealed`, which is
   true while that window may show contents (set at open for unlocked notes, after the password, or when opened
@@ -62,6 +97,11 @@ Open this when changing `main.js`, `preload.js`, IPC, windows, the tray, or anyt
   whose open window is unlocked (`win.revealed` and not `win.lockPending`, 1.1.14, the owner's wish): it shows in the
   list too (`openUnlocked: true`) until that window is closed or locked again. A note
   locked by its group can't remove the lock from inside the note ("Locked with its group").
+- **Unlocked for now (1.1.47, the owner's wish):** `unlockedForNow` (`main/list-visibility.js`) holds the note and group ids
+  unlocked from the list ("Unlock…") until CosmoNotes quits. **Memory only: never save it** (a restart must lock them
+  again). The lock itself (`n.locked` / `g.locked`) stays, so the note stays sealed on disk. `openForNow(n)` is the check
+  for "may show" (list, opening a window, `hideNewlyLocked` leaves it open). Locking, removing a lock, "Lock again" (list,
+  note, Locked tab) take ids out. "Remove lock…" is the only way to remove a lock from the list.
 - When a note becomes locked from outside (list right-click, locking its group, dragging it into a locked
   group), main sends `note:lock-now`. The window first saves what was typed, then hides. Never hide it
   directly from main, or the last keystrokes would be lost.

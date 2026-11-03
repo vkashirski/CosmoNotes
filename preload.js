@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld('sticky', {
     edit: (id, patch) => inv('list:edit', id, patch), // 1.1.15: title / colour from the Edit sheet
     unlockAll: (pw) => inv('list:unlock-all', pw), // 1.1.15: the Locked tab
     lockAll: () => inv('list:lock-all'),
+    unlockNow: (id, pw) => inv('list:unlock-now', id, pw), // 1.1.47: right-click → Unlock (until CosmoNotes quits)
+    relock: (id) => inv('list:relock', id), // ... and Lock again
   },
   groups: {
     make: (dragId, targetId) => inv('groups:make', dragId, targetId),
@@ -75,6 +77,16 @@ contextBridge.exposeInMainWorld('sticky', {
     makeFrom: (ids, parentId) => inv('groups:make-from', ids, parentId || null),
   },
   settings: { set: (patch) => inv('settings:set', patch) },
+  // 1.1.30: encryption of locked notes (Settings → Locked notes)
+  crypt: {
+    takeKey: () => inv('crypt:take-key'),
+    keySaved: () => inv('crypt:key-saved'),
+    saveKey: (code) => inv('crypt:save-key', code),
+    start: (pw) => inv('crypt:start', pw),
+    newKey: (pw) => inv('crypt:new-key', pw),
+    recover: (code, next, kind) => inv('crypt:recover', { code, next, kind }),
+    setOff: (pw, off) => inv('crypt:set-off', pw, !!off),
+  },
   backups: {
     list: () => inv('backups:list'),
     now: () => inv('backups:now'),

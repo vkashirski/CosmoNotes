@@ -1,0 +1,44 @@
+/* ---------- 1.1.16: pop-ups and toolbars in the app's colours ----------
+   body[data-apptheme] = the notes list's theme (Settings → General), sent with the settings (appTheme).
+   Same colours as list.css's themes: the pop-up = their card colour, rows = soft / soft2, text = ink / mute. */
+body[data-apptheme="rose"]  { --pop-ink2: #5E4049; --pop-bg: #FFFAFB; --pop-soft: #FBE1E8; --pop-soft2: #F2CAD6; --pop-mute: #A57A87; --pop-ink: #3F2A31; --pop-pick: #3F2A31; --pop-pickfg: #FFF0F3; }
+body[data-apptheme="mint"]  { --pop-ink2: #3F574A; --pop-bg: #FAFEFC; --pop-soft: #DCEFE4; --pop-soft2: #C4E2D1; --pop-mute: #789686; --pop-ink: #25362D; --pop-pick: #25362D; --pop-pickfg: #EDF8F2; }
+body[data-apptheme="sky"]   { --pop-ink2: #3D5066; --pop-bg: #FAFCFF; --pop-soft: #DCEAF8; --pop-soft2: #C5DAF0; --pop-mute: #7A8EA4; --pop-ink: #24313F; --pop-pick: #24313F; --pop-pickfg: #EDF5FD; }
+body[data-apptheme="lilac"] { --pop-ink2: #4A4166; --pop-bg: #FCFBFF; --pop-soft: #E7E0F9; --pop-soft2: #D5CAF2; --pop-mute: #8B80A8; --pop-ink: #2F2843; --pop-pick: #2F2843; --pop-pickfg: #F4F0FD; }
+body[data-apptheme="night"]    { --pop-ink2: #CFC6B6; --pop-hover: rgba(255,255,255,.08); --pop-bg: #2F2D35; --pop-card: #45414D; --pop-soft: #3A3742; --pop-soft2: #4A4652; --pop-mute: #A89F90; --pop-ink: #EDE6D8; --pop-pick: #EDE6D8; --pop-pickfg: #25232A; --pop-danger: #FF8A80; }
+body[data-apptheme="midnight"] { --pop-ink2: #C3C9D8; --pop-hover: rgba(255,255,255,.08); --pop-bg: #252B3D; --pop-card: #3A4259; --pop-soft: #2E3549; --pop-soft2: #3E4660; --pop-mute: #98A1B8; --pop-ink: #E4E8F2; --pop-pick: #E4E8F2; --pop-pickfg: #1D2232; --pop-danger: #FF8A80; }
+body[data-apptheme="forest"]   { --pop-ink2: #C2D0C5; --pop-hover: rgba(255,255,255,.08); --pop-bg: #232E28; --pop-card: #38463D; --pop-soft: #2C3830; --pop-soft2: #3C4A41; --pop-mute: #9AAE9F; --pop-ink: #E2ECE4; --pop-pick: #E2ECE4; --pop-pickfg: #1C2520; --pop-danger: #FF8A80; }
+body[data-apptheme="plum"]     { --pop-ink2: #D2C3D5; --pop-hover: rgba(255,255,255,.08); --pop-bg: #2D2432; --pop-card: #45384B; --pop-soft: #362C3B; --pop-soft2: #48394D; --pop-mute: #AE9FB3; --pop-ink: #EEE3F0; --pop-pick: #EEE3F0; --pop-pickfg: #251D29; --pop-danger: #FF8A80; }
+body:is([data-apptheme="night"], [data-apptheme="midnight"], [data-apptheme="forest"], [data-apptheme="plum"]) :is(.pop, #inkBar, .ctx) { box-shadow: 0 12px 32px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06); }
+
+/* ---------- 1.1.22 (ninth round): Ctrl+F, find in the note ---------- */
+#find {
+  position: fixed; right: 10px; top: 40px; z-index: 25;
+  display: flex; align-items: center; gap: 4px;
+  width: min(330px, calc(100vw - 20px)); padding: 4px 4px 4px 9px;
+  border-radius: 12px; background: var(--pop-bg); color: var(--pop-ink);
+  box-shadow: 0 10px 26px rgba(60,40,10,.25), 0 1px 3px rgba(0,0,0,.12);
+  font: 700 12.5px var(--ui); animation: popin .05s ease-out; user-select: none; /* 3 frames at 60 Hz */
+}
+#find[hidden] { display: none; }
+#find .fi { flex: none; width: 15px; height: 15px; fill: none; stroke: var(--pop-mute); stroke-width: 2.4; stroke-linecap: round; }
+#findQ { flex: 1; min-width: 0; height: 26px; padding: 0 6px; border: 0; border-radius: 7px; outline: 0; background: transparent; color: var(--pop-ink); font: 700 13px var(--ui); user-select: text; }
+#findQ::placeholder { color: var(--pop-mute); }
+#findN { flex: none; min-width: 3.4em; text-align: right; color: var(--pop-mute); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#find.none #findN { color: #C0392B; }
+#find .fb { flex: none; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--pop-ink); display: grid; place-items: center; cursor: pointer; }
+#find .fb:hover { background: var(--pop-soft); }
+#find .fb:disabled { opacity: .35; cursor: default; background: transparent; }
+#find .fb svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+#find .fb:focus-visible, #findQ:focus-visible { outline: 2px solid #E8C547; outline-offset: 1px; }
+/* every match, and the one you're on (the browser's highlight layer: the note's text itself isn't changed) */
+::highlight(cn-find) { background-color: rgba(255, 196, 0, .38); }
+::highlight(cn-find-cur) { background-color: #FF9F1C; color: #1A1408; }
+/* marks beside the scrollbar: where the matches are in the whole note */
+#findMarks { position: fixed; z-index: 24; width: 8px; pointer-events: none; }
+#findMarks[hidden] { display: none; }
+#findMarks i { position: absolute; left: 1px; right: 0; height: 3px; border-radius: 2px; background: rgba(230, 160, 0, .75); pointer-events: auto; cursor: pointer; }
+#findMarks i.cur { left: 0; height: 4px; background: #FF7A00; box-shadow: 0 0 0 1px rgba(255,255,255,.6); }
+/* 1.1.23: Ctrl+F found a picture by its description */
+#editor img.find-hit { outline: 3px solid rgba(255, 196, 0, .7); outline-offset: 2px; }
+#editor img.find-cur { outline: 3px solid #FF9F1C; outline-offset: 2px; }

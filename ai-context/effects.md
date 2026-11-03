@@ -6,9 +6,11 @@ Open this when adding or changing a background effect or mouse follower, or the 
 
 **Removed at the owner's request (don't bring back unless asked):** Lorenz (`lorenz`), Shape shifter (`morph`), Contour map (`topo`, too processing-hungry), Black hole (`blackhole`, an Interstellar-style redo was too heavy), Fairy dust (`fairy`), XP orbs (`xp`), Neon tunnel (`tunnel`), Synthwave (`synthwave`), Solar system (`solar`), Aquarium (`aquarium`). Old saved choices of a removed id fall back to "same as all notes".
 
+**Effects on the list's cards stay at full speed (the owner's call, 1.2.3):** each card with an effect is its own canvas, and that is the list's biggest cost (about 14 % of a core at rest with an effect on every card, 60 notes). Offered: cards at 15 steps a second (about 43 % less), or only the card under the mouse animating. The owner chose to keep them as they are. Don't suggest these again unless asked.
+
 ## The files in `src/fx/` (1.1.24; before that one 180 KB file, `src/fx.js`)
 
-`note.html` and `list.html` load them in this order (the tests too, through `tests/fx-source.js`, which reads the list
+`note.html` and `list.html` load them in this order (the tests too, through `tests/helpers/sources.js`, which reads the list
 from `note.html`). Each file is its own closed block. They share names through `window.COSMO_FX_KIT`: `kit.js` makes it,
 every other part takes what it needs on its first line (`const { … } = window.COSMO_FX_KIT;`) and adds what later parts
 need at its end. `engine.js` puts the finished API on `window.COSMO_FX`.
@@ -31,11 +33,11 @@ follower (a `followers-*` file). Read from that line to the next `^    [a-z]+: {
 `const { … }` line at the top of that file: a missing name only fails (ReferenceError) when the effect runs, so run
 `npm test`, which runs every effect. A new shared helper goes in `kit.js` and in the `window.COSMO_FX_KIT = { … }` list
 at its end. Add the id to `ORDER` in `engine.js` and to `FX_EFFECTS` / `FX_FOLLOWERS` in store.js. A new part file must be
-added to both HTML files in the same place (`v1124.test.js` checks).
+added to both HTML files in the same place (`code-structure.test.js` checks).
 
 **The Layer draws once before the first step** (when an effect or follower is switched on). Anything `draw()` reads
 must already have a value then: the Ghost ripple follower read `near` before `step()` set it and threw (fixed in
-1.1.25). `v1125.test.js` switches every effect and follower on and draws before anything moves.
+1.1.25). `effects-rules.test.js` switches every effect and follower on and draws before anything moves.
 
 ## Lab names → app ids
 
@@ -95,4 +97,4 @@ The owner may name an effect by its preview-page name. From the "CosmoNotes Effe
 - **Analog monitor:** calm 6 px scanlines crawling at 3 px/s, and one slow soft scan line (8 s to cross, every `clamp(24 / k, 12, 75)` s, so frequency = how often it sweeps); the pointer opens a smooth gap in the lines where it is (no springs).
 - **Pickers and order:** effect choices have a fixed height and "Same as all"; dust +20 %; the order changed again.
 - **Order of the effects** is by theme (the owner's Option A, adjusted): `ORDER` in engine.js (builds `EFFECT_IDS` / `FOLLOWER_IDS`) and `FX_EFFECTS` / `FX_FOLLOWERS` in store.js must stay the same list; ids unchanged. (1.1.22 tweak: Rainbow after Rain; Fireworks, Confetti, Hearts after Cherry blossom, then Bubbles, Fish, Glass shards, Plankton.)
-- Tests: `v1122.test.js`, `v1123.test.js`.
+- Tests: `effects-backgrounds.test.js`, `effects-followers.test.js` (each one's behaviour), `effects-rules.test.js` (order, lists).

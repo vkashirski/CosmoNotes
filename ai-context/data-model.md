@@ -3,9 +3,9 @@
 Open this when adding or changing a note field, a setting, backups, the Bin, groups or ink data.
 
 ```
-notes/<uuid>.json      one note per file (+ .bak = previous version, .tmp during a write)
-attachments/<name>     photos (png/jpg/gif/webp/bmp), drawings (png), voice (webm)
-backups/YYYY-MM-DD[_HH-MM-SS]/   <uuid>.json…, groups.json, meta.json {created,count}
+notes/<uuid>.json      one note per file (+ .bak = previous version, .tmp during a write; a locked note is sealed: `enc`, 1.1.30)
+attachments/<name>     photos (png/jpg/gif/webp/bmp), drawings (png), voice (webm) (a locked note's are sealed: they start with CNSEAL2, or CNSEAL1 from 1.1.30)
+backups/YYYY-MM-DD[_HH-MM-SS]/   <uuid>.json…, groups.json, meta.json {created,count} (copies of locked notes sealed, 1.1.31)
 groups.json            { groups: [{ id, name, createdAt, parentId, style, color, locked, favorite }] }
 settings.json          see below
 ```
@@ -17,11 +17,11 @@ save 350ms after typing stops, on blur, and synchronously on unload. Main flushe
 **Note fields** (`normalize()` in store.js is the schema; it always fills defaults):
 `id, title, html, text (plain text for list/search), firstImage, color (yellow|pink|green|blue|purple|
 orange|mint|charcoal, and since 1.1.15 the list themes' colours cream|rose|sage|mist|lavender|night|midnight|forest|plum;
-dark ones = `DARK_COLORS`: charcoal, night, midnight, forest, plum), font (hand|round), size (s|m|l), ink (draw-over, see below), wrapWidth (px or null:
+dark ones = `DARK_COLORS`: charcoal, night, midnight, forest, plum), font (hand|round|medieval; `FONTS` in store.js, unknown → hand), size (s|m|l), ink (draw-over, see below), wrapWidth (px or null:
 locked text layout), opacity (0.25–1), solidOnHover, pinned, open
 (window open → reopens at start), rolled, zoom (0.5–3, Ctrl + wheel in the note; not an edit), locked, favorite (starred in the list; not an edit), spell (null = follow Settings | true | false),
 groupId, bounds {x,y,width,height} (unrolled height), createdAt, updatedAt, deletedAt (null or in Bin),
-restoredFrom, fx ({ e, f, ea, fa, eo, fo }: the note's own effect / mouse follower, null = same as all notes, 'none' = nothing; ea /
+restoredFrom, coverTitle (1.1.30: "Title while locked", shown instead of the title while locked; not secret), enc / encAtt (1.1.30: a locked note's sealed title/html/text/firstImage/ink and the names of its sealed attachment files; main/crypt.js), fx ({ e, f, ea, fa, eo, fo }: the note's own effect / mouse follower, null = same as all notes, 'none' = nothing; ea /
 fa = how much, low | mid | high or null; eo / fo = opacity 0.1–1 in 5 % steps or null (1.1.17, `cleanFxOpacity`); mi = the mouse plays with the background, true / false / null (1.1.21); not an edit; 1.1.16), fxPaused (effects paused on this note; not an edit)`.
 
 **Draw-over ink** (`note.ink`): `{ s: [ { t: pen|hl|line|arrow|rect|ellipse, c: '#rrggbb', w: 1–40, l: 'a'|'b',
@@ -32,6 +32,11 @@ whole path; shapes use `[x1,y1,x2,y2]`. `l: 'a'` = over the text (SVG `#inkAbove
 (`#inkBelow`, z-index 0, under `#editor` z-index 1, so pictures cover it). `normalizeInk` in store.js validates
 and caps it (4000 strokes, 20000 numbers per stroke). Ink is in `SECRET` (main.js): blanked for hidden locked
 notes, and patches can't change it while hidden. It counts as an edit for `updatedAt`.
+
+**Word wrap off = no limit (1.1.45):** with `wrapWidth` set and no drawing, or with `note.nowrap` true, `#sheet.nowrap`:
+lines only end at Enter, the sheet is `max-content` wide, pictures cap at `--picW` (the visible width; with a drawing,
+`wrapWidth`). `nowrap` is set by the toggle and by the first stroke on such a note (`keepForInk`, which also sets
+`wrapWidth` to the visible width). Without `nowrap`, a note with a drawing keeps the older lock described next.
 
 **Text layout lock** (`note.wrapWidth`; called **"Word wrap" off** in the UI since 1.1.6): when set, `#sheet` has that fixed width (`applyLayout` in note.js), so text
 and pictures never re-wrap; `#scroller` is `overflow: auto` and shows a sideways scrollbar when the note is
@@ -59,7 +64,8 @@ each note's own choice is kept), fxPaused (pause all effects; also the tray's "P
 defaultOpacity (0.25–1: see-through of new notes), defaultSolidOnHover (true: new notes turn solid on hover),
 listTheme (cream|rose|mint|sky|lilac, dark: night|midnight|forest|plum: colours of the list window; doesn't trigger a reload either),
 madeGroup (true once any group was ever made; hides the "drag to make a group" tip for good),
-lock ("salt:hash" scrypt, or null), lockKind ('pin'|'password', null = password from before 1.1.6),
+lock ("salt:hash" scrypt, or null; since 1.1.30 the marker 'encrypted' while crypt exists), crypt (1.1.30: { v, pub, byPw, byRec, keyShown, off, backupsSealed (1.1.31) }: the
+encryption keys, see architecture.md; never sent to a window), lockKind ('pin'|'password', null = password from before 1.1.6),
 lockLen (PIN length, so a PIN can open by itself)`.
 
 **Backups**: made at most once per day (on start and every 3 hours). The newest 30 are kept. Restoring a

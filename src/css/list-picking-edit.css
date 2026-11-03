@@ -1,0 +1,175 @@
+/* the bar for the picked cards */
+.bulkbar {
+  position: fixed; left: 50%; bottom: 14px; z-index: 40;
+  transform: translateX(-50%);
+  display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 1px;
+  max-width: calc(100vw - 24px);
+  padding: 5px 5px 5px 14px;
+  border-radius: 22px;
+  background: #3B3226; color: #FFF8E6;
+  box-shadow: 0 10px 28px rgba(40,30,10,.35);
+  animation: bulkIn .2s ease-out;
+}
+.bulkbar[hidden] { display: none; }
+@keyframes bulkIn { from { opacity: 0; transform: translate(-50%, 10px); } }
+.bcount { margin-right: 6px; font: 800 12.5px var(--ui); white-space: nowrap; }
+.bb {
+  height: 32px; padding: 0 8px;
+  border: 0; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; color: inherit;
+  font: 800 11.5px var(--ui); white-space: nowrap;
+  cursor: pointer;
+}
+.bb[hidden] { display: none; }
+.bb:hover { background: rgba(255,255,255,.13); }
+.bb:disabled { opacity: .4; cursor: default; background: transparent; }
+.bb svg { width: 15px; height: 15px; }
+.bb#bFav.on svg { fill: #FFD54A; stroke: #FFD54A; }
+.bb.danger { color: #FFB4AE; }
+.bb.danger:not(:disabled):hover { background: rgba(229,72,77,.28); }
+.bb.x { width: 32px; padding: 0; justify-content: center; }
+@media (max-width: 700px) { .bb:not(.x) span { display: none; } .bb { padding: 0 9px; } }
+.bulkpop {
+  position: absolute; left: 50%; bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  background: #FFFDF7; color: #3B3226;
+  box-shadow: 0 10px 26px rgba(40,30,10,.3);
+}
+.bulkpop[hidden] { display: none; }
+.bulkpop .sws { display: flex; gap: 6px; }
+
+/* ---------- 1.1.15: rows of colour circles that scroll sideways (swatchStrip in list.js) ----------
+   Same circle sizes as before; the row is as wide as the old one (Settings: 9 circles, group panel and the
+   selection bar: 8) and scrolls: drag it, use the mouse wheel, or the arrows on a side with more colours. */
+.swstrip { --sz: 28px; --gap: 8px; --n: 9; --stripbg: var(--card); position: relative; width: calc(var(--n) * var(--sz) + (var(--n) - 1) * var(--gap)); max-width: 100%; }
+.swstrip.small, .bulkpop .swstrip { --sz: 24px; --gap: 6px; --n: 8; }
+/* Settings and the Edit sheet: every colour shows at once. When the window is too narrow they carry on in the
+   next line, like text does (no scrolling, no arrows) */
+.swstrip.wide { width: 100%; }
+.swstrip.wide > .swatches { flex-wrap: wrap; row-gap: 10px; overflow: visible; padding: 0; margin: 0; cursor: default; }
+.swstrip.wide .swarr { display: none; }
+#groupPanel .swstrip { --stripbg: var(--card2); }
+.bulkpop .swstrip { --stripbg: #FFFDF7; }
+.swstrip > .swatches, .swstrip > .sws {
+  display: flex; flex-wrap: nowrap; gap: var(--gap);
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  padding: 5px; margin: -5px;
+  cursor: grab; touch-action: pan-y;
+}
+.swstrip > .swatches::-webkit-scrollbar, .swstrip > .sws::-webkit-scrollbar { display: none; }
+.swstrip > * > .sw, .swstrip > * > .bsw { flex: none; }
+.swstrip .dragging, .swstrip .dragging > * { cursor: grabbing; }
+.swstrip .dragging > *:hover { transform: none; }
+.swarr {
+  position: absolute; top: -5px; bottom: -5px; width: 36px; z-index: 1;
+  display: flex; align-items: center; padding: 0;
+  border: 0; cursor: pointer; color: var(--ink);
+}
+.bulkpop .swarr { color: #3B3226; }
+.swarr[hidden] { display: none; }
+.swarr.l { left: -5px; justify-content: flex-start; padding-left: 2px; background: linear-gradient(90deg, var(--stripbg) 45%, transparent); }
+.swarr.r { right: -5px; justify-content: flex-end; padding-right: 2px; background: linear-gradient(270deg, var(--stripbg) 45%, transparent); }
+.swarr svg {
+  width: 20px; height: 20px; padding: 4px; box-sizing: border-box;
+  border-radius: 50%; background: var(--stripbg);
+  box-shadow: 0 1px 4px rgba(0,0,0,.28);
+  fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
+}
+/* Settings → For new notes: pick several colours (a tick on each picked one) */
+.sw.pick { display: grid; place-items: center; }
+.sw.pick .tick { width: 15px; height: 15px; fill: none; stroke: #3B3226; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; opacity: 0; filter: drop-shadow(0 0 1.5px rgba(255,255,255,.9)); transition: opacity .12s; }
+.sw.pick.darkp .tick { stroke: #fff; filter: drop-shadow(0 0 1.5px rgba(0,0,0,.8)); }
+.sw.pick.on .tick { opacity: 1; }
+.shint { margin-top: -2px !important; line-height: 1.4; }
+
+/* ---------- 1.1.15: Edit sheet (right-click a note → Edit…) ---------- */
+.esheet { align-items: end; padding: 12px; }
+.ebox {
+  width: 100%; max-width: 440px; max-height: calc(100vh - 24px); overflow: auto;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 14px 16px 14px;
+  border-radius: 20px;
+  background: var(--card2);
+  box-shadow: 0 24px 60px rgba(60,40,10,.35);
+  animation: popup .16s ease-out;
+  --stripbg: var(--card2);
+}
+.ebox .swstrip { --stripbg: var(--card2); }
+.ehead { display: flex; align-items: center; justify-content: space-between; }
+.ehead h3 { margin: 0; font: 700 25px/1.1 var(--hand); color: var(--ink); }
+.epaper {
+  --paper: #FFF4A3; --bar: #FBE278; --accent: #7A5C00; --cink: #3B3220; /* yellow, like .card */
+  padding: 9px 12px;
+  border-radius: 3px 3px 3px 14px;
+  background: var(--paper); color: var(--cink);
+  box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 6px 16px -8px rgba(80,60,20,.45);
+  transition: background .2s, color .2s;
+}
+.etitle {
+  width: 100%; border: 0; outline: 0; padding: 2px 0;
+  background: transparent; color: inherit;
+  font: 800 15px var(--ui);
+}
+.etitle::placeholder { color: inherit; opacity: .45; font-weight: 700; }
+.ecover { display: block; margin-bottom: 8px; }
+.ecover[hidden] { display: none; }
+.ecover .minput { width: 100%; margin: 4px 0 0; box-sizing: border-box; }
+.erow { display: flex; flex-direction: column; gap: 8px; }
+.erow b { font-weight: 800; font-size: 13.5px; }
+.ebtns { display: flex; align-items: center; gap: 8px; }
+.ebtns small { flex: 1; font: 700 11.5px var(--ui); color: var(--mute); }
+.pickbtns { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.bsw { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); cursor: pointer; transition: transform .1s; }
+.bsw:hover { transform: scale(1.15); }
+.bfonts { display: flex; gap: 4px; }
+.bfonts button { flex: 1; height: 28px; border: 0; border-radius: 999px; background: #F2EAD7; color: #3B3226; font: 800 12px var(--ui); cursor: pointer; }
+.bfonts button.hand { font: 700 17px var(--hand); }
+.bfonts button.med { font: 400 16px var(--med); }
+.bfonts button:hover { background: #E8DCC0; }
+body.selecting #viewNotes { padding-bottom: 76px; }
+
+/* "Stardust": locking shrinks the writing into little stars and the lock glows in; unlocking reverses it */
+.stardust { position: absolute; left: 50%; top: 50%; z-index: 7; width: 0; height: 0; pointer-events: none; }
+.stardust i {
+  position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; opacity: 0;
+  background: #8E7BEF;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  animation: star .8s .1s ease-out both;
+}
+.stardust i:nth-child(even) { left: -4.5px; top: -4.5px; width: 9px; height: 9px; background: #F0B800; }
+.stardust i:nth-child(1) { --dx: -46px; --dy: -34px; } .stardust i:nth-child(2) { --dx: 44px; --dy: -38px; }
+.stardust i:nth-child(3) { --dx: 52px; --dy: 10px; }   .stardust i:nth-child(4) { --dx: -54px; --dy: 14px; }
+.stardust i:nth-child(5) { --dx: -20px; --dy: 46px; }  .stardust i:nth-child(6) { --dx: 26px; --dy: 44px; }
+.stardust i:nth-child(7) { --dx: 4px; --dy: -52px; }   .stardust i:nth-child(8) { --dx: -34px; --dy: -6px; }
+@keyframes star {
+  0% { transform: translate(0, 0) scale(0) rotate(0); opacity: 0; }
+  30% { opacity: 1; transform: translate(calc(var(--dx) * .55), calc(var(--dy) * .55)) scale(1.1) rotate(60deg); }
+  100% { transform: translate(var(--dx), var(--dy)) scale(.2) rotate(160deg); opacity: 0; }
+}
+/* "Snap shut" lock / unlock (1.1.14): the padlock drops in with a bounce and its shackle snaps shut; unlocking pops
+   the shackle open (its long side stays in the lock body) and the padlock floats away while the card fades in */
+.shackle { transform-box: fill-box; transform-origin: 0% 100%; }
+.lockmark svg, .glock svg, .lockfly svg { overflow: visible; }
+@keyframes lkDrop { 0% { translate: 0 -34px; opacity: 0; } 55% { translate: 0 2px; opacity: 1; } 78% { translate: 0 -1px; } 100% { translate: 0 0; opacity: 1; } }
+@keyframes lkSquash { 0%, 60% { scale: 1; } 70% { scale: 1.12 .9; } 100% { scale: 1; } }
+@keyframes lkSnap { 0%, 55% { transform: translateY(-4.5px) rotate(-16deg); } 66% { transform: translateY(.6px); } 100% { transform: none; } }
+@keyframes lkOpen { 0% { transform: none; } 35%, 100% { transform: translateY(-4.5px) rotate(-16deg); } }
+@keyframes lkAway { 0%, 40% { translate: 0 0; opacity: 1; } 100% { translate: 0 -26px; opacity: 0; } }
+@keyframes fadeInSoft { from { opacity: 0; } to { opacity: 1; } }
+.card.lock-anim .lockmark svg, .card.lock-anim .glock svg { animation: lkDrop .6s cubic-bezier(.3,1.3,.5,1) both, lkSquash .6s both; }
+.card.lock-anim .shackle { animation: lkSnap .6s both; }
+.card.lock-anim:not(.group) .txt { animation: fadeInSoft .4s both; }
+.card.unlock-anim:not(.group) .body, .card.group.unlock-anim .art { animation: fadeInSoft .5s .1s ease-out both; }
+/* 1.1.14: a locked note that's unlocked for now in its open window */
+.card .ulk { display: inline-grid; place-items: center; flex: none; margin-left: 4px; color: var(--accent); opacity: .8; }
+.card .ulk svg { width: 13px; height: 13px; stroke-width: 2.4; }
+.lockfly { position: absolute; z-index: 7; pointer-events: none; color: var(--accent); opacity: .55; }
+.card.group .lockfly { color: var(--ink2); opacity: .8; }
+.lockfly svg { width: 100%; height: 100%; stroke-width: 1.8; animation: lkAway .7s ease-in both; }
+.lockfly .shackle { animation: lkOpen .7s both; }
+@media (prefers-reduced-motion: reduce) { .stardust { display: none; } .card > .fav.pop svg, .card > .fav.pop::after { animation: none; } }

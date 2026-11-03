@@ -144,6 +144,13 @@ function normalizeBounds(b) {
 }
 
 const cleanTitle = (t) => (typeof t === 'string' ? t.replace(/[\r\n\t]+/g, ' ').slice(0, 120) : '');
+// 1.1.30: a locked note's sealed contents (main/crypt.js makes and opens them; the store only keeps them)
+function cleanEnc(e) {
+  if (!e || typeof e !== 'object' || (e.v !== 1 && e.v !== 2)) return null; // 2 since 1.1.31
+  if (!['k', 'n', 't', 'c'].every((k) => typeof e[k] === 'string' && e[k].length < 50e6)) return null;
+  return { v: e.v, k: e.k, n: e.n, t: e.t, c: e.c };
+}
+const cleanEncAtt = (a) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string' && /^[A-Za-z0-9_.-]{1,120}$/.test(x)).slice(0, 2000) : null);
 
 // Draw-over ink: { s: [stroke, ...] } in the note's own coordinates (px from the top-left of the text area).
 // stroke = { t: pen|hl|line|arrow|rect|ellipse, c: '#rrggbb', w: 1-40, l: 'a' (above text) | 'b' (behind),
@@ -228,6 +235,51 @@ function checklistMarks(html, text) {
   return any ? out : '';
 }
 
+// 1.1.46: where the note's first picture sits and how big it is there, so its card in the list shows it in the same
+// place and at the same size next to the words (the owner: a small picture far down took half the card). Returns
+// { at, px, pct, d, fs, tw } or null: at = how many lines of the text come before it (lines as the list counts them:
+// trimmed, empty ones left out); px = its width in the note (its width attribute), pct = Small / Medium (45 / 72 % of
+// the text's width), neither = full width (no wider than the picture itself); d = a drawing; fs = the note's text size
+// (px), tw = the text's width (px), so the card can turn px into "this many letters wide".
+const FONT_PX = { hand: { s: 19, m: 23, l: 28 }, round: { s: 13.5, m: 15.5, l: 18.5 }, medieval: { s: 16, m: 18.5, l: 22 } };
+// the note fonts: Handwritten (Caveat), Rounded (Nunito), Medieval (Augusta, src/fonts/, 1.2.1)
+const FONTS = ['hand', 'round', 'medieval'];
+function picturePlace(n) {
+  const html = n && typeof n.html === 'string' ? n.html : '';
+  const m = /<img\b([^>]*)>/i.exec(html);
+  if (!m) return null;
+  // the words before the picture, broken into lines the way the note's innerText does (blocks and <br> end a line)
+  const before = decodeEnt(html.slice(0, m.index)
+    .replace(/<br\b[^>]*>/gi, '\n')
+    .replace(/<\/?(div|p|li|ul|ol|h[1-6]|blockquote|pre|tr|table|section|article)\b[^>]*>/gi, '\n')
+    .replace(/<[^>]*>/g, ''));
+  const prev = before.split('\n').map(normLine).filter(Boolean);
+  const lines = (typeof n.text === 'string' ? n.text : '').split('\n').map(normLine).filter(Boolean);
+  let at = Math.min(prev.length, lines.length);
+  // counting can be off by a line (tables, voice notes): if the last line before it is known, trust where that one is
+  const last = prev[prev.length - 1];
+  if (last && lines[at - 1] !== last) {
+    let best = -1;
+    lines.forEach((l, i) => { if (l === last && (best < 0 || Math.abs(i + 1 - at) < Math.abs(best + 1 - at))) best = i; });
+    if (best >= 0) at = best + 1;
+  }
+  const attrs = m[1];
+  const cls = (/\bclass\s*=\s*("([^"]*)"|'([^']*)')/i.exec(attrs) || [])[2] || '';
+  const w = Number((/\bwidth\s*=\s*["']?(\d+(?:\.\d+)?)/i.exec(attrs) || [])[1]);
+  const fs = (FONT_PX[n.font] || FONT_PX.hand)[n.size] || FONT_PX.hand.m;
+  const tw = Math.max(80, Number(n.wrapWidth) || ((n.bounds && n.bounds.width) || 340) - 32);
+  return {
+    at,
+    px: w > 0 ? Math.round(w) : null,
+    pct: w > 0 ? null : /(^|\s)w-s(\s|$)/.test(cls) ? 45 : /(^|\s)w-m(\s|$)/.test(cls) ? 72 : null,
+    d: /(^|\s)att-drawing(\s|$)/.test(cls),
+    fs,
+    tw,
+  };
+}
+// 1.1.46: how many lines of words a note has (as the list counts them), for the card's "+3 lines"
+const lineCount = (text) => (typeof text === 'string' ? text.split('\n').filter((l) => l.trim()).length : 0);
+
 // 1.1.23: the descriptions of a note's pictures (their alt text), one per line, for the notes list's search
 function pictureWords(html) {
   if (typeof html !== 'string' || !/<img/i.test(html)) return '';
@@ -240,11 +292,12 @@ function normalize(n) {
   return {
     id: String(n.id),
     title: cleanTitle(n.title),
+    coverTitle: cleanTitle(n.coverTitle), // 1.1.30: shown instead of the title while the note is locked
     html: typeof n.html === 'string' ? n.html : '',
     text: typeof n.text === 'string' ? n.text : '',
     firstImage: typeof n.firstImage === 'string' ? n.firstImage : null,
     color: COLORS.includes(n.color) ? n.color : 'yellow',
-    font: n.font === 'round' ? 'round' : 'hand',
+    font: FONTS.includes(n.font) ? n.font : 'hand',
     size: ['s', 'm', 'l'].includes(n.size) ? n.size : 'm',
     opacity: clamp(Number(n.opacity) || 1, 0.25, 1),
     zoom: clamp(Math.round((Number(n.zoom) || 1) * 10) / 10, 0.5, 3), // Ctrl + mouse wheel in the note (1.1.13)
@@ -260,6 +313,8 @@ function normalize(n) {
     ink: normalizeInk(n.ink),
     // text layout locked at this width (px) so text and pictures don't re-wrap; null = wraps with the note
     wrapWidth: Number.isFinite(Number(n.wrapWidth)) && Number(n.wrapWidth) >= 80 ? Math.min(4000, Math.round(Number(n.wrapWidth))) : null,
+    // 1.1.45: word wrap off with no limit, kept with a drawing too (then wrapWidth is only the pictures' width)
+    nowrap: n.nowrap === true,
     spell: n.spell === true || n.spell === false ? n.spell : null,
     groupId: typeof n.groupId === 'string' && n.groupId ? n.groupId : null,
     bounds: normalizeBounds(n.bounds),
@@ -267,6 +322,10 @@ function normalize(n) {
     updatedAt: Number(n.updatedAt) || now,
     deletedAt: n.deletedAt ? Number(n.deletedAt) : null,
     restoredFrom: n.restoredFrom || null,
+    // 1.1.30: a locked note as it is on disk: title, html, text, firstImage and ink sealed together (empty above
+    // until the PIN opens them), and the names of its sealed photo / drawing / voice files (for the attachment sweep)
+    enc: cleanEnc(n.enc),
+    encAtt: n.enc ? cleanEncAtt(n.encAtt) : null,
   };
 }
 
@@ -286,6 +345,11 @@ class Store {
     for (const d of [root, this.notesDir, this.attDir, this.backupDir]) fs.mkdirSync(d, { recursive: true });
     this.notes = new Map();
     this.timers = new Map();
+    // 1.1.30 (main/crypt.js): sealer(note) = what is written to disk for a note (a locked note sealed),
+    // opener(note from a backup) = it opened, or null if it can't be opened now. Without them notes are written as they are.
+    this.sealer = null;
+    this.opener = null;
+    this.sealedOnDisk = new Set(); // ids whose file on disk is sealed
     this.settings = { ...DEFAULT_SETTINGS, ...(readJson(this.settingsFile) || readJson(this.settingsFile + '.bak') || {}) };
     this.settings.listSort = { ...DEFAULT_SETTINGS.listSort, ...(this.settings.listSort || {}) };
     // 1.1.15: one colour for new notes became a list to pick from. "random" meant the 7 original pastels.
@@ -323,6 +387,7 @@ class Store {
       const data = main || readJson(base + '.tmp') || readJson(base + '.bak');
       if (data && data.id) {
         this.notes.set(String(data.id), normalize(data));
+        if (main && main.enc) this.sealedOnDisk.add(String(data.id));
         // Repair a damaged or missing main file right away.
         if (!main) { try { writeFileSafe(base, JSON.stringify(this.notes.get(String(data.id)), null, 1)); } catch { /* ignore */ } }
       }
@@ -342,12 +407,22 @@ class Store {
     return path.join(this.notesDir, id + '.json');
   }
 
+  diskForm(n) {
+    return this.sealer ? this.sealer(n) : n;
+  }
+
   writeNow(id) {
     const t = this.timers.get(id);
     if (t) { clearTimeout(t); this.timers.delete(id); }
     const n = this.notes.get(id);
     if (!n) return;
-    writeFileSafe(this.fileOf(id), JSON.stringify(n, null, 1));
+    const out = this.diskForm(n);
+    const text = JSON.stringify(out, null, 1);
+    writeFileSafe(this.fileOf(id), text);
+    // 1.1.30: the first sealed save of a note would leave its plain previous version in <id>.json.bak: that copy
+    // gets the sealed version too (the .bak is there to repair a damaged file, which the same version does as well)
+    if (out.enc && !this.sealedOnDisk.has(id)) { try { fs.writeFileSync(this.fileOf(id) + '.bak', text); } catch { /* ignore */ } }
+    if (out.enc) this.sealedOnDisk.add(id); else this.sealedOnDisk.delete(id);
   }
 
   save(id, delay = 250) {
@@ -402,10 +477,12 @@ class Store {
   duplicate(id, extra = {}) {
     const src = this.notes.get(id);
     if (!src || src.deletedAt) return null;
-    const keys = ['html', 'text', 'firstImage', 'ink', 'wrapWidth', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'spell', 'locked', 'groupId', 'fx'];
+    const keys = ['html', 'text', 'firstImage', 'ink', 'wrapWidth', 'nowrap', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'spell', 'locked', 'groupId', 'fx', 'coverTitle'];
     const copy = {};
     for (const k of keys) copy[k] = src[k] && typeof src[k] === 'object' ? JSON.parse(JSON.stringify(src[k])) : src[k];
     copy.title = src.title ? `${src.title} (copy)` : '';
+    // 1.1.30: a locked note not opened with the PIN yet: the copy gets the same sealed contents, and its own lock
+    if (src.enc) Object.assign(copy, { enc: { ...src.enc }, encAtt: src.encAtt ? [...src.encAtt] : null, locked: true, title: '' });
     if (copy.groupId && !this.groups.has(copy.groupId)) copy.groupId = null;
     return this.create({ ...copy, ...extra });
   }
@@ -600,15 +677,17 @@ class Store {
 
   referencedAttachments() {
     const used = new Set();
-    const scan = (html) => {
-      if (typeof html !== 'string') return;
-      for (const m of html.matchAll(ATT_REF)) used.add(m[1]);
+    // a sealed (locked) note lists its files in encAtt (1.1.30): its html can't be read
+    const scan = (n) => {
+      if (!n) return;
+      if (typeof n.html === 'string') for (const m of n.html.matchAll(ATT_REF)) used.add(m[1]);
+      if (Array.isArray(n.encAtt)) for (const x of n.encAtt) if (typeof x === 'string') used.add(x);
     };
-    for (const n of this.notes.values()) scan(n.html);
+    for (const n of this.notes.values()) scan(n);
     for (const b of this.listBackups()) {
       const dir = path.join(this.backupDir, b.name);
       for (const f of fs.readdirSync(dir)) {
-        if (f.endsWith('.json') && f !== 'meta.json' && f !== 'groups.json') scan((readJson(path.join(dir, f)) || {}).html);
+        if (f.endsWith('.json') && f !== 'meta.json' && f !== 'groups.json') scan(readJson(path.join(dir, f)));
       }
     }
     return used;
@@ -651,7 +730,7 @@ class Store {
     fs.mkdirSync(tmpDir, { recursive: true });
     let count = 0;
     for (const n of this.notes.values()) {
-      fs.writeFileSync(path.join(tmpDir, n.id + '.json'), JSON.stringify(n));
+      fs.writeFileSync(path.join(tmpDir, n.id + '.json'), JSON.stringify(this.diskForm(n)));
       count++;
     }
     fs.writeFileSync(path.join(tmpDir, 'groups.json'), JSON.stringify({ groups: [...this.groups.values()] }));
@@ -693,15 +772,20 @@ class Store {
     const ids = [];
     for (const f of fs.readdirSync(dir)) {
       if (!f.endsWith('.json') || f === 'meta.json' || f === 'groups.json') continue;
-      const b = readJson(path.join(dir, f));
-      if (!b || !b.id) continue;
+      const raw = readJson(path.join(dir, f));
+      if (!raw || !raw.id) continue;
+      // 1.1.30: a sealed (locked) note is opened if the PIN was typed; otherwise it comes back sealed
+      const opened = raw.enc && this.opener ? this.opener(raw) : null;
+      const b = opened || raw;
       const cur = this.notes.get(String(b.id));
-      if (cur && cur.html === b.html) {
+      const same = cur && (b.enc ? !!cur.enc && cur.enc.c === b.enc.c : !cur.enc && cur.html === b.html);
+      if (same) {
         if (cur.deletedAt && !b.deletedAt) { this.restore(cur.id); ids.push(cur.id); restored++; }
         continue;
       }
       if (b.deletedAt) continue;
-      const copy = normalize({ ...b, id: crypto.randomUUID(), open: false, restoredFrom: name, deletedAt: null });
+      // a note that was locked when backed up stays locked (its group's lock doesn't come along into "Restored Notes")
+      const copy = normalize({ ...b, id: crypto.randomUUID(), open: false, restoredFrom: name, deletedAt: null, ...(raw.enc ? { locked: true } : {}) });
       if (copy.groupId && !this.groups.has(copy.groupId)) copy.groupId = null;
       this.notes.set(copy.id, copy);
       this.writeNow(copy.id);
@@ -726,4 +810,4 @@ function backupDayName(name) {
   return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-module.exports = { checklistMarks, pictureWords, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };
+module.exports = { FONTS, checklistMarks, pictureWords, picturePlace, lineCount, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };

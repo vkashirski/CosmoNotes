@@ -1,6 +1,6 @@
 # UI gotchas – note editor, toolbars, pop-ups, notes list
 
-Open this when working in `src/note.*` or `src/list.*`. Effects have their own file: `effects.md`.
+Open this when working in `src/note.*` or `src/list.*`. Effects have their own file: `effects.md`. The window styles are in `src/css/` (`note-*.css`, `list-*.css`); `CONTEXT.md` says what each holds.
 
 ## Drawing (draw-over)
 
@@ -30,6 +30,12 @@ Open this when working in `src/note.*` or `src/list.*`. Effects have their own f
   While drawing, the editor is
   `contentEditable=false` and `#inkCatch` gets the pointer. Mouse-wheel scrolling still works because the
   catcher sits inside the scroller.
+
+- **Smooth scrolling in the list (1.1.43):** a scrolling area (`.view`, or a new one) needs a solid background of its own
+  (`var(--bg)` + the dots, `local`), or Windows redraws it on every frame of a scroll (Chromium won't scroll a see-through
+  area on the graphics card, to keep ClearType text). Don't put a wheel listener with `passive: false` on `window` or
+  `document` (it slows every scroll): put it on the element that needs it. `.view.scrolling` turns the mouse off for
+  what's inside while it scrolls (`events.js`); don't rely on hover or clicks there during a scroll.
 
 ## Toolbars, menus and pop-ups
 

@@ -1,0 +1,105 @@
+/* 1.2.1: the Medieval note font (Augusta by Dieter Steffmann, free on dafont), packed with the app in src/fonts/.
+   Letters it doesn't have (Cyrillic, č, ž...) fall back to the next fonts. */
+@font-face { font-family: "Augusta"; src: url("../fonts/Augusta.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: block; }
+:root {
+  --ui: "Nunito", "Segoe UI", system-ui, sans-serif;
+  --hand: "Caveat", "Ink Free", "Segoe Print", cursive;
+  --med: "Augusta", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --pop-bg: #FFFDF6;
+  --pop-ink: #3B3226;
+  --pop-soft: #F5EEDD;
+  --pop-soft2: #EDE3CB;
+  --pop-mute: #9A8B70;
+  --pop-ink2: #5C4D35; /* second text colour on pop-ups (1.1.16) */
+  --pop-card: #fff; /* raised bits on a pop-up: fields, the picked button of a row (1.1.16) */
+  --pop-pick: #3B3226; --pop-pickfg: #FFF8E6; /* a picked tool, dark pills */
+}
+
+body[data-color="yellow"]   { --paper:#FFF4A3; --paper2:#FFEC85; --bar:#FBE278; --accent:#7A5C00; --ink:#3B3220; --sel:rgba(255,190,0,.42); --line:rgba(122,92,0,.28); }
+body[data-color="pink"]     { --paper:#FFD6E6; --paper2:#FFC6DB; --bar:#FFB5D0; --accent:#9C2A5B; --ink:#3D2430; --sel:rgba(255,92,150,.32); --line:rgba(156,42,91,.28); }
+body[data-color="green"]    { --paper:#D8F5C4; --paper2:#C9F0AF; --bar:#B9E79C; --accent:#3D7A1A; --ink:#25331C; --sel:rgba(90,190,40,.32);  --line:rgba(61,122,26,.28); }
+body[data-color="blue"]     { --paper:#D2ECFF; --paper2:#C1E3FF; --bar:#A9D8FF; --accent:#1F5F93; --ink:#1D2B38; --sel:rgba(40,140,240,.28); --line:rgba(31,95,147,.28); }
+body[data-color="purple"]   { --paper:#E8DDFF; --paper2:#DDCEFF; --bar:#D0BDFF; --accent:#5B3AA8; --ink:#2B2340; --sel:rgba(130,80,240,.28); --line:rgba(91,58,168,.28); }
+body[data-color="orange"]   { --paper:#FFDFBF; --paper2:#FFD2A8; --bar:#FFC38C; --accent:#9A4E0C; --ink:#3A2A1A; --sel:rgba(255,140,40,.32); --line:rgba(154,78,12,.28); }
+body[data-color="mint"]     { --paper:#CDF3E8; --paper2:#BCEDDE; --bar:#A4E5D1; --accent:#1F7560; --ink:#1C332D; --sel:rgba(30,180,140,.3);  --line:rgba(31,117,96,.28); }
+body[data-color="charcoal"] { --paper:#3A3940; --paper2:#333239; --bar:#2B2A30; --accent:#FFD86B; --ink:#F3EFE6; --sel:rgba(255,216,107,.3); --line:rgba(255,216,107,.3); }
+/* 1.1.15: the colours of the list themes */
+body[data-color="cream"]    { --paper:#F5EDD9; --paper2:#EFE4CB; --bar:#E8DCC0; --accent:#7D6C50; --ink:#3B3226; --sel:rgba(200,160,80,.32);  --line:rgba(125,108,80,.28); }
+body[data-color="rose"]     { --paper:#FBE1E8; --paper2:#F7D3DE; --bar:#F2CAD6; --accent:#86606B; --ink:#3F2A31; --sel:rgba(190,90,120,.28);  --line:rgba(134,96,107,.3); }
+body[data-color="sage"]     { --paper:#DCEFE4; --paper2:#CFE8D9; --bar:#C4E2D1; --accent:#4F6D5D; --ink:#25362D; --sel:rgba(60,130,95,.28);   --line:rgba(79,109,93,.3); }
+body[data-color="mist"]     { --paper:#DCEAF8; --paper2:#CEE0F3; --bar:#C5DAF0; --accent:#4F6782; --ink:#24313F; --sel:rgba(60,110,170,.26);  --line:rgba(79,103,130,.3); }
+body[data-color="lavender"] { --paper:#E7E0F9; --paper2:#DCD3F5; --bar:#D5CAF2; --accent:#5E5480; --ink:#2F2843; --sel:rgba(110,80,190,.26);  --line:rgba(94,84,128,.3); }
+body[data-color="night"]    { --paper:#2F2D35; --paper2:#2A2830; --bar:#25232A; --accent:#B3A4FF; --ink:#EDE6D8; --sel:rgba(142,123,239,.35); --line:rgba(179,164,255,.3); }
+body[data-color="midnight"] { --paper:#252B3D; --paper2:#212637; --bar:#1D2232; --accent:#9FB2FF; --ink:#E4E8F2; --sel:rgba(110,139,255,.35); --line:rgba(159,178,255,.3); }
+body[data-color="forest"]   { --paper:#232E28; --paper2:#1F2924; --bar:#1C2520; --accent:#8FD9B0; --ink:#E2ECE4; --sel:rgba(91,191,138,.33);  --line:rgba(143,217,176,.3); }
+body[data-color="plum"]     { --paper:#2D2432; --paper2:#28202D; --bar:#251D29; --accent:#E0A6EE; --ink:#EEE3F0; --sel:rgba(199,125,219,.33); --line:rgba(224,166,238,.3); }
+
+body[data-font="hand"][data-size="s"]  { --fs: 19px; }
+body[data-font="hand"][data-size="m"]  { --fs: 23px; }
+body[data-font="hand"][data-size="l"]  { --fs: 28px; }
+body[data-font="round"][data-size="s"] { --fs: 13.5px; }
+body[data-font="round"][data-size="m"] { --fs: 15.5px; }
+body[data-font="round"][data-size="l"] { --fs: 18.5px; }
+body[data-font="medieval"][data-size="s"] { --fs: 16px; }
+body[data-font="medieval"][data-size="m"] { --fs: 18.5px; }
+body[data-font="medieval"][data-size="l"] { --fs: 22px; }
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--paper) 0%, var(--paper) 55%, var(--paper2) 100%);
+  color: var(--ink);
+  font-family: var(--ui);
+  user-select: none;
+  transition: background-color .2s;
+}
+button { font-family: var(--ui); }
+svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+svg .fill { fill: currentColor; stroke: none; }
+
+/* ---------- top bar ---------- */
+#bar {
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0 3px;
+  background: var(--bar);
+  -webkit-app-region: drag;
+}
+.hb {
+  -webkit-app-region: no-drag;
+  width: 28px; height: 26px;
+  border: 0; border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  display: grid; place-items: center;
+  cursor: pointer;
+  opacity: .72;
+  transition: opacity .12s, background .12s;
+}
+.hb:hover { opacity: 1; background: rgba(0,0,0,.08); }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .hb:hover { background: rgba(255,255,255,.1); }
+.hb svg { width: 16px; height: 16px; }
+#btnPin[aria-pressed="true"] { opacity: 1; }
+#btnPin[aria-pressed="true"] svg { fill: currentColor; transform: rotate(-25deg); }
+#title {
+  flex: 1; min-width: 0;
+  padding: 0 6px;
+  font: 800 13px var(--ui);
+  color: var(--accent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  opacity: 0;
+}
+body[data-font="hand"] #title { font: 700 19px var(--hand); line-height: 1; padding-bottom: 1px; }
+body[data-font="medieval"] #title { font: 400 17px var(--med); line-height: 1; padding-bottom: 1px; }
+body.has-title #title, body.rolled #title { opacity: .95; }
+.hb[hidden] { display: none; }
+#btnRoll svg { transition: transform .18s; }
+body.rolled #btnRoll svg { transform: rotate(180deg); }
+body.rolled #scroller, body.rolled #tools, body.rolled .corner, body.rolled #stamp, body.rolled #lockScreen { display: none !important; }
+

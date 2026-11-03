@@ -39,19 +39,36 @@ WHERE ARE MY NOTES SAVED?
 
 
 LOCKED NOTES
-   The lock hides a note's contents behind your password or PIN, in the
-   note itself and in the notes list. It's a privacy screen, not
-   encryption: the note is still stored as a normal file on this computer.
+   The lock hides a note behind your password or PIN, in the note itself
+   and in the notes list. Since version 1.1.30 locked notes are also
+   ENCRYPTED on this computer: their title, words, drawings, photos and
+   voice clips can't be read from the files without your PIN or password.
+   (Give a locked note a "Title while locked" in its menu, or in Edit
+   design in the list, to see which note it is while it's locked.)
 
    You can choose a PIN (numbers only: the note opens as soon as you type
-   it) or a password.
+   it) or a password. A short PIN is the weak spot: someone who copies
+   your notes folder can try every PIN on their own computer. A PIN of 8
+   or more digits, or a password, is much safer.
 
-   Forgot the password or PIN? Quit CosmoNotes, open %APPDATA%\CosmoNotes,
-   open settings.json in Notepad, change the "lock" line to
-       "lock": null,
-   save, and start CosmoNotes again. Your locked notes stay locked; choose a
-   new password the next time you lock a note (or in Settings) and they
-   open with that one.
+   Updating from an older version? Your locked notes are encrypted the
+   first time you type your PIN: the notes list asks for it as soon as
+   the app starts. Their copies in the daily backups are encrypted too.
+
+   RECOVERY KEY: when encryption starts, the list shows a recovery key of
+   25 letters and digits. Print it or write it down and keep it away
+   from this computer.
+
+   Forgot the password or PIN? Notes list > Settings > Locked notes >
+   "Forgot it? Use the recovery key", then choose a new one.
+   Without your PIN AND without the recovery key, encrypted notes can't
+   be opened by anyone - not even by editing settings.json. (If you've
+   lost the recovery key but still know your PIN: Settings > Locked
+   notes > "New recovery key".)
+
+   Changed your mind? Settings > Locked notes > "Turn off encryption"
+   writes the locked notes back as normal files (they stay locked in the
+   app). "Turn encryption back on" encrypts them again.
 
 
 QUICK TIPS

@@ -1,42 +1,61 @@
 # CosmoNotes – version history
 
-The app shows a short, plain-language version of this list: notes list → Settings → About CosmoNotes → Version history
-(source: `src/about.js` → `VERSIONS`, shortened in 1.1.13 at the owner's request: only the important changes, one line each).
-Keep both up to date; the details belong here.
+The app shows no version history (since 1.1.41): it lives only here and in [`CHANGELOG-archive.md`](CHANGELOG-archive.md).
+Settings → About CosmoNotes shows the version, the date of the last update and the feature list.
 
-This file keeps only the **two newest versions**. Older ones (1.1.23 back to 1.0.0) are in [`CHANGELOG-archive.md`](CHANGELOG-archive.md). When a new version is added at the top, move the oldest one here down to the top of the archive.
+This file keeps only the **two newest versions**. Older ones (1.2.1 back to 1.0.0) are in the archive. When a new
+version is added at the top, move the oldest one here to the top of the archive.
 
-## 1.1.25 – 31 October 2026
+**Renumbered in 1.1.41.** Six big versions were split into smaller ones, so the numbers from 1.1.13 on moved up. Each
+heading says what it was. Version numbers written before 1.1.41 (in code comments, test file names such as
+`tests/v1131.test.js`, `ai-context/`, and the text of older entries) are the old ones (tests are named by area since 1.1.49):
 
-- **Fixed: Ghost ripple as a mouse effect.** Switching it on threw an error: the Layer draws once before the first step,
-  and the follower's dots had no brightness (`near`) yet, so `bucketDots` got NaN. The error stopped whatever came
-  after: in a note, the effects setup half-way (pause and rolled-up were not applied); in the notes list, the effects of
-  every card after that note. Now `near` counts as 0 until the first step (`followers-lab.js`, the `ghost` follower).
-  Checked with the drawing recording from 1.1.24: only the six Ghost ripple runs changed (three more drawing calls each,
-  the first drawing now finishes); the other 171 runs are identical.
-- Tests: `v1125.test.js` switches on every background and every follower, on light and dark paper, and draws before
-  anything has moved: none may throw or draw at NaN.
-- Docs: `ai-context/splitting-code.md`, what was learned splitting `src/fx.js`, for splitting other big files later.
+| Old number | New number |
+|---|---|
+| 1.0.0 – 1.1.12 | the same |
+| 1.1.13 | 1.1.13 and 1.1.14 |
+| 1.1.14 | 1.1.15 |
+| 1.1.15 | 1.1.16 and 1.1.17 |
+| 1.1.16 | 1.1.18, 1.1.19 and 1.1.20 |
+| 1.1.17 – 1.1.19 | 1.1.21 – 1.1.23 |
+| 1.1.20 | 1.1.24 and 1.1.25 |
+| 1.1.21 | 1.1.26 |
+| 1.1.22 | 1.1.27, 1.1.28 and 1.1.29 |
+| 1.1.23 | 1.1.30, 1.1.31 and 1.1.32 |
+| 1.1.24 – 1.1.31 | 1.1.33 – 1.1.40 (old + 9) |
 
-## 1.1.24 – 30 October 2026
+## 1.2.3 – 3 November 2026
 
-Behind the scenes only: nothing in the app looks or works differently.
+The notes list redraws less after a note changes: its own work on each refresh is 2–4 times faster. It looks the same.
 
-- **The effects code is split into smaller files.** `src/fx.js` (about 180 KB, 2,350 lines) is now eight files in `src/fx/`:
-  `kit.js` (colours and shared helpers), `effects-classic.js`, `effects-lab.js`, `effects-magic.js` (the backgrounds),
-  `followers-classic.js`, `followers-lab.js`, `followers-magic.js` (the mouse followers) and `engine.js` (order, choosing
-  rules, the shared loop, the Layer, icons). `note.html` and `list.html` load them in that order; they share their helpers
-  through `window.COSMO_FX_KIT`. Every line of code was copied unchanged; only the lines that open and close the two
-  lists of effects became `Object.assign(…)`. A change to one effect now needs only its own file (9–34 KB).
-- **How it was checked:** every background and mouse follower was run through the real Layer before and after, with the
-  same random numbers and clock, on light and dark paper, at three frequencies and two sizes, with a moving, resting and
-  leaving mouse: all 177 runs made the same 7,234,430 drawing calls. Both windows also load in Chromium with the same
-  messages as before, and the effects draw.
-- `src/fx.js` is now only a note that says where the code went; it is not loaded any more and can be deleted.
-- Tests: `tests/fx-source.js` loads the parts the way `note.html` lists them (the effects tests use it);
-  `v1124.test.js` checks that both windows load the same parts in the same order, that every part is loaded, that each
-  part keeps to itself, and that together they give the same effects as `store.js`. The version check moved there.
-- Docs for AI assistants: a short `CLAUDE.md` plus one file per topic in `ai-context/`; older versions of this changelog
-  moved to `CHANGELOG-archive.md`.
-- Found while checking (not changed): the Ghost ripple mouse follower throws an error once when it is switched on, before
-  the mouse has moved (its dots have no brightness yet on the first drawing). It works normally after that.
+- The owner asked whether the app redraws too much. Measured in Chromium first (60 and 200 notes, with and without
+  an effect): typing in a note costs about 5 ms a key, fine. A list refresh (a note was edited) cost 3.6 ms of the
+  list's code at 60 notes and 10.6 ms at 200. Now 1.5 ms and 2.8 ms.
+- The list already kept every card whose note didn't change (`cards.js`, the card cache). But after each refresh it
+  still measured every card (`markMore`, which forces a layout) and looked at every card's effect (`paintFx`:
+  `resolve`, `resize`, `set`). Now only the cards built again get that. When the card size, the theme or the window's
+  width changed, or an effect setting changed, every card is done again, as before.
+- A card body is marked `data-m` once measured. A card that couldn't be measured yet is measured on the next refresh.
+- `noteById` (`list/base.js`) finds a note by id from an index, instead of searching all notes once for each card
+  (`itemOfKey` in `picking.js`, `paintFx`).
+- What still costs the most: effects on the cards. Each card with an effect is its own small animation (24 on screen in
+  a normal window). With an effect on every card, the list uses about 14 % of one processor core at rest (60 notes,
+  in Chromium without a graphics card). Without effects, about 0 %. Nothing about the effects changed in this version.
+- Tests: a refresh keeps the unchanged cards, builds and measures the edited one, and both keep their effect.
+
+## 1.2.2 – 3 November 2026
+
+The bar for several picked notes has **Edit design** instead of Colour: the same pop-up as right-click → Edit design.
+
+- The owner's wish. It opens the Edit design pop-up for all the picked notes (and the notes in picked open groups),
+  in the middle of the window. The right-click menu on a picked card has it too.
+- Colour, see-through, Background and Mouse go to every note. A setting the notes don't share says **Mixed** until
+  you pick one. The preview shows the first note.
+- An effect change sends only that setting (`fxKeys` in main `list:edit`), so each note keeps its other effect picks.
+- No title for several notes (the paper says "3 notes"). "Open note" becomes "Open notes".
+- The old Colour pop-up also changed the font. So the pop-up has a **Font** row, only for several notes (one note's font
+  is set in the note itself). It goes through `list:apply`, as before.
+- The Colour pop-up (`#bColor`, `#bulkColors`, `bulkApply`) is gone. Its styles (`.bulkpop`, `.bsw`, `.bfonts`) are
+  still in `list-picking-edit.css`, unused.
+- Tests: `list-ui-picking` (Edit design for two notes: colour, see-through, font, an effect setting, titles left
+  alone); `list-ui-settings` (no Font row for one note).

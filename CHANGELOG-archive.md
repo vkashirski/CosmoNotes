@@ -1,10 +1,432 @@
 # CosmoNotes – version history (archive)
 
-Older versions, moved out of [`CHANGELOG.md`](CHANGELOG.md) so that file stays small. Newest first. Nothing in the app or the tests reads this file.
+Older versions, moved out of [`CHANGELOG.md`](CHANGELOG.md) so that file stays small. Newest first. Nothing in the app reads this
+file (`tests/release.test.js` checks that every version is in one of the two files, once).
 
-## 1.1.23 – 30 October 2026
+Renumbered in 1.1.41: each heading says its old number (the table is at the top of `CHANGELOG.md`). Version numbers inside
+the entries are the old ones.
 
-The owner asked for the changes made after the 1.1.22 cut-off (from the checklist-box round on) to be their own version, together with the ones below.
+## 1.2.1 – 3 November 2026
+
+A third note font: **Medieval**, an old book hand (Augusta by Dieter Steffmann, 100% free on dafont).
+
+- The owner found it in a game screenshot ("The earth remembers.") and picked it from a shortlist of ten.
+- Pick it like the other two: the A button's text panel (on the selected text, or what you type next), Settings →
+  For new notes → Font, a group's panel (every note inside), and the bar for several picked notes.
+- The font file is packed with the app (`src/fonts/Augusta.ttf`, 55 KB), so it works offline. Both windows load it
+  with an `@font-face` in `note-base.css` / `list-base.css` and use it as `--med`.
+- Sizes are set so it reads about as big as Rounded: 16 / 18.5 / 22 px in a note, 14.5 px on a medium card. Part of
+  the text in another font keeps about the same size (`note-drawing.css`).
+- Augusta has no Cyrillic and no č / ž. Those letters show in a book-style fallback (Palatino Linotype, then Georgia).
+- Augusta has no bold. A card's plain first line stays plain; the title is still drawn bold.
+- Checklist boxes in a Medieval note are sized like in a Rounded one.
+- The note's font is checked against one list, `FONTS` in `store.js`, also in main (a group's font, several notes,
+  the default font). An unknown font is still read as Handwritten.
+- The version's middle number went up to 2 (the owner's pick: there is no 1.2.0). `release.test.js` knows that.
+- Tests: a Medieval note loads the font file and is written in it, the text panel puts it on the selected text,
+  Settings and the list accept it, and an unknown font is ignored.
+
+## 1.1.49 – 2 November 2026
+
+The tests are sorted by what they test instead of by version, with no repeats, and run about 7 times faster. The app itself is unchanged.
+
+- **By area, not by version.** The 41 test files (26 of them named after versions, `v1113.test.js` … `v1148.test.js`)
+  became 33 files named after what they check: `notes`, `colours`, `duplicate`, `groups`, `locks`, `unlock`,
+  `crypt`, `windows`, `toolbars`, `safety`, `settings`, the effects (`effects-rules`, `-draw`, `-backgrounds`,
+  `-followers`, `-settings`), `code-structure`, `release`, `texts`, `editor-code`, the browser tests (`list-ui-*`,
+  `note-ui`) and more. `ai-context/testing.md` lists them in one line each. A new check goes into the file for its area.
+- **Each thing is checked once.** For example, "every effect draws without NaN" was in six files and "fx.js and
+  store.js have the same effects" in six. The same 10 lines of set-up were in every file: they are now `tests/helpers/`.
+- **Better checks.** A few checks that only read the code now test what it does: toolbars stick within 12 px, a locked
+  note's card gets no checklist boxes or picture words, Duplicate keeps "word wrap off", every message the windows send
+  is answered. New checks: a wrong PIN still waits a moment, and a note closed with Alt+F4 is remembered as closed. One
+  `release.test.js` checks that the version, changelog, About date and `CONTEXT.md` agree. No test has to be moved when
+  the version goes up any more. Dropped checks only pinned a pixel size in the CSS, or tested the tests themselves.
+- **Faster:** all tests took 224 s one after another; now ~30 s on a 2-core machine, less on more cores. The tests run
+  side by side. A PIN is hashed with a cheap setting in tests only (the app still saves and uses 2^17). The pause after
+  a wrong PIN is skipped. The list's browser tests wait only until the window is idle, instead of a fixed 200 ms after
+  every click.
+- `npm test` prints only failures and one summary line. `npm test -- locks` runs only the files whose name contains
+  "locks"; `-v` lists every file with its time.
+- The fake Electron in the tests no longer fires "ready-to-show" on a window that was already closed. Real Electron
+  doesn't either.
+- The recorders for refactors moved to `tests/record/`.
+- 1.1.48's checks (no "+3 lines", the stronger fade) are in `list-ui-pictures.test.js` now, and they pass.
+- The 45 old test files are removed by double-clicking `delete-old-tests.bat` once (the folder bridge can't delete
+  files). It deletes only those files, then itself. Until then `npm test` also runs the old ones, and some fail.
+
+## 1.1.48 – 2 November 2026
+
+No "+3 lines" on cards; a stronger fade instead.
+
+- The owner didn't like the "+3 lines" in a card's foot (1.1.46): it is gone (`.moretag` and its code in `markMore`).
+- The fade at the bottom of a card with more (`.card .body.more`) was too faint on some paper colours. It now starts
+  about two lines higher, is at 42 % halfway and gone just above the edge, so the last line or two clearly fade out.
+- `tests/v1147.test.js` (1.1.47's, overwritten for a moment by this chat) was put back from that chat's history.
+- Tests: `tests/v1148.test.js`; `tests/v1146.test.js` no longer checks the label. Not run yet (the owner: later).
+
+## 1.1.47 – 2 November 2026
+
+"Unlock" in the notes list now lasts only until CosmoNotes restarts. "Remove lock…" removes a lock for good.
+
+- **The owner's wish:** the padlock on a locked card in All notes removed the lock for good. Now right-click a locked note
+  or group → **Unlock…** (or click its padlock): with the PIN it shows the note (or the group's notes) in the list and opens
+  them without asking, until CosmoNotes restarts. Then it is locked again. **Remove lock…** sits right under it and still
+  removes the lock for good, as does "Remove lock" in the note's own menu and in the group's settings.
+- Once unlocked, the menu item and the padlock say **Lock again** (no PIN needed). The card shows a small open padlock
+  ("Unlocked until CosmoNotes restarts"). "Lock again" in the note itself or in the Locked tab locks it again too.
+- Safe for the notes: the lock itself never changes, so a locked note stays locked and encrypted on disk and in backups.
+  Only memory knows it is unlocked (`unlockedForNow` in `main/list-visibility.js`; new `list:unlock-now`, `list:relock`).
+- Small change on the side: locking one note no longer hides another note that is open and unlocked for now (or in a
+  group opened in the list).
+- Made at the same time as 1.1.46 in another chat, then rebuilt on top of it. That chat's `tests/v1146.test.js` was
+  overwritten for a moment and has been put back.
+- Tests: `tests/v1147.test.js` (main's side, a real restart in a second process on the same data, and the list window in
+  Chromium through `tests/v1147-list.js`).
+
+## 1.1.46 – 2 November 2026
+
+A note's picture shows on its card where it is in the note and at its size; cards say when there's more.
+
+- **Pictures on cards** (the owner: a small picture far down a long note took half the card, so the card showed only two
+  lines). Before, a card always put the first picture below two lines of text, cropped to the card's full width. Now
+  `cardBody` (`src/list/cards.js`) puts it between the same lines as in the note, as wide as in the note measured in
+  letters (a picture 5 letters wide in the note is 5 letters wide on the card; Small / Medium = 45 / 72 %; never wider
+  than the card or the picture itself; a tall one is cropped at 55 % of the card). Further down than the card shows, it
+  is simply not seen; further down than the 600 letters the list gets, it isn't put on the card at all. A note that is
+  only a picture still shows it big, as before. Main works out the place and size: `picturePlace` (store.js) →
+  `pic: { at, px, pct, d, fs, tw }` in `list:get`.
+- **"There's more"**: no fixed number of lines any more (`-webkit-line-clamp` is gone from the cards). Each line is its
+  own row (`.ln`) and `markMore` measures what fits after every render (and when a picture loads or the fonts are ready).
+  A card with more fades out at the bottom (`.body.more`) and its foot says "+3 lines" (`.moretag`; "+ picture" when only
+  a picture is left out). The count is of the whole note (`lines` in `list:get`). The Bin's cards do the same; the stacked
+  sheets on group cards only fade.
+- Tests: `tests/v1146.test.js` (main's picture place; in Chromium: order, size, the count on two card sizes).
+
+## 1.1.45 – 1 November 2026
+
+Text colour keeps the selection, word wrap off has no limit, shorter Settings texts.
+
+- **"Normal" colour kept the text selected** (the owner: picking no colour deselected the text). `cleanResetColor`
+  (`src/note/panels.js`) takes the stand-in colour's `<font>` off, which moves the text, and the browser then dropped the
+  selection. It now notes where the selection was (in letters, `selOffsets`) and puts it back (`selectOffsets`).
+- **Word wrap off = no limit** (the owner: "word wrap means the size of the note is the max limit; off means no limit").
+  Before, off kept the text at the width the note had then, so a wider note still wrapped there. Now `#sheet.nowrap`: a
+  line only ends where you pressed Enter, the sheet is as wide as the longest line, long lines scroll sideways. Pictures
+  still fit the note (`--picW`). Older notes with word wrap off and no drawing work this way too.
+  With a drawing: new field `note.nowrap` (store.js, `EDITABLE`, copied by Duplicate). The first stroke on a note with word
+  wrap off sets it and sets `wrapWidth` to the visible width, so pictures keep their size under the drawing
+  (`keepForInk`, `src/note/lock-zoom.js`). Older notes with a drawing and no `nowrap` keep the locked width (`#sheet.fixed`),
+  as does the first drawing on a note with word wrap on. Turning word wrap off with a drawing now asks first.
+- **Settings:** "Colours of this window" is now "Colour Theme"; it and "Start with Windows" have no text below.
+  "Pause all effects" no longer says "by the clock".
+- Tests: `tests/v1145.test.js` (in Chromium: the selection after Normal; word wrap off in wider / narrower notes, older
+  notes, the first drawing).
+
+## 1.1.44 – 1 November 2026
+
+The note window's code split into smaller files (the owner: "we split most files, time to split note"). Nothing in the app
+changes.
+
+- `src/note.js` (~165 KB, the last big file) is now ten parts in `src/note/` (13–24 KB each), which `note.html` loads in
+  order: base · fx-format · panels · content · editing · menus-voice-ink · lock-zoom · draw-over · ink-out · eraser-start
+  (`ai-context/CONTEXT.md` says what each holds). They share names like the list's parts (1.1.37): `window.COSMO_NOTE_KIT`
+  (`K`), with the variables several parts change on `K.V` (`V.note`, `V.settings`, `V.hidden`, `V.dirty`, `V.savedRange`…).
+  Cut by `tools/split/split-page.js` with `tools/split/plan-note.json`; every line is the old line, apart from the `V.` / `K.`
+  in front of a shared name (`tools/split/check-parts.js` checks it).
+- `src/note.js` is now only a note saying where the code went (the folder bridge can't delete files): it can be deleted.
+- Proof that it behaves the same: `tests/record-note.js` (new) records three note windows in Chromium against the real
+  main process (284 steps: typing, formatting, lists, links, tables, pictures, voice, find, menus, effects, zoom, word wrap,
+  drawing and both erasers, passwords and locks): the old code three times and the new code twice gave the same log; three
+  small planted mistakes each changed it. How it works and what it can't see: `ai-context/splitting-code.md` → "note.js".
+- Only a real Windows PC can confirm the installed app; a refactor like this one should look and work exactly as before.
+- Tests: `tests/v1144.test.js` (the version; `note.html` loads the ten parts in order and nothing loads `note.js`; CRLF; each
+  part's shared names; the ten parts load in a stand-in window and every shared name exists). `tests/note-source.js` joins the
+  parts for the tests that read the note's code (`v1123`, `v1124`).
+
+## 1.1.43 – 31 October 2026
+
+Smooth scrolling in the notes list (the owner: scrolling Settings lags, most of all with "Everything CosmoNotes can do"
+open, on a fast PC).
+
+- **Why it lagged:** the views (`.view`: Notes, Bin, Settings) had a see-through background (the dots were on `body`). On
+  Windows, Chromium won't scroll a see-through area on the graphics card (it would lose ClearType's sharp text), so it
+  redrew the whole visible part (text, dots, shadows) on every frame. In a Chromium copy set up like Windows (ClearType
+  text, 100 % scale), one scroll down Settings did 397 redraw jobs (153 ms); now 26 (16 ms).
+- **Fix 1** (`list-base.css`): each `.view` carries the window colour and the dots itself, with `background-attachment:
+  local` (so they move with the page). Offset `0 -88px`, so the dots line up with the window's above the views. Seen
+  from still, the window looks the same.
+- **Fix 2:** while a view scrolls it has `.scrolling` (`events.js`, removed 150 ms after the last step); what's inside then
+  ignores the mouse (`body:not(.is-dragging) .view.scrolling > *`). Nothing under the mouse redraws its hover look on the
+  way past (style work during that scroll: 117 → 2 times), and a colour row passing under the mouse no longer catches
+  the wheel and turns it into a sideways scroll.
+- **Fix 3:** the Ctrl + wheel card-size listener (`onSizeWheel`) is on the title bar, the tabs, Notes and the Bin, not on
+  `window`. A wheel listener that can cancel scrolling makes Chromium wait for the page before scrolling; Settings now
+  has none. Electron never zooms a page on Ctrl + wheel by itself, so nothing else changes.
+- Only a real Windows PC can confirm how smooth it feels.
+- Tests: `tests/v1143.test.js` (the version; the background, `.scrolling` and the mouse, Ctrl + wheel in Settings and over
+  the tabs). `v1141.test.js` only asks the renumbered versions (1.1.13 – 1.1.40) to say what they were, now that 1.1.41 is
+  in the archive.
+
+## 1.1.42 – 31 October 2026
+
+Shorter Bin texts (the owner: "deleted note wait here... fix that text too").
+
+- The tip above the Bin (`.bintip` in list.html): "You can restore these notes, or delete them for good." (was "Deleted notes
+  wait here until you delete them for good.").
+- The empty Bin (`renderBin` in `src/list/picking.js`): "Deleted notes show up here." (was "Notes you delete will wait here.").
+- Tests: `tests/v1142.test.js` (the version, the two texts). `v1141.test.js` now reads the newest version from `package.json`.
+
+## 1.1.41 – 31 October 2026
+
+The owner: too much text in places; the version history belongs in a file only; some versions were too big, and the
+numbers ought to be about .10 higher once they are split.
+
+- **No version history in the app.** `src/about.js` has no `VERSIONS` any more (only `LAST_UPDATED` and `FEATURES`).
+  Settings → About shows "Version x · Last updated …" and "Everything CosmoNotes can do". Gone: the "Version history" fold
+  (`#foldVersions`, `#versions` in list.html), its styles (`.vblock`, `.vhead`, `.vtag`, `.vdate`, `.vnow`, `.vchanges` in
+  `list-groups-menus.css`) and the code that drew it (`renderAbout` in `src/list/settings-menus.js`).
+- **History split and renumbered** (table above). Old 1.1.13, 1.1.15, 1.1.16, 1.1.20, 1.1.22 and 1.1.23 became two or three
+  versions each, split by topic or by the owner's rounds of notes, each with a one-line summary. Nothing was dropped:
+  every bullet is in one of the parts. Later versions moved up by 9 (old 1.1.31 is 1.1.40), so this one is 1.1.41.
+- **Shorter texts, in short sentences:**
+  - Locked notes: the info and the short-PIN warning in Settings → Locked notes, the recovery key pop-up and its file,
+    "Encrypt your locked notes", "Could not be encrypted", Unlock all, Encrypt now, New recovery key, Forgot it?, Turn off
+    encryption, and the PIN tips.
+  - Settings: the hints under For new notes, Effects, Spelling, Backups, Where your notes live and the colour picker;
+    the restore pop-ups; the Effects pop-up's switches and "Settings uses the same effects" hint (also in Edit design and
+    in a note's Effects).
+  - Notes list: Bin questions, the empty Favourites and Locked tabs, the "more in a locked group" tips, the Locked tab bar.
+  - Note window: the choose-a-password hint, the picture description hint, the Ctrl+S toast, the picture-resize warning,
+    the Minimise tooltip.
+  - About → "Everything CosmoNotes can do": every item rewritten in one or two short sentences (no "since 1.1.x").
+- Tests: `tests/v1141.test.js` (the version; no version history in about.js, list.html or the list's code; the
+  changelog's top entry; long texts stay gone). The version check moved there from `v1131.test.js`.
+
+## 1.1.40 – 31 October 2026 (was 1.1.31)
+
+The owner found a locked note still readable in `notes/` after 1.1.30: his `settings.json` had no encryption keys, so
+nothing had been encrypted. Notes locked before 1.1.30 wait for the PIN (the private key needs it), and nothing asked for
+it. He also asked to encrypt the old backups and to leave no plain photo copies in the temp folder.
+
+- **The list asks for the PIN at start** while notes locked before the update are still unencrypted (`status().needPin`:
+  main opens the list 1.5 s after start; the list's "Encrypt your locked notes" pop-up). Settings → Locked notes now says
+  plainly that they are NOT encrypted yet.
+- **Setting up tries everything first** (`makeKeys` in `main/crypt.js`): seal and open a test note, lock the key with the
+  PIN and the recovery key and open it again with both, and check that a wrong PIN doesn't. If anything fails, nothing is
+  saved, the PIN keeps working as before (`lock:set` falls back to the old `salt:hash`), and the list shows what went wrong
+  ("Locked notes could not be encrypted", also in Settings). This cloud workspace can't run Electron's own crypto library
+  (BoringSSL), so this is how the owner's PC tells us if a crypto call doesn't work there.
+- **Version 2 of the format:** the AES key is made with plain SHA-256 instead of HKDF (one crypto feature fewer). Notes say
+  `enc.v: 2`, files start with `CNSEAL2`; 1.1.30's version 1 (`CNSEAL1`) is still read.
+- **Old backups are encrypted too:** every copy in `backups/` of a note that is locked now, or was locked when that backup
+  was made (its own lock, or a locked group in that backup's `groups.json`), is sealed in place, with its photos. One full
+  pass (`settings.crypt.backupsSealed`; again after "Turn encryption back on", since backups made while it was off are
+  plain), then only the copies of a note that just became locked. Nothing is removed; a sealed copy restores with its
+  words after the PIN. With the key open, each sealed copy is opened again before the plain one is replaced.
+- **Photo copies:** the plain copies made for "Open" on an encrypted photo are deleted when the app quits, as well as at start.
+- `HOW TO INSTALL.txt`: updating from an older version (the PIN pop-up at start) and the encrypted backups.
+- Tests: `tests/v1131.test.js` (old backups and their groups, a note locked later, off and on again, restore, the temp copies
+  on quit, a crypto library that fails: nothing changes and the PIN still works, a version 1 note still opens, and the list
+  window asking for the PIN at start and then showing the recovery key). `v1130.test.js` expects `CNSEAL2`.
+- Only a real Windows PC can confirm that encryption sets up there: after installing, typing the PIN should show the
+  recovery key (and `settings.json` gets a `"crypt"` part). If it says it could not encrypt, the message says why.
+
+## 1.1.39 – 31 October 2026 (was 1.1.30)
+
+**Locked notes are encrypted on this computer** (the owner's wish). Until now the lock was only a privacy screen: the note
+file stayed readable in Notepad. The owner chose a recovery key for a forgotten PIN, PINs stay allowed with a warning,
+and titles, photos and voice clips are encrypted too, with an optional "title while locked" to tell notes apart.
+
+- **How it works** (`main/crypt.js`): one X25519 key pair for the app. The public half is stored as it is, so locking still
+  needs no PIN. The private half is stored twice in `settings.json` → `crypt`, each copy AES-256-GCM-encrypted with a key
+  made from the PIN / password (scrypt N=2^17, about 0.3 s and 128 MB per try, so every guess is slow) or from the
+  **recovery key** (25 random letters and digits, scrypt N=2^15). Typing the PIN opens the private key for the session; it is
+  never written down. `settings.lock` becomes the marker `'encrypted'`: the old quick `salt:hash` would have been the weak
+  spot, so the PIN is now checked by opening the key.
+- **What is sealed:** a locked note's (own lock or a locked group's) title, html, text, first picture and drawing go into
+  `note.enc` together; its photos, drawings and voice clips are sealed in their own files (they start with `CNSEAL1`), and
+  `note.encAtt` keeps their names so the attachment sweep never deletes them. Every save of a locked note seals it again; a
+  note sealed on disk and not yet opened is written back as it was read. The first sealed save also seals the note's `.bak`
+  (it would otherwise keep the plain previous version). Daily backups are written sealed too; **older backups (from before
+  this update) are left as they were**. Opening a sealed photo with "Open" uses a plain copy in a temp folder that is emptied
+  at every start. Speed: about 0.3 s once when the PIN is typed; saving and opening notes take well under a millisecond more.
+- **Files follow the lock at once** (`syncSeals`, run at start and with every change the list hears about): locking a note or
+  a group, or dragging a note into a locked group, seals it; removing a lock or taking it out writes it plain again (photos too).
+- **Upgrading:** notes locked with an older version stay as they were until the PIN is typed once (anywhere); then
+  encryption is set up, they are sealed and the list shows the recovery key. Settings also has "Encrypt now".
+- **The recovery key** is shown once in the notes list (also when the PIN was typed in a note window: the list opens):
+  Copy, Save to a file…, and "I have saved my recovery key" before Done. Closed without that tick, Settings offers it again.
+- **Settings → Locked notes:** whether locked notes are encrypted; a warning while the PIN is shorter than 8 digits;
+  "New recovery key" (the old one stops working), "Forgot it? Use the recovery key" (recovery key + a new PIN or password),
+  "Turn off encryption" / "Turn encryption back on". Off writes every locked note and photo back in plain text (they stay
+  locked in the app); the keys stay in `settings.json` so backups made while it was on can still be opened.
+  The choose-a-PIN pop-ups have a tip about PIN length.
+- **The title is hidden while locked** (it is in `SECRET` now): locked cards, the note's top bar and its window title show
+  the new **`coverTitle`** ("Title while locked", in the note's ⋯ menu, and in Edit design in the list: on a locked card its
+  title field edits this one) or "Locked note". Searching locked cards searches that title.
+- **Never lose a note:** a note that is still sealed counts as locked whatever happened (it can't be emptied from its
+  window or binned), Duplicate copies the sealed contents (the copy is locked), restoring a backup before the PIN brings
+  sealed notes back sealed and locked, and a file that can't be opened is left as it is rather than overwritten.
+- `HOW TO INSTALL.txt`: the reset by editing `settings.json` no longer works for encrypted notes; it explains the recovery key.
+- Tests: `tests/v1130.test.js` starts the real main process four times over the same data (first PIN, after a restart,
+  recovery key, turning off and on, removing a lock, a locked group, a note locked with 1.1.29) and checks the files
+  themselves, plus the list window in Chromium (the recovery key pop-up, Settings, the title while locked, "Forgot it?").
+  `list-ui-cards` / `list-ui-locks-bin` follow the new behaviour (a locked card hides its title; the first PIN shows the
+  recovery key), `list-ui.js`'s `seed.password()` skips that pop-up, and `v1127.test.js` knows the seven `crypt:` messages.
+- Only a real Windows PC can confirm the speed of typing the PIN and opening photos and voice clips from encrypted files.
+
+## 1.1.38 – 31 October 2026 (was 1.1.29)
+
+Behind the scenes only: nothing in the app looks or works differently. Many more automatic checks of how the notes list
+works, written with what the 1.1.28 split taught about its code.
+
+- **`tests/list-logic.test.js`** (runs anywhere, no browser): the list's own rules, loaded through `tests/list-kit.js`
+  (the seven `src/list/` parts in a sandbox, with chosen data): groups inside groups (chains, sub-groups, a loop in broken
+  data doesn't hang), what counts as locked (its own lock, a locked group around it, a group holding a locked note), the
+  Locked and Favourites tabs (what shows, what is only counted), sorting (all six choices; a group counts its newest note),
+  where a dragged card may go (never a group inside itself), the password / PIN rules, dates on cards, size and window
+  colour fallbacks, and that the list's colours, group colours, window colours and sizes match `store.js` and main.
+- **Five browser tests, `tests/list-ui-*.test.js`:** the real list window in Chromium, backed by the real main process
+  through the real `preload.js` (`tests/list-ui.js`), so a click changes real notes and the test checks both the window
+  and what main saved. `cards` (tabs and counts, what a card shows, a locked note's words never reach the window, search
+  by title / text / picture description, sorting and sizes saved, Ctrl + wheel, open / close, Ctrl+N), `groups` (open,
+  crumbs, back, mouse back / forward, new note inside, rename, the panel's look / colour / every note's colour, drag & drop,
+  a locked group asks for the password, ungroup and bin ask first, a locked group can't be binned), `picking`
+  (Ctrl / Shift-click, Ctrl+A, Escape, empty space, the bar's favourite / colour / font / group / open / close / lock / Bin,
+  the right-click menu for picked cards, Delete and Shift+Delete, locked ones stay, dragging several), `locks-bin` (the
+  first lock asks for a PIN with its rules, wrong PIN, Unlock all / Lock again, the Bin's questions, search, Restore into
+  its group, Delete forever, Empty bin) and `settings` (sections fold, window colour, new notes' colours (never none; a new
+  note gets them), font, see-through, switches, effects for all and the pause button, changing the password, Edit design).
+- **Checked that they catch mistakes:** six small bugs planted in a copy of the code (a note in a locked group not counted
+  as locked, Settings not going back, Move to Bin not asking, the last new-note colour removable, search skipping picture
+  descriptions, Escape not clearing picked cards): each made the right test fail. All browser tests passed 15 runs in a row
+  and with all five running at once.
+- **`tests/run.js`:** a test that exits with 77 is shown as SKIP (the browser tests without Playwright, e.g. on a PC
+  without it); the summary says how many were skipped. `npm test` now runs 31 files, about 2 minutes with the browser tests.
+- `v1129.test.js` checks this set-up stays in place; the version check moved there.
+
+## 1.1.37 – 31 October 2026 (was 1.1.28)
+
+Behind the scenes only: nothing in the app looks or works differently.
+
+- **The notes list's code (`src/list.js`, 2,177 lines, ~117 KB) is split into seven files in `src/list/`**, 11–25 KB each,
+  loaded in this order by `list.html`: `base` (colours, themes, sizes, icons, the DOM helper, the colour row, loading the
+  data), `cards` (drawing the list, drag & drop, note and group cards, the group header), `picking` (favourites, Ctrl/Shift-click,
+  the lock animation, the bar for picked cards), `settings-menus` (Settings: new-note colours, About, backups; the app's
+  pop-ups and toasts; the right-click menus), `effects-design` (effects on the cards, Settings → Effects, Edit design),
+  `actions-locks` (Bin and delete, passwords and locks, the Locked tab, the group panel, folding sections, back / forward) and
+  `events` (the window's buttons, search, keys, mouse, and the first load). `CONTEXT.md` lists what each holds.
+- **How the parts share names:** each part is still its own closed block. They share through one object,
+  `window.COSMO_LIST_KIT` (`K`): a part takes the names of earlier parts on its first lines, calls a function of a later part
+  through `K.later('name')` (looked up when it is called), and hands its own names on at its end. The 16 variables that
+  more than one part changes (`tab`, `openGroup`, `state`, `query`, `drag`…) are now properties of one object, `V`, so every
+  reference reads `V.tab` etc. Every other line was copied unchanged: of the old file's 2,174 code lines, 1,995 are identical
+  and the other 179 differ only by those `V.` / `K.` prefixes (checked by script).
+- **How it was checked:** besides the line check above, each part on its own uses no name it doesn't have (only the
+  browser's and the kit's), and a recording of the window: `tests/record-list.js` runs the real main process (fake
+  Electron, fixed clock, counted ids) behind the real `preload.js`, opens the list in Chromium with a stopped clock and plays
+  285 steps (tabs, search, sort, sizes, groups and their panel, drag & drop, picking and the bar, every right-click menu,
+  Edit design, Settings, Effects, passwords, the Locked tab, the Bin, keys), logging after each step the whole page, every
+  call to the app with its answer (295 calls, plus 109 messages from main) and any error. The old code recorded twice gives
+  identical logs, and the new code gives the same log as the old. Three deliberate mistakes in the new code (a forgotten
+  line in back / forward, a pop-up message that stays 0.1 s shorter, one part keeping a stale copy of a shared variable)
+  each changed the log. 474 of the 508 functions in the list's code ran during the recording, among them every function
+  one part calls in another. Not reachable here: everything that needs a real Windows PC.
+- `src/list.js` is now only a note saying where the code went (the folder bridge can't delete files; it can be deleted).
+- New helper: `tools/split/split-page.js` does such a split from a plan (`tools/split/plan-list.json`), ready for `note.js`.
+  `tests/record-list.js` + `tests/record-list-scenario.js` record the window (not run by `npm test`; they need Playwright).
+- Tests: `tests/list-source.js` joins the parts for the tests that check a line of the list's source (`v1120`, `v1122`,
+  `v1123`, `v1124`); `v1128.test.js` checks that `list.html` loads every part in order, that each part is a closed block with
+  LF line endings, that every name a part takes or calls is given by the right part, that each `V.x` is set up once, and it
+  loads all seven parts together in a sandbox. The version check moved there.
+
+## 1.1.36 – 31 October 2026 (was 1.1.27)
+
+Behind the scenes only: nothing in the app looks or works differently.
+
+- **`main.js` (1,400 lines) is split into modules.** `main.js` is now only the start-up (the custom file protocol, the app
+  id, the single-instance rule, the app lifecycle); everything else is in a new `main/` folder, 23 files of 11–223 lines:
+  `state`, `constants`, `locks`, `migrate`, `settings`, `display`, `web`, `ink-geometry`, `ink-window`, `list-notify`,
+  `note-state`, `list-visibility`, `note-window`, `list-window`, `tray`, `ipc-common` and the IPC handlers in six files
+  (`ipc-notes`, `ipc-ink`, `ipc-files`, `ipc-groups`, `ipc-list-actions`, `ipc-settings`, started by `ipc.js`). `CONTEXT.md`
+  says what each holds. The code was copied unchanged except: the four variables the old file shared (`store`, `listWin`,
+  `quitting`, `listUnlockedAll`) are now properties of one object, `S` (`main/state.js`), so every reference reads
+  `S.store` etc.; the paths to `assets/`, `preload.js` and `src/` go one folder up; and the big `registerIpc` function is six
+  smaller functions called in the old order.
+- **`package.json`:** `build.files` now also packs `main/**/*` (without it the installer would build an app that cannot start).
+- **How it was checked:** `tests/record-main.js` runs the real app code under the fake Electron with the clock, timers, random
+  numbers and ids replaced, drives every one of the 60 IPC channels, the window events, the toolbar windows, the tray menu,
+  permissions, the migration from "Sticky Pins" and a restart, and logs every window call, message, answer and file written.
+  Before and after the split the three recordings (1,025 + 36 + 72 lines) are identical. The recorder was checked first:
+  the old code recorded twice gives identical logs, and six deliberate small mistakes in the new code (a constant, a skipped
+  password check, a flipped condition…) each made the recording differ. Not reachable in this check (needs a real Windows
+  PC): "Start with Windows" (`setLoginItemSettings`) and everything about real windows, the tray and the installer.
+- Tests: `tests/main-source.js` joins `main.js` and `main/*.js` for the tests that check a line of the source (`v1120`,
+  `v1122`, `v1123`); `v1127.test.js` checks that every part is loaded and none needs another in a circle, that
+  `main/**/*` is packaged, that the shared variables are only used as `S.…`, that the paths still find `assets/`,
+  `preload.js` and `src/`, and that all 54 + 6 IPC channels are still registered. The version check moved there.
+  `tests/record-main.js` is kept for the next change to the main process (it is not run by `npm test`).
+
+## 1.1.35 – 31 October 2026 (was 1.1.26)
+
+Behind the scenes only: nothing in the app looks or works differently.
+
+- **The two big style files are split into smaller ones.** `src/note.css` (1,177 lines) is now six files in `src/css/`:
+  `note-base.css` (colours, base, top bar), `note-text.css` (locked note, photo handle, writing area),
+  `note-toolbars.css` (bottom bar, pop-overs), `note-drawing.css` (right-click menu, recording, drawing, toast and the
+  1.1.0–1.1.10 additions), `note-effects-lock.css` (effects, lock animation, small notes) and `note-popups-find.css`
+  (pop-ups in the app's colours, Ctrl+F). `src/list.css` (1,289 lines) is five: `list-base.css`, `list-cards.css`,
+  `list-groups-menus.css`, `list-settings-fx.css`, `list-picking-edit.css`. `note.html` and `list.html` load them in that
+  order, which is the order the rules had before, so later rules still win exactly as before. Every line was copied
+  unchanged, and every cut is between two top-level rules (never inside one).
+- **How it was checked:** joining the parts gives back the old files byte for byte (same SHA-256); then both windows were
+  loaded in Chromium before and after and the computed style of every element was compared: no difference (and the
+  old page compared with itself also showed none, so the check is not just noise).
+- `src/note.css` and `src/list.css` are now only notes saying where the styles went; they are not loaded any more and
+  can be deleted.
+- Tests: `tests/css-source.js` joins the parts the way the pages load them (`v1122` and `v1123`, which read the CSS text,
+  use it); `v1126.test.js` checks both windows load the parts in order, every file in `src/css/` is loaded, every part
+  is complete on its own (braces balance) and the line endings are kept. The version check moved there.
+
+## 1.1.34 – 31 October 2026 (was 1.1.25)
+
+- **Fixed: Ghost ripple as a mouse effect.** Switching it on threw an error: the Layer draws once before the first step,
+  and the follower's dots had no brightness (`near`) yet, so `bucketDots` got NaN. The error stopped whatever came
+  after: in a note, the effects setup half-way (pause and rolled-up were not applied); in the notes list, the effects of
+  every card after that note. Now `near` counts as 0 until the first step (`followers-lab.js`, the `ghost` follower).
+  Checked with the drawing recording from 1.1.24: only the six Ghost ripple runs changed (three more drawing calls each,
+  the first drawing now finishes); the other 171 runs are identical.
+- Tests: `v1125.test.js` switches on every background and every follower, on light and dark paper, and draws before
+  anything has moved: none may throw or draw at NaN.
+- Docs: `ai-context/splitting-code.md`, what was learned splitting `src/fx.js`, for splitting other big files later.
+
+## 1.1.33 – 30 October 2026 (was 1.1.24)
+
+Behind the scenes only: nothing in the app looks or works differently.
+
+- **The effects code is split into smaller files.** `src/fx.js` (about 180 KB, 2,350 lines) is now eight files in `src/fx/`:
+  `kit.js` (colours and shared helpers), `effects-classic.js`, `effects-lab.js`, `effects-magic.js` (the backgrounds),
+  `followers-classic.js`, `followers-lab.js`, `followers-magic.js` (the mouse followers) and `engine.js` (order, choosing
+  rules, the shared loop, the Layer, icons). `note.html` and `list.html` load them in that order; they share their helpers
+  through `window.COSMO_FX_KIT`. Every line of code was copied unchanged; only the lines that open and close the two
+  lists of effects became `Object.assign(…)`. A change to one effect now needs only its own file (9–34 KB).
+- **How it was checked:** every background and mouse follower was run through the real Layer before and after, with the
+  same random numbers and clock, on light and dark paper, at three frequencies and two sizes, with a moving, resting and
+  leaving mouse: all 177 runs made the same 7,234,430 drawing calls. Both windows also load in Chromium with the same
+  messages as before, and the effects draw.
+- `src/fx.js` is now only a note that says where the code went; it is not loaded any more and can be deleted.
+- Tests: `tests/fx-source.js` loads the parts the way `note.html` lists them (the effects tests use it);
+  `v1124.test.js` checks that both windows load the same parts in the same order, that every part is loaded, that each
+  part keeps to itself, and that together they give the same effects as `store.js`. The version check moved there.
+- Docs for AI assistants: a short `CLAUDE.md` plus one file per topic in `ai-context/`; older versions of this changelog
+  moved to `CHANGELOG-archive.md`.
+- Found while checking (not changed): the Ghost ripple mouse follower throws an error once when it is switched on, before
+  the mouse has moved (its dots have no brightness yet on the first drawing). It works normally after that.
+
+## 1.1.32 – 30 October 2026 (was part 3 of 3 of 1.1.23)
+
+Picture descriptions, a touch of the paper’s colour on effects, and faster effects.
 
 - **Picture descriptions.** Right-click a picture (or a drawing) → **Add description…** / **Edit description…**: a small form (`#descPop`, Enter saves, empty removes it). The words are stored as the picture's `alt` (and `title`, so they show as a tooltip); they never show in the note. **Ctrl+F** finds the picture by them (the picture gets an outline: `img.find-hit` / `find-cur`, stripped in `collect()`), and the **notes list's search** too: main.js sends `pics` (`pictureWords(html)` in store.js reads the `alt`s; empty for locked notes) and every list / Bin search looks in it. Pasting keeps a picture's `alt` / `title` (the paste allow-list had only `src`).
 - **A touch of the paper's colour on effects.** `paperPalette(dark, paper)` in fx.js: every coloured ink of the palette turns 12 % of the way round the colour wheel towards the note's paper hue (`PAPER_HUE`), keeping its lightness and strength, so it reads the same; greys, whites and near-blacks don't change, and charcoal (no hue) is untouched. Cached per paper. `Layer.set({ paper })` (the note window, the list's cards and the Edit design preview pass the note's colour); changing the colour remakes the effect.
@@ -17,15 +439,26 @@ The owner asked for the changes made after the 1.1.22 cut-off (from the checklis
 - **The text panel keeps your selection.** Opening it creates its small window, which could take the focus from the note for a moment and with it the selected text's highlight. Main now gives the focus straight back to the note when that window is made (if the note had it), and the note puts the selection back after the panel opens.
 - **Edit design, Background tab:** it had a second scrollbar. The hidden checkbox of the "Mouse can interact with the background" switch is placed absolutely, and the tab area (`.epanes`) wasn't positioned, so the checkbox hung far below the pop-up and made the whole pop-up scroll too. `.epanes` is now `position: relative`.
 - **Ctrl+S** in a note shows a toast: "Already saved. Your notes save by themselves as you type." (and saves at once, in case the 350 ms auto-save hadn't run yet).
-- *Warp speed:* the hyperdrive spot is a little closer to the centre: a box 24 % of the note's width and height (was 31.6 %).
-- **Ctrl+F and Warp speed (29 October 2026):**
-  - **Ctrl+F: find in a note.** A small find bar under the top bar (`#find`): type to find (not case-sensitive, also across bold / coloured bits of a word, never across lines; up to 2000 matches); "3 of 9"; **Enter / F3 / ↓** next, **Shift+Enter / Shift+F3 / ↑** previous (wraps round), and the note scrolls the match to the middle. Every match is highlighted and the current one stronger, using the browser's CSS Custom Highlight API (`::highlight(cn-find)`, `cn-find-cur`), so the note's HTML isn't touched and nothing is saved. **Marks beside the scrollbar** (`#findMarks`) show where all matches are in the whole note (the current one bigger and brighter; click one to jump to it). Text selected when you press Ctrl+F (one line) becomes the search. Typing in the note while it's open finds again and stays on the same match. **Esc** closes it and leaves the current match selected in the note. It pops up in 0.05 s (3 frames; was 0.14 s). Closes by itself if the note locks.
-  - *Warp speed* (background, mouse interacts): the pointer no longer steers the vanishing point. While it's **in the middle of the note** (a centred box with 10 % of the note's area: 31.6 % of its width and height) it's **hyperdrive the whole time**, at speed 3 (the normal jump is 1.6, cruising 0.1), spooling up in about a second with a flash; streaks get only a little longer. Leaving the middle drops back to the normal 30 s cruise / 3 s jump cycle.
-  - Tests (v1123): warp goes into hyperdrive in the middle and back out (checked against a twin with no pointer, so its own jump doesn't interfere); find's pieces are there and nothing of it is saved.
+- Tests: v1123.test.js (the version, everything above; the earlier rounds' tests moved here from v1122).
+
+## 1.1.31 – 29 October 2026 (was part 2 of 3 of 1.1.23)
+
+Ctrl+F in a note, Warp speed’s hyperdrive, and a calmer Analog monitor and Cauldron.
+
 - **Analog monitor and Cauldron (29 October 2026):**
   - *Analog monitor* (background): the fifth round made it busy (springy lines shaken by the scan line, many brighter bent lines). Now calm again: scanlines every **6 px** (was 4) crawling at **3 px/s** (was 8); one soft scan line takes **8 s** to cross and doesn't move the lines; Frequency = how often it comes, `clamp(24 s / k, 12 s, 75 s)` start to start. **Mouse interacts: the pointer opens a gap in the lines where it is** (also while it rests): lines above and below bend smoothly away (half-gap 9 px, reaching ~44 px sideways and ~24 px up/down, never crossing), opening in ~0.2 s and closing in ~0.3 s after it leaves. No springs, no `Float32Array` rows.
   - *Cauldron* (background, mouse interacts): the owner picked the soft dip of **pick B** ("Cauldron Picks" page) without its whirlpool. Near the surface the pointer presses a smooth dip (4.5 px, ~30 px wide) that drifts after it with a lag, stays while it rests and fades out in about a second when it leaves. The quick sideways wave, the swirl and the extra bubbles from a moving pointer are gone; orbs still pop when touched.
   - Tests (v1123): the monitor's gap opens at rest, leaves far lines alone and closes again; 6 px lines crawling 3 px/s; scan line counts; no cauldron whirlpool.
+- **Ctrl+F and Warp speed (29 October 2026):**
+  - **Ctrl+F: find in a note.** A small find bar under the top bar (`#find`): type to find (not case-sensitive, also across bold / coloured bits of a word, never across lines; up to 2000 matches); "3 of 9"; **Enter / F3 / ↓** next, **Shift+Enter / Shift+F3 / ↑** previous (wraps round), and the note scrolls the match to the middle. Every match is highlighted and the current one stronger, using the browser's CSS Custom Highlight API (`::highlight(cn-find)`, `cn-find-cur`), so the note's HTML isn't touched and nothing is saved. **Marks beside the scrollbar** (`#findMarks`) show where all matches are in the whole note (the current one bigger and brighter; click one to jump to it). Text selected when you press Ctrl+F (one line) becomes the search. Typing in the note while it's open finds again and stays on the same match. **Esc** closes it and leaves the current match selected in the note. It pops up in 0.05 s (3 frames; was 0.14 s). Closes by itself if the note locks.
+  - *Warp speed* (background, mouse interacts): the pointer no longer steers the vanishing point. While it's **in the middle of the note** (a centred box with 10 % of the note's area: 31.6 % of its width and height) it's **hyperdrive the whole time**, at speed 3 (the normal jump is 1.6, cruising 0.1), spooling up in about a second with a flash; streaks get only a little longer. Leaving the middle drops back to the normal 30 s cruise / 3 s jump cycle.
+  - Tests (v1123): warp goes into hyperdrive in the middle and back out (checked against a twin with no pointer, so its own jump doesn't interfere); find's pieces are there and nothing of it is saved.
+- *Warp speed:* the hyperdrive spot is a little closer to the centre: a box 24 % of the note's width and height (was 31.6 %).
+
+## 1.1.30 – 29 October 2026 (was part 1 of 3 of 1.1.23)
+
+Checklists, pictures, effect choices and the notes list.
+
 - **Checklists, pictures, effect choices and the notes list (28–29 October 2026):**
   - **Checklist boxes centred at every text size.** The box was one size (0.78 em / 1 em of the note's size) at one height (0.3 em), so with bigger or smaller text, or the other font, on the line it sat up to 13–18 px too high or low and stayed small. Now `alignChecks()` (note.js) measures each checklist line's first words on screen and sets `--cb-s` (box size: that text's size, ×0.78 for Caveat), `--cb-t` (centred on those words) and, when the box grows, `--cb-p` (more room before the text) on the line; note.css uses them with the old values as fallback. Measured: every box now within 0.1 px of its words' centre (was −17.6 to +1.9 px). Runs on typing, resizing, the note's font / size changing, pictures loading and fonts loading. `collect()` strips these values, so they are never saved.
   - **Backspace at the start of a checklist line takes its box away** (the text stays as a normal line, via the browser's `outdent`, so Ctrl+Z works; a ticked line is unticked first so its text isn't left crossed out). Before, the browser glued the line onto the line above, except for a list's first line, which is why it "sometimes" worked. An empty checklist line still just goes away.
@@ -37,11 +470,49 @@ The owner asked for the changes made after the 1.1.22 cut-off (from the checklis
   - **Effect order:** Snow, Rain, Lightning, Rainbow · Autumn leaves, Cherry blossom · Fireworks, Confetti, Hearts · Bubbles, Night sky, Embers, Stardust, Glass shards, Plankton · Fish, Fireflies, Dust in light · Digital ocean, Silk waves, Ghost jellyfish · Network, Ghost ripple, Warp speed · Analog monitor, Matrix · Healing aura, Cauldron, Fel fire.
   - **Notes list:** a small picture on a card is shown at its own size instead of being stretched (and cropped) to fill the picture box (`fitThumb`: if filling the box would enlarge it, it keeps its size, never taller than the box), and the card then shows more lines of text. The card's right-click menu: **Add to favourites** first, then **Edit design…**; "Open on desktop" / "Bring to front" removed (clicking the card opens it).
   - Tests (v1123): the order, dust, and checks for each change above.
-- Tests: v1123.test.js (the version, everything above; the earlier rounds' tests moved here from v1122).
 
-## 1.1.22 – 26 October 2026
+## 1.1.29 – 28 October 2026 (was part 3 of 3 of 1.1.22)
 
-Same version, at the owner's request ("same ver as before"). (Later rounds, from the checklist boxes on, became 1.1.23 at the owner's request.)
+The owner’s fifth and sixth rounds of notes.
+
+- **Fifth round of the owner's notes (still 1.1.22, 28 October 2026; the owner said not to raise the version):**
+  - *Dust in light* (mouse): less dust. The frequency scale moved down so the old "Rarely" amount is now "Often" (`k × 0.35 / 2.6`): one speck every ~17 px at Often (was every ~6 px), ~44 px at Normal, ~128 px at Rarely.
+  - *Analog monitor* (background, mouse interacts): the Magnet is gone (no lumpy blobs, no tail, no red / cyan fringe). The owner liked the bending lines, so the lines stay and now work like Ghost ripple: each scanline is a row of springy points (one every 8 px, a line every 4 px; `dy`, `vy` per point, spring 7, damping 3). **One** bright scan line (with a soft glow trailing it) sweeps down the screen now and then; the lines part to let it through and wobble back into place behind it (up to ~8 px, calm again in ~2–3 s). The pointer does the same while it **moves** (faster than 25 px/s; a resting pointer leaves the lines alone, so there is no fixed lump or ellipse). Lines that are out of place shine a little brighter. The slowly crawling scanlines stay. The second, slower bar that "Often" used to add is gone.
+  - **What Frequency means now** (there is only one line): how often it sweeps. Cycle (start to start) = `clamp(16 s / k, 5 s, 60 s)`: about once a minute at Rarely, every ~16 s at Normal, every ~5 s at Often (which also sweeps quicker: 4 s instead of 7 s; bigger notes count as "more often" too, like every other background). The push is scaled with the sweep speed so the lines part about the same at every frequency.
+  - **Effects listed by theme** (the owner picked "Option A" of three): the Background and Mouse tabs (note Effects, Settings → Effects → Choose…, Edit design) now list alike effects together: Snow, Rain, Lightning · Autumn leaves, Cherry blossom · Fireflies, Dust in light, Embers · Night sky, Stardust, Warp speed · Plankton, Bubbles, Fish · Digital ocean, Silk waves, Network, Ghost ripple · Matrix, Analog monitor, Glass shards, Rainbow · Healing aura, Cauldron, Fel fire, Ghost jellyfish · Fireworks, Confetti, Hearts. Only the order changed, not any id, so saved choices stay. The order is now an explicit list (`ORDER` in fx.js, which builds `EFFECT_IDS` and so the followers' order; an effect missing from it is added at the end) and the same list is in store.js (`FX_EFFECTS` / `FX_FOLLOWERS`). Tests: v1118 / v1120 no longer expect the old positions; v1122 checks the new order and that fx.js and store.js agree.
+  - Tests (v1122): no blobs / fringe in the code; a moving pointer parts the lines and they come back to straight, a resting one leaves them alone; only one scan line at a time even at Often; sweeps per 5 min at Rarely / Normal / Often (3–7, 14–23, 45–70); dust at Often makes about what Rarely used to. The old "bend gets bigger with speed" tests were removed.
+- **Sixth round of the owner's notes (still 1.1.22, 28 October 2026, same version again):**
+  - **Effect order** tweaked: Snow, Rain, **Rainbow**, Lightning · Autumn leaves, Cherry blossom · **Fireworks, Confetti, Hearts** · **Bubbles, Fish** · **Glass shards** · **Plankton** · Fireflies, Dust in light, Embers · Night sky, Stardust, Warp speed · Digital ocean, Silk waves, Network, Ghost ripple · Matrix, Analog monitor · Healing aura, Cauldron, Fel fire, Ghost jellyfish (`ORDER` in fx.js, `FX_EFFECTS` / `FX_FOLLOWERS` in store.js; ids unchanged).
+  - **Checklists show their boxes in the notes list.** The list only got a note's plain text, so checklist items looked like ordinary lines. New `checklistMarks(html, text)` in store.js reads the note's html (no browser needed: a small tag reader) and gives one letter per line the card shows (`o` box, `x` ticked, `.` plain); any `<li>` inside a `ul.checklist` counts, its box on its first line, matched to the lines by their words in order (a line that doesn't match just has no box). main.js sends it as `checks` in `list:get` (empty for locked / hidden notes); `cardBody` (list.js) draws a small box in the card's accent colour, ticked ones filled with a tick and the line struck through and faded, like in the note (also on dark papers and in the Bin). Works for existing notes straight away. Checked against real browser `innerText` for the welcome note and nested / multi-line items.
+  - **Network** (background): the nodes ended up **scrunched into one clump** after a while. They all drifted on the same "wind" (`flow`), which has spots where it gathers, and nothing kept them apart (the pointer also pulled near ones into one dot that never came apart). Measured over a simulated hour: 30 nodes ended in 4–5 of 36 grid cells, 2–12 px apart. Now: nodes closer than 0.55 × the link length push apart, each node has its own slowly turning heading (the shared wind is weaker), the edges push softly inwards (18 px) instead of piling nodes against them, and a node never drops below 3 px/s. After an hour: 21–24 of 36 cells, 35–64 px apart, with or without the pointer resting on it.
+  - **Edit design** is now a **small pop-up next to the note** (352 px wide, right of the card if there's room, else left, always inside the window) instead of a sheet covering the whole list; nothing behind it is dimmed or blurred, and the note being edited gets a dark outline. **Tabs: Colour** (colours and see-through), **Background**, **Mouse**; the title and live preview strip stay on top; the tab area keeps one height (long effect lists scroll inside). **What's picked now stands out** like in Settings → window colours / backups: a white button with a 2 px dark ring (effects, Frequency), the open tab is a dark pill (was a slightly darker beige, hard to tell apart). The same picked style applies in Settings → Effects → Choose…. Fixed on the way: the right-click menu forgot which card was clicked before the item ran (`ctxCard`).
+  - Tests (v1122): the new order; network nodes stay spread after 20 simulated minutes; `checklistMarks` cases and that the list sends / draws them; Edit design has the three tabs, no dimming, small width and the ring style.
+- Tests: v1122 (versions, jelly doesn't flee, lightning hits only when near, fel stays low, fel / embers burn and go out, cauldron has no gaps, renamed switch); v1120 adjusted (fel / embers burn on a resting pointer).
+
+## 1.1.28 – 27 October 2026 (was part 2 of 3 of 1.1.22)
+
+The owner’s third and fourth rounds of notes, and the picks from the “1.1.22 Picks” page.
+
+- **Third round of the owner's notes (still 1.1.22):**
+  - **Removed:** Solar system and Aquarium, backgrounds and mouse effects (fx.js `EFFECTS` / `FOLLOWERS`, `aqKit`, the `aq` palette, icons; store.js `FX_EFFECTS` / `FX_FOLLOWERS`). A note that had one goes back to "same as all notes" (`cleanFx`), a setting that had one shows nothing (`resolve`). Tests v1118–v1120 updated.
+  - **Effects pop-up (note):** the note's colour swatches and see-through slider (`.fxlook`, `#fxColors`, `#fxOpacity`, added in 1.1.20) were taken out again; see-through stays in the ⋯ menu. With "None", Frequency, Opacity and "Mouse can interact with the background" are greyed out and switched off (`.off`, `disabled`) instead of hidden; the same in Settings → Effects → Choose… and in Edit design.
+  - *Ghost jellyfish:* the shine stays 0.35 s after the pointer leaves, then fades in under a second (was ~2 s); the twin fades in 1.2 s (was 2.2 s).
+  - *Lightning* (mouse): a single line (no forks), strikes 1.5 s after it starts (was 2 s), no length limit (was the last 70 points; now 2000, a safety net only), and it rests 1 s after a strike before a new one can start. (Background, mouse interacts): hits the pointer more often: 60 % of bolts start above it and they bend to it from `max(50, 24 %)` px (about half to two-thirds of bolts hit, depending on where the pointer is); a hit has a white flash, a shock ring, three tiny crackling arcs and 5 sparks (was 9).
+  - *Mouse effects that spawn by distance* (stardust, hearts, bubbles, rain, snow, confetti, leaves, plankton, network, embers, blossom, night sky, glass shards, dust, fireworks, warp speed, analog monitor, fel fire): a fast mouse jumps 30–60 px between two events, so the particles came out in clumps at the end of each jump with gaps between, and the ones with a small limit (glass shards 16, plankton 90, dust 80, blossom 40, ...) simply stopped making new ones while the old ones were still alive. Now `Layer.move` feeds these followers the jump in steps of at most ~10 px along the path (`ALONG` list in fx.js), and when a limit is reached the oldest particle goes instead of refusing the new one (`room()`); the limits were raised a little (shards 28, plankton 120, warp 110, blossom 60, night sky 70, dust 110, embers 110, fel 170, analog monitor cells 260).
+  - *Healing aura* (mouse): crosses come by time (9 a second while moving), not by distance with a cap of 40, which came in bursts and gaps.
+  - *Digital ocean* (mouse): it kept only the last 36 slices, so at a normal mouse speed the wave was cut off before it could curl over and break (the picks page's ghost pointer was slow, so it looked fine there); now up to 140 slices (wider apart once there are 100), and the curl direction comes from the last 14 px of the path instead of every tiny mouse wobble.
+  - *Analog monitor* (mouse interacts): the old-TV break-up is gone; the owner picked **Magnet** from three tries (Magnet / Light pen / Vertical hold, now removed with `COSMO_FX.PICK`) and asked for it not to be a perfect circle: the scanlines bend away round the pointer in a lumpy smear that **grows and strengthens with the mouse's speed** (radius `40 + 0.055·speed` px, up to 1800 px/s) and stretches into a **fading tail along the path just taken** (up to 10 earlier bends, ~0.7 s), settling back when the mouse slows; a faint red / blue fringe shows where lines bend most.
+- **The owner's picks (from the "CosmoNotes 1.1.22 Picks" page):** Analog monitor mouse = **Phosphor pixels** (`triad`), Healing aura bottom = **Breathing** (`breath`), Ghost jellyfish touch = **Slingshot ghost** (`sling`), Digital ocean mouse = **Surf**. The other versions were removed and `COSMO_FX.PICK` is gone. Last change to the slingshot (the owner: the ghost shouldn't follow the mouse): the twin is flung **once, the moment the pointer goes in**, in the direction the pointer was moving as it entered (from a standing start: away from where it came in), at 70–120 px/s slowing fast (`.08^t`, ~28–47 px) and fading in 2.2 s; it never follows the pointer, and moving round inside does nothing more until the pointer leaves and comes back (at most one every 0.6 s, 3 at a time).
+- **Fourth round of the owner's notes (still 1.1.22, 27 October 2026):**
+  - *Ghost jellyfish* (mouse interacts): the violet twin is now a **still mirage**. Before, it was flung out and drawn as a live copy of the jellyfish, so it pulsed, swayed and swam along with it. Now a **snapshot of the jellyfish's dots** is taken the first time it is drawn and stays exactly where it appeared (`twins[].snap`; no more `vx` / `vy`). It lasts 1.6 s (was 1.2) and its opacity is `0.6 · min(1, 10v) · (1 − v)^1.5` (v = age / life): a quick fade-in, then a smooth fade from the first moment to the very end. **Why the ending was abrupt:** it was drawn with `bucketDots` (4 opacity groups), whose faintest group is always drawn at about 12 % however faint a dot really is, so the twin went from about 12–30 % to nothing in one frame when it was removed. New helper `bucketFade(c, items, col, B, maxA, fade)` multiplies every group by one smooth fade value, so it reaches 0. The mirage is drawn outside the `if (jelly)` block, so it also finishes fading if the jellyfish has gone. (`bucketDots` is still used for everything else.)
+  - *Lightning* (mouse): rests **0.5 s** after a strike (`REST`, was 1 s) before the next bolt starts building (about 0.6 s until its line shows).
+  - *Lightning* (background, mouse interacts): hits the pointer more. Bolts bend into the pointer from `max(70, 32 %)` of the note's short side (was `max(50, 24 %)`), and 70 % of bolts start above the pointer (was 60 %; spread ±20 % of the width, was ±25 %). Measured over 240 s of bolts at three pointer positions on two note sizes: hits went from about 41–66 % of bolts to about 66–82 %. The rest still strike anywhere, so the side bolts stay.
+  - *Fireflies* (background, mouse interacts): the magnet was too strong and reached too far. Only fireflies within **70 px** (was 150) of the pointer get interested; the pull is `0.5–1.1` a second (was 1–2.2) and weaker the further away (`0.4 + 0.6 · closeness` within 110 px); they follow for 1.6–3 s (was 2.5–4.5); and a firefly **lets go** once the pointer is over 110 px away (then ignores it for 4–8 s). Before, it chased the pointer wherever it went: when the pointer leapt 200 px away a following firefly flew about 217 px after it, and one 125 px away was pulled in to within ~28 px. Now the first just wanders (about 11 px) and the second ignores the pointer. The Fireflies mouse follower (all of them follow the pointer, by design) is unchanged.
+  - Tests (v1122): the mirage never moves and only gets fainter (last visible frame under 3 % opacity and no step bigger than 5 % in a frame; the old code ended at 12 % with a 24 % step); the lightning mouse rests about half a second; fireflies: near ones come over, far ones ignore the pointer, and they let go when it leaps away; the lightning background hits more than 60 % of bolts but not every one.
+
+## 1.1.27 – 26 October 2026 (was part 1 of 3 of 1.1.22)
+
+The owner’s first and second rounds of notes on the effects. Menus no longer snap from far away.
 
 - **Effects, the owner's notes** (src/fx.js):
   - *Analog monitor* (mouse interacts): "like touching an old TV". Around the pointer: snow (static specks, new every frame), shaky brighter scanlines with red / cyan fringes, a magnet-like rainbow smudge, torn lines that slip sideways (more when it moves fast), a flickering tube; a hard flick (> 1100 px/s) makes the picture lose its hold and roll once. Settles when the mouse leaves (`hot` fades).
@@ -56,34 +527,6 @@ Same version, at the owner's request ("same ver as before"). (Later rounds, from
   - *Digital ocean* (follower): new, in one of three versions on the picks page (`PICK.ocean`: `ripples` default, `patch` = a little window of the dot sea under the pointer, `surf` = a wave of dots that curls over and breaks into spray).
   - Followers can have `leave()` (the Layer calls it when the pointer leaves the note): fel and embers stop burning; `busy()` stays true while the pointer is on the note.
   - `COSMO_FX.PICK` holds the versions the owner is choosing between; the app uses the defaults until a pick is made.
-- **Sixth round of the owner's notes (still 1.1.22, 28 October 2026, same version again):**
-  - **Effect order** tweaked: Snow, Rain, **Rainbow**, Lightning · Autumn leaves, Cherry blossom · **Fireworks, Confetti, Hearts** · **Bubbles, Fish** · **Glass shards** · **Plankton** · Fireflies, Dust in light, Embers · Night sky, Stardust, Warp speed · Digital ocean, Silk waves, Network, Ghost ripple · Matrix, Analog monitor · Healing aura, Cauldron, Fel fire, Ghost jellyfish (`ORDER` in fx.js, `FX_EFFECTS` / `FX_FOLLOWERS` in store.js; ids unchanged).
-  - **Checklists show their boxes in the notes list.** The list only got a note's plain text, so checklist items looked like ordinary lines. New `checklistMarks(html, text)` in store.js reads the note's html (no browser needed: a small tag reader) and gives one letter per line the card shows (`o` box, `x` ticked, `.` plain); any `<li>` inside a `ul.checklist` counts, its box on its first line, matched to the lines by their words in order (a line that doesn't match just has no box). main.js sends it as `checks` in `list:get` (empty for locked / hidden notes); `cardBody` (list.js) draws a small box in the card's accent colour, ticked ones filled with a tick and the line struck through and faded, like in the note (also on dark papers and in the Bin). Works for existing notes straight away. Checked against real browser `innerText` for the welcome note and nested / multi-line items.
-  - **Network** (background): the nodes ended up **scrunched into one clump** after a while. They all drifted on the same "wind" (`flow`), which has spots where it gathers, and nothing kept them apart (the pointer also pulled near ones into one dot that never came apart). Measured over a simulated hour: 30 nodes ended in 4–5 of 36 grid cells, 2–12 px apart. Now: nodes closer than 0.55 × the link length push apart, each node has its own slowly turning heading (the shared wind is weaker), the edges push softly inwards (18 px) instead of piling nodes against them, and a node never drops below 3 px/s. After an hour: 21–24 of 36 cells, 35–64 px apart, with or without the pointer resting on it.
-  - **Edit design** is now a **small pop-up next to the note** (352 px wide, right of the card if there's room, else left, always inside the window) instead of a sheet covering the whole list; nothing behind it is dimmed or blurred, and the note being edited gets a dark outline. **Tabs: Colour** (colours and see-through), **Background**, **Mouse**; the title and live preview strip stay on top; the tab area keeps one height (long effect lists scroll inside). **What's picked now stands out** like in Settings → window colours / backups: a white button with a 2 px dark ring (effects, Frequency), the open tab is a dark pill (was a slightly darker beige, hard to tell apart). The same picked style applies in Settings → Effects → Choose…. Fixed on the way: the right-click menu forgot which card was clicked before the item ran (`ctxCard`).
-  - Tests (v1122): the new order; network nodes stay spread after 20 simulated minutes; `checklistMarks` cases and that the list sends / draws them; Edit design has the three tabs, no dimming, small width and the ring style.
-- **Fifth round of the owner's notes (still 1.1.22, 28 October 2026; the owner said not to raise the version):**
-  - *Dust in light* (mouse): less dust. The frequency scale moved down so the old "Rarely" amount is now "Often" (`k × 0.35 / 2.6`): one speck every ~17 px at Often (was every ~6 px), ~44 px at Normal, ~128 px at Rarely.
-  - *Analog monitor* (background, mouse interacts): the Magnet is gone (no lumpy blobs, no tail, no red / cyan fringe). The owner liked the bending lines, so the lines stay and now work like Ghost ripple: each scanline is a row of springy points (one every 8 px, a line every 4 px; `dy`, `vy` per point, spring 7, damping 3). **One** bright scan line (with a soft glow trailing it) sweeps down the screen now and then; the lines part to let it through and wobble back into place behind it (up to ~8 px, calm again in ~2–3 s). The pointer does the same while it **moves** (faster than 25 px/s; a resting pointer leaves the lines alone, so there is no fixed lump or ellipse). Lines that are out of place shine a little brighter. The slowly crawling scanlines stay. The second, slower bar that "Often" used to add is gone.
-  - **What Frequency means now** (there is only one line): how often it sweeps. Cycle (start to start) = `clamp(16 s / k, 5 s, 60 s)`: about once a minute at Rarely, every ~16 s at Normal, every ~5 s at Often (which also sweeps quicker: 4 s instead of 7 s; bigger notes count as "more often" too, like every other background). The push is scaled with the sweep speed so the lines part about the same at every frequency.
-  - **Effects listed by theme** (the owner picked "Option A" of three): the Background and Mouse tabs (note Effects, Settings → Effects → Choose…, Edit design) now list alike effects together: Snow, Rain, Lightning · Autumn leaves, Cherry blossom · Fireflies, Dust in light, Embers · Night sky, Stardust, Warp speed · Plankton, Bubbles, Fish · Digital ocean, Silk waves, Network, Ghost ripple · Matrix, Analog monitor, Glass shards, Rainbow · Healing aura, Cauldron, Fel fire, Ghost jellyfish · Fireworks, Confetti, Hearts. Only the order changed, not any id, so saved choices stay. The order is now an explicit list (`ORDER` in fx.js, which builds `EFFECT_IDS` and so the followers' order; an effect missing from it is added at the end) and the same list is in store.js (`FX_EFFECTS` / `FX_FOLLOWERS`). Tests: v1118 / v1120 no longer expect the old positions; v1122 checks the new order and that fx.js and store.js agree.
-  - Tests (v1122): no blobs / fringe in the code; a moving pointer parts the lines and they come back to straight, a resting one leaves them alone; only one scan line at a time even at Often; sweeps per 5 min at Rarely / Normal / Often (3–7, 14–23, 45–70); dust at Often makes about what Rarely used to. The old "bend gets bigger with speed" tests were removed.
-- **Fourth round of the owner's notes (still 1.1.22, 27 October 2026):**
-  - *Ghost jellyfish* (mouse interacts): the violet twin is now a **still mirage**. Before, it was flung out and drawn as a live copy of the jellyfish, so it pulsed, swayed and swam along with it. Now a **snapshot of the jellyfish's dots** is taken the first time it is drawn and stays exactly where it appeared (`twins[].snap`; no more `vx` / `vy`). It lasts 1.6 s (was 1.2) and its opacity is `0.6 · min(1, 10v) · (1 − v)^1.5` (v = age / life): a quick fade-in, then a smooth fade from the first moment to the very end. **Why the ending was abrupt:** it was drawn with `bucketDots` (4 opacity groups), whose faintest group is always drawn at about 12 % however faint a dot really is, so the twin went from about 12–30 % to nothing in one frame when it was removed. New helper `bucketFade(c, items, col, B, maxA, fade)` multiplies every group by one smooth fade value, so it reaches 0. The mirage is drawn outside the `if (jelly)` block, so it also finishes fading if the jellyfish has gone. (`bucketDots` is still used for everything else.)
-  - *Lightning* (mouse): rests **0.5 s** after a strike (`REST`, was 1 s) before the next bolt starts building (about 0.6 s until its line shows).
-  - *Lightning* (background, mouse interacts): hits the pointer more. Bolts bend into the pointer from `max(70, 32 %)` of the note's short side (was `max(50, 24 %)`), and 70 % of bolts start above the pointer (was 60 %; spread ±20 % of the width, was ±25 %). Measured over 240 s of bolts at three pointer positions on two note sizes: hits went from about 41–66 % of bolts to about 66–82 %. The rest still strike anywhere, so the side bolts stay.
-  - *Fireflies* (background, mouse interacts): the magnet was too strong and reached too far. Only fireflies within **70 px** (was 150) of the pointer get interested; the pull is `0.5–1.1` a second (was 1–2.2) and weaker the further away (`0.4 + 0.6 · closeness` within 110 px); they follow for 1.6–3 s (was 2.5–4.5); and a firefly **lets go** once the pointer is over 110 px away (then ignores it for 4–8 s). Before, it chased the pointer wherever it went: when the pointer leapt 200 px away a following firefly flew about 217 px after it, and one 125 px away was pulled in to within ~28 px. Now the first just wanders (about 11 px) and the second ignores the pointer. The Fireflies mouse follower (all of them follow the pointer, by design) is unchanged.
-  - Tests (v1122): the mirage never moves and only gets fainter (last visible frame under 3 % opacity and no step bigger than 5 % in a frame; the old code ended at 12 % with a 24 % step); the lightning mouse rests about half a second; fireflies: near ones come over, far ones ignore the pointer, and they let go when it leaps away; the lightning background hits more than 60 % of bolts but not every one.
-- **Third round of the owner's notes (still 1.1.22):**
-  - **Removed:** Solar system and Aquarium, backgrounds and mouse effects (fx.js `EFFECTS` / `FOLLOWERS`, `aqKit`, the `aq` palette, icons; store.js `FX_EFFECTS` / `FX_FOLLOWERS`). A note that had one goes back to "same as all notes" (`cleanFx`), a setting that had one shows nothing (`resolve`). Tests v1118–v1120 updated.
-  - **Effects pop-up (note):** the note's colour swatches and see-through slider (`.fxlook`, `#fxColors`, `#fxOpacity`, added in 1.1.20) were taken out again; see-through stays in the ⋯ menu. With "None", Frequency, Opacity and "Mouse can interact with the background" are greyed out and switched off (`.off`, `disabled`) instead of hidden; the same in Settings → Effects → Choose… and in Edit design.
-  - *Ghost jellyfish:* the shine stays 0.35 s after the pointer leaves, then fades in under a second (was ~2 s); the twin fades in 1.2 s (was 2.2 s).
-  - *Lightning* (mouse): a single line (no forks), strikes 1.5 s after it starts (was 2 s), no length limit (was the last 70 points; now 2000, a safety net only), and it rests 1 s after a strike before a new one can start. (Background, mouse interacts): hits the pointer more often: 60 % of bolts start above it and they bend to it from `max(50, 24 %)` px (about half to two-thirds of bolts hit, depending on where the pointer is); a hit has a white flash, a shock ring, three tiny crackling arcs and 5 sparks (was 9).
-  - *Mouse effects that spawn by distance* (stardust, hearts, bubbles, rain, snow, confetti, leaves, plankton, network, embers, blossom, night sky, glass shards, dust, fireworks, warp speed, analog monitor, fel fire): a fast mouse jumps 30–60 px between two events, so the particles came out in clumps at the end of each jump with gaps between, and the ones with a small limit (glass shards 16, plankton 90, dust 80, blossom 40, ...) simply stopped making new ones while the old ones were still alive. Now `Layer.move` feeds these followers the jump in steps of at most ~10 px along the path (`ALONG` list in fx.js), and when a limit is reached the oldest particle goes instead of refusing the new one (`room()`); the limits were raised a little (shards 28, plankton 120, warp 110, blossom 60, night sky 70, dust 110, embers 110, fel 170, analog monitor cells 260).
-  - *Healing aura* (mouse): crosses come by time (9 a second while moving), not by distance with a cap of 40, which came in bursts and gaps.
-  - *Digital ocean* (mouse): it kept only the last 36 slices, so at a normal mouse speed the wave was cut off before it could curl over and break (the picks page's ghost pointer was slow, so it looked fine there); now up to 140 slices (wider apart once there are 100), and the curl direction comes from the last 14 px of the path instead of every tiny mouse wobble.
-  - *Analog monitor* (mouse interacts): the old-TV break-up is gone; the owner picked **Magnet** from three tries (Magnet / Light pen / Vertical hold, now removed with `COSMO_FX.PICK`) and asked for it not to be a perfect circle: the scanlines bend away round the pointer in a lumpy smear that **grows and strengthens with the mouse's speed** (radius `40 + 0.055·speed` px, up to 1800 px/s) and stretches into a **fading tail along the path just taken** (up to 10 earlier bends, ~0.7 s), settling back when the mouse slows; a faint red / blue fringe shows where lines bend most.
-- **The owner's picks (from the "CosmoNotes 1.1.22 Picks" page):** Analog monitor mouse = **Phosphor pixels** (`triad`), Healing aura bottom = **Breathing** (`breath`), Ghost jellyfish touch = **Slingshot ghost** (`sling`), Digital ocean mouse = **Surf**. The other versions were removed and `COSMO_FX.PICK` is gone. Last change to the slingshot (the owner: the ghost shouldn't follow the mouse): the twin is flung **once, the moment the pointer goes in**, in the direction the pointer was moving as it entered (from a standing start: away from where it came in), at 70–120 px/s slowing fast (`.08^t`, ~28–47 px) and fading in 2.2 s; it never follows the pointer, and moving round inside does nothing more until the pointer leaves and comes back (at most one every 0.6 s, 3 at a time).
 - **Second round of the owner's notes (still 1.1.22):**
   - *Snow* (mouse interacts): a flake the pointer touches shatters: its six arms break off and tumble away the way the pointer went, with a puff of powder, and fade; a new flake starts at the top. (Replaces blowing flakes aside.)
   - *Fireflies* (mouse interacts): the ones within 150 px get curious and follow the pointer for 2.5–4.5 s, hovering round it like the Fireflies mouse effect, then lose interest, fly off away from it and ignore it for 10–16 s. (Replaces circling / fleeing.)
@@ -93,11 +536,9 @@ Same version, at the owner's request ("same ver as before"). (Later rounds, from
   - *Ghost jellyfish* shine (`glow`, and `sling`), third round: every dot lights up now, not only some (the old shimmer switched colour on half of them). The shine starts where the pointer first touches it and spreads over the whole jellyfish as a wave with a bright edge (`src`, `wave`, about half a second), then all of it glows with a soft shimmer. Slingshot made gentler: the twin stretches out only half as far as the pointer goes (at most 0.6 × the jellyfish's size), and once let go it starts at up to 110 px/s and slows fast (`.08^t`), so it travels at most ~45 px and fades in 2.2 s.
   - *Ghost jellyfish*: a third version, `sling`: it shines like `glow`, and a violet twin is pulled out of it from where the pointer first touched; when the pointer leaves the jellyfish the twin is let go (speed = 0.2 × the pointer's + 0.6 × how far it was pulled, at most 90 px/s), slows down and fades over 3 s.
 - **Renamed** the switch "Mouse plays with the background" to **"Mouse can interact with the background"** (note Effects, Settings → Effects → Choose…, Edit design).
-- Tests: v1122 (versions, jelly doesn't flee, lightning hits only when near, fel stays low, fel / embers burn and go out, cauldron has no gaps, renamed switch); v1120 adjusted (fel / embers burn on a resting pointer).
-
 - **Menus no longer snap from far away** (the owner: moving a big menu 5 px made it clip to the note's side). `snapInk` (main.js): the old test `near(d, size)` accepted `-size/2 < d < INK_SNAP`, so a menu overlapping the note's edge by up to half its own width still docked. Now `near(d)` = `-INK_SNAP < d < INK_SNAP` (12 px each way): it only docks when its edge is within 12 px of the note's edge.
 
-## 1.1.21 – 26 October 2026
+## 1.1.26 – 26 October 2026 (was 1.1.21)
 
 - **"Mouse plays with the background"** (the owner's request: "make the mouse interact with the background… be creative for all the effects"), its own version as the owner asked. A new switch in the note's Effects pop-up (`#fxInteract`, next to "Pause effects on this note"), in Settings → Effects → Choose… for all notes (`#fxInteractAll`) and in the list's Edit design sheet (`#editFxInteract`). Settings `fxInteract` (default **on**; `settings:set`, `fxSettings()`), note `fx.mi` (true / false / null = same as all notes; `cleanFx`; not an edit, copied by Duplicate). `COSMO_FX.resolve` returns `interact` (a note's own wins, except with "use on every note").
 - How: `Layer.move` now also tracks the pointer for the background (even without a follower): `ptr = { x, y, vx, vy, sp }` (speed in px/s, smoothed; it slows down when the mouse rests and is dropped when the mouse leaves). `Layer.tick` calls `eff.step(dt, t, m)` with `m = ptr` while the switch is on and the mouse is over the note, otherwise `null`. `Layer.set({ interact })` only changes that, never remakes the effect. New helpers `near`, `shove` (push a speed away from the pointer and along its way) and `nudge` (the same for a position).
@@ -105,11 +546,10 @@ Same version, at the owner's request ("same ver as before"). (Later rounds, from
 - Measured in Chromium with the pointer moving on a normal note at "Often": every background stays at what it cost before (most 0.02–0.45 ms a frame; Fish ~0.7 and Rainbow ~1.7 as before).
 - Tests: `tests/v1121.test.js` (choosing rules, settings saved and sent to notes, a note's switch not an edit and duplicated, the layer passes the pointer with its speed only while on, every background with a moving pointer on three note sizes and both papers without NaN, bubbles pop, rain splashes, ghost ripple).
 
-## 1.1.20 – 26 October 2026
+## 1.1.25 – 26 October 2026 (was part 2 of 2 of 1.1.20)
 
-- **Removed** at the owner's request: `fairy` (Fairy dust), `xp` (XP orbs), `tunnel` (Neon tunnel) and `synthwave` (Synthwave), with their colours (`fairy`, `fairyCore`, `fairyHead`, `xp`, `xpText`, `tunnel`, `tunnel2`, `sunTop`, `sunBot`, `horizon`) and icons. A note or Settings that still has one saved shows the effect for all notes, or none (`resolve` / `cleanFx` ignore unknown ids).
-- **A mouse follower for every background** ("when I switch between the Background/Mouse tabs, they stay exactly the same, except for Pencil line"): 20 new followers, with the same id, name and icon as their background (`PAIRS` and `FOLLOWER_IDS` are now worked out from `EFFECT_IDS`; `frost` = Snow and `ripples` = Rain keep their old ids), Pencil line last. Each is a small cousin of its background: **Plankton** glowing specks stirred up behind the pointer; **Warp speed** stars streak away behind it; **Network** points dropped along the way, joined to each other and to the pointer; **Embers** sparks fly up, cooling yellow → red; **Cherry blossom** petals flutter down; **Night sky** the pointer is a shooting star leaving twinkling stars; **Analog monitor** short scanline afterimages; **Digital ocean** a bobbing wake of dots; **Silk waves** three glittering ribbons weave behind it; **Glass shards** pieces of glass fall, turning in 3D; **Ghost ripple** a field of dots shows up around the pointer and parts around it; **Fish** a little school circles the pointer; **Solar system** the pointer is a tiny sun with 2–4 planets; **Dust in light** a soft beam follows the pointer and the dust it stirs sparkles in it; **Healing aura** motes and crosses float up, with rings; **Lightning** little forked bolts crackle along; **Cauldron** potion bubbles rise and burst into droplets, stars and steam; **Ghost jellyfish** a dotted jellyfish follows in pushes; **Fel fire** green flames lick up; **Aquarium** a clownfish with neon tetras follows, bubbles rise. Fish, Solar system, Ghost jellyfish and Aquarium are companions (`presence()`): they show while the mouse moves and fade away 2.5 s after it stops (a follower may now have `fade()`; `Layer` multiplies its opacity by it), so the loop can still sleep. Every follower measured at 0.01–0.5 ms a frame (normal note, "Often").
-- Shared drawing moved out of the effects so the followers can use it: `fishHw` / `fishSpine` / `fishBody` / `fishFins` / `fishBend` / `fishNew` / `fishDraw` (Fish), `aqKit` (the Aquarium's fish), `zig` (Lightning); new helpers `bucketSegs`, `presence`. The backgrounds look exactly the same.
+Colour and see-through in the Effects pop-up, menus that stay open, and Edit design in the list.
+
 - **Colour and see-through in the note's Effects pop-up** ("to mix and match"): the same swatches (`#fxColors`, copied from `#colors` at start-up) and a See-through slider (`#fxOpacity`) at the top, in `.fxlook`; both stay in step with the ⋯ menu's. The pop-up can be 440 px tall (was 360).
 - **Menus on a note no longer close each other** ("don't auto close menus just because another has opened"): opening the ⋯ menu, Effects or Add leaves the others open, the newest (or the one clicked) on top (`toFront`). Each closes with its own button / X (`closePop(id)`), Esc or a click in the note still closes them all, and a new **close-all** button in the top bar (`#btnCloseAll`, left of ⋯; shows when two or more of ⋯ / Effects / Add / the text toolbar are open) closes them all, text toolbar included. The small dialogs (password, link, questions) still replace each other. `openPopId` is gone; `syncPops()` keeps `body.pop-open` and the button right.
 - **Weaker sticking** for toolbars and menus dragged out of a note: `INK_SNAP` 12 px (was 40), so they only stick to a side when really close.
@@ -117,14 +557,22 @@ Same version, at the owner's request ("same ver as before"). (Later rounds, from
 - **Edit design** (notes list, right-click; was "Edit…"): besides title and colour, a See-through slider and the note's own effects (Background / Mouse tabs with "Same as all notes", None and every effect; frequency, opacity, "Mouse plays with the background" from 1.1.21). The paper at the top previews the colour and the effects live (`#editFxCanvas`, its own `Layer`; move the mouse over it for the follower). `list:edit` now also takes `opacity` (0.25–1, 5 % steps; the open window changes at once) and `fx` (`cleanFx`); neither counts as an edit. `list:get` sends each note's `opacity`.
 - Tests: `tests/v1120.test.js` (removed ids everywhere, followers in the same order with the same names and icons, every follower on three sizes, three frequencies and both papers without NaN and quiet after the mouse stops, companions, Edit design's `list:edit`, the 12 px snap); `v1115`/`v1116`/`v1117`/`v1118` updated (closer drops for sticking, `mi` in a note's `fx`, the removed ids).
 
-## 1.1.19 – 25 October 2026
+## 1.1.24 – 26 October 2026 (was part 1 of 2 of 1.1.20)
+
+Four effects removed, and a mouse follower for every background.
+
+- **Removed** at the owner's request: `fairy` (Fairy dust), `xp` (XP orbs), `tunnel` (Neon tunnel) and `synthwave` (Synthwave), with their colours (`fairy`, `fairyCore`, `fairyHead`, `xp`, `xpText`, `tunnel`, `tunnel2`, `sunTop`, `sunBot`, `horizon`) and icons. A note or Settings that still has one saved shows the effect for all notes, or none (`resolve` / `cleanFx` ignore unknown ids).
+- **A mouse follower for every background** ("when I switch between the Background/Mouse tabs, they stay exactly the same, except for Pencil line"): 20 new followers, with the same id, name and icon as their background (`PAIRS` and `FOLLOWER_IDS` are now worked out from `EFFECT_IDS`; `frost` = Snow and `ripples` = Rain keep their old ids), Pencil line last. Each is a small cousin of its background: **Plankton** glowing specks stirred up behind the pointer; **Warp speed** stars streak away behind it; **Network** points dropped along the way, joined to each other and to the pointer; **Embers** sparks fly up, cooling yellow → red; **Cherry blossom** petals flutter down; **Night sky** the pointer is a shooting star leaving twinkling stars; **Analog monitor** short scanline afterimages; **Digital ocean** a bobbing wake of dots; **Silk waves** three glittering ribbons weave behind it; **Glass shards** pieces of glass fall, turning in 3D; **Ghost ripple** a field of dots shows up around the pointer and parts around it; **Fish** a little school circles the pointer; **Solar system** the pointer is a tiny sun with 2–4 planets; **Dust in light** a soft beam follows the pointer and the dust it stirs sparkles in it; **Healing aura** motes and crosses float up, with rings; **Lightning** little forked bolts crackle along; **Cauldron** potion bubbles rise and burst into droplets, stars and steam; **Ghost jellyfish** a dotted jellyfish follows in pushes; **Fel fire** green flames lick up; **Aquarium** a clownfish with neon tetras follows, bubbles rise. Fish, Solar system, Ghost jellyfish and Aquarium are companions (`presence()`): they show while the mouse moves and fade away 2.5 s after it stops (a follower may now have `fade()`; `Layer` multiplies its opacity by it), so the loop can still sleep. Every follower measured at 0.01–0.5 ms a frame (normal note, "Often").
+- Shared drawing moved out of the effects so the followers can use it: `fishHw` / `fishSpine` / `fishBody` / `fishFins` / `fishBend` / `fishNew` / `fishDraw` (Fish), `aqKit` (the Aquarium's fish), `zig` (Lightning); new helpers `bucketSegs`, `presence`. The backgrounds look exactly the same.
+
+## 1.1.23 – 25 October 2026 (was 1.1.19)
 
 - The owner didn't like the look of Fish, so a "Fish Picks" preview page showed four new fish backgrounds on the real engine: Koi pond, Aquarium, Silver shoal and Doodle fish. The owner picked **Aquarium**, and asked for the current Fish to stay but look better ("the triangle should move better behind them; it's too obvious it's just a shape").
 - **New background `aquarium` (Aquarium)**, added at the end of `EFFECTS` / store.js `FX_EFFECTS` (saved choices keep their place), with a picker icon and light/dark colours (`aq` in `LIGHT` / `DARK`): a tank seen from the side. 1–2 clownfish (more on big notes), an angelfish and (not on small list cards) a blue tang swim to and fro at their own depths and turn round now and then (the body squeezes edge-on through the turn: `scale(face, 1)`); a small group of neon tetras (6, at most 14) follows a hidden leader; tapered seaweed ribbons sway along the bottom; bubbles rise from a corner and fish now and then let out a "blub". About 0.15–0.17 ms a frame on a normal note.
 - **Fish redrawn** (same id, name, colours and flocking): the oval + triangle is replaced by a fish drawn along a short spine (5 points that follow the head, so the body bends when it turns), with a swimming wave running down to the tail; a tapered body (round head, slim tail end); a forked tail that swings a beat behind the body, its tips lagging a little more; two paddling side fins; a soft sheen along the back; and two tiny eyes (new colour `fishEye`). The tail beats faster when the fish hurries (when startled). Still one fill per colour for the fins and one for the bodies (7 fills a frame however many fish), about 0.15–0.18 ms a frame (was ~0.11).
 - Tests: `tests/v1119.test.js` (Aquarium is last in both lists, has a name and icon; Aquarium and Fish run on light and dark paper on a small card, a normal note and a big note at "Often" without NaN; every colour exists on both papers; Fish stays at 7 fills a frame). `v1118.test.js` now only checks that its own 23 ids come right after the first eleven.
 
-## 1.1.18 – 25 October 2026
+## 1.1.22 – 25 October 2026 (was 1.1.18)
 
 - **23 new background effects**: 18 from the Effect Lab (22 picked; Lorenz, Shape shifter, Contour map and Black hole were taken out again in the second round below) and 5 magic ones from the Spell Lab (third round below), chosen by the owner from three batches of previews (two versions of each idea, on note-sized canvases with the real engine) in the "CosmoNotes Effect Lab" page. New ids in `src/fx.js` `EFFECTS` and store.js `FX_EFFECTS`, after the old ones, each with a picker icon (`ICONS.effect`) and light/dark colours in `LIGHT` / `DARK`:
   - `plankton` **Plankton** (lab: Bioluminescent plankton B, "Breaking wave"): specks rest almost dark; an invisible wave rolls across every few seconds and lights them up, then the glow fades.
@@ -164,33 +612,17 @@ Same version, at the owner's request ("same ver as before"). (Later rounds, from
   - `fel` **Fel fire**: eerie green flame tongues flicker along the bottom; now and then one flares up taller, throwing sparks.
   - New colours `heal`, `healHi`, `lightning`, `lightningHi`, `brew`, `brewHi`, `steam`, `sea`, `fel`, `felHi`; new icons. `v1118.test.js` covers them like the others and checks the black hole is gone.
 
-## 1.1.17 – 25 October 2026
+## 1.1.21 – 25 October 2026 (was 1.1.17)
 
 - **Opacity for effects and mouse followers:** an **Opacity** slider (10 % – 100 %, 5 % steps) under each Frequency row, in the note's Effects pop-up (`#fxEOp` / `#fxFOp`, one per tab) and in Settings → Effects → Choose… (`#fxAllEOp` / `#fxAllFOp`). Dragging shows the change straight away (on the note, or on the cards in the list); it's saved when the slider is let go, or 300 ms after it stops moving. In a note the sliders are greyed out while Settings uses the same effects on every note. The Settings summary shows it, e.g. "Snow (more, 40%)".
 - Settings `fxEffectOpacity` / `fxFollowerOpacity` (default 1; `settings:set` takes them through `cleanFxOpacity` and broadcasts `settings:changed`; `fxSettings()` sends them to note windows). Note `fx.eo` / `fx.fo` (null = same as all notes; `cleanFx`; not an edit, copied by Duplicate). `COSMO_FX.resolve` returns `effectOpacity` / `followerOpacity` (a note's own wins, except with "use on every note"); `COSMO_FX.opacityOf` = the same cleaning as store.js.
 - **How it's drawn:** `Layer.set({ effectOpacity, followerOpacity })`. `fadeable(ctx)` wraps the canvas context's `globalAlpha` so everything an effect or follower draws is multiplied by its opacity: no extra canvas or drawing pass, and the effects themselves are unchanged. Changing the opacity only redraws; it never restarts the effect. The note's Effects pop-up can be 360 px tall (was 330) for the extra row.
 - Tests: `tests/v1117.test.js`; `v1116.test.js` expects `eo` / `fo` in a note's `fx`.
 
-## 1.1.16 – 25 October 2026
+## 1.1.20 – 25 October 2026 (was part 3 of 3 of 1.1.16)
 
-- **Note effects and mouse followers** (new `src/fx.js`, loaded by note.html and list.html before their own script; `window.COSMO_FX`). Effects behind the writing: snow (big flakes, more and smaller), fireworks (classic rockets with four kinds of burst, round / ring / willow / crackle, never the same kind twice in a row, more often and sometimes two or three at once), stardust (brighter twinkles with a glow and rays), fireflies, bubbles (pop), autumn leaves, hearts, rain (drizzle), confetti. Mouse followers: stardust (falling sparkles), comet (rainbow ribbon), hearts (puffs), bubbles (popping), fireflies (swarm), ripples (water rings), frost (crystals), confetti (sprinkles), leaves (autumn), pencil (line). Picked by the owner from a preview page; shooting stars were dropped.
-- **Light by design:** a handful of shapes (counts scale with the note's area, `k`), drawn by ONE shared `requestAnimationFrame` loop at most 30 times a second, which stops itself when no layer `wants()` frames (no effect, paused, rolled up, off screen, or only a follower and the mouse is still). Canvases use at most 2× pixel ratio.
-- **Choosing:** settings `fxEffect`, `fxFollower` (the choice for all notes), `fxForceAll` (use it on every note; each note's own choice is kept and comes back when switched off), `fxPaused` (pause all). Note fields `fx: { e, f }` (`cleanFx`: null = same as all notes, 'none' = nothing, or an id from `FX_EFFECTS` / `FX_FOLLOWERS` in store.js, which must match fx.js) and `fxPaused`; both in `EDITABLE`, not edits, `fx` copied by Duplicate. `COSMO_FX.resolve(note.fx, settings, note.fxPaused)` decides what shows. main.js `fxSettings()` is part of `noteSettings()`; `settings:set` takes the four keys and broadcasts `settings:changed` to note windows; tray menu **Pause effects** (`setFxPaused`, rebuilt with `buildTray`). `list:get` sends each note's `fx` / `fxPaused`.
-- **Note window:** `#fxCanvas` (first in `<body>`, `position: fixed; z-index: -1`, so it's under everything but over the paper, which is the page background), hidden while rolled up. Follower fed from `pointermove` on the document. ⋯ menu → **Effects…** (`#miFx`, shows what's on) opens the pop-up `#fxPop`: tiles for "Same as all notes" (named), None and every effect / follower, each with a still picture on the note's own paper (`COSMO_FX.thumb`), a note when Settings uses the same on every note, and "Pause effects on this note". Top bar: sparkle button `#btnFx` (only when something is on; hidden below 280 px) pauses / plays this note.
-- **Notes list:** cards show their note's effect (a canvas `.fxc` as the card's first child, z-index -1 inside `.card { isolation: isolate }`), the follower trails the mouse over the card; only cards on screen draw (`fxIO`). `paintFx()` runs after `paintCards()`. Settings → **Effects** panel: what's chosen for all notes, **Choose…** (pop-up `#fxSheet` with the tiles, on Lemon paper or Midnight in a dark theme, and "Use these on every note"), and **Pause all effects**.
-- **Pickers are lists:** an icon (`COSMO_FX.ICONS`, coloured per effect) and the name for each choice (`.fxlist` / `.fxi`, names wrap), in both pop-ups; "Background of a note" instead of "Behind the writing". The still pictures (`thumb`) were dropped.
-- **How much (Less / Normal / More):** `.fxamt` buttons under each list. Settings `fxEffectAmount` / `fxFollowerAmount`, note `fx.ea` / `fx.fa` ('low' | 'mid' | 'high', null = same as all notes; `FX_AMOUNTS`, `cleanFx`). `COSMO_FX.AMOUNTS` = .5 / 1 / 1.8: effects multiply their counts and how often things start by it (the `k` they already scale by); followers spawn that much more often (`spacer(gap / k)`), and the swarm / tails grow with it. `resolve` returns `effectAmount` / `followerAmount` (a note's own amount wins, except with "use on every note").
-- **Pause button left of Settings** in the notes list (`#btnFxPause`, sparkle icon, crossed out while paused; `paintFxPause`).
-- **Matrix** (effect and follower, id `matrix`, picked from a preview page: "The film" and "Code trail"): the digital rain, half-width katakana + digits + a few symbols (`GLYPHS`), drawn mirrored (`mirror()` flips the canvas once), phosphor green `#00FF41` with a pale head on dark paper, deep green on light paper (palette `code` / `codeDim` / `codeHead`). The film's font (Matrix Code NFI) is free for personal use only, so it isn't bundled: `CODE_FONT` uses it if installed, else Windows' Japanese fonts (MS Gothic, Yu Gothic, Meiryo). Effect: a stream in most 14 px columns (`.75 × k^.6`), speed / length random, characters change as they fall (`drawStream`). Follower: short streams that drip down from the pointer.
-- **Resizing a note no longer restarts its effect over and over:** `Layer.resize()` resizes the canvas and keeps the running effect (clipped, or with some room) and only makes it again for the new size 300 ms after the resizing stops (`rebuildTimer`, `bw`/`bh` = the size it was made for).
-- **Text toolbar outside the note**, like the drawing toolbar: note.js `inkOut` became `barOut({ el, kind, frame, title, key, mover })`, used for both (`inkOut`, `textOut`; window names `cosmoInkBar` / `cosmoTextBar`, remembered in `localStorage.inkBarOut` / `textBarOut`). The text toolbar's window is made when it opens and closed when it closes (A, its X, locking). `$`/`$$` search every outside window (`outDocs`). main.js keeps one window per kind (`win.inkWin/inkOut/inkState`, `win.textWin/textOut/textState`; `BAR_FRAMES`, `barKind`); `placeInk`, `inkSpot`, `inkBarOptions` take the kind, `showInk(win, on)` without a kind does both (rolled up, pinned). The `ink:*` messages carry `bar: 'text'` for the text toolbar (`ink:hide` takes it as its argument; preload `ink.hide(bar)`). note.css `body.inkbar-out #textPop.tbar`.
-- **Second round of changes (owner's feedback):**
-  - Labels: "How much" → **Frequency**, Less / Normal / More → **Rarely / Normal / Often** (same values `low` / `mid` / `high`). `AMOUNTS` = .35 / 1 / 2.6 (was .5 / 1 / 1.8) so the difference shows; `every()` now allows ×0.2–×4 (was ×0.5–×2) and `spacer` up to 8 shapes per mouse move (was 4).
-  - **Fireworks:** the round (perfect circle), ring and crackle (little second bursts) kinds are gone. Now peony (uneven: each spark its own speed and a slightly bent angle), willow (gold, drooping trails), glitter (twinkling cloud) and palm (a few uneven arms). Rockets lean (`vx`), slow as they climb and burst near the top; sparks slow in the air (`drag`) and fade more slowly (1.6–3.3 s).
-  - **Follower order** = background order: `FOLLOWER_IDS` (and store.js `FX_FOLLOWERS`) frost, comet, stardust, fireflies, bubbles, leaves, hearts, ripples, confetti, matrix, pencil. Ids unchanged, so saved choices stay. "Sprinkles" is now called **Confetti**.
-  - **Matrix follower:** only letters where the pointer went, on the background's grid, flickering and fading from a pale head to green (no more dripping streams).
-  - **Effects pop-up smaller:** top-right like the ⋯ menu, at most 330 px tall, tabs Background / Mouse (`#fxTabs`, `.fxsec`, `fxTab()`), compact two-column rows, no tick (the picked row is shaded).
-  - **Text toolbar with nothing selected changes only what you type next** (the browser's typing style, so several buttons add up; it ends when the cursor moves). `onText` no longer selects the whole note, and doesn't put the cursor back when it's already there (that would forget the typing style: `caretIsSaved`). The font buttons work the same way now (no more changing the note's own font from here). Normal colour = sentinel `#010203`, cleaned off right away for a selection and after typing (`cleanResetColor` on `input`). Clear formatting with nothing selected = plain from here on (bold/italic/underline/strike off, normal colour, no highlight, normal size, the note's font). `#tScope`: "selected text" / "what you type next". **Black** text colour (`#1B1B1B`); the colour dots are 23 px so 8 fit.
+The owner’s third round of feedback, and small fixes.
+
 - **Third round of changes (owner's feedback):**
   - **Fixed the text toolbar:** an old note.css rule (1.1.9 section) had lost its selector, so the browser also dropped the rule after it, `#textPop.tbar` (250 px wide, bottom-left, no max-height). The toolbar was as wide as the note, and outside the note `.pop`'s `max-height: calc(100vh - 48px)` squashed it to its grip. Leftover removed.
   - **Sliding past corners:** a toolbar stuck to a side can slide along it past the note's corners; `inkSpot` only keeps `INK_TOUCH` (16 px) of it next to the side (it used to clamp the offset between the corners). Further out it comes loose as before (`snapInk`).
@@ -211,13 +643,38 @@ Same version, at the owner's request ("same ver as before"). (Later rounds, from
 - **X always visible in a small note:** a pop-up that scrolls (⋯ menu, Effects) keeps its X at the top right (note.js `pinX`: moved down by `scrollTop`, `.ix.pinned` gets a backing). The text and drawing toolbars never go past the note's top (`movable` → `fitIn`: moved down; taller than the note → `.fit-tall`, scrolls, X pinned too); re-placed when their size changes (`ResizeObserver`).
 - Tests: `tests/v1116.test.js` (ids match between fx.js and store.js, the choosing rules, every effect and follower runs, settings + broadcast, a note's own choice is not an edit and is copied, use-on-every-note keeps it, pause from Settings and the tray). The fake Electron keeps the tray (`__tray`).
 
-## 1.1.15 – 24 October 2026
+## 1.1.19 – 25 October 2026 (was part 2 of 3 of 1.1.16)
 
-- **9 new paper colours** from the list themes: `cream`, `rose`, `sage` (the Mint theme), `mist` (Sky), `lavender` (Lilac) and the dark `night`, `midnight`, `forest`, `plum` (store.js `COLORS`, now 17; `DARK_COLORS`; main.js `PAPER`; note.css `body[data-color]` variables and `.sw` swatches; list.css `.card` / `.epaper` / `.sheet` / `.paper` variables; list.js `COLORS`, `SWATCH`, `COLOR_NAMES`). Rules that were only for charcoal now apply to every dark paper (`:is([data-color="charcoal"],…night…midnight…forest…plum)`). The dark swatches get a small dot of their theme's colour so they can be told apart.
-- **Colour order** everywhere (the order of `COLORS` in store.js and list.js, and the buttons in note.html): each colour next to its light version, dark ones last: yellow, cream, orange, pink, rose, purple, lavender, blue, mist, mint, sage, green, charcoal, night, plum, midnight, forest.
-- **Colour rows scroll sideways** (`swatchStrip`, same function in note.js and list.js): the note's ⋯ menu still shows 8 circles of exactly the same size (`grid-auto-columns: calc((100% - 49px) / 8)`, measured: 23.4 px, same gap and menu size as 1.1.14); the group panel and the selection bar show 8 (24 px). Drag, mouse wheel, or the `.swarr` arrows that appear on a side with more colours; a drag never picks a colour. Settings → For new notes and the Edit sheet don't scroll: all 17 show at once (`.swstrip.wide`), and when the window is too narrow they carry on in a second line, like text (no `swatchStrip` there). The ⋯ menu scrolls the note's colour into view when it opens.
-- **Several colours for new notes:** new setting `defaultColors` (list, always at least one, order of `COLORS`; `cleanColors` in store.js). `store.create` picks a random one (`newNoteColor`). `defaultColor` is kept as the first one, for older versions. Old settings move over on load: `"random"` → the 7 original pastels, a single colour → `[it]`. `settings:set` takes `defaultColors` (and still `defaultColor`, incl. `"random"`). Settings → For new notes: a multi-pick row (`.sw.pick`, tick on picked ones; the last one can't be unpicked) and Pick all / Light only / Dark only / Just one (`paintNewColors`, `setNewColors`). The old "random" swatch is gone. New switch **Never the same colour twice in a row** (`#sNoRepeat`, setting `newColorNoRepeat`, on by default): with more than one colour picked, `newNoteColor` leaves out `lastNewColor` (the colour the last new note got, kept in settings.json). Duplicates and the welcome note bring their own colour (`create` only picks one when `partial.color` isn't a real colour), so they don't count.
-- **Right-click → Edit… in the list:** sheet `#editSheet` (list.html) with the title (in the note's paper colour) and the colour row. The title saves 350 ms after typing stops, the colour at once (`editQueue` / `editFlush`). IPC `list:edit(id, patch)` takes only `title` and `color` (a new title counts as an edit, a colour doesn't); an open window gets `note:look` and its window title/background follow. While the sheet is open, changes from the note's window show in it (`editRefresh`). `hiddenInList` / `revealedNow` moved out of `list:get` so other handlers can use them.
+The owner’s second round of feedback on the effects.
+
+- **Second round of changes (owner's feedback):**
+  - Labels: "How much" → **Frequency**, Less / Normal / More → **Rarely / Normal / Often** (same values `low` / `mid` / `high`). `AMOUNTS` = .35 / 1 / 2.6 (was .5 / 1 / 1.8) so the difference shows; `every()` now allows ×0.2–×4 (was ×0.5–×2) and `spacer` up to 8 shapes per mouse move (was 4).
+  - **Fireworks:** the round (perfect circle), ring and crackle (little second bursts) kinds are gone. Now peony (uneven: each spark its own speed and a slightly bent angle), willow (gold, drooping trails), glitter (twinkling cloud) and palm (a few uneven arms). Rockets lean (`vx`), slow as they climb and burst near the top; sparks slow in the air (`drag`) and fade more slowly (1.6–3.3 s).
+  - **Follower order** = background order: `FOLLOWER_IDS` (and store.js `FX_FOLLOWERS`) frost, comet, stardust, fireflies, bubbles, leaves, hearts, ripples, confetti, matrix, pencil. Ids unchanged, so saved choices stay. "Sprinkles" is now called **Confetti**.
+  - **Matrix follower:** only letters where the pointer went, on the background's grid, flickering and fading from a pale head to green (no more dripping streams).
+  - **Effects pop-up smaller:** top-right like the ⋯ menu, at most 330 px tall, tabs Background / Mouse (`#fxTabs`, `.fxsec`, `fxTab()`), compact two-column rows, no tick (the picked row is shaded).
+  - **Text toolbar with nothing selected changes only what you type next** (the browser's typing style, so several buttons add up; it ends when the cursor moves). `onText` no longer selects the whole note, and doesn't put the cursor back when it's already there (that would forget the typing style: `caretIsSaved`). The font buttons work the same way now (no more changing the note's own font from here). Normal colour = sentinel `#010203`, cleaned off right away for a selection and after typing (`cleanResetColor` on `input`). Clear formatting with nothing selected = plain from here on (bold/italic/underline/strike off, normal colour, no highlight, normal size, the note's font). `#tScope`: "selected text" / "what you type next". **Black** text colour (`#1B1B1B`); the colour dots are 23 px so 8 fit.
+
+## 1.1.18 – 25 October 2026 (was part 1 of 3 of 1.1.16)
+
+Effects in the background of a note, and mouse followers.
+
+- **Note effects and mouse followers** (new `src/fx.js`, loaded by note.html and list.html before their own script; `window.COSMO_FX`). Effects behind the writing: snow (big flakes, more and smaller), fireworks (classic rockets with four kinds of burst, round / ring / willow / crackle, never the same kind twice in a row, more often and sometimes two or three at once), stardust (brighter twinkles with a glow and rays), fireflies, bubbles (pop), autumn leaves, hearts, rain (drizzle), confetti. Mouse followers: stardust (falling sparkles), comet (rainbow ribbon), hearts (puffs), bubbles (popping), fireflies (swarm), ripples (water rings), frost (crystals), confetti (sprinkles), leaves (autumn), pencil (line). Picked by the owner from a preview page; shooting stars were dropped.
+- **Light by design:** a handful of shapes (counts scale with the note's area, `k`), drawn by ONE shared `requestAnimationFrame` loop at most 30 times a second, which stops itself when no layer `wants()` frames (no effect, paused, rolled up, off screen, or only a follower and the mouse is still). Canvases use at most 2× pixel ratio.
+- **Choosing:** settings `fxEffect`, `fxFollower` (the choice for all notes), `fxForceAll` (use it on every note; each note's own choice is kept and comes back when switched off), `fxPaused` (pause all). Note fields `fx: { e, f }` (`cleanFx`: null = same as all notes, 'none' = nothing, or an id from `FX_EFFECTS` / `FX_FOLLOWERS` in store.js, which must match fx.js) and `fxPaused`; both in `EDITABLE`, not edits, `fx` copied by Duplicate. `COSMO_FX.resolve(note.fx, settings, note.fxPaused)` decides what shows. main.js `fxSettings()` is part of `noteSettings()`; `settings:set` takes the four keys and broadcasts `settings:changed` to note windows; tray menu **Pause effects** (`setFxPaused`, rebuilt with `buildTray`). `list:get` sends each note's `fx` / `fxPaused`.
+- **Note window:** `#fxCanvas` (first in `<body>`, `position: fixed; z-index: -1`, so it's under everything but over the paper, which is the page background), hidden while rolled up. Follower fed from `pointermove` on the document. ⋯ menu → **Effects…** (`#miFx`, shows what's on) opens the pop-up `#fxPop`: tiles for "Same as all notes" (named), None and every effect / follower, each with a still picture on the note's own paper (`COSMO_FX.thumb`), a note when Settings uses the same on every note, and "Pause effects on this note". Top bar: sparkle button `#btnFx` (only when something is on; hidden below 280 px) pauses / plays this note.
+- **Notes list:** cards show their note's effect (a canvas `.fxc` as the card's first child, z-index -1 inside `.card { isolation: isolate }`), the follower trails the mouse over the card; only cards on screen draw (`fxIO`). `paintFx()` runs after `paintCards()`. Settings → **Effects** panel: what's chosen for all notes, **Choose…** (pop-up `#fxSheet` with the tiles, on Lemon paper or Midnight in a dark theme, and "Use these on every note"), and **Pause all effects**.
+- **Pickers are lists:** an icon (`COSMO_FX.ICONS`, coloured per effect) and the name for each choice (`.fxlist` / `.fxi`, names wrap), in both pop-ups; "Background of a note" instead of "Behind the writing". The still pictures (`thumb`) were dropped.
+- **How much (Less / Normal / More):** `.fxamt` buttons under each list. Settings `fxEffectAmount` / `fxFollowerAmount`, note `fx.ea` / `fx.fa` ('low' | 'mid' | 'high', null = same as all notes; `FX_AMOUNTS`, `cleanFx`). `COSMO_FX.AMOUNTS` = .5 / 1 / 1.8: effects multiply their counts and how often things start by it (the `k` they already scale by); followers spawn that much more often (`spacer(gap / k)`), and the swarm / tails grow with it. `resolve` returns `effectAmount` / `followerAmount` (a note's own amount wins, except with "use on every note").
+- **Pause button left of Settings** in the notes list (`#btnFxPause`, sparkle icon, crossed out while paused; `paintFxPause`).
+- **Matrix** (effect and follower, id `matrix`, picked from a preview page: "The film" and "Code trail"): the digital rain, half-width katakana + digits + a few symbols (`GLYPHS`), drawn mirrored (`mirror()` flips the canvas once), phosphor green `#00FF41` with a pale head on dark paper, deep green on light paper (palette `code` / `codeDim` / `codeHead`). The film's font (Matrix Code NFI) is free for personal use only, so it isn't bundled: `CODE_FONT` uses it if installed, else Windows' Japanese fonts (MS Gothic, Yu Gothic, Meiryo). Effect: a stream in most 14 px columns (`.75 × k^.6`), speed / length random, characters change as they fall (`drawStream`). Follower: short streams that drip down from the pointer.
+- **Resizing a note no longer restarts its effect over and over:** `Layer.resize()` resizes the canvas and keeps the running effect (clipped, or with some room) and only makes it again for the new size 300 ms after the resizing stops (`rebuildTimer`, `bw`/`bh` = the size it was made for).
+- **Text toolbar outside the note**, like the drawing toolbar: note.js `inkOut` became `barOut({ el, kind, frame, title, key, mover })`, used for both (`inkOut`, `textOut`; window names `cosmoInkBar` / `cosmoTextBar`, remembered in `localStorage.inkBarOut` / `textBarOut`). The text toolbar's window is made when it opens and closed when it closes (A, its X, locking). `$`/`$$` search every outside window (`outDocs`). main.js keeps one window per kind (`win.inkWin/inkOut/inkState`, `win.textWin/textOut/textState`; `BAR_FRAMES`, `barKind`); `placeInk`, `inkSpot`, `inkBarOptions` take the kind, `showInk(win, on)` without a kind does both (rolled up, pinned). The `ink:*` messages carry `bar: 'text'` for the text toolbar (`ink:hide` takes it as its argument; preload `ink.hide(bar)`). note.css `body.inkbar-out #textPop.tbar`.
+
+## 1.1.17 – 24 October 2026 (was part 2 of 2 of 1.1.15)
+
+The Locked tab, the drawing toolbar outside the note, and small fixes.
+
 - **Locked tab** (`tab = 'locks'`, after Favourites, padlock icon `.tlock`, count `#cLocks`): every note with its own lock and every locked group (`lockedOnes`, like `favourites`); ones inside an unopened locked group are counted in `#tip`. Bar `#lockBar`: **Unlock all…** asks the password once (IPC `list:unlock-all`) and sets `listUnlockedAll` in main: `hiddenInList` and `groupOpenInList` then treat everything as open, so the list shows (and searches) every locked note's words; notes opened from the list don't ask (`list:open-note`). **Lock again** (`list:lock-all`) clears it and `listOpenGroups`, and open note windows that are unlocked save and hide (`note:lock-now`). Closing the list also locks again. `list:get` sends `settings.unlockedAll`. Searching never looks inside locked notes otherwise (the list never gets their words). `cardsTabNow()` = notes, favs or locks.
 - **Drawing toolbar outside the note:** dragged past the note's edge, `#inkBar` moves (the same element, so all its buttons keep working) into a small see-through window: note.js `inkOut` opens it with `window.open('about:blank', 'cosmoInkBar')` when drawing starts (hidden; it loads the note's stylesheets and copies the body's classes/data, `body.inkbar-out` in note.css) and closes it when drawing ends. `$`/`$$` also look in that window (`outDoc`). `movable()` captures the pointer on the page (not the button) so a drag carries on across windows, and works in screen coordinates. main.js only allows that exact window for note windows (`hardenContents(wc, { inkBarFor })`, `inkBarOptions`: frameless, transparent, not focusable, `parent` = the note), places it (`placeInk`, `inkSpot`, always on a screen) and snaps it: within 40 px of a side it sticks there (4 px gap) and follows the note on `move`/`resize` (`snapInk`, `watchInkBar`); further away it stays put. IPC `ink:show`, `ink:drag`, `ink:size`, `ink:drop` (pointer on the note = back inside, under the pointer), `ink:hide`. Hidden while rolled up (`setRolled` → `showInk`), on top with a pinned note (`applyState`). Remembered in `localStorage.inkBarOut` (`{mode:'dock', side, off}` / `{mode:'free', x, y}`), so it opens there next time; double-click its grip to bring it back into the corner.
 - **Drawing toolbar layout:** the pause button (`#inkPz`, now a "Pause" / "Carry on" pill) and **Clear all** (`#inkClear`, `.iclear`) moved into a bottom row below the tip (`.ifoot`); nothing sticks out of the toolbar any more (its own window has only 12 px around it). `.iwidths` and `.idash` are the same width, so Partial/Whole line and Over/Behind are too (162 px).
@@ -225,7 +682,17 @@ Same version, at the owner's request ("same ver as before"). (Later rounds, from
 - **Padlock fix:** a sliver of the shackle's long side showed just inside the body's top line (the clip `#lockClip` only hid the body's inside from y 12, but the line's inner edge is at 11.9 with 1.8 px strokes). Now the shackle is only drawn above y 11 (the middle of that line), so the body always covers its ends; also while it opens and closes (note.html, list.html).
 - Tests: `tests/v1115.test.js` (colours, defaultColors, list edit (title/colour only) + sync, Unlock all / Lock again, the toolbar window: allowed only for notes, sticking to each side, following the note, screen edges, rolled/pinned, drop back inside). `groups.test.js` updated ("random" becomes the 7 pastels). The fake Electron got `setWindowOpenHandler` (kept), `hide`, `setParentWindow`, `destroy`, `screen.getDisplayNearestPoint`.
 
-## 1.1.14 – 23 October 2026
+## 1.1.16 – 24 October 2026 (was part 1 of 2 of 1.1.15)
+
+Nine new paper colours, several colours for new notes, and right-click → Edit… in the list.
+
+- **9 new paper colours** from the list themes: `cream`, `rose`, `sage` (the Mint theme), `mist` (Sky), `lavender` (Lilac) and the dark `night`, `midnight`, `forest`, `plum` (store.js `COLORS`, now 17; `DARK_COLORS`; main.js `PAPER`; note.css `body[data-color]` variables and `.sw` swatches; list.css `.card` / `.epaper` / `.sheet` / `.paper` variables; list.js `COLORS`, `SWATCH`, `COLOR_NAMES`). Rules that were only for charcoal now apply to every dark paper (`:is([data-color="charcoal"],…night…midnight…forest…plum)`). The dark swatches get a small dot of their theme's colour so they can be told apart.
+- **Colour order** everywhere (the order of `COLORS` in store.js and list.js, and the buttons in note.html): each colour next to its light version, dark ones last: yellow, cream, orange, pink, rose, purple, lavender, blue, mist, mint, sage, green, charcoal, night, plum, midnight, forest.
+- **Colour rows scroll sideways** (`swatchStrip`, same function in note.js and list.js): the note's ⋯ menu still shows 8 circles of exactly the same size (`grid-auto-columns: calc((100% - 49px) / 8)`, measured: 23.4 px, same gap and menu size as 1.1.14); the group panel and the selection bar show 8 (24 px). Drag, mouse wheel, or the `.swarr` arrows that appear on a side with more colours; a drag never picks a colour. Settings → For new notes and the Edit sheet don't scroll: all 17 show at once (`.swstrip.wide`), and when the window is too narrow they carry on in a second line, like text (no `swatchStrip` there). The ⋯ menu scrolls the note's colour into view when it opens.
+- **Several colours for new notes:** new setting `defaultColors` (list, always at least one, order of `COLORS`; `cleanColors` in store.js). `store.create` picks a random one (`newNoteColor`). `defaultColor` is kept as the first one, for older versions. Old settings move over on load: `"random"` → the 7 original pastels, a single colour → `[it]`. `settings:set` takes `defaultColors` (and still `defaultColor`, incl. `"random"`). Settings → For new notes: a multi-pick row (`.sw.pick`, tick on picked ones; the last one can't be unpicked) and Pick all / Light only / Dark only / Just one (`paintNewColors`, `setNewColors`). The old "random" swatch is gone. New switch **Never the same colour twice in a row** (`#sNoRepeat`, setting `newColorNoRepeat`, on by default): with more than one colour picked, `newNoteColor` leaves out `lastNewColor` (the colour the last new note got, kept in settings.json). Duplicates and the welcome note bring their own colour (`create` only picks one when `partial.color` isn't a real colour), so they don't count.
+- **Right-click → Edit… in the list:** sheet `#editSheet` (list.html) with the title (in the note's paper colour) and the colour row. The title saves 350 ms after typing stops, the colour at once (`editQueue` / `editFlush`). IPC `list:edit(id, patch)` takes only `title` and `color` (a new title counts as an edit, a colour doesn't); an open window gets `note:look` and its window title/background follow. While the sheet is open, changes from the note's window show in it (`editRefresh`). `hiddenInList` / `revealedNow` moved out of `list:get` so other handlers can use them.
+
+## 1.1.15 – 23 October 2026 (was 1.1.14)
 
 - **Unlocked in its window = unlocked in the list:** `list:get` shows a locked note's text/picture while its open window is unlocked (`win.revealed`), until the window is closed or locked again; new card field `openUnlocked` → small open padlock (`.ulk`) next to "open". `note:unlock` / `note:relock` now `notifyList()`. When a note gets locked from outside, `hideNewlyLocked` sets `win.lockPending`, so the list hides it at once (before the window has saved and called `note:relock`). Tests: lock-refresh, groups and upgrade tests updated for the new rule.
 - **Star is only an overlay:** removed `.card.is-fav .body { padding-right }`, which made pictures on starred cards narrower. Starring plays a stardust burst from the star (`starDust`: a `.stardust.fixed.fast` layer on the page, so the card's edge doesn't cut it off; 15 % quicker than the lock's).
@@ -235,13 +702,10 @@ Same version, at the owner's request ("same ver as before"). (Later rounds, from
 - **Text toolbar starts at full strength:** `body.text-fresh` (set by `openText`, cleared by a click in the note, typing, or going back to drawing) overrides the fade.
 - **Redo** (`#btnRedo`, right after `#btnUndo`, outside `.tleft`; full strength on hover like Undo). `redoAny()`: while drawing `inkRedo()` (new `inkState.redo` list: `inkUndo` pushes the current drawing onto it, `snapshot()` clears it when something new is drawn or erased, keeping it aside in `redoKept` in case the eraser touched nothing; cleared on locking), otherwise `redoText()`: a font change taken back by Undo (`textRedo`), else the editor's own `execCommand('redo')`. Keys: Ctrl+Y and Ctrl+Shift+Z. `.tb` buttons are 20 px (was 22) below 430 px wide so the bar still fits a 340 px note.
 
-## 1.1.13 – 23 October 2026
+## 1.1.14 – 23 October 2026 (was part 2 of 2 of 1.1.13)
 
-- **Favourites:** new `favorite` flag on notes (store `normalize`, not an edit, not copied by `duplicate`) and groups (`normalizeGroup`); `list:get` sends it. IPC `list:favorite(ids, on)`. List: `.fav` star button top-right of every card (outline on hover, filled `#FFD54A` when on, `.pop` animation); its state and the selection are painted after placing cards (`paintCards`), and `favorite` is left out of the card cache signature (`sigOf`), so starring never rebuilds a card. New **Favourites** tab (`tab = 'favs'`, reuses `#viewNotes`, `#cFavs`): every starred note/group, sorted like Notes, searchable; ones inside a locked group that isn't open are hidden and counted in `#tip`. Opening a group from Favourites switches to Notes. Right-click menus have Add to / Remove from favourites.
-- **Selecting several cards:** Ctrl+click toggles (`sel`, keys `n:<id>` / `g:<id>`, `data-key` on cards), Shift+click picks a run from the last pick (`selAnchor`), Ctrl+A all shown cards, Esc / clicking empty space clears, Delete = Bin (Shift+Delete: no question). Picks not on screen are dropped in `paintCards`. Bottom bar `#bulk` (built in list.js): Open, Close, Favourite/Unfavourite, Colour (pop-up with the 8 papers + font; IPC `list:apply(ids, patch)`, groups via `groups:apply`), Group (IPC `groups:make-from(ids, parentId)`: new group at the current level; skips things inside an unopened locked group and never puts a group inside itself), Lock, Bin (one question; locked ones are left). Right-click on one of several picked cards shows the same actions (`bulkMenu`). Dragging a picked card drags all of them (`drag.many`, `canMove`/`moveInto`; onto a note = new group with all of them, via `groups:make-from`).
-- **Locked notes/groups can't be deleted:** main refuses `list:trash`, `note:trash`, `list:destroy` for `isLocked` notes and `groups:trash` when any note in the tree is locked (`{ error: 'locked' }`); `list:empty-bin` leaves locked notes and returns `{ removed, kept }`. List: `noteIsLocked` / `groupIsLocked` hide the card's bin button, grey out the menu item ("Locked: can't be deleted"), disable Delete in the Bin; note window ⋯ → Delete is disabled ("remove the lock first").
-- **Lock removed from the list while the note is open:** note.js `onLook` now shows the content when a hidden window gets `hidden: false` (it only handled hiding); main `pushLook` sets `win.revealed` once the note isn't locked. Test `tests/lock-refresh.test.js`.
-- **"Stardust" lock animation** (option 3 of "Lock animation options.html"): note window: `lockGhost()` clones `#scroller` into a picture-only `.lockghost` that shrinks/blurs away (removed after 0.6 s; the real editor is emptied at once), `.stardust` stars burst from the lock icon, `body.anim-lock` glows it in; unlocking bursts stars and grows `#scroller` back (`body.anim-unlock`). List: `paintCards` compares each card's lock state with the last render (`lockSeen`) and plays `stardust()` (`.lock-anim` / `.unlock-anim`). Off with "reduce motion".
+Dashed and dotted drawing lines, minimise and maximise, zoom inside a note, and new icons.
+
 - **Dashed / dotted drawing lines:** stroke field `d: 'dash' | 'dot'` (store `normalizeInk` keeps only those), `inkState.dash` (saved in `inkPrefs`), buttons `#inkDash` in the drawing toolbar's last row (greyed out for the eraser). `strokeEl` sets `stroke-dasharray` from the drawn width (dots = zero-length dashes with round caps); a dashed arrow is a `<g>` with a dashed shaft and a solid head. Partial erasing keeps `d` on the pieces.
 - **Minimise / maximise:** top bar `.hsep` divider, `#btnMin`, `#btnMax` before `#btnClose`. Windows are `maximizable: true` (so double-clicking the top bar's drag area maximises); IPC `note:maximize` toggles, unrolling a rolled note first; the `maximize` event also unrolls; `note:win-state` → `body.maxed` swaps the icon. `note:minimize` sets `win.userMin` + `setMinimizable(true)` so even pinned notes stay down (the `minimize` handler and `enforcePinned` skip them) until `restore` clears it. Bounds aren't remembered while maximised/minimised. Rolling up a maximised note unmaximises it first.
 - **••• menu:** sits in the top-right corner (`right: 4px`), normal size, `width: clamp(260px, 40vw, 100vw - 8px)` (at least 40% of the note).
@@ -250,12 +714,21 @@ Same version, at the owner's request ("same ver as before"). (Later rounds, from
 - **In-app version history shortened** (`src/about.js` `VERSIONS`): a few short lines per version.
 - **No shaded boxes on the bottom bar:** `#tools .tb.on` has no background; only with the text toolbar open (`body.text-open`) do `[data-cmd]` buttons show their on-box and `#btnText` is shaded. Hover still tints.
 - **Notebook group look:** the elastic band is `.nb-cover::after` (tilts with the cover on hover); `.nb-band` is hidden.
-- Tests: `tests/v1113.test.js` (favourites, apply, make-from, no deleting locked things, empty bin keeps locked, dashed ink, minimise/maximise); fake-electron windows can minimise/maximise and record send arguments (`sentArgs`).
-
 - **Settings split:** "General" (Start with Windows, window colours) and "For new notes" (Colour, Font, See-through, solid on hover) are two separate `.panel`s in list.html, so each folds on its own (`foldPanels`). The "For new notes" panel has a short `.muted` line; the `.subhead` heading and its CSS are gone.
 - **Word wrap icon** (`#btnWrap`): return arrow (option 1 of "Wrap and spelling options.png") instead of the lines with a W cut out (`#wrapW` mask and `.lines` CSS removed).
 - **Spelling icon** (`#btnSpell`): "abc" (SVG `<text class="fill">`, `#btnSpell text { font: 800 11px var(--ui) }`, Nunito 800) with a tick under it, instead of the A with a tick.
 - **Slash gap on both:** each icon is drawn inside a `<g mask>` (`#wrapCut`, `#spellCut`) whose `.slashcut` cuts a 6-unit gap around the slash; `#btnWrap.on .slashcut, #btnSpell.on .slashcut { display: none }`. Spelling's "on" box (`.tb.on`) is unchanged.
+- Tests: `tests/v1113.test.js` (favourites, apply, make-from, no deleting locked things, empty bin keeps locked, dashed ink, minimise/maximise); fake-electron windows can minimise/maximise and record send arguments (`sentArgs`).
+
+## 1.1.13 – 23 October 2026 (was part 1 of 2 of 1.1.13)
+
+Favourites, picking several cards at once, and locked notes that can’t be deleted.
+
+- **Favourites:** new `favorite` flag on notes (store `normalize`, not an edit, not copied by `duplicate`) and groups (`normalizeGroup`); `list:get` sends it. IPC `list:favorite(ids, on)`. List: `.fav` star button top-right of every card (outline on hover, filled `#FFD54A` when on, `.pop` animation); its state and the selection are painted after placing cards (`paintCards`), and `favorite` is left out of the card cache signature (`sigOf`), so starring never rebuilds a card. New **Favourites** tab (`tab = 'favs'`, reuses `#viewNotes`, `#cFavs`): every starred note/group, sorted like Notes, searchable; ones inside a locked group that isn't open are hidden and counted in `#tip`. Opening a group from Favourites switches to Notes. Right-click menus have Add to / Remove from favourites.
+- **Selecting several cards:** Ctrl+click toggles (`sel`, keys `n:<id>` / `g:<id>`, `data-key` on cards), Shift+click picks a run from the last pick (`selAnchor`), Ctrl+A all shown cards, Esc / clicking empty space clears, Delete = Bin (Shift+Delete: no question). Picks not on screen are dropped in `paintCards`. Bottom bar `#bulk` (built in list.js): Open, Close, Favourite/Unfavourite, Colour (pop-up with the 8 papers + font; IPC `list:apply(ids, patch)`, groups via `groups:apply`), Group (IPC `groups:make-from(ids, parentId)`: new group at the current level; skips things inside an unopened locked group and never puts a group inside itself), Lock, Bin (one question; locked ones are left). Right-click on one of several picked cards shows the same actions (`bulkMenu`). Dragging a picked card drags all of them (`drag.many`, `canMove`/`moveInto`; onto a note = new group with all of them, via `groups:make-from`).
+- **Locked notes/groups can't be deleted:** main refuses `list:trash`, `note:trash`, `list:destroy` for `isLocked` notes and `groups:trash` when any note in the tree is locked (`{ error: 'locked' }`); `list:empty-bin` leaves locked notes and returns `{ removed, kept }`. List: `noteIsLocked` / `groupIsLocked` hide the card's bin button, grey out the menu item ("Locked: can't be deleted"), disable Delete in the Bin; note window ⋯ → Delete is disabled ("remove the lock first").
+- **Lock removed from the list while the note is open:** note.js `onLook` now shows the content when a hidden window gets `hidden: false` (it only handled hiding); main `pushLook` sets `win.revealed` once the note isn't locked. Test `tests/lock-refresh.test.js`.
+- **"Stardust" lock animation** (option 3 of "Lock animation options.html"): note window: `lockGhost()` clones `#scroller` into a picture-only `.lockghost` that shrinks/blurs away (removed after 0.6 s; the real editor is emptied at once), `.stardust` stars burst from the lock icon, `body.anim-lock` glows it in; unlocking bursts stars and grows `#scroller` back (`body.anim-unlock`). List: `paintCards` compares each card's lock state with the last render (`lockSeen`) and plays `stardust()` (`.lock-anim` / `.unlock-anim`). Off with "reduce motion".
 
 ## 1.1.12 – 23 October 2026
 

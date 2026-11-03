@@ -1,0 +1,338 @@
+/* ---------- right-click menu ---------- */
+.ctx {
+  position: fixed;
+  z-index: 40;
+  min-width: 170px;
+  padding: 5px;
+  border-radius: 11px;
+  background: var(--pop-bg);
+  box-shadow: 0 10px 28px rgba(60,40,10,.25), 0 1px 3px rgba(0,0,0,.12);
+  animation: popin .1s ease-out;
+}
+.ctx[hidden] { display: none; }
+.ctx .mi { padding: 6px 9px; font-size: 12.5px; }
+.ctx .sep { height: 1px; margin: 4px 6px; background: var(--pop-soft2); }
+
+/* ---------- recording ---------- */
+#recbar {
+  position: fixed; left: 8px; right: 8px; bottom: 5px;
+  z-index: 30;
+  height: 38px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 4px 0 12px;
+  border-radius: 999px;
+  background: var(--pop-bg);
+  color: var(--pop-ink);
+  box-shadow: 0 6px 20px rgba(60,40,10,.25);
+  font: 800 13px var(--ui);
+}
+#recbar[hidden] { display: none; }
+.rdot { width: 10px; height: 10px; border-radius: 50%; background: #E5484D; animation: pulse 1.1s infinite; flex: none; }
+@keyframes pulse { 50% { opacity: .35; transform: scale(.8); } }
+.rtime { font-variant-numeric: tabular-nums; min-width: 32px; }
+.meter { flex: 1; min-width: 0; height: 22px; display: flex; align-items: center; gap: 2px; overflow: hidden; }
+.meter i { flex: none; width: 3px; height: 3px; border-radius: 2px; background: #E5484D; opacity: .8; transition: height .08s; }
+.rbtn { height: 30px; border: 0; border-radius: 999px; cursor: pointer; display: flex; align-items: center; gap: 6px; font: 800 12.5px var(--ui); }
+.rbtn.ghost { width: 30px; justify-content: center; background: transparent; color: #8A7652; }
+.rbtn.ghost:hover { background: var(--pop-soft); }
+.rbtn.stop { padding: 0 12px 0 10px; background: #E5484D; color: #fff; }
+.rbtn.stop span { width: 9px; height: 9px; border-radius: 2px; background: #fff; }
+
+/* ---------- drawing ---------- */
+#draw {
+  position: fixed; left: 0; right: 0; top: 32px; bottom: 0;
+  z-index: 25;
+  display: flex; flex-direction: column;
+  background: var(--paper);
+}
+#draw[hidden] { display: none; }
+.dbar, .dfoot { flex: none; display: flex; align-items: center; gap: 4px; padding: 5px 8px; flex-wrap: wrap; }
+.dbar { border-bottom: 1px dashed var(--line); }
+.dbar { flex-wrap: nowrap; gap: 3px; padding: 5px 6px; overflow-x: auto; }
+.dfoot { border-top: 1px dashed var(--line); }
+.dfoot .sp { flex: 1; }
+.cvwrap { position: relative; flex: 1; min-height: 0; display: flex; }
+.dhint {
+  position: absolute; left: 0; right: 0; top: 42%;
+  text-align: center;
+  font: 700 26px var(--hand);
+  color: var(--accent); opacity: .35;
+  pointer-events: none;
+}
+.dhint small { display: block; font: 700 11px var(--ui); margin-top: 4px; }
+.pens, .sizes { display: flex; gap: 2px; align-items: center; }
+.sizes { margin: 0 1px; padding: 0 3px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+.pen { width: 19px; height: 19px; flex: none; padding: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,.7); background: var(--c); cursor: pointer; box-shadow: 0 0 0 1px rgba(0,0,0,.12); }
+.pen.on { box-shadow: 0 0 0 2px var(--accent); }
+.size { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 7px; background: transparent; display: grid; place-items: center; cursor: pointer; }
+.size i { display: block; border-radius: 50%; background: var(--accent); }
+.size.on, .dtool.on { background: rgba(0,0,0,.1); }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .size.on, body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .dtool.on { background: rgba(255,255,255,.14); }
+.dtool { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--accent); display: grid; place-items: center; cursor: pointer; }
+.dtool:hover, .size:hover { background: rgba(0,0,0,.07); }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+body.erasing #cv { cursor: cell; }
+
+/* ---------- toast ---------- */
+#toast {
+  position: fixed; left: 50%; bottom: 46px;
+  z-index: 18;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: #3B3226;
+  color: #FFF8E6;
+  font: 700 12px var(--ui);
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,.2);
+  animation: popin .15s ease-out;
+}
+#toast[hidden] { display: none; }
+
+
+/* ================================================================ 1.1.0: text layout lock + draw-over */
+/* word wrap button: like spelling, a slash and a little faded when it's off */
+#btnWrap .slash { stroke-width: 2.2; }
+#btnWrap.on .slash { display: none; }
+#btnWrap:not(.on) { opacity: .7; }
+
+#btnInk {
+  flex: none;
+  width: 28px; height: 26px;
+  margin-left: 4px;
+  border: 0; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  display: grid; place-items: center;
+  cursor: pointer;
+  transition: transform .12s, background .12s;
+}
+#btnInk:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--accent) 26%, transparent); }
+#btnInk svg { width: 17px; height: 17px; stroke-width: 2.3; }
+/* on normal-width notes Add becomes a round "+" (like the draw button) so every button fits */
+@media (max-width: 389px) {
+  #btnInsert { width: 28px; padding: 0; justify-content: center; }
+  #btnInsert span { display: none; }
+  #btnInsert svg { width: 15px; height: 15px; }
+  .tb { width: 26px; }
+}
+
+body.inking #stamp, body.inking .corner { display: none; }
+/* while drawing, the bottom bar stays (faded); using it switches to typing */
+body.inking:not(.ink-paused) #tools > * { opacity: .35; }
+body.inking:not(.ink-paused) #tools:hover > * { opacity: .7; }
+body.inking:not(.ink-paused) #scroller, body.inking:not(.ink-paused) #sheet { cursor: crosshair; }
+
+#inkBar {
+  position: fixed; right: 8px; bottom: 42px; z-index: 22; /* just above the bottom bar */
+  /* it can be dragged by any empty spot, but only the grip at the top shows the hand */
+  width: 250px; max-width: calc(100vw - 16px);
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--pop-bg);
+  color: var(--pop-ink);
+  box-shadow: 0 10px 28px rgba(60,40,10,.28), 0 1px 3px rgba(0,0,0,.12);
+  animation: popin .14s ease-out;
+  user-select: none;
+}
+#inkBar[hidden] { display: none; }
+.irow { display: flex; align-items: center; gap: 3px; }
+.irow + .irow { margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--pop-soft2); }
+.irow.tools { justify-content: space-between; }
+.irow.tools button, .iact {
+  width: 27px; height: 27px; flex: none;
+  padding: 0; border: 0; border-radius: 8px;
+  background: transparent; color: var(--pop-ink2);
+  display: grid; place-items: center;
+  cursor: pointer;
+}
+.irow.tools button:hover, .iact:hover { background: var(--pop-soft); }
+.irow.tools button.on { background: var(--pop-pick); color: var(--pop-pickfg); }
+.irow.tools svg, .iact svg { width: 17px; height: 17px; }
+.irow.tools .hlbar { stroke-width: 4; stroke: #FFD43B; }
+.icolors { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; min-width: 0; }
+.icolors button { width: 16px; height: 16px; flex: none; padding: 0; border-radius: 50%; border: 2px solid #fff; background: var(--c); box-shadow: 0 0 0 1px rgba(0,0,0,.15); cursor: pointer; }
+.icolors button.on { box-shadow: 0 0 0 2px var(--pop-pick); }
+.iwidths { display: flex; gap: 1px; padding-left: 4px; border-left: 1px solid var(--pop-soft2); flex: none; }
+.iwidths button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 7px; background: transparent; display: grid; place-items: center; cursor: pointer; }
+.iwidths button i { display: block; border-radius: 50%; background: var(--pop-ink); }
+.iwidths button.on { background: var(--pop-soft2); }
+.ilayer { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--pop-soft); flex: 1; min-width: 0; }
+.ilayer button {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: center; gap: 2px;
+  height: 25px; padding: 0 2px;
+  white-space: nowrap; overflow: hidden;
+  border: 0; border-radius: 7px;
+  background: transparent; color: var(--pop-ink2);
+  font: 800 11px var(--ui);
+  cursor: pointer;
+}
+.ilayer button.on { background: var(--pop-card); color: var(--pop-ink); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+.ilayer svg { width: 15px; height: 15px; flex: none; }
+.ilayer .soft, .ilayer .txt { stroke: #8A7652; stroke-width: 2; }
+/* Over / Behind: which square is in front: the red one (your drawing) or the paper one (the note) */
+.ilayer .pg { fill: #FFFDF6; stroke: #6A5A40; stroke-width: 1.8; }
+.ilayer .ik { fill: #E5484D; stroke: #B42D32; stroke-width: 1.4; }
+.ilayer button:not(.on) svg { opacity: .8; }
+.ilayer .strong { stroke: #E5484D; stroke-width: 2.6; }
+.ilayer .faint { stroke-opacity: .55; stroke-width: 4; }
+.idone { height: 27px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--pop-pick); color: var(--pop-pickfg); font: 800 11.5px var(--ui); cursor: pointer; }
+.emode[hidden], .icolors[hidden], .iwidths[hidden] { display: none; }
+/* "Whole line" has no size: the size buttons stay where they are, greyed out */
+.iwidths.off { opacity: .32; pointer-events: none; }
+.emode { flex: 1; }
+.emode .ring { stroke: var(--pop-ink); stroke-width: 1.8; }
+.emode .x { stroke: #3B3226; stroke-width: 2.2; }
+.ihint {
+  margin: 5px 2px 0; height: 14px;
+  font: 700 10.5px/14px var(--ui); color: var(--pop-mute);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* every row keeps the same height, whichever tool is picked, so the toolbar never jumps:
+   the colour dots take as much room as the eraser choice that replaces them */
+.irow.tools { height: 27px; }
+.icolors { height: 29px; align-items: center; align-content: center; }
+body.rolled #inkBar { display: none !important; }
+
+#askPop { top: 36px; z-index: 30; }
+#editor img.att-img.fixed, #editor img.att-drawing.fixed { max-width: none; }
+/* Text layout locked (#sheet.fixed) and no drawing: the text keeps its width, but pictures without
+   "Keep size" still shrink to the visible note width (--viewW, set in note.js). Photos have 10px of
+   frame padding on top of max-width. With a drawing (.inked) everything keeps its size. */
+#sheet.fixed:not(.inked) #editor img:not(.fixed) { max-width: min(100%, var(--viewW, 100%)); }
+#sheet.fixed:not(.inked) #editor img.att-img:not(.fixed) { max-width: min(100%, calc(var(--viewW, 100%) - 10px)); }
+#sheet.fixed:not(.inked) #editor img.att-img.w-s:not(.fixed) { max-width: min(45%, calc(var(--viewW, 100%) - 10px)); }
+#sheet.fixed:not(.inked) #editor img.att-img.w-m:not(.fixed) { max-width: min(72%, calc(var(--viewW, 100%) - 10px)); }
+/* 1.1.45: word wrap off = no limit (#sheet.nowrap): a line only ends where you pressed Enter. The sheet is as wide as
+   the longest line (at least the note). Pictures are as wide as with word wrap on: --picW is the visible width, or
+   with a drawing the width they had when it started (note.wrapWidth). */
+#sheet.nowrap { flex: none; }
+#sheet.nowrap #editor, #sheet.nowrap #editor * { text-wrap-mode: nowrap; }
+#sheet.nowrap #editor img:not(.fixed) { max-width: var(--picW); }
+#sheet.nowrap #editor img.att-img.w-s:not(.fixed) { max-width: calc(var(--picW) * .45); }
+#sheet.nowrap #editor img.att-img.w-m:not(.fixed) { max-width: calc(var(--picW) * .72); }
+
+/* ================================================================ 1.1.6 */
+/* password / PIN switch when choosing one */
+.pwkind { margin: 0 2px 10px; }
+
+/* ================================================================ 1.1.8 */
+/* the draw button says "Draw" */
+#btnInk { width: auto; padding: 0 8px 0 5px; gap: 2px; display: flex; align-items: center; font: 800 11.5px var(--ui); }
+#btnInk svg { width: 15px; height: 15px; }
+/* with "Draw" written out, the formatting buttons sit a little closer on normal-width notes so all of them fit */
+@media (max-width: 439px) {
+  .tb { width: 24px; }
+  .tsep { margin: 0 2px; }
+  #tools { padding: 0 4px; }
+  #btnInk { margin-left: 2px; }
+  #btnInsert { margin-left: 2px; }
+}
+/* drawing toolbar: a grip at the top to drag it anywhere */
+.igrip {
+  height: 12px; margin: -3px -2px 3px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  cursor: grab; touch-action: none;
+}
+.igrip:hover { background: var(--pop-soft); }
+.igrip i { width: 34px; height: 4px; border-radius: 4px; background: var(--pop-soft2); box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.igrip:hover i { background: var(--pop-mute); }
+body.moving-inkbar, body.moving-inkbar * { cursor: grabbing !important; user-select: none; }
+@media (max-width: 279px) { #btnInk span { display: none; } #btnInk { padding: 0 6px; } }
+/* 1.1.13: word wrap icon = return arrow, spelling icon = "abc" + tick. When off, a slash goes through them with a
+   gap cut around it (mask .slashcut in note.html) so the icon stays readable */
+#btnWrap.on .slashcut, #btnSpell.on .slashcut { display: none; }
+#btnSpell text { font: 800 11px var(--ui); }
+/* word wrap on = just the icon without the slash (no highlighted box) */
+#btnWrap.on, body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #btnWrap.on { background: transparent; }
+#btnWrap.on:hover { background: rgba(0,0,0,.08); }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #btnWrap.on:hover { background: rgba(255,255,255,.12); }
+/* 1.1.13: no shaded boxes in the bottom bar for buttons that are "on" (bold, lists, spelling…). Only while the
+   text toolbar (A) is open do B I U S and the lists show their state with a box, and A itself is shaded.
+   Pointing at a button still tints it. */
+#tools .tb.on, body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #tools .tb.on { background: transparent; }
+#tools .tb.on:hover { background: rgba(0,0,0,.08); }
+body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #tools .tb.on:hover { background: rgba(255,255,255,.12); }
+body.text-open #tools .tb[data-cmd].on, body.text-open #btnText { background: rgba(0,0,0,.12); }
+body.text-open:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #tools .tb[data-cmd].on, body.text-open:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #btnText { background: rgba(255,255,255,.12); }
+/* 1.1.12: "Turn solid when my mouse is over it" is a sliding switch, like the ones in Settings */
+.check.switch { display: grid; grid-template-columns: fit-content(240px) auto; justify-content: start; align-items: center; column-gap: 12px; }
+.check.switch[hidden] { display: none; }
+/* 1.1.20: the switch sits right after its text; switches one after another line up (.switches, note.js groupSwitches) */
+.switches { display: grid; grid-template-columns: fit-content(240px) 1fr; column-gap: 12px; }
+.switches > .check.switch { grid-column: 1 / -1; grid-template-columns: subgrid; justify-content: normal; }
+.switches > .check.switch > i { justify-self: start; }
+.check.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.check.switch i { position: relative; flex: none; width: 34px; height: 20px; border-radius: 999px; background: var(--pop-soft2); transition: background .15s; }
+.check.switch i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s; }
+.check.switch input:checked + i { background: #3DAA5C; }
+.check.switch input:checked + i::after { transform: translateX(14px); }
+.check.switch input:focus-visible + i { box-shadow: 0 0 0 3px rgba(61,170,92,.3); }
+/* 1.1.12: a divider always runs the whole width of the note, also when word wrap is off and the note was made wider
+   (--viewW = visible writing width, set in note.js). Inside a list or table cell it stays the cell's width. */
+#editor hr { width: max(100%, var(--viewW, 100%)); }
+#editor li hr, #editor td hr, #editor th hr { width: auto; }
+/* 1.1.12: while the caret is right next to a photo, the (tilted) photo goes one layer down so the caret shows on its edge (note.js) */
+#editor img.caret-near { position: relative; z-index: -1; }
+/* typing for a moment: the drawing toolbar stays, faded; clicking any tool goes back to drawing */
+body.ink-paused #inkBar { background: color-mix(in srgb, var(--pop-bg) 55%, transparent); box-shadow: 0 4px 14px rgba(60,40,10,.14); animation: none; }
+body.ink-paused #btnInk { background: var(--accent); color: var(--paper); } /* drawing is on hold: Draw brings it back */
+
+/* ================================================================ 1.1.9 */
+/* 1.1.16: a leftover rule here had lost its selector (declarations with no "selector {" before them), so the
+   browser threw away the NEXT rule too: the text toolbar's own size and place (#textPop.tbar). That's why the
+   text toolbar was as wide as the note, and squashed in its own window outside the note. Removed. */
+
+/* the text panel (A): a small toolbar like the drawing one, stays open, can be dragged */
+#textPop.tbar {
+  left: 8px; right: auto; bottom: 42px; /* opens on the left (the drawing toolbar opens on the right) */
+  width: 250px; max-width: calc(100vw - 16px);
+  max-height: none; overflow: visible;
+  padding: 6px;
+  font: 700 12px var(--ui);
+  user-select: none;
+}
+body.rolled #textPop { display: none !important; }
+.tsec { margin: 0 3px 4px; font: 800 9.5px/1 var(--ui); letter-spacing: .07em; text-transform: uppercase; color: var(--pop-mute); text-align: left; }
+.tbar .irow { gap: 4px; }
+.tbar .irow + .irow { margin-top: 4px; padding-top: 0; border-top: 0; }
+.tbar .irow + .tsec { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--pop-soft2); }
+.tbar .seg { padding: 2px; gap: 2px; border-radius: 9px; }
+.tbar .seg button { padding: 3px 2px; min-height: 23px; font-size: 11px; border-radius: 7px; }
+.tbar .seg button.hand { font-size: 15px; padding: 0 2px; }
+.tbar .seg button.med { font-size: 14px; padding: 0 2px; }
+#fontSeg, #fsizeSeg { flex: 1; min-width: 0; }
+.tbar .thead { justify-content: space-between; margin-bottom: 2px; }
+.tscope { padding-left: 3px; font: 700 11px var(--ui); color: var(--pop-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tscope b { font-weight: 800; color: var(--pop-ink); }
+.tbar .iact { width: 27px; height: 25px; flex: none; }
+.tbar .iact:disabled { opacity: .35; cursor: default; }
+/* a different font on part of the text keeps about the same size as the note's own font */
+body[data-font="round"] #editor font[face="Caveat"] { font-size: 1.45em; line-height: 1.1; }
+body[data-font="hand"] #editor font[face="Nunito"] { font-size: .68em; }
+body[data-font="round"] #editor font[face="Augusta"] { font-size: 1.19em; }
+body[data-font="hand"] #editor font[face="Augusta"] { font-size: .8em; }
+body[data-font="medieval"] #editor font[face="Caveat"] { font-size: 1.24em; line-height: 1.1; }
+body[data-font="medieval"] #editor font[face="Nunito"] { font-size: .84em; }
+.tlab { flex: none; width: 20px; display: grid; place-items: center; color: var(--pop-mute); }
+.tlab svg { width: 16px; height: 16px; }
+.tlab .cbar { stroke: #E5484D; stroke-width: 3; }
+.tlab .hbar { stroke: #FFD43B; stroke-width: 4; }
+.tbar .dots { gap: 4px; padding: 0; flex-wrap: nowrap; }
+.tbar .dot { width: 23px; height: 23px; flex: none; } /* 1.1.16: 23 px, so 8 colours fit (black added) */
+.tbar .dot .none { width: 12px; }
+
+/* ================================================================ 1.1.10 */
+/* both floating toolbars: an X at the top right, next to the grip */
+#inkBar .igrip, #textPop .igrip { height: 18px; margin: -4px 24px 2px; }
+.ix {
+  position: absolute; top: 3px; right: 4px;
+  width: 20px; height: 20px; padding: 0;
+  border: 0; border-radius: 7px;
+  background: transparent; color: var(--pop-mute);
+  display: grid; place-items: center; cursor: pointer;
+}
+.ix:hover { background: var(--pop-soft); color: var(--pop-ink); }

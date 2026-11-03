@@ -1,0 +1,195 @@
+/* ---------- 1.1.16: effects ---------- */
+/* behind everything in the note (the paper is the page's own background, under it) */
+#fxCanvas { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; }
+body.rolled #fxCanvas { display: none; }
+#btnFx svg { stroke-width: 1.7; }
+#btnFx.off { opacity: .45; } /* paused */
+#btnFx.off svg { stroke-dasharray: 2 2.2; }
+@media (max-width: 279px) { #btnFx { display: none; } }
+.mi .mival { margin-left: auto; padding-left: 8px; font: 700 11.5px var(--ui); color: var(--pop-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+#fxPop > .ix { top: 8px; right: 8px; }
+.fxsub { margin: 10px 2px 6px; font: 800 12px var(--ui); color: var(--pop-ink); }
+.fxlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 2px 6px; }
+.fxi {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  min-height: 34px; padding: 4px 8px 4px 5px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--pop-ink); cursor: pointer;
+  font: 800 12.5px var(--ui); text-align: left;
+}
+.fxi:hover { background: var(--pop-soft); }
+.fxi .ic { flex: none; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--pop-soft); color: var(--ic, var(--pop-mute)); }
+.fxi .ic svg { width: 17px; height: 17px; stroke-width: 1.8; }
+.fxi .ic .f { fill: currentColor; stroke: none; }
+.fxi .nm { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; overflow-wrap: anywhere; }
+.fxi .nm small { font: 700 10.5px var(--ui); color: var(--pop-mute); }
+.fxamt { display: flex; align-items: center; gap: 8px; margin: 6px 2px 0; font: 800 11.5px var(--ui); color: var(--pop-mute); }
+.fxamt .seg { flex: 1; }
+.fxamt[hidden] { display: none; }
+/* 1.1.17: opacity slider under each Frequency row */
+.fxamt > span, .fxop > span { flex: none; min-width: 58px; }
+.fxop { display: flex; align-items: center; gap: 8px; margin: 6px 2px 0; font: 800 11.5px var(--ui); color: var(--pop-mute); }
+.fxop input[type="range"] { flex: 1; min-width: 0; margin: 0; cursor: pointer; }
+.fxop em { flex: none; min-width: 34px; text-align: right; font-style: normal; color: var(--pop-ink); }
+.fxop[hidden] { display: none; }
+/* 1.1.22: switched off (the effect is None): greyed out, still there */
+.fxamt.off, .fxop.off, #fxInteractRow.off { opacity: .45; }
+.fxamt.off button, .fxop.off input, #fxInteractRow.off input { cursor: default; pointer-events: none; }
+.fxi .ok { flex: none; width: 15px; height: 15px; stroke-width: 2.6; visibility: hidden; }
+.fxi.on { background: var(--pop-soft2); }
+.fxi.on .ic { background: var(--pop-bg); }
+.fxi.on .ok { visibility: visible; }
+#fxPop .check.switch { margin-top: 12px; }
+#menu > .ix { top: 8px; right: 8px; } /* 1.1.15: the ⋯ menu's X, level with "Title" */
+.ix svg { width: 13px; height: 13px; stroke-width: 2.6; }
+/* typing while drawing: the whole drawing toolbar fades (clicking a tool goes back to drawing) */
+body.ink-paused #inkBar > * { opacity: .38; transition: opacity .15s; }
+body.ink-paused #inkBar:hover > * { opacity: .75; }
+/* the text toolbar fades while you're drawing or working in the note; full again on hover */
+#textPop { transition: opacity .18s; }
+body.inking:not(.ink-paused) #textPop, body:has(#editor:focus) #textPop { opacity: .4; }
+#textPop:hover { opacity: 1 !important; }
+body.text-open #tools > * { opacity: 1; }
+body.text-open #stamp { opacity: 0; }
+/* the one undo button, always in the bottom bar (outside the part that scrolls) */
+#btnUndo { flex: none; margin-left: 2px; }
+#btnUndo svg, #btnRedo svg { width: 16px; height: 16px; }
+#btnRedo { flex: none; } /* 1.1.14: Redo, right after Undo */
+
+/* with Undo and Redo too, normal-width notes (340 px) need the formatting buttons a little closer (20 px since 1.1.14) */
+@media (max-width: 429px) {
+  .tb { width: 20px; }
+  .tsep { margin: 0 1px; }
+  #tools { padding: 0 3px; }
+  #btnInk { padding: 0 6px 0 4px; }
+  #btnUndo { margin-left: 1px; }
+}
+/* bottom row (1.1.15, below the tip): pause on the left, "Clear all" on the right. Paused, the pause button turns into
+   "Carry on" and stays at full strength while the rest of the toolbar fades */
+.ifoot { justify-content: space-between; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--pop-soft2); }
+.ipz, .iclear {
+  height: 26px; padding: 0 10px 0 8px;
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 0; border-radius: 8px;
+  background: var(--pop-soft); color: var(--pop-ink);
+  font: 800 11.5px var(--ui); white-space: nowrap; cursor: pointer;
+}
+.ipz:hover, .iclear:hover { background: var(--pop-soft2); }
+.iclear { background: transparent; color: var(--pop-danger, #A5402F); }
+.iclear:hover { background: #FBE5E1; }
+.iclear svg { width: 15px; height: 15px; }
+.ipz .l-play { display: none; }
+body.ink-paused .ipz .l-pause { display: none; }
+body.ink-paused .ipz .l-play { display: inline; }
+/* 1.1.15: the drawing toolbar in its own see-through window, outside the note (inkOut in note.js).
+   The window is the toolbar's size plus a little room for its shadow. */
+body.inkbar-out { background: transparent !important; overflow: hidden; }
+body.inkbar-out #inkBar {
+  position: absolute; left: 12px !important; top: 8px !important; right: auto !important; bottom: auto !important;
+  max-width: none; animation: none;
+  box-shadow: 0 4px 12px rgba(60,40,10,.26), 0 1px 3px rgba(0,0,0,.12);
+}
+.ipz svg { width: 11px; height: 11px; fill: currentColor; stroke: none; }
+.ipz .i-play { display: none; }
+body.ink-paused #inkBar > .ifoot { opacity: 1; }
+body.ink-paused #inkBar .iclear { opacity: .38; }
+body.ink-paused #inkPz { background: var(--pop-pick); color: var(--pop-pickfg); }
+body.ink-paused .ipz .i-pause { display: none; }
+body.ink-paused .ipz .i-play { display: block; }
+/* ---------- lock / unlock animation: "Snap shut" (1.1.14; 1.1.13 had "stardust") ---------- */
+.lockghost { position: fixed !important; display: block !important; z-index: 40; margin: 0 !important; overflow: hidden !important; pointer-events: none; animation: blurAway .45s ease-in forwards; }
+@keyframes blurAway { to { filter: blur(8px); opacity: 0; } }
+/* the shackle's long (left) side reaches down inside the lock body, so it never comes loose: it lifts and swings
+   open around that side, like a real padlock */
+.lockicon svg { overflow: visible; }
+.shackle { transform-box: fill-box; transform-origin: 0% 100%; }
+@keyframes lkDrop { 0% { translate: 0 -40px; opacity: 0; } 55% { translate: 0 2px; opacity: 1; } 78% { translate: 0 -1px; } 100% { translate: 0 0; opacity: 1; } }
+@keyframes lkSquash { 0%, 60% { scale: 1; } 70% { scale: 1.12 .9; } 100% { scale: 1; } }
+@keyframes lkSnap { 0%, 55% { transform: translateY(-4.5px) rotate(-16deg); } 66% { transform: translateY(.6px); } 100% { transform: none; } }
+@keyframes lkOpen { 0% { transform: none; } 35%, 100% { transform: translateY(-4.5px) rotate(-16deg); } }
+@keyframes lkAway { 0%, 40% { translate: 0 0; opacity: 1; } 100% { translate: 0 -30px; opacity: 0; } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fadeInSoft { from { opacity: 0; } to { opacity: 1; } }
+body.anim-lock .lockicon { animation: fadeInSoft .25s both; }
+body.anim-lock .lockicon svg { animation: lkDrop .6s cubic-bezier(.3,1.3,.5,1) both, lkSquash .6s both; }
+body.anim-lock .lockicon .shackle { animation: lkSnap .6s both; }
+body.anim-lock .lt, body.anim-lock .lrow { animation: fadeUp .35s .45s both; }
+/* unlocking: a copy of the padlock opens and floats up, the note just fades in (no zoom) */
+.lockfly { position: fixed !important; z-index: 45; margin: 0 !important; pointer-events: none; animation: lkAway .7s ease-in both; }
+.lockfly .shackle { animation: lkOpen .7s both; }
+body.anim-unlock #scroller { animation: fadeInSoft .5s .1s ease-out both; }
+/* 1.1.14: the text toolbar opens at full strength, and only fades once you go back to typing or drawing */
+body.text-fresh #textPop { opacity: 1 !important; }
+/* 1.1.13: solid / dashed / dotted line, for every drawing tool (greyed out with the eraser) */
+/* same width as the line thickness buttons above it, so Over/Behind is as wide as Partial/Whole line (1.1.15) */
+.idash { display: flex; gap: 1px; padding: 0 0 0 4px; border-left: 1px solid var(--pop-soft2); flex: none; }
+.idash button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--pop-ink); display: grid; place-items: center; cursor: pointer; }
+.idash button svg { width: 16px; height: 16px; stroke-width: 2.4; }
+.idash button:hover { background: var(--pop-soft); }
+.idash button.on { background: var(--pop-soft2); }
+.idash.off { opacity: .32; pointer-events: none; }
+/* 1.1.13: a small divider, then minimise, maximise and close */
+.hsep { flex: none; width: 1px; height: 16px; margin: 0 3px; background: var(--line); }
+#btnMax .i-restore, body.maxed #btnMax .i-max { display: none; }
+body.maxed #btnMax .i-restore { display: block; }
+@media (max-width: 330px) { .hb { width: 24px; } .hsep { margin: 0 2px; } }
+@media (max-width: 250px) { #btnNew { display: none; } }
+/* 1.1.13: the ••• menu sits in the top-right corner, normal size, at least 40% of the note's width
+   (and never narrower than 260 px, so nothing in it gets squashed) */
+#menu {
+  left: auto; right: 4px; top: 34px;
+  width: clamp(260px, 40vw, calc(100vw - 8px));
+  max-height: calc(100vh - 42px);
+}
+/* 1.1.13: the paper corner curl never sits on top of the Add button: it hides at once when the bottom bar shows
+   (also while a pop-up or the text toolbar keeps the bar visible), and only comes back after the bar has faded */
+.corner { transition: opacity .12s .2s; }
+body:hover .corner, body:focus-within .corner, body.pop-open .corner, body.text-open .corner { opacity: 0; transition: opacity .05s 0s; }
+
+/* ---------- 1.1.16: a small note never hides the X of its pop-ups and toolbars ---------- */
+/* a toolbar taller than the note scrolls (not when it's in its own window outside the note) */
+body:not(.inkbar-out) .fit-tall { max-height: calc(100vh - 8px) !important; overflow-y: auto !important; overflow-x: hidden !important; scrollbar-width: thin; }
+/* the X stays at the top while the rest scrolls under it (note.js pinX), on a small backing so it reads */
+.ix.pinned { z-index: 3; background: var(--pop-bg); box-shadow: 0 1px 4px rgba(0,0,0,.16); }
+.ix.pinned:hover { background: var(--pop-soft); }
+/* 1.1.16: the text toolbar outside the note, in its own window (like the drawing toolbar) */
+body.inkbar-out #textPop.tbar {
+  position: absolute; left: 12px !important; top: 8px !important; right: auto !important; bottom: auto !important;
+  max-width: none; animation: none;
+  box-shadow: 0 4px 12px rgba(60,40,10,.26), 0 1px 3px rgba(0,0,0,.12);
+}
+/* 1.1.16 (second round): the Effects pop-up is smaller: in the top-right corner like the ⋯ menu, one list at a
+   time (tabs), two columns of compact rows */
+#fxPop { left: auto; right: 4px; top: 34px; width: clamp(250px, 62vw, calc(100vw - 8px)); max-height: min(calc(100vh - 42px), 440px); }
+#fxPop h4 { margin-bottom: 4px; }
+#fxPop .fxtabs { margin: 0 26px 6px 0; }
+#fxPop .fxtabs button { flex: 1; }
+.fxsec[hidden] { display: none; }
+#fxPop .fxlist { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 1px 4px; }
+#fxPop .fxi { min-height: 28px; gap: 6px; padding: 2px 6px 2px 3px; font-size: 12px; }
+#fxPop .fxi .ic { width: 22px; height: 22px; border-radius: 7px; }
+#fxPop .fxi .ic svg { width: 15px; height: 15px; }
+#fxPop .fxi .ok { width: 13px; height: 13px; }
+#fxPop .check.switch { margin-top: 8px; }
+#fxPop { width: clamp(270px, 66vw, calc(100vw - 8px)); }
+#fxPop .fxi .ok { display: none; } /* the picked one already has the darker background */
+#fxPop .fxi .nm { overflow-wrap: break-word; }
+#fxPop .fxi .nm small { font-size: 10px; }
+/* 1.1.22 (sixth round): every choice the same size (the row with "Same as all notes" used to be taller, so None, Snow
+   and Rain next to it had more room around them): fixed row height, names on one line */
+#fxPop .fxlist { grid-auto-rows: 30px; }
+#fxPop .fxi { min-height: 0; height: 30px; }
+.fxi .nm { justify-content: center; }
+.fxi .nt, .fxi .nm small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 1.1.16: the ⋯ menu and Effects pop-up have the same top bar as the toolbars: a grip to drag them (also out of
+   the note) and the X at the top right */
+#menu > .igrip, #fxPop > .igrip { height: 18px; margin: -4px 24px 4px; }
+#menu > .ix, #fxPop > .ix { top: 4px; right: 5px; }
+#menu > .igrip + h4, #fxPop > .igrip + h4 { margin-top: 0; }
+#fxPop .fxtabs { margin-right: 0; }
+/* outside the note, in their own windows */
+body.inkbar-out #menu, body.inkbar-out #fxPop {
+  position: absolute; left: 12px !important; top: 8px !important; right: auto !important; bottom: auto !important;
+  max-height: none !important; overflow: visible; animation: none;
+  box-shadow: 0 4px 12px rgba(60,40,10,.26), 0 1px 3px rgba(0,0,0,.12);
+}
+

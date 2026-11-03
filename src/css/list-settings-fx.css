@@ -1,0 +1,243 @@
+/* ================================================================ 1.1.6 */
+/* window colour themes (Settings → General) */
+.themes { display: flex; flex-wrap: wrap; gap: 7px; }
+.theme {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 11px 4px 4px;
+  border: 0; border-radius: 999px;
+  background: var(--soft); color: var(--ink2);
+  font: 800 12px var(--ui);
+  cursor: pointer;
+}
+.theme:hover { background: var(--soft2); }
+.theme i {
+  width: 22px; height: 22px; flex: none; border-radius: 50%;
+  background: radial-gradient(circle at 68% 32%, var(--td) 0 4.5px, transparent 5px), var(--tb);
+  box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.16);
+}
+.theme.on { background: var(--card); color: var(--ink); box-shadow: 0 0 0 2px var(--ink); }
+/* password / PIN switch in the pop-up */
+.mkind { margin: 0 0 10px; }
+.mkind button { font-size: 12px; }
+
+/* ================================================================ 1.1.10 */
+/* Settings sections fold open (smoothly) by clicking their title; all start closed */
+#viewSettings .panel { padding: 0; }
+.phead {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 !important; padding: 12px 16px;
+  border-radius: 16px;
+  cursor: pointer; user-select: none;
+  transition: background .15s;
+}
+/* hover: a soft yellow tint of the section itself (not the page colour) */
+.phead:hover { background: color-mix(in srgb, #FFE45C 16%, var(--card)); }
+body.dark .phead:hover { background: var(--card2); }
+.phead:focus-visible { outline: 2px solid #E8C547; outline-offset: -2px; }
+.phead::after {
+  content: ""; margin-left: auto; flex: none;
+  width: 8px; height: 8px;
+  border-right: 2.2px solid var(--mute); border-bottom: 2.2px solid var(--mute);
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform .3s ease;
+}
+.panel.open > .phead::after { transform: rotate(-135deg) translate(-2px, -2px); }
+/* open: the title keeps its rounded corners, with a little room before the text below */
+.panel.open > .phead { margin-bottom: 2px !important; }
+.pbody { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .32s cubic-bezier(.3,.7,.3,1); }
+.panel.open > .pbody { grid-template-rows: 1fr; }
+.pinner { min-height: 0; overflow: hidden; padding: 0 16px; opacity: 0; transform: translateY(-4px); transition: opacity .25s ease, transform .32s ease, padding .32s ease; }
+.panel.open .pinner { opacity: 1; transform: none; padding-top: 6px; padding-bottom: 14px; }
+.abouthead.phead { padding: 10px 16px; }
+/* backups: the newest one, and the picker pop-up */
+/* General: "For new notes" heading, said once for colour, font and see-through */
+.oprow { display: flex; align-items: baseline; justify-content: space-between; }
+.oprow em { font: 800 12px var(--ui); font-style: normal; color: var(--ink2); }
+.srange { width: 100%; accent-color: #8E7BEF; cursor: pointer; }
+.bklast { margin: 0 0 10px; font: 700 12px var(--ui); color: var(--ink2); }
+.bklist { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; margin: 2px 0 8px; padding: 2px; text-align: left; }
+.bkpick {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border: 0; border-radius: 11px;
+  background: var(--soft); color: var(--ink);
+  font: 700 13px var(--ui); text-align: left; cursor: pointer;
+}
+.bkpick:hover { background: var(--soft2); }
+.bkpick i { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 2px solid var(--mute); }
+.bkpick.on { background: var(--card); box-shadow: 0 0 0 2px var(--ink); }
+.bkpick.on i { border: 5px solid var(--ink); }
+.bkpick b { display: block; font-weight: 800; }
+.bkpick small { display: block; color: var(--mute); font-weight: 700; font-size: 11.5px; }
+/* ================= 1.1.13: favourites, picking several cards, the "Stardust" lock animation ================= */
+.tab .tstar { width: 14px; height: 14px; color: #E0A800; }
+.tab.on .tstar { fill: #FFD54A; }
+/* 1.1.15: Locked tab */
+.tab .tlock { width: 14px; height: 14px; }
+.lockbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 0 0 12px; padding: 10px 12px;
+  border-radius: 14px; background: var(--card); box-shadow: 0 1px 3px rgba(80,60,20,.12), inset 0 0 0 1.5px var(--soft);
+}
+.lockbar[hidden] { display: none; }
+.lbtext { flex: 1 1 220px; font: 700 12.5px/1.4 var(--ui); color: var(--ink2); }
+.lockbar .pill svg { width: 14px; height: 14px; }
+
+/* ---------- 1.1.16: effects ---------- */
+/* a note's effect on its card, behind the card's writing (the card is its own layer, so -1 stays inside it) */
+.card { isolation: isolate; }
+.card > .fxc { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; border-radius: inherit; }
+/* the pickers: a list of icons and names */
+.fxlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 2px 8px; }
+.fxi {
+  display: flex; align-items: center; gap: 9px; min-width: 0;
+  min-height: 38px; padding: 4px 10px 4px 5px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--ink); cursor: pointer;
+  font: 800 13px var(--ui); text-align: left;
+}
+.fxi:hover { background: var(--soft); }
+.fxi .ic { flex: none; width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: var(--soft); color: var(--ic, var(--mute)); }
+body.dark .fxi .ic { color: color-mix(in srgb, var(--ic, var(--mute)) 70%, #fff); }
+.fxi .ic svg { width: 18px; height: 18px; stroke-width: 1.8; }
+.fxi .ic .f { fill: currentColor; stroke: none; }
+.fxi .nm { flex: 1; min-width: 0; line-height: 1.2; overflow-wrap: anywhere; }
+.fxamt { display: flex; align-items: center; gap: 10px; margin-top: 4px; font: 800 12px var(--ui); color: var(--mute); }
+.fxamt .seg { flex: 1; max-width: 320px; }
+.fxamt[hidden] { display: none; }
+/* 1.1.17: opacity slider under each Frequency row */
+.fxamt > span, .fxop > span { flex: none; min-width: 64px; }
+.fxop { display: flex; align-items: center; gap: 10px; margin-top: 6px; font: 800 12px var(--ui); color: var(--mute); }
+.fxop .srange { flex: 1; min-width: 0; max-width: 320px; margin: 0; }
+.fxop em { flex: none; min-width: 36px; font-style: normal; color: var(--ink2); }
+.fxop[hidden] { display: none; }
+/* 1.1.22: switched off (the effect is None): greyed out, still there */
+.fxamt.off, .fxop.off, #editFxInteractRow.off { opacity: .45; }
+.fxamt.off button, .fxop.off input, #editFxInteractRow.off input { cursor: default; pointer-events: none; }
+.fxi .ok { width: 16px; height: 16px; stroke-width: 2.6; visibility: hidden; }
+.fxi.on { background: var(--soft2); }
+.fxi.on .ic { background: var(--card); }
+.fxi.on .ok { visibility: visible; }
+.fxi:focus-visible { outline: 2.5px solid #E8C547; outline-offset: 1px; }
+/* the pause button left of Settings */
+.fxpause {
+  margin-left: auto; width: 34px; height: 34px; flex: none; align-self: center;
+  border: 0; border-radius: 10px; background: transparent; color: var(--ink3);
+  display: grid; place-items: center; cursor: pointer;
+}
+.fxpause:hover { background: var(--soft); color: var(--ink); }
+.fxpause svg { width: 18px; height: 18px; stroke-width: 1.8; }
+.fxpause .slash { display: none; stroke-width: 2.2; }
+.fxpause.paused { color: var(--mute); }
+.fxpause.paused .slash { display: inline; }
+.fxpause + .tab[data-tab="settings"] { margin-left: 0; }
+#fxSheet .ebox { max-width: 560px; }
+#fxSheet .row.toggle { padding: 4px 0; }
+/* 1.1.20: Edit design: the paper previews the note's effects; effect lists in two tabs, like in a note */
+/* 1.1.22 (fifth round): Edit design is a small pop-up beside the note (tabs: Colour / Background / Mouse), not a sheet
+   over the whole list. No dimming or blur behind it, so the notes stay visible; click outside or Esc closes it. */
+#editSheet { display: block; padding: 0; background: transparent; backdrop-filter: none; animation: none; }
+body.dark #editSheet { background: transparent; }
+#editSheet[hidden] { display: none; }
+#editSheet .ebox {
+  position: fixed; width: 352px; max-width: calc(100vw - 20px); max-height: calc(100vh - 20px);
+  gap: 10px; padding: 12px 14px 12px; border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(60,40,10,.28), 0 1px 3px rgba(0,0,0,.12), 0 0 0 1px rgba(80,60,20,.06);
+}
+#editSheet .ehead h3 { font-size: 22px; }
+#editSheet .ehead .qclear { width: 28px; height: 28px; }
+#editSheet .epaper { position: relative; isolation: isolate; flex: none; height: 54px; overflow: hidden; display: flex; align-items: flex-start; }
+#editSheet .epaper > .fxc { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+#editSheet .epaper .etitle { position: relative; }
+.etabs { flex: none; }
+/* the panes keep one height, so switching tabs doesn't make the pop-up jump; a long effect list scrolls inside */
+.epanes { position: relative; flex: 1 1 auto; height: 262px; min-height: 120px; overflow: auto; margin: 0 -6px; padding: 2px 6px; } /* relative: the switch's hidden checkbox (absolutely placed) stays inside it, not hanging below the pop-up and giving it a second scrollbar */
+.epane { display: flex; flex-direction: column; gap: 8px; }
+.epane[hidden] { display: none; }
+.epane .oprow b { font-weight: 800; font-size: 13px; }
+#editSheet .swstrip.wide > .swatches { gap: 7px; row-gap: 9px; }
+#editSheet .sw { width: 28px; height: 28px; }
+#editSheet .fxlist { grid-template-columns: 1fr 1fr; gap: 3px 5px; }
+#editSheet .fxi { min-height: 36px; padding: 4px 8px 4px 4px; font-size: 12.5px; gap: 7px; }
+#editSheet .fxi .ic { width: 26px; height: 26px; }
+#editSheet .fxi .nm small { display: block; font: 700 11px var(--ui); color: var(--mute); }
+/* 1.1.22 (sixth round): every effect choice the same height, names on one line */
+.fxlist { grid-auto-rows: 38px; }
+#editSheet .fxlist { grid-auto-rows: 36px; }
+#editSheet .fxi .ok { display: none; } /* the dark ring already shows what's picked; the hidden tick took room from the names */
+.fxi { min-height: 0; }
+.fxi .nm { display: flex; flex-direction: column; justify-content: center; line-height: 1.15; }
+.fxi .nt, .fxi .nm small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#editSheet .fxamt, #editSheet .fxop { margin-top: 2px; }
+#editSheet .row.toggle { padding: 2px 0; column-gap: 12px; }
+#editSheet .ebtns small { font-size: 11px; }
+/* the note being edited gets an outline in the list */
+.card.editing { outline: 2.5px solid var(--ink); outline-offset: 3px; }
+/* 1.1.22 (fifth round): what's picked stands out like in Settings (window colours, backups): a white button with a
+   dark ring, not just a slightly darker beige (the owner couldn't tell what was picked) */
+.esheet .fxi.on { background: var(--card); box-shadow: 0 0 0 2px var(--ink); }
+.esheet .fxi.on .ic { background: var(--soft); }
+.esheet .fxi:not(.on):hover { background: var(--soft); }
+.esheet .seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 0 0 2px var(--ink); }
+.esheet .seg.etabs button.on { background: var(--ink); color: var(--pillfg); box-shadow: none; }
+.esheet .fxamt.off .seg button.on { box-shadow: 0 0 0 2px var(--mute); }
+.ehint { margin: 0; font: 700 12px/1.4 var(--ui); color: var(--mute); }
+/* the star in a card's top-right corner: an outline while you point at the card, filled (soft yellow) once starred */
+.card > .fav {
+  position: absolute; top: 10px; right: 2px; z-index: 4;
+  width: 33px; height: 33px; padding: 0;
+  border: 0; border-radius: 50%;
+  display: grid; place-items: center;
+  background: transparent; color: var(--accent);
+  cursor: pointer;
+  opacity: 0; transition: opacity .12s, transform .12s, background .12s;
+}
+.card:hover > .fav, .card > .fav:focus-visible, .card > .fav.on { opacity: 1; }
+.card > .fav:hover { transform: scale(1.15); background: rgba(255,255,255,.45); }
+/* bigger than at first (+15 %, then +10 % in 1.1.14), and tilted a little to the left */
+.card > .fav svg { width: 21.5px; height: 21.5px; stroke-width: 2; rotate: -9deg; transition: fill .2s, stroke .2s; }
+.card > .fav.on { color: #D9A10A; }
+.card > .fav.on svg { fill: #FFD54A; stroke: #D9A10A; }
+.card:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) > .fav.on svg { stroke: #FFD54A; }
+/* (1.1.14: the star only sits on top of the card; it no longer makes room for itself, which squeezed pictures) */
+/* stars bursting from the favourite star: a fixed layer, so the card's edge doesn't cut them off; 15 % quicker */
+.stardust.fixed { position: fixed; z-index: 60; }
+.stardust.fast i { animation-duration: .68s; animation-delay: .085s; }
+/* the star pops in, with a soft ring */
+.card > .fav.pop svg { animation: starPop .55s cubic-bezier(.3,1.6,.5,1); }
+.card > .fav.pop::after { content: ""; position: absolute; inset: 1px; border-radius: 50%; border: 2px solid #FFD54A; animation: starRing .55s ease-out forwards; }
+@keyframes starPop { 0% { transform: scale(.3) rotate(-40deg); } 60% { transform: scale(1.35) rotate(12deg); } 100% { transform: none; } }
+@keyframes starRing { 0% { transform: scale(.6); opacity: 1; } 100% { transform: scale(1.9); opacity: 0; } }
+/* groups: the star sits on a little round badge so it shows on every look */
+.card.group > .fav { top: -4px; right: -2px; z-index: 6; background: var(--card); box-shadow: 0 2px 6px rgba(0,0,0,.18); color: var(--ink3); }
+.card.group > .fav:hover { background: var(--card); }
+.card.group > .fav.on { color: #D9A10A; }
+/* 1.1.14: lock / unlock button, left of the star, only while you point at the card */
+.card > .lockb {
+  position: absolute; top: 12px; right: 35px; z-index: 4;
+  width: 29px; height: 29px; padding: 0;
+  border: 0; border-radius: 50%;
+  display: grid; place-items: center;
+  background: transparent; color: var(--accent);
+  cursor: pointer;
+  opacity: 0; transition: opacity .12s, transform .12s, background .12s;
+}
+.card:hover > .lockb, .card > .lockb:focus-visible { opacity: 1; }
+.card > .lockb:hover { transform: scale(1.12); background: rgba(255,255,255,.45); }
+.card > .lockb svg { width: 17px; height: 17px; stroke-width: 2.2; }
+.card.group > .lockb { top: -2px; right: 31px; z-index: 6; background: var(--card); box-shadow: 0 2px 6px rgba(0,0,0,.18); color: var(--ink3); }
+.card.group > .lockb:hover { background: var(--card); }
+
+/* picked cards (Ctrl+click): a violet outline and a tick */
+.card.sel { outline: 3px solid #8E7BEF; outline-offset: 3px; transform: rotate(0deg); }
+.card.group.sel { outline-offset: 1px; border-radius: 10px; }
+.card.sel::before {
+  content: ""; position: absolute; left: 1px; top: 1px; z-index: 5;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: #8E7BEF url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 11px no-repeat;
+  box-shadow: 0 2px 5px rgba(80,50,180,.35);
+}
+.card.group.sel::before { top: -4px; left: -2px; }
+/* 1.1.16: the card whose right-click menu is open: the same outline, fainter and thinner, no tick */
+.card.ctxon:not(.sel) { outline: 2px solid rgba(142,123,239,.5); outline-offset: 3px; transform: rotate(0deg); }
+.card.group.ctxon:not(.sel) { outline-offset: 1px; border-radius: 10px; }
+.dragchip { position: fixed; left: -500px; top: 0; padding: 7px 13px; border-radius: 999px; background: #8E7BEF; color: #fff; font: 800 12px var(--ui); }
+

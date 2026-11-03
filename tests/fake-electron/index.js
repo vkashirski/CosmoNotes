@@ -5,7 +5,7 @@ const all = [];
 class WebContents extends EventEmitter { constructor(w){ super(); this.win=w; this.sent=[]; this.session={addWordToSpellCheckerDictionary(){}} } send(ch, ...a){ this.sent.push(ch); (this.sentArgs || (this.sentArgs = [])).push([ch, ...a]); } setWindowOpenHandler(f){ this.openHandler=f } replaceMisspelling(){} }
 class BrowserWindow extends EventEmitter {
   constructor(o){ super(); this.o=o; this.id=nextId++; this.bounds={x:o.x??100,y:o.y??100,width:o.width,height:o.height}; this.webContents=new WebContents(this); this.destroyed=false; this.visible=false; this.top=false; this.opacity=1; all.push(this); }
-  loadFile(f){ this.file=f; setImmediate(()=>this.emit('ready-to-show')); }
+  loadFile(f){ this.file=f; setImmediate(()=>{ if(!this.destroyed) this.emit('ready-to-show'); }); }
   show(){this.visible=true} showInactive(){this.visible=true} hide(){this.visible=false} focus(){} isFocused(){return false} setParentWindow(p){this.parent=p} destroy(){this.close()}
   close(){ if(this.destroyed) return; this.destroyed=true; this.emit('closed'); }
   isDestroyed(){return this.destroyed} isMinimized(){return !!this.minimized} isMaximized(){return !!this.maximized} minimize(){this.minimized=true;this.emit('minimize')} maximize(){this.maximized=true;this.emit('maximize')} unmaximize(){this.maximized=false;this.emit('unmaximize')} setMinimizable(v){this.minimizable=v} setMaximizable(){} isVisible(){return this.visible} restore(){ if(this.minimized){this.minimized=false;this.emit('restore')} }
