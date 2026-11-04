@@ -45,7 +45,10 @@ echo.
 echo   Step 2 of 3: getting the voice-to-text model...
 echo.
 node build\fetch-model.js
-if errorlevel 1 goto :fail
+rem If the model cannot be downloaded (for example a work network that blocks huggingface.co), the installer is
+rem still built, just without the model: the app works, only Speak to text and Transcribe need it.
+if errorlevel 1 call :nomodel
+if not exist "%~dp0build\models" mkdir "%~dp0build\models"
 
 echo.
 echo   Step 3 of 3: building the installer...
@@ -91,6 +94,19 @@ echo   other laptops to install it there too.
 echo.
 start "" "%~dp0dist"
 pause
+exit /b 0
+
+:nomodel
+echo.
+echo   ------------------------------------------------------------
+echo   The voice-to-text model could not be downloaded.
+echo   This network probably blocks huggingface.co ^(common on work laptops^).
+echo   Building the installer WITHOUT the model. The app works as usual,
+echo   but Speak to text and Transcribe will not work until the model is there.
+echo   To add it later: copy the folder build\models from a computer that
+echo   could download it into this folder's build folder, then run build.bat again.
+echo   ------------------------------------------------------------
+echo.
 exit /b 0
 
 :nodehelp
