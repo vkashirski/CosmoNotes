@@ -6,6 +6,42 @@ file (`tests/release.test.js` checks that every version is in one of the two fil
 Renumbered in 1.1.41: each heading says its old number (the table is at the top of `CHANGELOG.md`). Version numbers inside
 the entries are the old ones.
 
+## 1.2.3 – 3 November 2026
+
+The notes list redraws less after a note changes: its own work on each refresh is 2–4 times faster. It looks the same.
+
+- The owner asked whether the app redraws too much. Measured in Chromium first (60 and 200 notes, with and without
+  an effect): typing in a note costs about 5 ms a key, fine. A list refresh (a note was edited) cost 3.6 ms of the
+  list's code at 60 notes and 10.6 ms at 200. Now 1.5 ms and 2.8 ms.
+- The list already kept every card whose note didn't change (`cards.js`, the card cache). But after each refresh it
+  still measured every card (`markMore`, which forces a layout) and looked at every card's effect (`paintFx`:
+  `resolve`, `resize`, `set`). Now only the cards built again get that. When the card size, the theme or the window's
+  width changed, or an effect setting changed, every card is done again, as before.
+- A card body is marked `data-m` once measured. A card that couldn't be measured yet is measured on the next refresh.
+- `noteById` (`list/base.js`) finds a note by id from an index, instead of searching all notes once for each card
+  (`itemOfKey` in `picking.js`, `paintFx`).
+- What still costs the most: effects on the cards. Each card with an effect is its own small animation (24 on screen in
+  a normal window). With an effect on every card, the list uses about 14 % of one processor core at rest (60 notes,
+  in Chromium without a graphics card). Without effects, about 0 %. Nothing about the effects changed in this version.
+- Tests: a refresh keeps the unchanged cards, builds and measures the edited one, and both keep their effect.
+
+## 1.2.2 – 3 November 2026
+
+The bar for several picked notes has **Edit design** instead of Colour: the same pop-up as right-click → Edit design.
+
+- The owner's wish. It opens the Edit design pop-up for all the picked notes (and the notes in picked open groups),
+  in the middle of the window. The right-click menu on a picked card has it too.
+- Colour, see-through, Background and Mouse go to every note. A setting the notes don't share says **Mixed** until
+  you pick one. The preview shows the first note.
+- An effect change sends only that setting (`fxKeys` in main `list:edit`), so each note keeps its other effect picks.
+- No title for several notes (the paper says "3 notes"). "Open note" becomes "Open notes".
+- The old Colour pop-up also changed the font. So the pop-up has a **Font** row, only for several notes (one note's font
+  is set in the note itself). It goes through `list:apply`, as before.
+- The Colour pop-up (`#bColor`, `#bulkColors`, `bulkApply`) is gone. Its styles (`.bulkpop`, `.bsw`, `.bfonts`) are
+  still in `list-picking-edit.css`, unused.
+- Tests: `list-ui-picking` (Edit design for two notes: colour, see-through, font, an effect setting, titles left
+  alone); `list-ui-settings` (no Font row for one note).
+
 ## 1.2.1 – 3 November 2026
 
 A third note font: **Medieval**, an old book hand (Augusta by Dieter Steffmann, 100% free on dafont).

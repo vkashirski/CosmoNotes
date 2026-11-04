@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 1 of 10: the colour row, saving, dates, look & settings, effects on the note
+// CosmoNotes note window, part 1 of 11: the colour row, saving, dates, look & settings, effects on the note
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   // K: the names the parts share. V: variables more than one part changes (V.note etc.). K.later('f'): a function a later part
@@ -9,7 +9,7 @@
   // defined in a later part:
   const paintFxPop = K.later('paintFxPop'), setFxPlaying = K.later('setFxPlaying'),
     applySpell = K.later('applySpell'), decorate = K.later('decorate'), applyZoom = K.later('applyZoom'),
-    applyLayout = K.later('applyLayout'), fitSideways = K.later('fitSideways');
+    applyLayout = K.later('applyLayout'), fitSideways = K.later('fitSideways'), stopRecordingNow = K.later('stopRecordingNow');
   const api = window.sticky;
   // 1.1.15: while the drawing toolbar is outside the note, it lives in its own little window (inkOut below);
   // $ and $$ look there too, so the code that paints and wires up the toolbar works the same either way.
@@ -117,6 +117,7 @@
       if (t) t.textContent = fmt(+v.dataset.dur);
     });
     clone.querySelectorAll('.sel-img').forEach((i) => i.classList.remove('sel-img'));
+    clone.querySelectorAll('.stt-pending').forEach((m) => m.remove()); // 1.3.1: where voice to text's words go (src/note/speech.js)
     clone.querySelectorAll('.caret-near').forEach((i) => i.classList.remove('caret-near'));
     clone.querySelectorAll('.find-hit, .find-cur').forEach((i) => i.classList.remove('find-hit', 'find-cur'));
     // 1.1.22 (sixth round): the checkbox size / place measured for the screen (alignChecks) isn't saved
@@ -152,6 +153,7 @@
   }
 
   window.addEventListener('beforeunload', () => {
+    if (V.note && !V.hidden) stopRecordingNow(); // 1.2.4: closing mid-recording keeps it (its chip is saved just below)
     if (V.dirty && V.note && !V.hidden) { V.dirty = false; api.updateSync(collect()); }
     if (K.inkState.dirty && V.note && !V.hidden) { K.inkState.dirty = false; api.updateSync({ ink: V.note.ink }); }
   });

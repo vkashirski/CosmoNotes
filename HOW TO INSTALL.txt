@@ -104,6 +104,12 @@ QUICK TIPS
      newest or oldest first, groups first or mixed in.
    - Spelling is ignored by default. Turn it on for all notes in
      Settings, or per note with its spelling button.
+   - Voice to text: [+] > Speak to text writes what you say into the
+     note. Right-click a voice note > Transcribe turns it into text.
+     It all runs on this computer. Settings > Voice to text: Standard
+     comes with the app; Best downloads from Hugging Face (only when you
+     press Download). Your voice never leaves this PC.
+     Test my computer shows if words can appear while you talk.
    - Shortcuts: Ctrl+N new note, Ctrl+B/I/U bold/italic/underline,
      Ctrl+T strikethrough, Ctrl+Shift+L bullets, Ctrl+Shift+C checklist,
      Ctrl+K link, Ctrl+W close note.

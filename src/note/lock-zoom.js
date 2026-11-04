@@ -1,10 +1,10 @@
 'use strict';
-// CosmoNotes note window, part 7 of 10: locking, password or PIN, the "are you sure?" pop-up, word wrap, zoom
+// CosmoNotes note window, part 8 of 11: locking, password or PIN, the "are you sure?" pop-up, word wrap, zoom
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
   const { V, api, $, $$, editor, body, saveNow, observer, updateEmpty, applyLook, setProp, caretAtEnd, closePop,
-    closePops, openPop, closeText, decorate, stopPlay, rec, stopRecording, closeDraw, handle, placeHandle } = K;
+    closePops, openPop, closeText, decorate, stopPlay, rec, stopRecording, stopRecordingNow, closeDraw, handle, placeHandle, sttHide } = K;
   // defined in a later part:
   const renderInk = K.later('renderInk'), inkBounds = K.later('inkBounds'), exitInk = K.later('exitInk'),
     toast = K.later('toast');
@@ -80,7 +80,9 @@
     renderInk();
     stopPlay();
     if (!$('#draw').hidden) closeDraw();
-    if (rec.mr) stopRecording(false);
+    // 1.2.4: locking mid-recording keeps it (main adds its chip: this window can't save any more)
+    if (rec.mr && !stopRecordingNow()) stopRecording(true);
+    sttHide(); // 1.3.1: voice to text ends: a Transcribe adds nothing, Speak to text keeps its recording
     observer.disconnect();
     V.dirty = false;
     clearTimeout(V.saveTimer);
@@ -99,6 +101,7 @@
     if (ghost) playLockAnim('lock');
   }
   async function relock() {
+    stopRecordingNow(); // 1.2.4: a recording becomes a voice note, saved with the rest
     await saveNow();
     await api.relock();
     hideContent();
@@ -133,6 +136,7 @@
     await lockNow();
   }
   async function lockNow() {
+    stopRecordingNow(); // 1.2.4: a recording becomes a voice note, saved with the rest
     saveNow();
     const n = await api.setLocked(true);
     if (!n || n.error) { toast('Could not lock this note'); return; }
@@ -385,5 +389,5 @@
   }
 
   Object.assign(K, { relock, toggleLock, paintUnlock, sheet, zoomNow, applyZoom, setZoom, hasInk, applyLayout,
-    fitSideways, needsResizeWarning, resizeWarning, textWidth, keepForInk });
+    fitSideways, needsResizeWarning, resizeWarning, textWidth, keepForInk, ask });
 })();

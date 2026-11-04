@@ -6,6 +6,7 @@ class WebContents extends EventEmitter { constructor(w){ super(); this.win=w; th
 class BrowserWindow extends EventEmitter {
   constructor(o){ super(); this.o=o; this.id=nextId++; this.bounds={x:o.x??100,y:o.y??100,width:o.width,height:o.height}; this.webContents=new WebContents(this); this.destroyed=false; this.visible=false; this.top=false; this.opacity=1; all.push(this); }
   loadFile(f){ this.file=f; setImmediate(()=>{ if(!this.destroyed) this.emit('ready-to-show'); }); }
+  loadURL(u){ this.url=u; module.exports.__loaded.push(this); }
   show(){this.visible=true} showInactive(){this.visible=true} hide(){this.visible=false} focus(){} isFocused(){return false} setParentWindow(p){this.parent=p} destroy(){this.close()}
   close(){ if(this.destroyed) return; this.destroyed=true; this.emit('closed'); }
   isDestroyed(){return this.destroyed} isMinimized(){return !!this.minimized} isMaximized(){return !!this.maximized} minimize(){this.minimized=true;this.emit('minimize')} maximize(){this.maximized=true;this.emit('maximize')} unmaximize(){this.maximized=false;this.emit('unmaximize')} setMinimizable(v){this.minimizable=v} setMaximizable(){} isVisible(){return this.visible} restore(){ if(this.minimized){this.minimized=false;this.emit('restore')} }
@@ -15,7 +16,7 @@ class BrowserWindow extends EventEmitter {
 }
 const display = { workArea: { x: 0, y: 0, width: 1920, height: 1040 } };
 module.exports = {
-  __handlers: handlers, __listeners: listeners, __all: all,
+  __handlers: handlers, __listeners: listeners, __all: all, __loaded: [], __partitions: {},
   app: Object.assign(new EventEmitter(), { commandLine: { appendSwitch(){} }, setAppUserModelId(){}, requestSingleInstanceLock:()=>true, whenReady:()=>Promise.resolve(), getPath:(k)=> k==='appData' ? process.env.FAKE_APPDATA : process.env.FAKE_DATA, isPackaged:false, getVersion:()=>'1.0.0', quit(){ module.exports.app.emit('before-quit'); module.exports.app.emit('will-quit'); }, setLoginItemSettings(){} }),
   BrowserWindow,
   ipcMain: { handle:(c,f)=>handlers[c]=f, on:(c,f)=>listeners[c]=f },
@@ -27,6 +28,7 @@ module.exports = {
   dialog: { showMessageBox: async()=>({response:0}), showOpenDialog: async()=>({canceled:true}) },
   protocol: { registerSchemesAsPrivileged(){}, handle(s,f){ module.exports.__proto = f } },
   net: { fetch: async (u)=>({ url:u }) },
-  session: { defaultSession: { availableSpellCheckerLanguages: ['en-US','ru','bg','sr','uk','de'], setSpellCheckerLanguages(l){ module.exports.__langs=l }, setPermissionRequestHandler(f){module.exports.__perm=f}, setPermissionCheckHandler(){} } },
+  session: { fromPartition(name){ const P = module.exports.__partitions; return P[name] || (P[name] = { name, protocols: {}, protocol: { handle(s, f){ P[name].protocols[s] = f } }, setPermissionRequestHandler(f){ this.perm = f }, setPermissionCheckHandler(f){ this.check = f }, webRequest: { onBeforeRequest(filter, f){ P[name].before = f } } }); },
+    defaultSession: { availableSpellCheckerLanguages: ['en-US','ru','bg','sr','uk','de'], setSpellCheckerLanguages(l){ module.exports.__langs=l }, setPermissionRequestHandler(f){module.exports.__perm=f}, setPermissionCheckHandler(){} } },
   contextBridge: {}, ipcRenderer: {},
 };

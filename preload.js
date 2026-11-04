@@ -25,6 +25,18 @@ contextBridge.exposeInMainWorld('sticky', {
   onWinState: (cb) => ipcRenderer.on('note:win-state', (e, s) => cb(s)),
   hover: (over) => ipcRenderer.send('note:hover', !!over),
   saveAttachment: (bytes, ext) => inv('att:save', bytes, ext),
+  // 1.2.4: a voice recording is written to disk while it is made
+  recStart: () => inv('rec:start'),
+  recChunk: (id, bytes) => ipcRenderer.send('rec:chunk', id, bytes),
+  recEnd: (id, mode) => inv('rec:end', id, mode),
+  recDone: (id) => inv('rec:done', id),
+  // 1.3.1: voice to text (main/ipc-stt.js). Speak to text: start, audio (16 kHz pieces), stop / cancel; Transcribe a clip
+  sttStart: () => inv('stt:start'),
+  sttAudio: (id, pcm, rms) => ipcRenderer.send('stt:audio', id, pcm, rms),
+  sttStop: (id) => inv('stt:stop', id),
+  sttCancel: (id) => inv('stt:cancel', id),
+  sttTranscribe: (url, id) => inv('stt:transcribe', url, id),
+  onStt: (cb) => ipcRenderer.on('stt:event', (e, m) => cb(m)),
   pickImages: () => inv('att:pick-images'),
   openAttachment: (url) => inv('att:open', url),
   openExternal: (url) => inv('open-external', url),
@@ -94,4 +106,14 @@ contextBridge.exposeInMainWorld('sticky', {
     openFolder: () => inv('backups:open-folder'),
   },
   openDataFolder: () => inv('data:open-folder'),
+  // 1.3.1: Settings → Voice to text
+  stt: {
+    status: () => inv('stt:status'),
+    use: (id) => inv('stt:use', id),
+    download: (id) => inv('stt:download', id),
+    cancelDownload: (id) => inv('stt:download-cancel', id),
+    remove: (id) => inv('stt:remove', id),
+    test: () => inv('stt:test'),
+    onChanged: (cb) => ipcRenderer.on('stt:changed', (e, s) => cb(s)),
+  },
 });

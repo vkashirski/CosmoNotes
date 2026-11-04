@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 3 of 10: pop-overs, the header, the ⋯ menu, the Add and text panels, Undo / Redo
+// CosmoNotes note window, part 3 of 11: pop-overs, the header, the ⋯ menu, the Add and text panels, Undo / Redo
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -9,7 +9,8 @@
   const openLinkForm = K.later('openLinkForm'), insertTable = K.later('insertTable'), hideCtx = K.later('hideCtx'),
     startRecording = K.later('startRecording'), openDraw = K.later('openDraw'), relock = K.later('relock'),
     toggleLock = K.later('toggleLock'), saveInk = K.later('saveInk'), inkUndo = K.later('inkUndo'),
-    inkRedo = K.later('inkRedo'), finishStroke = K.later('finishStroke'), toast = K.later('toast');
+    inkRedo = K.later('inkRedo'), finishStroke = K.later('finishStroke'), toast = K.later('toast'),
+    speakToText = K.later('speakToText');
   // ================================================================ popovers
   // 1.1.16: the ⋯ menu and the Effects pop-up can be dragged (by their grip) and out of the note, like the
   // toolbars: id → { out: barOut(…), move: movable(…) } (filled in further down, next to the toolbars)
@@ -345,6 +346,7 @@
         break;
       }
       case 'voice': startRecording(); break;
+      case 'speak': speakToText(); break; // 1.3.1 (src/note/speech.js)
       case 'drawing': openDraw(null); break;
       case 'link': openLinkForm(); break;
       case 'table': insertTable(3, 2); toast('Tip: right-click a cell to add rows or columns'); break;

@@ -102,8 +102,73 @@
     $('#dataPath').textContent = s.dataPath || '';
     $('#version').textContent = `CosmoNotes ${s.version || ''} - Made with love.`;
     renderAbout(s.version);
+    paintVoice(await S.stt.status());
     renderBackups(await S.backups.list());
   }
+
+  // ---- Settings → Voice to text (1.3.1; main/ipc-stt.js): which model, its download, Test my computer
+  const VERDICT = { live: 'Live', after: 'After you stop', slow: 'Too slow', failed: "Didn't start" };
+  let sttNow = null;
+  function paintVoice(st) {
+    if (!st || !st.models) return;
+    sttNow = st;
+    const use = $('#sttUse');
+    use.innerHTML = '';
+    for (const m of st.models) {
+      use.append(h('button', {
+        class: st.selected === m.id ? 'on' : '',
+        'data-id': m.id,
+        onclick: async () => { if (sttNow.selected !== m.id) paintVoice(await S.stt.use(m.id)); },
+      }, m.name));
+    }
+    const box = $('#sttModels');
+    box.innerHTML = '';
+    for (const m of st.models) {
+      const size = m.mbMax ? `${m.mb}–${m.mbMax} MB` : `${m.mb} MB`;
+      const bits = [];
+      let btn = null;
+      if (m.state === 'ready') {
+        bits.push(m.builtIn ? `Built in · ${size}` : size, 'Ready');
+        if (m.test && VERDICT[m.test.verdict]) bits.push(VERDICT[m.test.verdict]);
+        if (!m.builtIn) btn = h('button', { class: 'pill ghost small', onclick: () => removeModel(m) }, 'Remove');
+      } else if (m.state === 'downloading') {
+        bits.push(`Downloading ${m.pct || 0}%`);
+        btn = h('button', { class: 'pill ghost small', onclick: async () => paintVoice(await S.stt.cancelDownload(m.id)) }, 'Cancel');
+      } else if (m.state === 'failed') {
+        bits.push(size, 'The download stopped');
+        btn = h('button', { class: 'pill small', onclick: async () => paintVoice(await S.stt.download(m.id)) }, 'Try again');
+      } else if (m.state === 'missing') {
+        bits.push('Not found. build.bat adds it.');
+      } else {
+        bits.push(size);
+        btn = h('button', { class: 'pill small', onclick: async () => paintVoice(await S.stt.download(m.id)) }, 'Download');
+      }
+      const err = !m.builtIn && st.startError && m.state === 'ready' ? h('small', { class: 'err' }, "Didn't start last time. Standard was used.") : null;
+      box.append(h('div', { class: 'row sttm', 'data-id': m.id },
+        h('span', {}, h('b', {}, m.name), h('small', {}, bits.join(' · ')), err),
+        btn,
+        m.state === 'downloading' ? h('div', { class: 'sttbar' }, h('i', { style: `width:${m.pct || 0}%` })) : null));
+    }
+    const sel = st.models.find((m) => m.id === st.selected) || st.models[0];
+    $('#sttUsing').textContent = `Using: ${sel.state === 'ready' && sel.device === 'gpu' ? 'graphics card' : 'processor'}.`;
+    $('#sttTest').disabled = !!st.testing;
+    $('#sttTest').textContent = st.testing ? 'Testing…' : 'Test';
+    $('#sttTestInfo').textContent = st.testing ? 'This takes a few seconds.' : 'Checks if words can appear while you talk.';
+  }
+  async function removeModel(m) {
+    const ok = await modal({ title: `Remove ${m.name}?`, text: 'You can download it again later.', okLabel: 'Remove', danger: true });
+    if (!ok) return;
+    const st = await S.stt.remove(m.id);
+    if (st && st.error === 'busy') toast('Voice to text is busy. Try again in a moment.');
+    paintVoice(st);
+  }
+  $('#sttTest').addEventListener('click', async () => {
+    if (sttNow) paintVoice({ ...sttNow, testing: true });
+    const st = await S.stt.test();
+    if (st && st.error === 'busy') toast('Voice to text is busy. Try again in a moment.');
+    paintVoice(st);
+  });
+  S.stt.onChanged((st) => { if (V.tab === 'settings') paintVoice(st); });
 
   const niceDate = (iso) => {
     const [y, m, d] = String(iso).split('-').map(Number);

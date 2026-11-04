@@ -5,7 +5,13 @@ Open this when adding or changing a note field, a setting, backups, the Bin, gro
 ```
 notes/<uuid>.json      one note per file (+ .bak = previous version, .tmp during a write; a locked note is sealed: `enc`, 1.1.30)
 attachments/<name>     photos (png/jpg/gif/webp/bmp), drawings (png), voice (webm) (a locked note's are sealed: they start with CNSEAL2, or CNSEAL1 from 1.1.30)
+attachments/<name>.part + <stem>.rec.json   1.2.4: a voice recording being made (pieces appended every 250 ms) and whose it is
+                       ({ noteId, file, startedAt, endedAt }); see "Voice recordings" below
 backups/YYYY-MM-DD[_HH-MM-SS]/   <uuid>.json…, groups.json, meta.json {created,count} (copies of locked notes sealed, 1.1.31)
+models/<id>/           1.3.1: a downloaded voice-to-text model (Best = whisper-small-en): its files as in main/stt-models.js, then
+                       ready.json { run: 'gpu'|'cpu', at } written last (no ready.json = not complete). Not in backups; the
+                       uninstaller leaves it. A .part left by a quit mid-download is removed at the next start.
+                       (Standard comes with the app: <install>/resources/models/moonshine-base/, from build/models/.)
 groups.json            { groups: [{ id, name, createdAt, parentId, style, color, locked, favorite }] }
 settings.json          see below
 ```
@@ -64,6 +70,9 @@ each note's own choice is kept), fxPaused (pause all effects; also the tray's "P
 defaultOpacity (0.25–1: see-through of new notes), defaultSolidOnHover (true: new notes turn solid on hover),
 listTheme (cream|rose|mint|sky|lilac, dark: night|midnight|forest|plum: colours of the list window; doesn't trigger a reload either),
 madeGroup (true once any group was ever made; hides the "drag to make a group" tip for good),
+sttModel (1.3.1: the voice-to-text model picked in Settings, a model id; missing = Standard), sttTests (1.3.1: { '<model id>/<set>':
+{ speed (× real time), verdict: live | after | slow | failed, quick (true = the 2-second check at first use, false = Test my
+computer), at } }), sttWebgpu (1.3.1: whether the engine found WebGPU last time; decides which set of Best is downloaded),
 lock ("salt:hash" scrypt, or null; since 1.1.30 the marker 'encrypted' while crypt exists), crypt (1.1.30: { v, pub, byPw, byRec, keyShown, off, backupsSealed (1.1.31) }: the
 encryption keys, see architecture.md; never sent to a window), lockKind ('pin'|'password', null = password from before 1.1.6),
 lockLen (PIN length, so a PIN can open by itself)`.
@@ -74,7 +83,22 @@ backup **never overwrites**: notes that differ come back as extra closed notes m
 shows their own dates, not "Restored". Settings shows only the newest backup; days are picked in a pop-up (`pickBackup`).
 Settings sections fold (`foldPanels`, all closed at first).
 Attachments are only deleted when no note *and no backup* references them, and only once they're over 2
-days old (`sweepAttachments`).
+days old (`sweepAttachments`). Files with a `<stem>.rec.json` next to them are never deleted (1.2.4).
+
+**Voice recordings (1.2.4, `main/recordings.js`)**: `rec:start` makes `<name>.part` (name = `<stem>.webm`, a normal
+attachment name) and `<stem>.rec.json`; `rec:chunk` appends (fsync every 8 pieces); `rec:end` with `save` renames the
+`.part` file (the window then adds the chip and calls `rec:done`, which removes the `.rec.json` once the note's html has
+the file), `discard` deletes both, `kept` (closed or locked mid-recording) renames it and makes sure the note has a chip.
+A window that closes or crashes, and quitting (`finishAll` in `will-quit`), finish what is open. At start (`recover`),
+leftover pairs become a chip at the end of their note (`settle`), or a new closed note "Recovered recording" if the note is
+gone. A note still sealed waits for the PIN (`pending`, `retryPending` from `notifyList`; its clip is sealed at once by
+`crypt.sealLoose`). The chip markup in `chipHtml` is the same as `voiceChip` in `src/note/menus-voice-ink.js`: keep both alike.
+
+**Voice to text in a note's html (1.3.1)**: Transcribe's text is `<span class="stt-text" data-of="<the clip's stickyfile url>">`
+(no look of its own; it is how "Replace the text from last time?" finds it; normal text otherwise). While a job runs its
+place is `<span class="stt-pending" contenteditable="false" data-job data-label data-draft>` (empty; the label and the grey
+draft are CSS from the attributes). `collect()` never saves it, and pasting strips both classes (`cleanTree` keeps no
+attributes on a span). Speak to text's own clip is deleted once its text is in (`rec:end 'discard'`).
 
 **Bin**: `list:trash` sets `deletedAt`, and only "Delete forever" / "Empty bin" removes the file. **Locked notes (own lock
 or a locked group around them) and groups with anything locked inside can't be binned or deleted** (main returns

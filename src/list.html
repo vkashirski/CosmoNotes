@@ -195,6 +195,23 @@
     </label>
   </div>
 
+  <!-- 1.3.1: voice to text (painted by paintVoice in list/settings-menus.js) -->
+  <div class="panel" id="sttPanel">
+    <h3>Voice to text</h3>
+    <p class="muted">For Speak to text (in + Add) and Transcribe (right-click a voice note).</p>
+    <div class="row col">
+      <span><b>Use</b></span>
+      <div class="seg" id="sttUse"></div>
+    </div>
+    <div id="sttModels"></div>
+    <div class="row">
+      <span><b>Test my computer</b><small id="sttTestInfo">Checks if words can appear while you talk.</small></span>
+      <button class="pill ghost small" id="sttTest">Test</button>
+    </div>
+    <p class="muted sttfoot" id="sttUsing"></p>
+    <p class="muted sttfoot">Best downloads from Hugging Face. Your voice never leaves this PC.</p>
+  </div>
+
   <div class="panel">
     <h3>Locked notes</h3>
     <p class="muted" id="lockInfo"></p>

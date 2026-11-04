@@ -23,19 +23,25 @@ no loose `store` / `listWin` / `quitting` / `listUnlockedAll` is left.
   - note window: `note:get`, `note:update`, `note:update-sync` (used on unload), `note:dates`,
     `note:new`, `note:duplicate`, `note:close`, `note:trash`, `note:hover`, `note:unlock`, `note:relock`,
     `note:set-locked`, `lock:set` (`{current, next, kind}`, kind = 'pin' | 'password'), `note:minimize`, `note:maximize`, `att:save`,
+    `rec:start`, `rec:chunk`, `rec:end`, `rec:done` (1.2.4: a voice recording written while it is made, `main/recordings.js`;
+    a hidden locked window can't start one),
     `att:pick-images`, `att:open`, `open-external`, `list:show`, `ink:show`, `ink:drag`, `ink:size`, `ink:drop`, `ink:hide`
-    (1.1.15: the drawing toolbar's own window, see §6)
+    (1.1.15: the drawing toolbar's own window, see §6), `stt:start`, `stt:audio` (send), `stt:stop`, `stt:cancel`,
+    `stt:transcribe` (1.3.1, voice to text, below)
   - list window: `list:get`, `list:new`, `list:duplicate`, `list:open-note`, `list:close-note`, `list:trash`,
     `list:restore`, `list:destroy`, `list:empty-bin`, `list:bring-front`, `list:set-locked`, `list:favorite`, `list:apply`,
     `list:edit` (1.1.15, the Edit sheet: title + colour; 1.1.20 "Edit design": also `opacity` and `fx`, neither an edit; 1.2.2: `fxKeys` changes only those effect settings), `list:unlock-all` / `list:lock-all` (1.1.15, the Locked tab),
     `groups:make`, `groups:move-up`, `groups:move-to`, `groups:ungroup` (= move-up for a note),
     `groups:make-from`, `groups:dissolve`, `groups:rename`, `groups:update` (name/style/color), `groups:apply` (mass edit
     colour/font), `groups:trash`, `groups:set-locked`, `groups:reveal`, `groups:hide`, `settings:set`,
-    `backups:list`, `backups:now`, `backups:restore`, `backups:open-folder`, `data:open-folder`
+    `backups:list`, `backups:now`, `backups:restore`, `backups:open-folder`, `data:open-folder`, `stt:status`, `stt:use`,
+    `stt:download`, `stt:download-cancel`, `stt:remove`, `stt:test` (1.3.1, Settings → Voice to text)
   - main → windows: `notes:changed` (list reloads), `settings:changed` (`{spellCheck, hasPassword, lockKind,
     lockLen}`), `note:look` (a note's colour/font/lock/rolled changed from outside), `note:lock-now` (note became
     locked from the list: the window saves, then calls `note:relock` and hides), `note:win-state` (`{maximized}`), `list:nav` (mouse back/forward
-    buttons sent as Windows app-commands)
+    buttons sent as Windows app-commands), `stt:event` (a voice-to-text job's draft / final / status / progress / ready /
+    error, to its note window only), `stt:changed` (Settings → Voice to text, to the list)
+  - the voice-to-text engine window (1.3.1) talks only `engine:msg`, both ways (`src/engine/preload.js`)
   - **No native message boxes.** The list window asks every question with its own app-styled `modal()`
     (list.js) and only then calls main (`list:destroy`, `list:empty-bin`, `backups:restore` don't ask
     themselves). The only native dialog left is the photo file picker (`att:pick-images`).
@@ -52,6 +58,8 @@ no loose `store` / `listWin` / `quitting` / `listUnlockedAll` is left.
 - Navigation is blocked. Links open in the real browser only for `http/https/mailto`.
 - Permissions: microphone (audio only) and clipboard write. Everything else is denied.
 - Pasted HTML is sanitized with an allow-list (`cleanTree` in note.js).
+- 1.3.1: `cosmomodel://engine/` is answered only on the voice-to-text engine's own session (see below); the note and
+  list windows can't load it.
 - Attachments are served through the custom `stickyfile://att/<name>` protocol. Names are validated by
   regex and `path.basename`. The scheme name `stickyfile` is kept from 1.0.0 because it is stored inside
   note HTML, so **don't rename it**.
@@ -105,12 +113,49 @@ no loose `store` / `listWin` / `quitting` / `listUnlockedAll` is left.
 - When a note becomes locked from outside (list right-click, locking its group, dragging it into a locked
   group), main sends `note:lock-now`. The window first saves what was typed, then hides. Never hide it
   directly from main, or the last keystrokes would be lost.
+- **Recording while a note gets locked (1.2.4):** the window puts the chip in and saves before it hides (`relock`,
+  `lockNow`); when it can't (already hidden), `rec:end` with `kept` makes main add the chip. The `.part` file of a
+  locked note being recorded is plain until it is finished; then the note's next save seals it (or `sealLoose` after a crash).
 - The renderer of a hidden locked note must never save: `changed()`/`saveNow()` return early when
   `hidden`, and main strips `html/text/firstImage` from patches. Keep both guards.
 - List cards for locked notes get `text:''` and `firstImage:null` from main, so never send content to the list.
+
+## Voice to text (1.3.1)
+
+Speak to text and Transcribe. Files: `main/stt-engine.js` (engine window, protocol, session), `main/ipc-stt.js` (jobs,
+Settings), `main/stt-models.js` (the list), `main/stt-download.js` (Best), `src/engine/` (the page), `src/note/speech.js`
+(the note window's side), `src/mic-worklet.js`. Rules that aren't obvious from the code:
+- **The engine** is one hidden window owned by main, made on first use and closed after 3 idle minutes (while no job
+  runs). It is sandboxed, has its own small preload and its own in-memory session `cosmonotes-stt`: no permissions,
+  `will-navigate` / `will-redirect` / new windows refused, and every request that is not `cosmomodel:`/`data:`/`blob:` is
+  cancelled (so the engine can never reach the internet). `cosmomodel://engine/` serves a fixed list only (`route`):
+  the page, `/engine.mjs`, `/engine-core.mjs`, `/test-clip.wav`, `/lib/<LIB_FILES>` and `/models/<id>/<file>` for the
+  files of the set that is installed; anything else (`..`, unknown names, a query string) is a 404. Every answer has
+  COOP/COEP/CORP (cross-origin isolation = multi-threaded WASM). The page's CSP: `script-src 'self' 'wasm-unsafe-eval'`
+  plus the import map's sha256; no `blob:` (the prototype's report-only check never saw it needed), no eval.
+- **The import map is fixed** (`IMPORT_MAP` in stt-models.js): `@huggingface/transformers`, `onnxruntime-web/webgpu`,
+  `onnxruntime-common` → files in `src/engine/lib/` (vendored; its README says from where). ONNX Runtime loads its
+  `.wasm`/`.mjs` from `/lib/` (`wasmPaths`); Transformers.js reads models from `/models/` with remote models off and
+  every cache off, and its `fetch` refuses other origins.
+- **Jobs never outlive their note window**: closing it, a crash of its page, or the window being hidden (locked) ends
+  them; every message to the window and every audio piece from it checks `mayShow` (the note unlocked or this window
+  revealed). Main never writes the text into a note: the window inserts it (the usual guards stay: a hidden window
+  gets nothing and never saves). One Speak to text at a time (another window gets `busy`); Transcribe jobs wait for each
+  other; the engine runs the model one piece at a time (`asrLock`), so a Transcribe can run during a Speak to text.
+- **The model of a job**: the one picked in Settings if installed, else Standard (`fallback: 'missing'`, the window says
+  "This model isn't downloaded yet."). While a job runs, the next one uses the model already loaded. Best that fails to
+  load (a graphics card problem) falls back to Standard (`fallback: 'failed'`, Settings shows it).
+- **Live or after you stop**: `settings.sttTests['<model>/<set>']` from Test my computer (the whole bundled clip) or the
+  quiet 2-second check the first time. Not `live` = the engine holds every piece's text until Stop (no drafts).
+- **Speak to text and the recording**: it is the 1.2.4 recorder (`rec.stt`). Normal finish = `rec:end 'discard'` (the
+  clip is deleted at once). Cancel or a failure = `rec:end 'save'` (a voice note where the text was). Closing / locking =
+  `stopRecordingNow` → `sttAbortNow` first (the caret goes to the marker), then the 1.2.4 `kept` path.
+- **Only main goes online**, and only on Download (Best, from huggingface.co at the fixed commit). The engine window
+  can't. Standard comes with the installer (build.bat downloads it once).
 
 ## Spellcheck
 
 - `app.commandLine.appendSwitch('disable-features','WinUseBrowserSpellChecker')` forces Chromium's Hunspell
   spellchecker so that with only `en-US` loaded, Cyrillic words are skipped. When spelling is first turned
-  on, Electron downloads the dictionary once from Google's CDN. That's the only network use, and it's optional.
+  on, Electron downloads the dictionary once from Google's CDN. That and the Best voice model's download (1.3.1, only
+  when you press Download) are the only network uses, and both are optional.

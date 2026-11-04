@@ -33,14 +33,22 @@ echo   Done, using the private copy.
 echo.
 
 :nodeok
-echo   Step 1 of 2: downloading the building kit.
+echo   Step 1 of 3: downloading the building kit.
 echo   The first time this takes a few minutes, please wait...
 echo.
 call npm install --no-audit --no-fund --loglevel=error
 if errorlevel 1 goto :fail
 
+rem 1.3.1: the voice-to-text model that comes with the app (Standard, about 64 MB) goes into build\models.
+rem Only the first time; every file is checked against its sha256 (build\fetch-model.js).
 echo.
-echo   Step 2 of 2: building the installer...
+echo   Step 2 of 3: getting the voice-to-text model...
+echo.
+node build\fetch-model.js
+if errorlevel 1 goto :fail
+
+echo.
+echo   Step 3 of 3: building the installer...
 echo.
 set CSC_IDENTITY_AUTO_DISCOVERY=false
 call npx electron-builder --win nsis --x64

@@ -699,8 +699,11 @@ class Store {
     let used;
     try { used = this.referencedAttachments(); } catch { return; }
     const now = Date.now();
-    for (const f of fs.readdirSync(this.attDir)) {
-      if (used.has(f)) continue;
+    const files = fs.readdirSync(this.attDir);
+    // 1.2.4: a recording being made or not yet in its note (<stem>.rec.json next to it, main/recordings.js) is kept
+    const recording = new Set(files.filter((f) => f.endsWith('.rec.json')).map((f) => f.split('.')[0]));
+    for (const f of files) {
+      if (used.has(f) || recording.has(f.split('.')[0])) continue;
       const p = path.join(this.attDir, f);
       try {
         const age = now - fs.statSync(p).mtimeMs;

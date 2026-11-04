@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 8 of 10: draw-over, floating toolbars
+// CosmoNotes note window, part 9 of 11: draw-over, floating toolbars
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;

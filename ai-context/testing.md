@@ -23,6 +23,8 @@ code (regex) is for rules a test can't easily click through (each such line says
 | `windows.test.js` | note windows: welcome note, see-through / hover / pinned / colour / rolled, placement, moved = remembered, min / max, title, Bring to front, second start, mouse back button, X vs Alt+F4 vs quit |
 | `safety.test.js` | attachments (images only, no path tricks), links (web only), permissions (microphone only), which child windows may open |
 | `toolbars.test.js` | drawing / text toolbars outside the note: 12 px sticking, following, screen edges, rolled, pinned, back inside |
+| `stt.test.js` | voice to text (1.3.1), main's side with a stub engine: jobs and the queue, close / lock / engine crash, the model and its fallback, live or after Stop, Test my computer, `cosmomodel://` (fixed list, COOP/COEP, CSP), the engine's session, the Best download against a local server; the live session logic (`engine-core.mjs`) under Node |
+| `recordings.test.js` | voice recordings on disk while made (1.2.4): Save, the X, close / page crash / lock / quit mid-recording, a real crash and the next start, a deleted note, a sealed note (chip after the PIN), the sweep |
 | `notes.test.js` | editing a note: title and what is an edit, drawing (cleaned, kept exactly while typing), dashes, zoom, word wrap off, favourites, Edit… title, the Bin |
 | `colours.test.js` | paper colours, several notes / Edit… colour, new notes' colours (picked list, no repeat, old settings) |
 | `duplicate.test.js` | Duplicate from the list and the note: what is copied, shared photos, locked copies, Bin |
@@ -42,7 +44,7 @@ code (regex) is for rules a test can't easily click through (each such line says
 | `texts.test.js` | short texts and the owner's wording |
 | `list-logic.test.js` | the list's rules without a browser (tests/helpers/list-kit.js) |
 | `list-ui-cards` / `-pictures` / `-groups` / `-picking` / `-locks-bin` / `-unlock` / `-crypt` / `-settings` | the notes list in Chromium against the real main process |
-| `note-ui.test.js` | a note window in Chromium: text toolbar keeps the selection, word wrap off |
+| `note-ui.test.js` | a note window in Chromium: text toolbar keeps the selection, word wrap off, the voice recorder (fake microphone), Speak to text and Transcribe (1.3.1, a stand-in main and engine) |
 
 ## Helpers (`tests/helpers/`)
 - `app.js`: the real main process in the test's process, under `tests/fake-electron`. `const app = require('./helpers/app')`
@@ -69,7 +71,13 @@ code (regex) is for rules a test can't easily click through (each such line says
   pressing the hidden pop-up's OK would reload the page (`modalOk` refuses). A first start has a welcome note too.
 - `note-ui.js`: a note window in Chromium with a stand-in `window.sticky` (main is not running): `const nu = await
   require('./helpers/note-ui')(); const page = await nu.open({ html }, width)`, `nu.press(page, sel)` (mousedown + click),
-  `await page.updates()` (what the window saved), `await nu.done()`.
+  `await page.updates()` (what the window saved), `await nu.done()`. `nu.open(note, w, h, init)`: `init` runs in the page
+  before it loads, to answer some `window.sticky` calls differently. Chromium has a fake microphone (a beep), and
+  `--allow-file-access-from-files` so Speak to text's AudioWorklet loads from file:// (Electron allows it by itself).
+- The real voice-to-text engine (Transformers.js + the real model) is not in `npm test` (the model isn't in git). To
+  check it in the cloud workspace: serve `main/stt-engine.js`'s `handle()` over a local http server, open its page in
+  Chromium with a stand-in `window.engineBridge`, and point `stt-models.setBuiltInDir()` at a folder with the model
+  (1.3.1 did this, also through the real main: Transcribe word for word, live drafts and finals).
 - `fx.js`: the effects (src/fx/ parts in note.html's order) in a vm: `FX`, `recorder()` (a 2D context that logs calls and
   any NaN), `canvas(w, h)`, `clock.t` (performance.now), `seeded(n)`, `ptr()`, `PAL(dark)`, `SIZES`, `allBad()`.
 - `sources.js`: the code as the windows load it: `src.note()`, `src.list()`, `src.fx()`, `src.css('note')`, `src.main()`,

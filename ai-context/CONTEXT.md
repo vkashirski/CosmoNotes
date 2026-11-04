@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 3 November 2026 · App version 1.2.3**
+**Last updated: 4 November 2026 · App version 1.3.1**
 
 Start with `CLAUDE.md` (rules, commands, pitfalls, release checklist). This file is the map: what the app is,
 how the folder is laid out, and which `ai-context/` file to open for the job in hand. Open only the files your
@@ -33,8 +33,9 @@ for Microsoft Sticky Notes. It was called **Sticky Pins** in 1.0.0.
 4. **Simple surface, power behind one button.** Basic formatting is always visible; complex things
    (photos, voice, drawing…) live behind **+ Add**.
 
-**The owner** is not a programmer. They build the installer by double-clicking `build.bat` and install
-`dist/CosmoNotes Setup <version>.exe` on their laptops. Explain things in plain language. The project is a git
+**The owner** is a programmer (older notes said otherwise; fixed in 1.2.4): technical detail is fine. Texts inside the
+app stay short and plain. They build the installer by double-clicking `build.bat` and install
+`dist/CosmoNotes Setup <version>.exe` on their laptops. The project is a git
 repo (public on GitHub: `vkashirski/CosmoNotes`); on the owner's PC it's at `C:\Workspaces\CosmoNotes` (it used
 to be `C:\Users\User\Desktop\Sticky Pins\Sticky Pins`). They want edits made **in that folder, in place**, not
 as new copies. Keep each file's existing line endings (they are mixed: see CLAUDE.md).
@@ -51,19 +52,24 @@ main/              state (S.store, S.listWin, S.quitting, S.listUnlockedAll + wi
                    display (fitBounds) · web (hardenContents, openExternal) · ink-geometry + ink-window (toolbars outside the note) ·
                    list-notify (notifyList) · note-state (applyState, setRolled, titles) · list-visibility (hidden-in-list rules, pushLook) ·
                    note-window (openNoteWindow, createNote, duplicateNote, bringToFront, enforcePinned) · list-window (showList, themes) ·
-                   tray (buildTray, startup, pause effects) · ipc-common (senderNote, applyPatch) · ipc-notes · ipc-ink · ipc-files ·
+                   tray (buildTray, startup, pause effects) · recordings (1.2.4: voice recordings on disk while made, finished on
+                   close / lock / quit, recovered after a crash) · ipc-common (senderNote, applyPatch) · ipc-notes · ipc-ink · ipc-files (+ rec:*) ·
                    ipc-groups (list:get, groups:*) · ipc-list-actions (list locks, open/close/trash/edit/apply, bin) · ipc-settings
-                   (settings:set, backups) · ipc-crypt (crypt:* from Settings → Locked notes) · ipc (registerIpc calls the seven ipc-* parts)
+                   (settings:set, backups) · ipc-crypt (crypt:* from Settings → Locked notes) · 1.3.1 voice to text: stt-models (the
+                   model list: files, commits, sha256; where they are) · stt-engine (the hidden engine window, cosmomodel://, its
+                   session) · stt-download (Best's download, Remove, .part cleanup) · ipc-stt (stt:* jobs + Settings) ·
+                   ipc (registerIpc calls the eight ipc-* parts)
 store.js           All disk storage (notes, groups, settings, attachments, backups). No Electron imports.
 preload.js         Safe bridge: exposes window.sticky.* to both windows (contextIsolation + sandbox)
-src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/note/*.js, 10 parts loaded in this order, sharing
+src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/note/*.js, 11 parts (1.3.1) loaded in this order, sharing
                    names through window.COSMO_NOTE_KIT (K) and its V (V.note, V.settings, V.hidden, V.dirty, V.savedRange…; see
                    splitting-code.md): base (api, $, colour row, saving: collect/changed/saveNow, dates, applyLook, effects on the
                    note) · fx-format (the Effects pop-up, spelling, selection helpers: saveSel/restoreSel/insertNodes, formatting:
                    runCmd) · panels (pop-overs: openPop/closePops, header buttons, ⋯ menu, Add panel: doInsert, text panel A,
                    Undo/Redo) · content (links, picture descriptions, tables, paste/drop and cleanTree, clicks in the note) ·
                    editing (editing helpers: line joins, checklist boxes, decorate; Ctrl+F find; keyboard) · menus-voice-ink
-                   (right-click menus, voice notes, drawing sketch, photo resizing) · lock-zoom (locking, password/PIN, ask(),
+                   (right-click menus, voice notes, drawing sketch, photo resizing) · speech (1.3.1: Speak to text, Transcribe;
+                   part 7 of 11) · lock-zoom (locking, password/PIN, ask(),
                    word wrap, zoom: zoomNow/setZoom, sideways scroll) · draw-over (draw-over: inkState, renderInk, saveInk; floating
                    toolbars: movable) · ink-out (toolbars in their own little windows: barOut, inkOut/textOut; whole-stroke
                    eraser) · eraser-start (the Partial eraser, toast(), start-up: init).
@@ -87,11 +93,16 @@ src/note.css, src/list.css  Not used since 1.1.26: only notes saying the styles 
 src/list.js        Not used since 1.1.28: only a note saying the code moved to src/list/ (can be deleted)
 src/note.js        Not used since 1.1.44: only a note saying the code moved to src/note/ (can be deleted)
 src/fonts/         Augusta.ttf, the Medieval note font (1.2.1; free, by Dieter Steffmann). Binary: no line endings to keep.
+src/engine/        1.3.1 voice to text: the engine page (engine.mjs, engine-core.mjs: the live session, pauses, text clean-up),
+                   its preload, test-clip.wav (Test my computer), lib/ (Transformers.js + ONNX Runtime, vendored unchanged:
+                   big files, never open them; README.md there says what they are). Served only through cosmomodel://
+src/mic-worklet.js 1.3.1: the AudioWorklet of Speak to text (16 kHz pieces)
 src/about.js       In-app feature list (window.COSMO_ABOUT.FEATURES) + LAST_UPDATED date; no version history since 1.1.41
 src/fx/            Note effects + mouse followers (window.COSMO_FX), used by both windows: 8 files loaded in order (see effects.md)
 src/fx.js          Not used since 1.1.24: only a note saying the code moved to src/fx/ (can be deleted)
 assets/            icon.ico/png (windows), tray.ico/png
-build/             icon.ico/png for the installer/shortcuts; afterPack.js is an unused stub (see build-and-release.md, Smart App Control)
+build/             icon.ico/png for the installer/shortcuts; afterPack.js is an unused stub (see build-and-release.md, Smart App Control);
+                   fetch-model.js (1.3.1: build.bat gets the Standard voice model into build/models/, git-ignored, packed into resources/models/)
 build.bat          One-click: (private Node if needed) + npm install + electron-builder → dist/CosmoNotes Setup <ver>.exe
 HOW TO INSTALL.txt Plain-language guide for the owner (install, data folder, forgot password, tips)
 test-run.bat       Runs CosmoNotes from this folder with Electron's original exe (no build needed)
@@ -104,6 +115,8 @@ tests/             npm test – one *.test.js per area (notes, groups, locks, cr
 CLAUDE.md         Short rules every AI session reads first (rules, commands, pitfalls, release checklist)
 ai-context/        Docs for AI assistants: this map + one file per topic (table below)
 tools/node/        Private Node.js 22 that build.bat downloads when the computer's Node is missing/too old (git-ignored)
+tools/stt-prototype/  The voice-to-text prototype (Step 1, git-ignored). Its code lives in the app since 1.3.1: delete it once
+                   Speak to text works on the owner's PC.
 tools/split/       Helper scripts for splitting big files (map, circles, CSS cuts, style compare); see splitting-code.md. Not packed.
 ```
 

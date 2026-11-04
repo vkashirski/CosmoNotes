@@ -37,6 +37,22 @@
 .rbtn.ghost:hover { background: var(--pop-soft); }
 .rbtn.stop { padding: 0 12px 0 10px; background: #E5484D; color: #fff; }
 .rbtn.stop span { width: 9px; height: 9px; border-radius: 2px; background: #fff; }
+/* 1.3.1: Speak to text uses the same bar ("Listening…", Stop, Cancel) */
+#recbar.stt .rtime { min-width: 0; font-variant-numeric: normal; }
+#recbar.stt .rbtn.stop span { border-radius: 2px; }
+
+/* ---------- voice to text in the note (src/note/speech.js) ---------- */
+/* where the words go: an empty span; its grey draft and its label are attributes, so they are never saved or copied */
+.stt-pending { white-space: pre-wrap; }
+.stt-pending::before { content: attr(data-draft); opacity: .45; }
+.stt-pending:not([data-label])::after {
+  content: ''; display: inline-block; width: .42em; height: .42em; margin: 0 .25em; border-radius: 50%;
+  background: currentColor; opacity: .5; vertical-align: .12em; animation: pulse 1.1s infinite;
+}
+.stt-pending[data-label]::after {
+  content: attr(data-label); display: inline-block; margin: 0 .2em; padding: 0 .6em; border-radius: 999px;
+  border: 1px dashed currentColor; opacity: .55; font: italic 700 .78em/1.5 var(--ui); white-space: nowrap;
+}
 
 /* ---------- drawing ---------- */
 #draw {

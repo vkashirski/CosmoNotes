@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 4 of 10: links, picture descriptions, tables, photos (paste / drop), clicks inside the note
+// CosmoNotes note window, part 4 of 11: links, picture descriptions, tables, photos (paste / drop), clicks inside the note
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;

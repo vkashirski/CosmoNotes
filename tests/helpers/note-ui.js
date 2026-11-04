@@ -6,6 +6,8 @@
 //   const nu = await require('./helpers/note-ui')();
 //   const page = await nu.open({ html: '<p>Hello</p>' }, 360);   // the note (added to a plain yellow note), window width
 //   await nu.press(page, '#btnText');  await page.updates()  →  every patch the window saved;  await nu.done()
+//   nu.open(note, w, h, init): init = a function run in the page before it loads (after window.sticky is set up), e.g. to
+//   answer some calls differently. Chromium has a fake microphone (a beep) that it may use without asking.
 const path = require('path');
 
 let playwright;
@@ -15,11 +17,14 @@ const BASE = { id: 'a', color: 'yellow', font: 'hand', size: 'm', opacity: 1, zo
 
 module.exports = async function noteUi() {
   let browser;
-  try { browser = await playwright.chromium.launch(); } catch (e) { console.log('SKIP: Chromium does not start here: ' + String(e.message).split('\n')[0]); process.exit(77); }
+  try { browser = await playwright.chromium.launch({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required',
+    // Speak to text's AudioWorklet (src/mic-worklet.js) is a module loaded from file://: Electron allows it (the prototype
+    // showed it), plain Chromium only with this
+    '--allow-file-access-from-files'] }); } catch (e) { console.log('SKIP: Chromium does not start here: ' + String(e.message).split('\n')[0]); process.exit(77); }
   const pages = [];
   const nu = {
     browser,
-    async open(note, w = 360, h = 320) {
+    async open(note, w = 360, h = 320, init = null) {
       const page = await browser.newPage({ viewport: { width: w, height: h } });
       pages.push(page);
       page.errors = [];
@@ -35,6 +40,7 @@ module.exports = async function noteUi() {
         const prox = (top) => new Proxy({}, { get: (t, k) => (top && ['ink', 'list', 'groups', 'settings', 'crypt', 'backups'].includes(k) ? prox(false) : fn(String(k))) });
         window.sticky = prox(true);
       }, { ...BASE, ...note });
+      if (init) await page.addInitScript(init);
       await page.goto('file://' + path.join(__dirname, '..', '..', 'src', 'note.html'));
       await page.waitForFunction(() => document.getElementById('editor') && document.getElementById('editor').innerHTML !== '' || document.readyState === 'complete');
       await page.waitForTimeout(150);

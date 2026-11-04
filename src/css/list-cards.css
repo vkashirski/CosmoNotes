@@ -192,6 +192,14 @@
 .row b { font-weight: 800; font-size: 13.5px; }
 .row small { display: block; color: var(--mute); font-weight: 700; font-size: 12px; margin-top: 2px; }
 .row > span { flex: 1; }
+/* 1.3.1: Settings → Voice to text */
+.sttm { flex-wrap: wrap; }
+#sttModels > .row:first-child, #sttModels + .row { border-top: 1px solid var(--soft); }
+.sttm .pill { flex: none; }
+.sttbar { flex-basis: 100%; height: 6px; border-radius: 999px; background: var(--soft); overflow: hidden; }
+.sttbar i { display: block; height: 100%; background: #3DAA5C; transition: width .25s; }
+.sttm small.err { color: var(--danger); }
+.panel .muted.sttfoot { margin: 8px 0 0; }
 .toggle { cursor: pointer; }
 /* 1.1.20: a switch sits right after its text (it used to be pushed to the far right). Switches one after another
    are grouped (.switches, made by list.js groupSwitches) so they still line up under each other */

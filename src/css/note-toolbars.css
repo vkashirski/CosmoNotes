@@ -221,6 +221,7 @@ input[type="range"] { width: 100%; margin: 2px 0 4px; accent-color: #C9A227; }
 .mi.danger, .mi.danger svg { color: var(--pop-danger, #B3261E); }
 
 .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+#insert .grid { grid-template-columns: repeat(3, 1fr); } /* 1.3.1: nine tiles (Speak to text) */
 .tile {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 8px 2px 7px;

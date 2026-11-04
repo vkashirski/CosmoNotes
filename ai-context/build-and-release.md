@@ -18,6 +18,20 @@ appears, or when files are saved into the owner's folder. The per-update checkli
   changing the system Node. If electron-builder ever needs a newer Node, raise the version in both the check and
   the download URL in `build.bat`.
 
+## Voice to text in the build (1.3.1)
+
+- **The Standard model** (Moonshine Base q8, ~64 MB) is not in git. `build.bat` step 2 runs `node build/fetch-model.js`:
+  it downloads the files listed in `main/stt-models.js` (fixed Hugging Face commit) into `build/models/moonshine-base/`
+  (git-ignored), checks every sha256, and keeps what is already there. `package.json` → `build.extraResources` packs
+  `build/models` into `resources/models/` (no `.part`). In the app, `app.isPackaged` reads it from `process.resourcesPath`,
+  `npm start` / `test-run.bat` from `build/models/` (run `node build/fetch-model.js` once, or build.bat). A download that
+  fails stops the build ("Could not get the voice model"): usually no internet.
+- **The engine's library is vendored** in `src/engine/lib/` (Transformers.js 4.3.1 and ONNX Runtime Web, unchanged; its
+  README lists versions and sha256). No npm dependency for it, so nothing native (`onnxruntime-node`, `sharp`) is ever
+  installed or packed. It is packed in `app.asar` with the rest of `src/` (the 27 MB `.wasm` is read from there by
+  `main/stt-engine.js`). Nothing about voice to text touches `CosmoNotes.exe`.
+- **Best** is never in the installer: Settings downloads it at run time into `<data>/models/`.
+
 ## Smart App Control (SAC)
 
 - **Smart App Control (SAC) – never modify CosmoNotes.exe.** The owner's PC has SAC **On**: it left

@@ -182,6 +182,11 @@ function usedByPlainNote(name, exceptId) {
   }
   return false;
 }
+// 1.2.4: a recording a crash left behind, for a note that is still sealed (PIN not typed yet): its file is sealed right
+// away; its chip is added after the PIN (main/recordings.js)
+function sealLoose(name, n) {
+  if (shouldSeal(n) && attStatus(name) === 'plain') sealFile(name);
+}
 // What the stickyfile:// protocol and "open" use: Buffer = the plain bytes of a sealed file, false = sealed and the
 // PIN wasn't typed yet, null = an ordinary file (read it directly).
 function attachmentBytes(p) {
@@ -478,5 +483,5 @@ const setPendingHandler = (fn) => { onPending = fn; };
 
 module.exports = {
   attachmentBytes, changePw, clearOpenCopies, mimeOf, cleanCode, cryptOn, install, isSetUp, keyLoaded, keySaved, newRecovery, openableCopy,
-  setOff, setPendingHandler, setUp, status, syncSeals, takePending, unlock, unlockWithRecovery,
+  sealLoose, setOff, setPendingHandler, setUp, status, syncSeals, takePending, unlock, unlockWithRecovery,
 };

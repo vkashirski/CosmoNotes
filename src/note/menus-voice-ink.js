@@ -1,13 +1,15 @@
 'use strict';
-// CosmoNotes note window, part 6 of 10: right-click menus, voice notes, drawing, photo resizing
+// CosmoNotes note window, part 6 of 11: right-click menus, voice notes, drawing, photo resizing
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
-  const { V, api, $, $$, editor, body, esc, fmt, changed, saveSel, insertNodes, closePops, openLinkForm, openDesc,
+  const { V, api, $, $$, editor, body, esc, fmt, changed, saveNow, saveSel, insertNodes, closePops, openLinkForm, openDesc,
     tableOp, copyPhoto, openPhoto } = K;
   // defined in a later part:
   const zoomNow = K.later('zoomNow'), hasInk = K.later('hasInk'), needsResizeWarning = K.later('needsResizeWarning'),
-    resizeWarning = K.later('resizeWarning'), toast = K.later('toast'), textWidth = K.later('textWidth');
+    resizeWarning = K.later('resizeWarning'), toast = K.later('toast'), textWidth = K.later('textWidth'),
+    transcribe = K.later('transcribe'), sttStop = K.later('sttStop'), sttCancel = K.later('sttCancel'), sttMic = K.later('sttMic'),
+    sttAbortNow = K.later('sttAbortNow');
   // ================================================================ right-click menus
   const ctx = $('#ctx');
   function hideCtx() { ctx.hidden = true; }
@@ -76,6 +78,7 @@
     } else if (voice) {
       items = [
         { label: playingChip === voice ? 'Pause' : 'Play', run: () => togglePlay(voice) },
+        { label: 'Transcribe', run: () => transcribe(voice) }, // 1.3.1: the text goes on the line after it (src/note/speech.js)
         '-',
         { label: 'Remove recording', danger: true, run: () => { if (playingChip === voice) stopPlay(); voice.remove(); changed(); } },
       ];
@@ -147,28 +150,59 @@
     return `<span class="voice" contenteditable="false" data-src="${esc(url)}" data-dur="${dur}"><span class="v-play"></span><span class="v-bars">${bars}</span><span class="v-time">${fmt(dur)}</span></span>&nbsp;`;
   }
 
-  const rec = { mr: null, stream: null, chunks: [], start: 0, timer: null, keep: true, ctx: null, raf: 0 };
-  async function startRecording() {
-    if (rec.mr) return;
+  // 1.2.4: the recording goes to disk while you talk (main/recordings.js: rec.id names the file), so closing the note,
+  // locking it, quitting or a crash keeps what was said. The pieces stay here too, in case the file can't be written.
+  // rec.keep: true = Save, false = thrown away, 'kept' = closed or locked mid-recording (stopRecordingNow),
+  // 'stt' = Speak to text stopped: the clip is on disk, and src/note/speech.js decides (rec.onSttStop) whether it stays.
+  // 1.3.1: rec.stt = this recording is Speak to text: the same recorder (the file is the safety net), plus the 16 kHz
+  // audio for the engine (sttMic); the bar says "Listening…" with Stop and Cancel.
+  const rec = { mr: null, stream: null, chunks: [], start: 0, timer: null, keep: true, ctx: null, raf: 0, id: null, url: null, q: null, starting: false,
+    stt: false, onSttStop: null };
+  async function startRecording({ stt = false } = {}) {
+    if (rec.mr || rec.starting) return false;
+    rec.starting = true;
     saveSel();
     try {
       rec.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
     } catch {
+      rec.starting = false;
       toast('No microphone found, or Windows blocked it (Settings → Privacy → Microphone)');
-      return;
+      return false;
     }
+    rec.id = null;
+    rec.url = null;
+    rec.q = Promise.resolve();
+    try {
+      const r = await api.recStart();
+      if (r && r.id) { rec.id = r.id; rec.url = r.url; }
+    } catch { /* kept in memory only, as before 1.2.4 */ }
+    rec.starting = false;
     const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
     rec.mr = new MediaRecorder(rec.stream, { mimeType: mime });
     rec.chunks = [];
     rec.keep = true;
-    rec.mr.ondataavailable = (e) => { if (e.data && e.data.size) rec.chunks.push(e.data); };
+    rec.mr.ondataavailable = (e) => {
+      if (!e.data || !e.data.size) return;
+      rec.chunks.push(e.data);
+      const id = rec.id;
+      const blob = e.data;
+      // in order: each piece is appended to the file only after the one before it
+      if (id) rec.q = rec.q.then(() => blob.arrayBuffer()).then((b) => api.recChunk(id, new Uint8Array(b))).catch(() => {});
+    };
     rec.mr.onstop = finishRecording;
     rec.mr.start(250);
     rec.start = Date.now();
+    rec.stt = stt;
+    $('#recbar').classList.toggle('stt', stt);
+    $('#recStop').lastChild.textContent = stt ? 'Stop' : 'Save';
+    $('#recStop').title = stt ? 'Stop and write it down' : 'Stop and save';
+    $('#recCancel').title = stt ? 'Cancel' : 'Throw away';
     $('#recbar').hidden = false;
-    $('#recTime').textContent = '0:00';
-    rec.timer = setInterval(() => { $('#recTime').textContent = fmt((Date.now() - rec.start) / 1000); }, 250);
+    $('#recTime').textContent = stt ? 'Listening…' : '0:00';
+    if (!stt) rec.timer = setInterval(() => { $('#recTime').textContent = fmt((Date.now() - rec.start) / 1000); }, 250);
     startMeter();
+    if (stt) sttMic(rec.stream);
+    return true;
   }
   function startMeter() {
     const meter = $('#meter');
@@ -198,9 +232,21 @@
     } catch { /* meter is just decoration */ }
   }
   function stopRecording(keep) {
-    if (!rec.mr) return;
+    if (!rec.mr || rec.keep === 'kept') return;
     rec.keep = keep;
     try { rec.mr.stop(); } catch { finishRecording(); }
+  }
+  // 1.2.4: the note closes or gets locked mid-recording. The chip goes in right away, so the save that follows
+  // (beforeunload, relock, lockNow) has it; main finishes the file with what arrived (and adds the chip if this window
+  // can't save any more). Returns false when there is no file to keep (the slower Save path is used then).
+  function stopRecordingNow() {
+    if (rec.stt || !rec.mr) sttAbortNow(); // 1.3.1: Speak to text stops at once; the chip goes where its text was
+    if (!rec.mr || rec.keep === 'kept' || !rec.id) return false;
+    rec.keep = 'kept';
+    insertNodes(voiceChip(rec.url, Math.max(1, Math.round((Date.now() - rec.start) / 1000))));
+    api.recEnd(rec.id, 'kept').catch(() => {});
+    try { rec.mr.stop(); } catch { finishRecording(); }
+    return true;
   }
   async function finishRecording() {
     clearInterval(rec.timer);
@@ -211,20 +257,39 @@
     const dur = Math.max(1, Math.round((Date.now() - rec.start) / 1000));
     const chunks = rec.chunks;
     const keep = rec.keep;
+    const { id, url } = rec;
     rec.mr = null;
     rec.stream = null;
     rec.chunks = [];
-    if (!keep || !chunks.length) return;
+    rec.id = null;
+    rec.url = null;
+    rec.keep = true;
+    rec.stt = false;
+    if (keep === 'kept') return; // done already (stopRecordingNow)
+    await rec.q; // every piece is in the file
+    const clip = { id, url, chunks, dur };
+    if (keep === 'stt') { const r = rec.onSttStop; rec.onSttStop = null; if (r) r(clip); else keepClip(clip); return; }
+    if (!keep || !chunks.length) { dropClip(clip); return; }
+    await keepClip(clip);
+  }
+  // a finished recording becomes a voice note (its chip where the caret is), or is thrown away
+  async function keepClip({ id, url, chunks, dur }) {
+    if (!chunks.length) { dropClip({ id }); return false; }
     try {
-      const blob = new Blob(chunks, { type: 'audio/webm' });
-      const url = await api.saveAttachment(new Uint8Array(await blob.arrayBuffer()), 'webm');
-      insertNodes(voiceChip(url, dur));
+      let got = id ? await api.recEnd(id, 'save').catch(() => null) : null;
+      // the file couldn't be written: save the pieces kept here, as before 1.2.4
+      if (!got) got = await api.saveAttachment(new Uint8Array(await new Blob(chunks, { type: 'audio/webm' }).arrayBuffer()), 'webm');
+      insertNodes(voiceChip(got, dur));
+      if (id && got === url) { await saveNow(); api.recDone(id).catch(() => {}); } // the note has it: main tidies up
+      return true;
     } catch {
       toast('Could not save the recording');
+      return false;
     }
   }
-  $('#recStop').addEventListener('click', () => stopRecording(true));
-  $('#recCancel').addEventListener('click', () => stopRecording(false));
+  function dropClip({ id }) { if (id) api.recEnd(id, 'discard').catch(() => {}); }
+  $('#recStop').addEventListener('click', () => (rec.stt ? sttStop() : stopRecording(true)));
+  $('#recCancel').addEventListener('click', () => (rec.stt ? sttCancel() : stopRecording(false)));
 
   // ================================================================ drawing
   const cv = $('#cv');
@@ -463,6 +528,7 @@
   window.addEventListener('resize', placeHandle);
   editor.addEventListener('load', placeHandle, true);
 
-  Object.assign(K, { hideCtx, togglePlay, stopPlay, rec, startRecording, stopRecording, openDraw, closeDraw, drawUndo,
+  Object.assign(K, { hideCtx, togglePlay, stopPlay, voiceChip, rec, startRecording, stopRecording, stopRecordingNow, keepClip, dropClip,
+    openDraw, closeDraw, drawUndo,
     handle, selectImage, placeHandle });
 })();

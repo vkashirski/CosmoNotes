@@ -10,9 +10,10 @@ const src = require('./helpers/sources');
 const { read } = src;
 const version = require('../package.json').version;
 const [MAJ, MIN, NOW] = version.split('.').map(Number);
-assert.deepEqual([MAJ, MIN], [1, 2], 'the owner decides when the first or second number goes up: update this check then');
-// where each 1.x series starts and ends: 1.0.0 – 1.0.4, 1.1.0 – 1.1.49, then 1.2.1 on (the owner's pick: there is no 1.2.0)
-const SERIES = [[2, 1, NOW], [1, 0, 49], [0, 0, 4]];
+assert.deepEqual([MAJ, MIN], [1, 3], 'the owner decides when the first or second number goes up: update this check then');
+// where each 1.x series starts and ends: 1.0.0 – 1.0.4, 1.1.0 – 1.1.49, 1.2.1 – 1.2.4 (the owner's pick: there is no 1.2.0),
+// then 1.3.1 on (voice to text; the owner's pick: there is no 1.3.0)
+const SERIES = [[3, 1, NOW], [2, 1, 4], [1, 0, 49], [0, 0, 4]];
 
 // ---- the newest version everywhere, with one date
 const box = { window: {} };

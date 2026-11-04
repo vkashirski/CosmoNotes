@@ -12,9 +12,12 @@ const { buildTray, syncLoginItem } = require('./main/tray');
 const { registerIpc } = require('./main/ipc');
 const { S } = require('./main/state');
 const { attachmentBytes, clearOpenCopies, install: installCrypt, mimeOf } = require('./main/crypt');
+const recordings = require('./main/recordings');
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'stickyfile', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
+  // 1.3.1: voice to text. Only the engine window's own session answers it (main/stt-engine.js)
+  { scheme: 'cosmomodel', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } },
 ]);
 // Kept from the "Sticky Pins" days so Windows treats CosmoNotes as the same app
 // (the installer replaces the old one and "Start with Windows" keeps working).
@@ -28,6 +31,7 @@ function start() {
   migrateOldData();
   S.store = new Store(app.getPath('userData'));
   installCrypt(); // 1.1.30: locked notes are encrypted on disk (main/crypt.js)
+  recordings.recover(); // 1.2.4: voice recordings a crash left behind get their chip back (main/recordings.js)
 
   protocol.handle('stickyfile', (req) => {
     const u = new URL(req.url);
@@ -90,5 +94,8 @@ if (!app.requestSingleInstanceLock()) {
       try { S.store.settings.listBounds = S.listWin.getBounds(); S.store.saveSettings(); } catch { /* ignore */ }
     }
   });
-  app.on('will-quit', () => { if (S.store) S.store.flush(); clearOpenCopies(); }); // 1.1.31: no plain photo copies left in temp
+  app.on('will-quit', () => {
+    if (S.store) { recordings.finishAll(); S.store.flush(); } // 1.2.4: a recording still running is kept
+    clearOpenCopies(); // 1.1.31: no plain photo copies left in temp
+  });
 }

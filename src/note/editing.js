@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 5 of 10: editing helpers (checklists, strike-through…), Ctrl+F find, the keyboard
+// CosmoNotes note window, part 5 of 11: editing helpers (checklists, strike-through…), Ctrl+F find, the keyboard
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -8,7 +8,8 @@
   // defined in a later part:
   const hideCtx = K.later('hideCtx'), stopRecording = K.later('stopRecording'), closeDraw = K.later('closeDraw'),
     drawUndo = K.later('drawUndo'), zoomNow = K.later('zoomNow'), setZoom = K.later('setZoom'),
-    exitInk = K.later('exitInk'), inkUndo = K.later('inkUndo'), inkRedo = K.later('inkRedo'), toast = K.later('toast');
+    exitInk = K.later('exitInk'), inkUndo = K.later('inkUndo'), inkRedo = K.later('inkRedo'), toast = K.later('toast'),
+    sttStop = K.later('sttStop');
   // ================================================================ 1.1.22 (sixth round): editing helpers
   // the next / previous thing you can see from the caret: a text with letters in it, a photo, a line break, a voice
   // note… (empty wrappers and line ends in between are skipped, also across lines)
@@ -314,7 +315,7 @@
       if (find.on) { closeFind(); return; }
       if (K.inkState.on) { exitInk(); return; }
       if (!$('#draw').hidden) closeDraw();
-      else if (!$('#recbar').hidden) stopRecording(false);
+      else if (!$('#recbar').hidden) { if (K.rec.stt) sttStop(); else stopRecording(true); } // 1.2.4: Esc saves the recording (only the X throws it away); 1.3.1: Esc = Stop for Speak to text
       closePops();
       hideCtx();
     }

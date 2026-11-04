@@ -8,7 +8,7 @@
  * Keep each item short: one or two plain sentences.
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-11-03',
+  LAST_UPDATED: '2026-11-04',
 
   FEATURES: [
     {
@@ -81,7 +81,10 @@ window.COSMO_ABOUT = {
       items: [
         'Photos: from a file, pasted or dragged in. Drag a corner to resize.',
         'Right-click a photo to add a description. Search finds the photo by it.',
-        'Voice recordings you can play inside the note.',
+        'Voice recordings you can play inside the note. They save while you talk, so closing the note or a crash keeps them.',
+        'Speak to text: talk, and the words appear in your note. It all stays on this PC.',
+        'Transcribe: right-click a voice note to turn it into text.',
+        'Voice to text has two models in Settings: Standard comes with the app, Best is a download. Test my computer shows what this PC can do.',
         'Sketches: a small drawing pad that becomes a picture.',
         'Links, tables, numbered lists, dividers and today’s date.',
       ],

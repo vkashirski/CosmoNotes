@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 2 of 10: the Effects pop-up, spelling, selection helpers, formatting
+// CosmoNotes note window, part 2 of 11: the Effects pop-up, spelling, selection helpers, formatting
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;

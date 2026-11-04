@@ -121,7 +121,7 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
   Intl, Date, Math, JSON, Object, Array, Set, Map, WeakMap, String, Number, Boolean, Promise, RegExp, Error, parseFloat, parseInt, isFinite, Uint8Array, encodeURIComponent };
 {
   const sticky = fake('sticky'); sticky.getNote = () => Promise.resolve(null); // the window then stops before it shows a note
-  const { K, parts } = checkKit('note', 'note', ['base', 'fx-format', 'panels', 'content', 'editing', 'menus-voice-ink', 'lock-zoom', 'draw-over', 'ink-out', 'eraser-start'], 'COSMO_NOTE_KIT', true,
+  const { K, parts } = checkKit('note', 'note', ['base', 'fx-format', 'panels', 'content', 'editing', 'menus-voice-ink', 'speech', 'lock-zoom', 'draw-over', 'ink-out', 'eraser-start'], 'COSMO_NOTE_KIT', true,
     { ...base, document: doc(), window: { sticky, COSMO_FX: fake('COSMO_FX'), addEventListener() {}, matchMedia: () => ({ matches: true }) }, getSelection: () => fake('selection'), innerWidth: 400, innerHeight: 400, devicePixelRatio: 1,
       localStorage: { getItem: () => null, setItem() {}, removeItem() {} }, navigator: fake('navigator'), CSS: fake('CSS'), Highlight: class {},
       Node: { TEXT_NODE: 3, ELEMENT_NODE: 1 }, NodeFilter: { SHOW_TEXT: 4, SHOW_ELEMENT: 1, FILTER_ACCEPT: 1, FILTER_REJECT: 2 } },
@@ -192,7 +192,7 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
 (async () => {
   const app = require('./helpers/app');
   const { H, L } = await app.start();
-  const pre = read('preload.js');
+  const pre = read('preload.js') + read('src/engine/preload.js'); // 1.3.1: the voice-to-text engine window has its own
   const inv = new Set([...pre.matchAll(/\binv\('([^']+)'/g)].map((m) => m[1]));
   const sends = new Set([...pre.matchAll(/ipcRenderer\.send(?:Sync)?\('([^']+)'/g)].map((m) => m[1]));
   const ons = new Set([...pre.matchAll(/ipcRenderer\.on\('([^']+)'/g)].map((m) => m[1]));

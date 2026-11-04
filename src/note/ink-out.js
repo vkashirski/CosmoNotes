@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 9 of 10: the toolbars outside the note (their own little windows), the eraser for whole strokes
+// CosmoNotes note window, part 10 of 11: the toolbars outside the note (their own little windows), the eraser for whole strokes
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
