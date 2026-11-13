@@ -1,5 +1,7 @@
 /* ---------- locked note ---------- */
 body.locked-hidden #scroller, body.locked-hidden #tools, body.locked-hidden #stamp { display: none; }
+/* 1.3.28 (the owner's wish): nothing of a hidden locked note can be changed: no ⋯ menu, no effects button (main refuses it too) */
+body.locked-hidden #btnMenu, body.locked-hidden #btnFx { display: none; }
 #lockScreen {
   flex: 1; min-height: 0;
   display: grid; place-items: center;
@@ -145,6 +147,8 @@ body[data-font="medieval"] #editor { font-family: var(--med); line-height: 1.38;
 }
 body[data-font="round"] #editor ul.checklist li { padding-left: var(--cb-p, 1.55em); }
 body[data-font="round"] #editor ul.checklist li::before { top: var(--cb-t, .3em); width: var(--cb-s, 1em); height: var(--cb-s, 1em); }
+/* 1.3.15: a Medieval note's box is .84em, the size its Rounded words are drawn at (alignChecks BOX), not Caveat's .78em */
+body[data-font="medieval"] #editor ul.checklist li::before { width: var(--cb-s, .84em); height: var(--cb-s, .84em); }
 body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #editor ul.checklist li:not(.done)::before { background-color: transparent; }
 #editor ul.checklist li.done::before {
   opacity: 1;
@@ -156,6 +160,13 @@ body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[da
 }
 #editor ul.checklist li.done { text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: .55; }
 #editor ul.checklist li.done li:not(.done) { opacity: 1; }
+/* 1.3.19: dragging a box moves its line (src/note/checklists.js): the line stays faint where it was, a bar shows where it goes */
+#editor ul.checklist li.cb-moving { opacity: .35; }
+body.cb-dragging, body.cb-dragging * { cursor: grabbing !important; }
+body.cb-dragging #editor { user-select: none; }
+#cbDrop { position: absolute; z-index: 3; height: 2px; margin-top: -1px; border-radius: 2px; background: var(--accent); pointer-events: none; }
+#cbDrop::before { content: ""; position: absolute; left: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+#cbDrop[hidden] { display: none; }
 /* 1.1.22 (sixth round): a ticked line's photos get a line struck through them too (drawn over the text by note.js) */
 #strikes { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: visible; }
 #strikes > i { position: absolute; display: block; border-radius: 2px; background: currentColor; opacity: .8; transform: rotate(-.7deg); box-shadow: 0 0 0 1px rgba(255,255,255,.25); }
@@ -164,13 +175,15 @@ body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[da
 #editor hr { border: 0; border-top: 2px dashed var(--line); margin: .5em 0; }
 #editor blockquote { margin: .2em 0; padding-left: .6em; border-left: 3px solid var(--line); }
 #editor code, #editor pre { font-family: Consolas, monospace; font-size: .8em; background: rgba(0,0,0,.06); border-radius: 4px; padding: 0 .2em; }
-#editor font[size="1"] { font-size: .7em; }
-#editor font[size="2"] { font-size: .82em; }
-#editor font[size="3"] { font-size: 1em; }
-#editor font[size="4"] { font-size: 1.2em; }
-#editor font[size="5"] { font-size: 1.45em; }
-#editor font[size="6"] { font-size: 1.85em; }
-#editor font[size="7"] { font-size: 2.3em; }
+/* --sm: the size on a font tag, also when the tag has a font of its own (note-drawing.css `font[face]`, 1.3.18) */
+#editor font { --sm: 1; }
+#editor font[size="1"] { font-size: .7em; --sm: .7; }
+#editor font[size="2"] { font-size: .82em; --sm: .82; }
+#editor font[size="3"] { font-size: 1em; --sm: 1; }
+#editor font[size="4"] { font-size: 1.2em; --sm: 1.2; }
+#editor font[size="5"] { font-size: 1.45em; --sm: 1.45; }
+#editor font[size="6"] { font-size: 1.85em; --sm: 1.85; }
+#editor font[size="7"] { font-size: 2.3em; --sm: 2.3; }
 
 #editor img { max-width: 100%; height: auto; }
 #editor img.att-img {

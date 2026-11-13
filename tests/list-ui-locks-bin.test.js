@@ -40,12 +40,31 @@ const assert = require('assert');
   assert.ok((await note(A)).ownLock, 'and the note is locked');
   assert.ok(!/dear diary/.test(await page.content()), 'its words left the window');
 
-  // ---- a locked note: no bin button, the menu says why, the Delete key refuses
-  assert.equal(await ui.count(`${N(A)} button[title^="Move to Bin"]`), 0);
+  // ---- a locked note (1.3.28, the owner's wish): only Select and its lock options; no buttons, no dragging, no star,
+  // the bar's actions leave it alone, the Delete key refuses
+  const LOCK_MENU = ['Select (Ctrl+click)', '-', 'Unlock…', 'Remove lock…'];
+  assert.equal(await ui.count(`${N(A)} .acts`), 0, 'no buttons on the card (no Bin, no open/close)');
   await ui.rclick(N(A));
-  assert.ok((await ui.menuLabels()).includes('Locked: can’t be deleted'), 'the menu says it can’t be deleted');
-  assert.ok(await page.isDisabled('#ctx button:has-text("Locked")'), '(greyed out)');
+  assert.deepEqual(await ui.menuLabels(), LOCK_MENU, 'the menu: only Select and the lock');
   await ui.key('Escape');
+  assert.equal(await page.getAttribute(N(A), 'draggable'), 'false', 'it can’t be dragged');
+  assert.ok(await page.isDisabled(`${N(A)} > .fav`), 'its star can’t be clicked');
+  await ui.click(N(A), { ctrlKey: true }); await ui.click(N(C), { ctrlKey: true });
+  assert.equal(await ui.text('#bulkCount'), '2 selected', 'it can be picked');
+  assert.ok(await ui.visible('#bFav') && !(await ui.visible('#bGroup')), 'Favourite is for the other one; no Group (one isn’t enough)');
+  await ui.click('#bFav');
+  assert.ok(!(await note(A)).favorite && (await note(C)).favorite, 'only the unlocked one became a favourite');
+  await ui.click('#bFav');
+  await ui.key('Escape');
+  // a locked group that isn't open in the list: the same
+  await ui.click(`${ui.groupKey(G)} .lockb`);
+  assert.ok((await ui.get()).groups.find((g) => g.id === G).locked, 'the group is locked (no question the second time)');
+  await ui.rclick(ui.groupKey(G));
+  assert.deepEqual(await ui.menuLabels(), LOCK_MENU, 'a locked group’s menu: only Select and the lock');
+  await ui.key('Escape');
+  assert.equal(await page.getAttribute(ui.groupKey(G), 'draggable'), 'false', 'it can’t be dragged');
+  await ui.menu(ui.groupKey(G), 'Remove lock…'); await ui.modalOk(['4321']);
+  assert.ok(!(await ui.get()).groups.find((g) => g.id === G).locked, '(its lock removed again)');
   await ui.click(N(A), { ctrlKey: true }); await ui.key('Delete');
   assert.ok(!(await ui.modalOpen()) && !(await note(A)).deletedAt, 'Delete on a locked note: nothing happens');
   assert.ok(/can’t be deleted/.test(await ui.text('#toast')), 'it says why');

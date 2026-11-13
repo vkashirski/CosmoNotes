@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 9 of 11: draw-over, floating toolbars
+// CosmoNotes note window, part 10 of 12: draw-over, floating toolbars
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -289,6 +289,11 @@
       let moving = false;
       let outside = !!(out && out.isOut());
       let grab = outside ? out.grab(e.clientX, e.clientY) : null; // where the pointer holds it, in its own window
+      // 1.3.22: one step per frame. A fast mouse sends many moves a frame; each one moved the toolbar (outside the note:
+      // a message to main and its window moved), and they queued up, so the toolbar lagged behind. Only the last counts.
+      // (A window Windows hides frames from can skip frames: after 100 ms the move counts anyway.)
+      let last = null; let frame = 0; let since = 0;
+      const flush = () => { frame = 0; const ev = last; last = null; if (ev) step(ev); };
       const move = (ev) => {
         if (!moving) {
           if (Math.hypot(ev.screenX - start.sx, ev.screenY - start.sy) < 4) return;
@@ -297,6 +302,11 @@
           // captured by the page itself (not the button), so the drag carries on if the toolbar changes windows
           try { view.document.documentElement.setPointerCapture(e.pointerId); } catch { /* fine */ }
         }
+        last = { clientX: ev.clientX, clientY: ev.clientY, screenX: ev.screenX, screenY: ev.screenY };
+        if (frame && performance.now() - since > 100) { view.cancelAnimationFrame(frame); flush(); return; }
+        if (!frame) { frame = view.requestAnimationFrame(flush); since = performance.now(); }
+      };
+      const step = (ev) => {
         if (!outside && out && (ev.clientX < -6 || ev.clientY < -6 || ev.clientX > innerWidth + 6 || ev.clientY > innerHeight + 6)) {
           const r = el.getBoundingClientRect();
           grab = out.popOut(ev.clientX - r.left, ev.clientY - r.top);
@@ -311,6 +321,7 @@
         view.removeEventListener('pointerup', up);
         view.removeEventListener('pointercancel', up);
         if (!moving) return;
+        if (frame) { view.cancelAnimationFrame(frame); flush(); } // the last move counts
         body.classList.remove('moving-inkbar');
         if (btn) { m.dragged = true; setTimeout(() => { m.dragged = false; }, 0); } // a drag is not a click
         if (outside) { out.drop(ev.screenX, ev.screenY, grab); return; }

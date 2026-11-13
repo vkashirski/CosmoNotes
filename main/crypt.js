@@ -243,6 +243,8 @@ function openAll() {
     n.text = typeof n.text === 'string' ? n.text : '';
     n.enc = null;
     n.encAtt = null;
+    S.store.openedSizes(n); // 1.3.18: old sizes that showed nothing come off (store.js dropDeadSizes)
+    S.store.openedLayout(n); // 1.3.29: word wrap's locked width, for a note sealed before it was saved (store.js normalize)
     opened++;
   }
   return opened;

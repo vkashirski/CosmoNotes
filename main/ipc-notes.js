@@ -4,10 +4,10 @@ const { checkPassword, hashPassword, isLocked, packLock, viewOf, wait } = requir
 const crypt = require('./crypt');
 const { broadcastSettings, lockInfo, noteSettings } = require('./settings');
 const { notifyList } = require('./list-notify');
-const { applyState, setWinTitle } = require('./note-state');
+const { applyClickThrough, applyState, clickThroughNow, setWinTitle } = require('./note-state');
 const { createNote, duplicateNote, unrollWin } = require('./note-window');
 const { applyPatch, senderNote } = require('./ipc-common');
-const { unlockedForNow } = require('./list-visibility');
+const { hiddenInList, unlockedForNow } = require('./list-visibility');
 const { S } = require('./state');
 
 function registerNoteIpc() {
@@ -81,14 +81,16 @@ function registerNoteIpc() {
     try { applyPatch(e, patch); const { note } = senderNote(e); if (note) S.store.writeNow(note.id); } catch (err) { console.error(err); }
     e.returnValue = true;
   });
-  ipcMain.handle('note:duplicate', (e) => { const { note } = senderNote(e); return note ? duplicateNote(note.id) : null; });
-  ipcMain.handle('list:duplicate', (e, id) => duplicateNote(String(id)));
+  // 1.3.28: a note its lock hides (in its window, or in the list) can't be copied: unlock it first
+  ipcMain.handle('note:duplicate', (e) => { const { win, note } = senderNote(e); return note && (win.revealed || !isLocked(note)) ? duplicateNote(note.id) : null; });
+  ipcMain.handle('list:duplicate', (e, id) => { const n = S.store.get(String(id)); return n && !hiddenInList(n) ? duplicateNote(n.id) : null; });
   ipcMain.handle('note:new', (e) => { createNote({ near: BrowserWindow.fromWebContents(e.sender) }); });
   ipcMain.handle('note:close', (e) => {
     const { win, note } = senderNote(e);
     if (!note) return;
     note.open = false;
     S.store.writeNow(note.id);
+    win.byHand = true; // 1.3.30: Ctrl+Shift+T / the tray can bring it back (note-window.js 'closed')
     win.close();
   });
   // 1.1.13: the note's own minimise and maximise buttons
@@ -118,7 +120,14 @@ function registerNoteIpc() {
   ipcMain.on('note:hover', (e, over) => {
     const { win, note } = senderNote(e);
     if (!note || win.isDestroyed()) return;
-    win.setOpacity(over && note.solidOnHover ? 1 : note.opacity);
+    win.setOpacity(over && note.solidOnHover && !clickThroughNow(note) ? 1 : note.opacity); // 1.3.34: click-through stays see-through
+  });
+  // 1.3.34: the mouse is on the click-through button (true) or left it (false): its window takes clicks only meanwhile
+  ipcMain.on('note:ct-awake', (e, awake) => {
+    const { win, note } = senderNote(e);
+    if (!note || win.isDestroyed()) return;
+    win.ctAwake = !!awake;
+    applyClickThrough(win, note);
   });
 }
 

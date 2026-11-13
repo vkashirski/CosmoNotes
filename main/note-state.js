@@ -1,9 +1,10 @@
 'use strict';
-const { APP_NAME, BIG, DEFAULT_H, MIN_H, MIN_W, PAPER, ROLLED_H } = require('./constants');
+const { APP_NAME, BIG, DEFAULT_H, MIN_H, MIN_W, ROLLED_H } = require('./constants');
+const { paperOf } = require('./evening');
 const { isLocked } = require('./locks');
 const { BAR_KINDS } = require('./ink-geometry');
 const { showInk } = require('./ink-window');
-const { S } = require('./state');
+const { S, wins } = require('./state');
 
  // note id -> BrowserWindow
 
@@ -23,8 +24,31 @@ function applyState(win, n) {
   win.setOpacity(n.opacity);
   win.setAlwaysOnTop(n.pinned, 'screen-saver');
   for (const k of BAR_KINDS) if (win[`${k}Win`] && !win[`${k}Win`].isDestroyed()) win[`${k}Win`].setAlwaysOnTop(n.pinned, 'screen-saver');
-  win.setBackgroundColor(PAPER[n.color] || PAPER.yellow);
+  win.setBackgroundColor(paperOf(n)); // 1.3.27: its evening colour in the evening
+  applyClickThrough(win, n);
   setWinTitle(win, n);
+}
+
+// ------------------------------------------------------------------ click-through (1.3.34)
+// A click-through note (note.clickThrough, only with Settings → Click-through on) lets the mouse through to the window
+// under it, so it can be read over a video or a game. Windows still sends it the mouse's moves (forward), and only its
+// click-through button wakes it: the note says when the mouse is on that button (note:ct-awake, win.ctAwake), and its
+// window takes clicks until the mouse leaves the button. Nothing else in the note reacts meanwhile (note-base.css body.ct).
+// Not Ctrl: the moves Windows forwards carry no keys, and a key held in another app never reaches this one.
+const clickThroughNow = (n) => !!(S.store.settings.clickThroughOn && n && n.clickThrough);
+function applyClickThrough(win, n) {
+  if (win.isDestroyed()) return;
+  const on = clickThroughNow(n);
+  if (!on) win.ctAwake = false;
+  const ignore = on && !win.ctAwake;
+  if (win.ctIgnore === ignore) return;
+  win.ctIgnore = ignore;
+  if (ignore) win.setIgnoreMouseEvents(true, { forward: true });
+  else win.setIgnoreMouseEvents(false);
+}
+// Settings → Click-through turned on or off: every open note follows
+function applyClickThroughAll() {
+  for (const [id, win] of wins) applyClickThrough(win, S.store.get(id));
 }
 // the window title follows the note's title or first line; only touch it when it really changes
 function setWinTitle(win, n) {
@@ -49,4 +73,4 @@ function setRolled(win, n) {
     win.setSize(b.width, n.bounds?.height || DEFAULT_H);
   }
 }
-module.exports = { applyState, setRolled, setWinTitle, titleOf };
+module.exports = { applyClickThrough, applyClickThroughAll, applyState, clickThroughNow, setRolled, setWinTitle, titleOf };

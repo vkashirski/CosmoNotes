@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes "All notes" window, part 6 of 7: actions (Bin, delete), passwords and locks, the Locked tab, the group panel, folds, back / forward
+// CosmoNotes "All notes" window, part 6 of 7: actions (Bin, delete), passwords and locks, the Locked tab, the group panel, folds and search in Settings, back / forward
 // (src/list.js until 1.1.28; the parts load in order from list.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_LIST_KIT;
@@ -272,6 +272,10 @@
   });
 
   // ---- Settings: every section folds open and closed by clicking its title (all closed at first)
+  const setFold = (panel, open) => {
+    panel.classList.toggle('open', open);
+    panel.querySelector(':scope > .phead').setAttribute('aria-expanded', String(open));
+  };
   (function foldPanels() {
     $$('#viewSettings .panel').forEach((panel) => {
       const head = panel.querySelector(':scope > h3, :scope > .abouthead');
@@ -284,12 +288,46 @@
       head.setAttribute('aria-expanded', 'false');
       head.tabIndex = 0;
       head.title = 'Click to open or close';
-      const toggle = () => { const open = panel.classList.toggle('open'); head.setAttribute('aria-expanded', String(open)); };
+      const toggle = () => setFold(panel, !panel.classList.contains('open'));
       head.addEventListener('mousedown', (e) => e.preventDefault()); // no focus ring after a mouse click
       head.addEventListener('click', toggle);
       head.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
     });
   })();
+
+  // ---- 1.3.35: search in Settings. A section matches when every word typed starts a word in it: its title, the
+  // text it shows (not what is hidden, nor About's feature list) and its data-find words (1.3.36: other names for what
+  // it does, in list.html, e.g. "dark mode" → General). Only the matching sections show, and they open.
+  // Clearing the search puts every section back, open or closed, as it was before the search began.
+  let foldsBefore = null; // the sections open when the search began (null: no search)
+  const plain = (s) => s.toLocaleLowerCase().replace(/[’‘]/g, "'");
+  const shownText = (el) => (el.hidden || el.matches('svg, details.fold') ? ''
+    : [...el.childNodes].map((c) => (c.nodeType === 3 ? c.data : c.nodeType === 1 ? shownText(c) : '')).join(' '));
+  const startsWord = (w) => new RegExp('(?:^|[^\\p{L}\\p{N}])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u');
+  function findSettings() {
+    const words = plain($('#sq').value).split(/\s+/).filter(Boolean).map(startsWord);
+    const panels = $$('#viewSettings .panel');
+    $('#sqClear').hidden = !words.length;
+    if (!words.length) {
+      if (foldsBefore) panels.forEach((p) => { p.classList.remove('unfound'); setFold(p, foldsBefore.has(p)); });
+      foldsBefore = null;
+      $('#sqNone').hidden = true;
+      return;
+    }
+    if (!foldsBefore) foldsBefore = new Set(panels.filter((p) => p.classList.contains('open')));
+    let found = 0;
+    panels.forEach((p) => {
+      const text = plain(shownText(p) + ' ' + (p.dataset.find || ''));
+      const hit = words.every((re) => re.test(text));
+      p.classList.toggle('unfound', !hit);
+      if (hit) { setFold(p, true); found++; }
+    });
+    $('#sqNone').hidden = found > 0;
+    $('#viewSettings').scrollTop = 0;
+  }
+  function clearSettingsSearch() { $('#sq').value = ''; findSettings(); }
+  $('#sq').addEventListener('input', findSettings);
+  $('#sqClear').addEventListener('click', () => { clearSettingsSearch(); $('#sq').focus(); });
 
   // ---- mouse back / forward buttons: back to the group level you were on before, and forward again.
   // Levels that no longer exist (ungrouped, emptied, locked again) are skipped.
@@ -370,7 +408,7 @@
     const r = await modal({
       title: 'Your recovery key',
       text: `Your locked notes are now encrypted. If you forget your ${pinWord()}, only this key can open them. Nobody else can.`,
-      tip: 'Print it or write it down. Keep it away from this computer. You only see it now.',
+      tip: 'Print it or write it down. Keep it away from this device. You only see it now.',
       icon: ICON.lock,
       noCancel: true,
       okLabel: 'Done',
@@ -392,7 +430,7 @@
     if (!c.setUp && c.error) info = `Locked notes could not be encrypted (${c.error}). They are only hidden in the app.`;
     else if (!c.setUp) info = `⚠️ Locked notes are NOT encrypted yet. Anyone who opens the notes folder can read them. Click “Encrypt now”.`;
     else if (!c.on) info = 'Encryption is off. Anyone who opens the notes folder can read your locked notes.';
-    else info = `🔐 Locked notes are encrypted on this computer. Only your ${pinWord()} or recovery key opens them.${c.keyShown ? '' : ' Your recovery key isn’t saved yet!'}`;
+    else info = `🔐 Locked notes are encrypted on this device. Only your ${pinWord()} or recovery key opens them.${c.keyShown ? '' : ' Your recovery key isn’t saved yet!'}`;
     $('#cryptInfo').textContent = info;
     // the owner's choice: PINs stay allowed, with a warning while it is short
     const shortPin = pin && (Number(s.lockLen) || 0) < 8;
@@ -448,5 +486,5 @@
   Object.assign(K, { trashNote, destroyNote, emptyBin, dissolveGroup, trashGroup, NEW_INPUTS, checkNew, savedLock,
     ensurePassword, paintLockBar, lockNote, unlockNote, lockGroup, unlockGroup, unlockNoteNow, relockNote, unlockGroupNow,
     relockGroup, openGroupView, openPanel, closePanel,
-    paintPanel, showKeyIfNeeded, paintCrypt });
+    paintPanel, showKeyIfNeeded, paintCrypt, clearSettingsSearch });
 })();

@@ -1,11 +1,11 @@
 'use strict';
-// CosmoNotes note window, part 11 of 11: the "Partial" eraser, the toast, start-up
+// CosmoNotes note window, part 12 of 12: the "Partial" eraser, the toast, start-up
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
   const { V, api, $, editor, observer, updateEmpty, applyLook, applyTheme, caretAtEnd, decorate, find, runFind,
     closeFind, paintUnlock, hasInk, applyLayout, inkState, rubbing, eraserR, r1, strokeEl, layerOf, elCache, paintInk,
-    renderInk, paintInkBar, scheduleInkSave, snapshot, catcher, inkPt, shapeEnd, redrawCurrent, eraseAt } = K;
+    renderInk, paintInkBar, paintUndo, scheduleInkSave, snapshot, catcher, inkPt, shapeEnd, redrawCurrent, eraseAt, dropEmptyLines, joinLists } = K;
   // ---- "Partial" eraser: erase only what's under the circle
   // A touched line or shape is traced into closely spaced points along what's actually drawn
   // (the same curves strokeEl draws, worked out here in plain maths, which is much faster than
@@ -325,11 +325,14 @@
     paintUnlock();
     V.hidden = !!V.note.hidden;
     editor.innerHTML = V.hidden ? '' : (V.note.html || '');
+    dropEmptyLines(editor, 'ul.checklist li'); // 1.3.15: invisible empty lines whose box covered the next one
+    joinLists(editor); // 1.3.25: lists that touch are one
     if (find.on) { if (V.hidden) closeFind(false); else runFind(true); }
     decorate();
     applyLook();
     renderInk();
     updateEmpty();
+    paintUndo();
     observer.observe(editor, { childList: true, subtree: true, characterData: true });
     if (V.hidden) {
       if (V.note.focusEditor) $('#unlockPw').focus();

@@ -1,14 +1,14 @@
 'use strict';
 // The notes list in a real browser (tests/helpers/list-ui.js): the tabs and their counts, what a card shows (and what a locked
-// note's card never shows), a card's menu, search (title, text, picture descriptions), sorting and card sizes, opening a note.
+// note's card never shows; a title in its own font, 1.3.3), a card's menu, search (title, text, picture descriptions), sorting and card sizes, opening a note.
 const assert = require('assert');
 
 (async () => {
   let A, B, C, D, E1, G;
   const ui = await require('./helpers/list-ui')(async (s) => {
     await s.password();
-    A = await s.note({ title: 'Shopping', html: '<ul class="checklist"><li class="done">milk</li><li>bread</li></ul>', color: 'pink', favorite: true });
-    B = await s.note({ html: '<div>Call the plumber</div><div>tomorrow</div>' });
+    A = await s.note({ title: 'Shopping', html: '<ul class="checklist"><li class="done">milk</li><li>bread</li></ul>', color: 'pink', favorite: true, titleFont: 'medieval' });
+    B = await s.note({ html: '<div><font face="Augusta">Call the plumber</font></div><div><b>tomorrow</b> <font color="#D93B3B">early</font></div>' }); // 1.3.11: formatting
     C = await s.note({ title: 'Secret', html: '<div>my diary text</div>' });
     await s.lock(C);
     D = await s.note({ title: 'Bike', html: '<div>x <img class="att-img" src="stickyfile://x/a.png" alt="A red bike"></div>' });
@@ -27,6 +27,8 @@ const assert = require('assert');
   // ---- what a card shows
   assert.ok(/Shopping/.test(await cardText(ui.noteKey(A))) && /milk/.test(await cardText(ui.noteKey(A))), 'title and text');
   assert.equal(await page.$$eval(`${ui.noteKey(A)} .cb`, (x) => x.length), 2, 'a checklist shows its boxes');
+  assert.ok(/^"?Augusta/.test(await page.$eval(`${ui.noteKey(A)} .tt`, (t) => getComputedStyle(t).fontFamily)), '1.3.3: the title in its own font (Medieval)');
+  assert.equal(await ui.count(`${ui.noteKey(C)} [data-tfont]`), 0, 'a card without a title font: none');
   assert.ok(/plumber/.test(await cardText(ui.noteKey(B))), 'a note without a title shows its text');
   // golden rule: a locked note's text never reaches the list (main doesn't send it, the card doesn't show it)
   const locked = (await ui.get()).notes.find((n) => n.id === C);
@@ -36,11 +38,38 @@ const assert = require('assert');
   assert.ok(await ui.count(`${ui.noteKey(C)} .lockb.on`), 'a locked note has the unlock button');
   assert.equal(await ui.count(`${ui.noteKey(C)} button[title^="Move to Bin"]`), 0, 'and no bin button (locked notes can’t be deleted)');
 
+  // ---- the words on a card look as in the note (1.3.11): a line in another font, bold, a colour (store.js cardRuns)
+  const runs = await page.$$eval(`${ui.noteKey(B)} .ln .run`, (rs) => rs.map((r) => [r.textContent, getComputedStyle(r).fontFamily.split(',')[0].replace(/"/g, ''), getComputedStyle(r).fontWeight, getComputedStyle(r).color]));
+  assert.deepEqual(runs.map((r) => r[0]), ['Call the plumber', 'tomorrow', 'early'], `runs: ${JSON.stringify(runs)}`);
+  assert.equal(runs[0][1], 'Augusta', 'the line in Medieval shows in Medieval');
+  assert.ok(Number(runs[1][2]) >= 700, 'bold'); assert.equal(runs[2][3], 'rgb(217, 59, 59)', 'its colour');
+  assert.equal(await ui.text(`${ui.noteKey(B)} .ln:nth-child(2)`), 'tomorrow early', 'the words are the same');
+
+  // 1.3.12: a font on some words is resized to match the note's font, as the note does (Medieval in Handwritten: 0.8×)
+  const px = (sel) => page.$eval(sel, (el) => parseFloat(getComputedStyle(el).fontSize));
+  const medPx = await px(`${ui.noteKey(B)} .ln:nth-child(1) .run`); const basePx = await px(`${ui.noteKey(B)} .ln:nth-child(2)`);
+  assert.ok(Math.abs(medPx / basePx - 0.8) < 0.01, `Medieval words ${medPx}px in a ${basePx}px Handwritten card`);
+
   // ---- a card's right-click menu: favourites first, then Edit design…; no "Open on desktop" (1.1.23)
   await ui.rclick(ui.noteKey(B));
   const menu = await ui.menuLabels(); await ui.key('Escape');
   assert.ok(!menu.includes('Open on desktop') && !menu.includes('Bring to front'), `no Open on desktop (${menu.join(' | ')})`);
   assert.ok(menu.indexOf('Add to favourites') >= 0 && menu.indexOf('Add to favourites') < menu.indexOf('Edit design…') && menu.indexOf('Edit design…') < menu.indexOf('Duplicate note'), `menu order: ${menu.join(' | ')}`);
+
+  // ---- Edit design's Title font (1.3.11): the one saved is lit, the preview's title uses it; a pick saves titleFont
+  await ui.menu(ui.noteKey(A), 'Edit design…');
+  assert.ok(await ui.visible('#editTFonts [data-tfont="medieval"].on') && !(await ui.visible('#editFontRow')), 'one note: Title font, no Font row');
+  assert.equal(await page.getAttribute('#editTitle', 'data-tfont'), 'medieval');
+  assert.equal(await page.getAttribute('#editCover', 'data-tfont'), 'medieval', 'Title while locked in it too');
+  const rowsOrder = await page.$$eval('#editPaper, #editCoverRow, #editTFontRow, #editTabs', (els) => els.map((e) => e.id));
+  assert.deepEqual(rowsOrder, ['editPaper', 'editCoverRow', 'editTFontRow', 'editTabs'], 'the title, Title while locked, Title font, then the tabs');
+  const tabsAt = () => page.$eval('#editTabs', (t) => t.getBoundingClientRect().top);
+  const top0 = await tabsAt();
+  await ui.click('#editTFonts [data-tfont="round"]');
+  assert.equal(await tabsAt(), top0, '1.3.12: nothing below moves when the font changes');
+  assert.equal((await ui.get()).notes.find((n) => n.id === A).titleFont, 'round', 'saved');
+  assert.equal(await page.getAttribute(`${ui.noteKey(A)} .t1`, 'data-tfont'), 'round', 'the card shows it');
+  await ui.click('#editTFonts [data-tfont="medieval"]'); await ui.key('Escape');
 
   // ---- search: title, text, picture words; only notes; nothing found; clear
   await ui.type('#q', 'plumb');
@@ -124,6 +153,10 @@ const assert = require('assert');
   const before = (await ui.get()).notes.length;
   await ui.key('Control+n');
   assert.equal((await ui.get()).notes.length, before + 1, 'Ctrl+N: a new note');
+  // Ctrl+Shift+T (1.3.30): the note closed last (B, closed above) opens again
+  await ui.key('Control+Shift+t');
+  assert.ok((await ui.get()).notes.find((x) => x.id === B).open, 'Ctrl+Shift+T: the closed note is open again');
+  assert.ok(ui.E.__all.some((x) => x.noteId === B && !x.destroyed), 'in its own window');
   await ui.done();
   console.log('ok');
   process.exit(0);

@@ -93,6 +93,57 @@ const app = require('./helpers/app');
   assert.equal((await H['list:destroy'](null, b)).error, 'locked');
   await H['groups:set-locked'](null, g1, false, 'kitty cat');
   assert.equal(await H['list:destroy'](null, b), true, 'deletable once the lock is gone');
+
+  // ---- a locked note or group its lock hides can only be picked, unlocked or have its lock removed (1.3.28, the owner's wish)
+  const { S } = require('../main/state');
+  const dw = app.winOf(d);
+  await H['note:relock'](ev(dw)); // (its window hid itself when told to lock)
+  const before = JSON.stringify(S.store.get(d));
+  const count = S.store.all().length;
+  assert.equal(await H['list:favorite'](null, [d], true), 0, 'no favourite');
+  assert.equal(await H['list:edit'](null, d, { color: 'mint', opacity: 0.5, coverTitle: 'x' }), null, 'no Edit design');
+  assert.equal(await H['list:apply'](null, [d], { color: 'mint', font: 'round' }), 0, 'no colour or font');
+  assert.equal(await H['list:duplicate'](null, d), null, 'no copy');
+  assert.equal(await H['note:duplicate'](ev(dw)), null, 'not from its hidden window either');
+  assert.equal(await H['groups:make'](null, d, a), null, 'not dragged onto a note');
+  assert.equal(await H['groups:make'](null, a, d), null, 'nothing dragged onto it');
+  assert.equal(await H['groups:make-from'](null, [d], null), null, 'not put in a new group');
+  assert.equal(await H['groups:move-to'](null, d, g2), false, 'not moved into a group');
+  await H['list:close-note'](null, d);
+  assert.ok(!dw.isDestroyed(), 'the list doesn’t close its window');
+  // its hidden window: only pinning and rolling up (where the window sits), nothing of the note
+  await H['note:update'](ev(dw), { color: 'mint', opacity: 0.5, font: 'round', fx: { e: 'snow', f: null }, checklist: { sink: true }, zoom: 2, spell: true });
+  assert.equal(JSON.stringify(S.store.get(d)), before, 'nothing of the note changed');
+  assert.equal(S.store.all().length, count);
+  await H['note:update'](ev(dw), { pinned: true, rolled: true });
+  assert.ok(S.store.get(d).pinned && S.store.get(d).rolled, 'pin and roll up still work');
+  await H['note:update'](ev(dw), { clickThrough: true });
+  assert.ok(S.store.get(d).clickThrough, 'click-through too (its window, not the note)');
+  await H['list:click-through-off'](null, d);
+  assert.ok(S.store.get(d).clickThrough, 'the list can’t turn it off while the note is hidden there');
+  await H['note:update'](ev(dw), { clickThrough: false });
+  // unlocked for now: everything works again
+  await H['list:unlock-now'](null, d, 'kitty cat');
+  assert.equal(await H['list:favorite'](null, [d], true), 1, 'unlocked: favourite');
+  assert.ok((await H['list:edit'](null, d, { color: 'mint' })).color === 'mint', 'unlocked: Edit design');
+  await H['list:relock'](null, d);
+  // a locked group that isn't open in the list: not renamed, restyled, recoloured, ungrouped, moved or filled
+  await H['groups:set-locked'](null, g2, true);
+  const gBefore = JSON.stringify(S.store.groups.get(g2));
+  await H['groups:rename'](null, g2, 'New name');
+  await H['groups:update'](null, g2, { style: 'folder', color: 'red' });
+  assert.equal(await H['groups:apply'](null, g2, { color: 'mint' }), 0, 'its notes aren’t recoloured');
+  await H['groups:dissolve'](null, g2);
+  assert.equal(await H['list:favorite'](null, [g2, g1], true), 0, 'no favourite (nor for a group inside it)');
+  assert.equal(JSON.stringify(S.store.groups.get(g2)), gBefore, 'the group is unchanged');
+  assert.equal(await H['groups:move-to'](null, g1, null), false, 'a group inside it isn’t moved out');
+  await H['groups:move-up'](null, c);
+  assert.equal(S.store.get(c).groupId, g2, 'nor a note');
+  const e2 = await app.newNote();
+  assert.equal(await H['groups:move-to'](null, e2, g2), false, 'nothing goes into it');
+  assert.equal(await H['groups:make'](null, e2, g2), null, '(not by dragging either)');
+  await H['groups:reveal'](null, g2, 'kitty cat');
+  assert.ok(await H['groups:move-to'](null, e2, g2), 'opened in the list: it can be filled again');
   console.log('ok');
   process.exit(0);
 })();

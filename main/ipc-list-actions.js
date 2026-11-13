@@ -5,8 +5,8 @@ const { PAPER } = require('./constants');
 const { checkPassword, isLocked, viewOf, wait } = require('./locks');
 const { notifyList } = require('./list-notify');
 const { applyState, setWinTitle } = require('./note-state');
-const { groupOpenInList, hiddenInList, hideNewlyLocked, listOpenGroups, openForNow, pushLook, unlockedForNow } = require('./list-visibility');
-const { bringToFront, createNote, openNoteWindow } = require('./note-window');
+const { coverAll, groupShut, hiddenInList, hideNewlyLocked, listOpenGroups, openForNow, pushLook, unlockedForNow } = require('./list-visibility');
+const { bringToFront, closeNoteWindow, createNote, openNoteWindow, reopenClosed } = require('./note-window');
 const { S, wins } = require('./state');
 
 // 1.1.47: a note just unlocked for now: its open window shows it without the password
@@ -109,15 +109,7 @@ function registerListActionIpc() {
     return { ok: true };
   });
   ipcMain.handle('list:lock-all', () => {
-    S.listUnlockedAll = false;
-    listOpenGroups.clear();
-    unlockedForNow.clear(); // 1.1.47: also what was unlocked for now
-    for (const [id, win] of wins) {
-      const n = S.store.get(id);
-      if (!n || win.isDestroyed()) continue;
-      // the window saves what was typed, then hides itself (like locking from the list)
-      if (isLocked(n) && win.revealed) { win.lockPending = true; win.webContents.send('note:lock-now'); }
-    }
+    coverAll();
     notifyList();
     return true;
   });
@@ -133,13 +125,27 @@ function registerListActionIpc() {
     if (fresh && isLocked(n) && (S.listUnlockedAll || openForNow(n))) { win.revealed = true; setWinTitle(win, n); }
     notifyList();
   });
+  // 1.3.28: everything below that changes a note or group refuses one its lock hides in the list (`hiddenInList`, `groupShut`):
+  // unlock it first (the owner's wish). Opening it is how it is unlocked, so that stays.
   ipcMain.handle('list:close-note', (e, id) => {
     const n = S.store.get(id);
-    if (!n) return;
-    n.open = false;
-    S.store.writeNow(n.id);
-    const win = wins.get(id);
-    if (win && !win.isDestroyed()) win.close();
+    if (!n || hiddenInList(n)) return;
+    closeNoteWindow(id, { byHand: true }); // 1.3.30: Ctrl+Shift+T / the tray can bring it back
+    notifyList();
+  });
+  // 1.3.30: Ctrl+Shift+T in the list (main/closed-notes.js)
+  ipcMain.handle('list:reopen-closed', () => reopenClosed());
+  // 1.3.34: right-click → Turn off click-through (the other way back is the note's own click-through button)
+  ipcMain.handle('list:click-through-off', (e, id) => {
+    const n = S.store.get(id);
+    if (!n || n.deletedAt || hiddenInList(n) || !n.clickThrough) return;
+    S.store.update(n.id, { clickThrough: false });
+    const m = S.store.get(n.id);
+    const win = wins.get(n.id);
+    if (win && !win.isDestroyed()) {
+      applyState(win, m);
+      win.webContents.send('note:look', viewOf(m, win));
+    }
     notifyList();
   });
   // 1.1.13: a locked note (its own lock or a locked group around it) can't be deleted: remove the lock first
@@ -157,8 +163,9 @@ function registerListActionIpc() {
   ipcMain.handle('list:favorite', (e, ids = [], on = true) => {
     let count = 0;
     for (const id of [].concat(ids)) {
-      if (S.store.groups.has(id)) { S.store.updateGroup(id, { favorite: !!on }); count++; }
-      else if (S.store.get(id)) { S.store.update(id, { favorite: !!on }); count++; }
+      const n = S.store.get(id);
+      if (S.store.groups.has(id)) { if (!groupShut(id)) { S.store.updateGroup(id, { favorite: !!on }); count++; } }
+      else if (n && !hiddenInList(n)) { S.store.update(id, { favorite: !!on }); count++; }
     }
     notifyList();
     return count;
@@ -168,10 +175,9 @@ function registerListActionIpc() {
   // change straight away ('note:look'), so both stay the same. A new title counts as an edit; a colour doesn't.
   ipcMain.handle('list:edit', (e, id, patch = {}) => {
     const n = S.store.get(id);
-    if (!n || n.deletedAt || !patch || typeof patch !== 'object') return null;
+    if (!n || n.deletedAt || hiddenInList(n) || !patch || typeof patch !== 'object') return null;
     const clean = {};
-    // 1.1.30: on a locked card the title field is the "title while locked" (the real one is hidden and sealed)
-    if (typeof patch.title === 'string') { if (hiddenInList(n)) clean.coverTitle = patch.title; else clean.title = patch.title; }
+    if (typeof patch.title === 'string') clean.title = patch.title;
     if (typeof patch.coverTitle === 'string') clean.coverTitle = patch.coverTitle;
     if (PAPER[patch.color]) clean.color = patch.color;
     // 1.1.20 (Edit design): see-through and the note's own effects; neither counts as an edit
@@ -191,18 +197,19 @@ function registerListActionIpc() {
       win.webContents.send('note:look', viewOf(m, win));
     }
     notifyList();
-    return { updatedAt: m.updatedAt, title: hiddenInList(m) ? m.coverTitle : m.title, coverTitle: m.coverTitle, color: m.color, opacity: m.opacity, fx: m.fx };
+    return { updatedAt: m.updatedAt, title: m.title, coverTitle: m.coverTitle, color: m.color, opacity: m.opacity, fx: m.fx };
   });
 
   ipcMain.handle('list:apply', (e, ids = [], patch = {}) => {
     const clean = {};
     if (PAPER[patch.color]) clean.color = patch.color;
     if (FONTS.includes(patch.font)) clean.font = patch.font;
+    if (FONTS.includes(patch.titleFont)) clean.titleFont = patch.titleFont; // 1.3.11: Edit design's Title font
     if (!Object.keys(clean).length) return 0;
     let count = 0;
     for (const id of [].concat(ids)) {
       const n = S.store.get(id);
-      if (!n || n.deletedAt) continue;
+      if (!n || n.deletedAt || hiddenInList(n)) continue;
       S.store.update(n.id, clean);
       pushLook(n.id);
       count++;
@@ -214,17 +221,18 @@ function registerListActionIpc() {
   // Things hidden by a locked group that isn't open in the list are left where they are.
   ipcMain.handle('groups:make-from', (e, ids = [], parentId = null) => {
     parentId = parentId && S.store.groups.has(parentId) ? parentId : null;
+    if (groupShut(parentId)) return null;
     const noteIds = [];
     const groupIds = [];
     for (const id of [].concat(ids)) {
       if (S.store.groups.has(id)) {
         const g = S.store.groups.get(id);
-        if (!groupOpenInList(g.parentId)) continue;
+        if (groupShut(id)) continue; // also when only a group around it is shut
         if (parentId && (parentId === id || S.store.isInside(parentId, id))) continue; // never inside itself
         groupIds.push(id);
       } else {
         const n = S.store.get(id);
-        if (n && !n.deletedAt && groupOpenInList(n.groupId)) noteIds.push(id);
+        if (n && !n.deletedAt && !hiddenInList(n)) noteIds.push(id);
       }
     }
     if (noteIds.length + groupIds.length < 1) return null;

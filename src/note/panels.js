@@ -1,9 +1,9 @@
 'use strict';
-// CosmoNotes note window, part 3 of 11: pop-overs, the header, the ⋯ menu, the Add and text panels, Undo / Redo
+// CosmoNotes note window, part 3 of 12: pop-overs, the header, the ⋯ menu, the Add and text panels, Undo / Redo
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
-  const { V, api, $, $$, editor, body, esc, swatchStrip, changed, saveNow, titleText, gotDates, setProp, saveSel,
+  const { V, api, $, $$, editor, body, esc, swatchStrip, changed, saveNow, collect, titleText, gotDates, setProp, saveSel,
     restoreSel, insertNodes, runCmd } = K;
   // defined in a later part:
   const openLinkForm = K.later('openLinkForm'), insertTable = K.later('insertTable'), hideCtx = K.later('hideCtx'),
@@ -19,7 +19,7 @@
   // the others open, the newest on top (clicking one brings it to the front). Each closes with its own button (or X),
   // and the "close all" button in the top bar (shown when two or more are open, text toolbar included) or Esc
   // closes them all. The small dialogs (password, link, questions) still replace each other.
-  const EDIT_POPS = ['#menu', '#fxPop', '#insert'];
+  const EDIT_POPS = ['#menu', '#fxPop', '#ckPop', '#insert']; // 1.3.21: #ckPop, this note's checklists
   const DIALOGS = ['#pwPop', '#linkPop', '#askPop', '#descPop'];
   function closePop(id) {
     const p = $(id);
@@ -72,7 +72,9 @@
   }
   document.addEventListener('mousedown', (e) => {
     // the text panel stays open while you click around the note; the A button (or Esc) closes it
-    if (!e.target.closest('.pop, #btnMenu, #btnInsert, #btnText')) closePops(true);
+    // 1.3.22: not for "close all" either: this closed the menus inside the note first, the button then hid (fewer than
+    // two left) and its click never came, so a menu dragged out of the note stayed open
+    if (!e.target.closest('.pop, #btnMenu, #btnInsert, #btnText, #btnCloseAll')) closePops(true);
     if (!e.target.closest('.ctx')) hideCtx();
   });
   // 1.1.20: switches one after another are grouped, so each sits right after its text and they still line up
@@ -101,7 +103,25 @@
   // ---------- header
   $('#btnNew').addEventListener('click', () => { saveNow(); api.newNote(); });
   $('#btnClose').addEventListener('click', () => { saveNow(); api.close(); });
-  $('#btnPin').addEventListener('click', () => setProp({ pinned: !V.note.pinned }));
+  $('#btnPin').addEventListener('click', () => setProp(V.note.pinned ? { pinned: false, clickThrough: false } : { pinned: true }));
+  // 1.3.34: click-through (base.js applyClickThrough, main/note-state.js). Turning it on pins the note. While it is on, the
+  // window ignores clicks, but Windows still sends the mouse's moves: on this button they wake the window (ctAwake) until
+  // the mouse leaves it, so this button can be clicked and nothing else can.
+  const wakeCt = (on) => {
+    on = on && body.classList.contains('ct');
+    if (on === V.ctAwake) return;
+    V.ctAwake = on;
+    api.ctAwake(on);
+  };
+  $('#btnCt').addEventListener('click', () => {
+    const on = !V.note.clickThrough;
+    if (on) { closePops(); finishStroke(); saveNow(); saveInk(); }
+    setProp(on ? { clickThrough: true, pinned: true } : { clickThrough: false });
+    wakeCt(true); // on: the mouse is still on the button (sent after the change, so main wakes it after starting it)
+  });
+  $('#btnCt').addEventListener('pointermove', () => wakeCt(true));
+  $('#btnCt').addEventListener('pointerleave', () => wakeCt(false));
+  document.documentElement.addEventListener('mouseleave', () => wakeCt(false));
   $('#btnMenu').addEventListener('click', () => togglePop('#menu'));
   $('#menuX').addEventListener('click', () => closePop('#menu'));
   // 1.1.13: minimise and maximise (double-clicking the top bar maximises too: Windows does that for the drag area)
@@ -122,6 +142,8 @@
     setProp({ rolled: !V.note.rolled });
   });
   $('#btnRelock').addEventListener('click', relock);
+  // 1.3.27: the panic button (main/panic.js closes this window too, unless this note stays open: it saves first anyway)
+  $('#btnPanic').addEventListener('click', () => { closePops(); saveNow(); saveInk(); api.panic(); });
   $('#btnInsert').addEventListener('mousedown', (e) => e.preventDefault());
   $('#btnInsert').addEventListener('click', () => togglePop('#insert'));
   $('#btnText').addEventListener('mousedown', (e) => e.preventDefault());
@@ -163,6 +185,9 @@
     api.update({ opacity: v });
   });
   $('#solidHover').addEventListener('change', (e) => setProp({ solidOnHover: e.target.checked }));
+  // 1.3.27: set like Settings = follow Settings again (null)
+  $('#eveSwitch').addEventListener('change', (e) => setProp({ evening: e.target.checked === !!V.settings.eveOn ? null : e.target.checked }));
+  $('#panicSwitch').addEventListener('change', (e) => setProp({ panic: e.target.checked ? null : false }));
   let titleTimer = null;
   $('#titleInput').addEventListener('input', (e) => {
     V.note.title = e.target.value;
@@ -172,6 +197,8 @@
     titleTimer = setTimeout(() => api.update({ title: V.note.title }).then(gotDates), 300);
   });
   $('#titleInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); closePop('#menu'); } });
+  // 1.3.3: the title's font (1.3.6: always the one picked; null = never picked, follows the note's font)
+  $$('#titleFontSeg button').forEach((b) => b.addEventListener('click', () => setProp({ titleFont: b.dataset.tfont })));
   let coverTimer = null;
   $('#coverInput').addEventListener('input', (e) => {
     V.note.coverTitle = e.target.value;
@@ -209,10 +236,98 @@
   // the text is a <font face>, sized to match in note.css.
   const RESET_COLOR = '#010203';
   const FACE = { hand: 'Caveat', round: 'Nunito', medieval: 'Augusta' };
-  // Before 1.1.16 the font buttons changed the note's own font (not part of the text, so the editor's undo couldn't
-  // take it back): kept here for undo/redo of those (cleared as soon as the text changes again, so undo stays in order).
-  const textUndo = []; // { font } = the note's font before
-  const textRedo = []; // { font } = the font an undo took away (1.1.14)
+  // ---- one Undo history for the text (1.3.31). The editor's own Undo only knows its own commands. Changes the note
+  // makes itself (ticking and moving checklist lines, checklists part; photos, drawings and voice notes put in, insertNodes)
+  // are steps of ours: ownStep({ undo(), redo(), alive() }). They keep their place among the editor's steps: a step
+  // remembers how the note looked right after it (`after`, its saved form), and Undo takes it back once the note looks
+  // like that again (the editor's later steps are undone), or when the editor has nothing left to undo. textRedo holds
+  // ours and NATIVE (one of the editor's steps undone) in the order Undo went, so Redo goes back the same way.
+  // Before, any typing wiped our steps (and a pasted photo was never one): Ctrl+Z couldn't take them back.
+  const NATIVE = 'native';
+  const textUndo = [];
+  const textRedo = [];
+  const looks = () => collect().html;
+  function ownStep(st) {
+    st.after = looks();
+    textUndo.push(st);
+    textRedo.length = 0;
+    paintUndo();
+  }
+  // ---- a change the note makes to its own text, as one step of ours (1.3.32): domStep(fn) records what fn changes in
+  // the note as it happens (a MutationObserver: elements added and removed, attributes, texts) and Undo plays it
+  // backwards, putting back the same elements and texts (so the editor's own earlier steps still fit them); Redo plays
+  // it forwards again. The cursor goes back to where it was. For a change spread over many events (a photo's size by
+  // dragging): const rec = domRecord(keep); …; rec.end(). keep(record) leaves out changes that aren't part of it.
+  // Any change to the note's DOM that isn't an editor command (execCommand) must go through one of these or ownStep.
+  const OBSERVE = { subtree: true, childList: true, attributes: true, attributeOldValue: true, characterData: true, characterDataOldValue: true };
+  function selNow() {
+    const s = getSelection();
+    if (!s.rangeCount || !editor.contains(s.getRangeAt(0).commonAncestorContainer)) return null;
+    const r = s.getRangeAt(0);
+    return [r.startContainer, r.startOffset, r.endContainer, r.endOffset];
+  }
+  function selSet(p) {
+    if (!p || !editor.contains(p[0]) || !editor.contains(p[2])) return;
+    try {
+      const r = document.createRange();
+      r.setStart(p[0], p[1]);
+      r.setEnd(p[2], p[3]);
+      const s = getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+      V.savedRange = r.cloneRange();
+    } catch { /* the place is gone */ }
+  }
+  function domRecord(keep = () => true) {
+    const before = selNow();
+    const got = []; // what the observer is handed between events (a drag), then what is still waiting at the end
+    const mo = new MutationObserver((list) => got.push(...list));
+    mo.observe(editor, OBSERVE);
+    return {
+      end() {
+        got.push(...mo.takeRecords());
+        const recs = got.filter(keep).map((r) => ({ type: r.type, target: r.target, name: r.attributeName,
+          old: r.oldValue, now: null, added: [...r.addedNodes], removed: [...r.removedNodes], next: r.nextSibling }));
+        mo.disconnect();
+        if (!recs.length) return;
+        const after = selNow();
+        ownStep({
+          alive: () => recs.some((r) => editor.contains(r.target)),
+          undo: () => {
+            for (const r of [...recs].reverse()) {
+              if (r.type === 'attributes') {
+                r.now = r.target.getAttribute(r.name);
+                if (r.old === null) r.target.removeAttribute(r.name); else r.target.setAttribute(r.name, r.old);
+              } else if (r.type === 'characterData') { r.now = r.target.data; r.target.data = r.old; }
+              else {
+                r.added.forEach((n) => { if (n.parentNode === r.target) n.remove(); });
+                r.removed.forEach((n) => r.target.insertBefore(n, r.next && r.next.parentNode === r.target ? r.next : null));
+              }
+            }
+            selSet(before);
+            changed();
+          },
+          redo: () => {
+            for (const r of recs) {
+              if (r.type === 'attributes') { if (r.now === null) r.target.removeAttribute(r.name); else r.target.setAttribute(r.name, r.now); }
+              else if (r.type === 'characterData') r.target.data = r.now;
+              else {
+                r.removed.forEach((n) => { if (n.parentNode === r.target) n.remove(); });
+                r.added.forEach((n) => r.target.insertBefore(n, r.next && r.next.parentNode === r.target ? r.next : null));
+              }
+            }
+            selSet(after);
+            changed();
+          },
+        });
+      },
+    };
+  }
+  function domStep(fn, keep) {
+    const rec = domRecord(keep);
+    try { return fn(); } finally { rec.end(); }
+  }
+  const dropDead = (list) => { while (list.length && list[list.length - 1] !== NATIVE && list[list.length - 1].alive && !list[list.length - 1].alive()) list.pop(); };
   const hasTextSel = () => !!(V.savedRange && !V.savedRange.collapsed && editor.contains(V.savedRange.commonAncestorContainer));
   function paintTextPanel() {
     if (!V.note) return;
@@ -299,10 +414,19 @@
     document.execCommand('fontSize', false, '3');
     document.execCommand('fontName', false, FACE[V.note.font] || 'Caveat');
   }));
-  editor.addEventListener('input', (e) => { if (!/^history/.test(e.inputType || '')) { textUndo.length = 0; textRedo.length = 0; } });
+  editor.addEventListener('input', (e) => {
+    if (e.inputType === 'historyUndo') textRedo.push(NATIVE);
+    else if (e.inputType === 'historyRedo') { if (textRedo[textRedo.length - 1] === NATIVE) textRedo.pop(); }
+    else textRedo.length = 0; // a new edit: nothing to redo (the editor's own Redo forgets too)
+    paintUndo(); // every edit, undo and redo changes what the two buttons can do
+  });
   // ---- the one Undo button (bottom bar, left of Draw): drawing while drawing, otherwise the text
   function undoText() {
-    if (textUndo.length) { textRedo.push({ font: V.note.font }); setProp({ font: textUndo.pop().font }); paintTextPanel(); return; }
+    dropDead(textUndo);
+    const st = textUndo[textUndo.length - 1];
+    if (st && (st.after === looks() || !document.queryCommandEnabled('undo'))) {
+      textUndo.pop(); st.undo(); textRedo.push(st); paintUndo(); return;
+    }
     editor.focus({ preventScroll: true });
     document.execCommand('undo');
     // undo selects what it brought back (for a whole-note change: everything); keep just the cursor
@@ -316,7 +440,10 @@
   }
   // ---- Redo (1.1.14, right after Undo): takes back what Undo did, for drawing and for text
   function redoText() {
-    if (textRedo.length) { textUndo.push({ font: V.note.font }); setProp({ font: textRedo.pop().font }); paintTextPanel(); return; }
+    dropDead(textRedo);
+    const st = textRedo[textRedo.length - 1];
+    if (!st) return; // the editor's own Redo may still hold steps from before one of ours: they no longer fit
+    if (st !== NATIVE) { textRedo.pop(); st.redo(); st.after = looks(); textUndo.push(st); paintUndo(); return; }
     editor.focus({ preventScroll: true });
     document.execCommand('redo');
     const sel = getSelection();
@@ -327,10 +454,20 @@
   function redoAny() {
     if (K.inkState.on && !K.inkState.paused) inkRedo(); else redoText();
   }
+  // 1.3.23: Undo and Redo are greyed out (disabled) when there is nothing to take back or put back. One place decides:
+  // while drawing it is the drawing lists; otherwise our own text steps, then the editor's own history (a locked note
+  // shows nothing, so nothing to undo). Call paintUndo() wherever either list changes.
+  const drawingNow = () => K.inkState.on && !K.inkState.paused;
+  const canUndo = () => drawingNow() ? K.inkState.undo.length > 0
+    : !V.hidden && (textUndo.length > 0 || document.queryCommandEnabled('undo'));
+  const canRedo = () => drawingNow() ? K.inkState.redo.length > 0
+    : !V.hidden && textRedo.length > 0;
   function paintUndo() {
-    const drawing = K.inkState.on && !K.inkState.paused;
+    const drawing = drawingNow();
     $('#btnUndo').title = drawing ? 'Undo drawing (Ctrl+Z)' : 'Undo (Ctrl+Z)';
     $('#btnRedo').title = drawing ? 'Redo drawing (Ctrl+Y)' : 'Redo (Ctrl+Y)';
+    $('#btnUndo').disabled = !canUndo();
+    $('#btnRedo').disabled = !canRedo();
   }
   $('#btnUndo').addEventListener('mousedown', (e) => e.preventDefault());
   $('#btnUndo').addEventListener('click', undoAny);
@@ -363,6 +500,6 @@
     }
   }
 
-  Object.assign(K, { popOuts, closePop, closePops, openPop, closeText, textUndo, textRedo, paintTextPanel, undoText,
-    redoText, paintUndo });
+  Object.assign(K, { popOuts, closePop, closePops, openPop, closeText, ownStep, domStep, domRecord, paintTextPanel, undoText,
+    redoText, paintUndo, FACE });
 })();

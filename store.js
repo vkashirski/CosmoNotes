@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const EVENING = require('./src/evening'); // 1.3.27: the evening colours' times (the same file the windows load)
 
 // Paper colours. 1.1.15 added the colours of the list themes (cream, rose, sage = the Mint theme, mist = Sky,
 // lavender = Lilac, and the dark night, midnight, forest, plum). In this order everywhere colours are shown:
@@ -87,7 +88,80 @@ const DEFAULT_SETTINGS = {
   fxPaused: false, // pause every effect and follower
   listTheme: 'cream', // colours of the notes list window (see THEMES in list.js; night, midnight, forest, plum are dark)
   madeGroup: false, // true once a group was ever made: the "drag to make a group" tip stops for good
+  // 1.3.19: checklists in every note that hasn't chosen its own (note.checklist; Settings → Checklists)
+  checkDrag: true, // drag a box to move its line (a click still ticks it)
+  checkSink: false, // a ticked line moves down, below the unticked ones
+  checkFixed: false, // every box is the note's own size, whatever the size of the words after it
+  // 1.3.27: evening colours (src/evening.js): light papers turn into a softer shade from eveFrom until eveTo (minutes after
+  // midnight; each change fades over 30 minutes). Each note can choose its own (note.evening)
+  eveOn: false,
+  eveFrom: EVENING.DEFAULT_FROM, // 19:00
+  eveTo: EVENING.DEFAULT_TO, // 07:00
+  // 1.3.27: the panic button (main/panic.js): in each note's top bar and the tray, and a shortcut for all of Windows.
+  // It closes every open note (except those with note.panic === false), locks everything again and hides the list.
+  panicOn: false,
+  panicKey: '', // the shortcut, as an Electron accelerator ('Alt+Z', 'F8'…); '' = none (the owner: no shortcut until one is set)
+  panicClosed: [], // the notes the last panic closed: they come back when CosmoNotes is opened again (main/panic.js reopen)
+  // 1.3.34: the click-through button, left of the pin in each note's top bar (note.clickThrough). Off: no note is click-through
+  clickThroughOn: false,
 };
+// 1.3.19: a note's own checklist options ({ drag, sink, fixed }: true / false; null = as in Settings)
+const CHECK_OPTS = { drag: 'checkDrag', sink: 'checkSink', fixed: 'checkFixed' };
+function cleanChecklist(c) {
+  const o = c && typeof c === 'object' ? c : {};
+  const out = {};
+  for (const k of Object.keys(CHECK_OPTS)) out[k] = typeof o[k] === 'boolean' ? o[k] : null;
+  return out;
+}
+
+// 1.3.27: the settings a note can have its own value of, and how Settings → "Use on all notes" puts Settings back on it.
+// own(n, s): the note differs from Settings; reset(n, s): the patch that makes it the same as Settings.
+// Font, see-through and turn solid are "for new notes" (the owner's pick): every note has a value of its own, so "own" is
+// a value that differs from Settings, and reset copies the Settings value in (later Settings changes don't touch it).
+// The rest follow Settings while they are null; reset makes them null again. A note's paper colour has no reset (the owner:
+// it would recolour every note at random), nor its title font (no setting for it).
+const newFont = (s) => (FONTS.includes(s.defaultFont) ? s.defaultFont : 'hand');
+const newOpacity = (s) => clamp(Math.round((Number(s.defaultOpacity) || 1) * 20) / 20, 0.25, 1);
+const FX_OF = { effect: ['e', 'ea', 'eo', 'mi'], follower: ['f', 'fa', 'fo'] };
+const OVERRIDES = {
+  font: { own: (n, s) => n.font !== newFont(s), reset: (n, s) => ({ font: newFont(s) }) },
+  opacity: { own: (n, s) => Math.abs(n.opacity - newOpacity(s)) > 0.001, reset: (n, s) => ({ opacity: newOpacity(s) }) },
+  solidOnHover: { own: (n, s) => n.solidOnHover !== (s.defaultSolidOnHover !== false), reset: (n, s) => ({ solidOnHover: s.defaultSolidOnHover !== false }) },
+  ...Object.fromEntries(Object.entries(FX_OF).map(([k, parts]) => [k, {
+    own: (n) => parts.some((p) => n.fx[p] !== null),
+    reset: (n) => ({ fx: { ...n.fx, ...Object.fromEntries(parts.map((p) => [p, null])) } }),
+  }])),
+  // "Pause effects on this note" and "play here while all are paused" (both against Settings → Pause all effects)
+  fxPause: { own: (n) => n.fxPaused || n.fxPlay, reset: () => ({ fxPaused: false, fxPlay: false }) },
+  spell: { own: (n) => n.spell !== null, reset: () => ({ spell: null }) },
+  ...Object.fromEntries(Object.entries(CHECK_OPTS).map(([k, key]) => [key, {
+    own: (n) => n.checklist[k] !== null,
+    reset: (n) => ({ checklist: { ...n.checklist, [k]: null } }),
+  }])),
+  evening: { own: (n) => n.evening !== null, reset: () => ({ evening: null }) },
+  panic: { own: (n) => n.panic !== null, reset: () => ({ panic: null }) },
+};
+const OVERRIDE_KEYS = Object.keys(OVERRIDES);
+// how many notes (not in the Bin) have their own value, per key
+function overrideCounts(notes, s) {
+  const out = Object.fromEntries(OVERRIDE_KEYS.map((k) => [k, 0]));
+  for (const n of notes) if (!n.deletedAt) for (const k of OVERRIDE_KEYS) if (OVERRIDES[k].own(n, s)) out[k]++;
+  return out;
+}
+// the one patch that puts Settings back on a note for these keys ({} = nothing to change)
+function resetPatch(n, s, keys) {
+  let cur = n;
+  const patch = {};
+  for (const k of keys) {
+    const o = OVERRIDES[k];
+    if (!o || !o.own(cur, s)) continue;
+    const p = o.reset(cur, s);
+    Object.assign(patch, p);
+    cur = { ...cur, ...p };
+  }
+  return patch;
+}
+
 const KEEP_BACKUPS = 30;
 const ATT_PREFIX = 'stickyfile://att/';
 const ATT_NAME = /^[A-Za-z0-9_-]+\.(png|jpe?g|gif|webp|bmp|webm|ogg|mp3|m4a|wav)$/i;
@@ -280,6 +354,142 @@ function picturePlace(n) {
 // 1.1.46: how many lines of words a note has (as the list counts them), for the card's "+3 lines"
 const lineCount = (text) => (typeof text === 'string' ? text.split('\n').filter((l) => l.trim()).length : 0);
 
+// 1.3.11: the look of the words on a note's card. A card is built from the note's plain text (n.text), so on its own it
+// lost every look the note gives its words (the owner saw a line in Rounded in the note and in Medieval on its card).
+// This is the one place that turns the note's html into that look: one walk makes the html's lines the way innerText
+// does (blocks, <br> and table rows end a line; empty lines are left out), each line a list of runs
+// { t, f, c, bg, k, b, i, u, s, mk, sub, sup, code, h, a } (CARD_RUN_KEYS; the card draws them: `runCss` in
+// src/list/cards.js). Each line of the text then gets the runs of the html line with the same words, in order (like
+// checklistMarks), or null: shown plain, as before (so a line that doesn't match can only look plain, never wrong).
+// Every tag the editor keeps (ALLOWED / RICH in src/note/content.js) is in CARD_TAGS: a look, a line break, or nothing to
+// show (list-logic.test.js checks this, so a new kind of formatting in the note can't be missed on the cards).
+const CARD_FACE = { caveat: 'hand', nunito: 'round', augusta: 'medieval' }; // <font face> (src/note/panels.js FACE)
+const CARD_COLOR = /^(#[0-9a-f]{3,8}|rgba?\([\d.,\s%]+\))$/i;
+const CARD_RESET = /^(#010203|rgb\(1,\s*2,\s*3\))$/i; // the editor's "Normal" colour marker (panels.js RESET_COLOR)
+const CARD_TAGS = {
+  // inline: the look they add (FONT and SPAN: from their attributes, see cardLook)
+  B: { b: 1 }, STRONG: { b: 1 }, I: { i: 1 }, EM: { i: 1 }, U: { u: 1 }, S: { s: 1 }, STRIKE: { s: 1 }, DEL: { s: 1 },
+  MARK: { mk: 1 }, SUB: { sub: 1 }, SUP: { sup: 1 }, CODE: { code: 1 }, A: { a: 1 }, FONT: {}, SPAN: {},
+  // blocks: a new line (and their own look)
+  PRE: { line: 1, code: 1 }, H1: { line: 1, h: 1 }, H2: { line: 1, h: 1 }, H3: { line: 1, h: 1 }, H4: { line: 1, h: 1 },
+  P: { line: 1 }, DIV: { line: 1 }, LI: { line: 1 }, UL: { line: 1 }, OL: { line: 1 }, BLOCKQUOTE: { line: 1 },
+  TABLE: { line: 1 }, TBODY: { line: 1 }, THEAD: { line: 1 }, TR: { line: 1 }, BR: { line: 1, empty: 1 }, HR: { line: 1, empty: 1 },
+  TD: { cell: 1 }, TH: { cell: 1, b: 1 },
+  // no words of their own
+  IMG: { empty: 1 },
+};
+const CARD_RUN_KEYS = ['f', 'c', 'bg', 'k', 'b', 'i', 'u', 's', 'mk', 'sub', 'sup', 'code', 'h', 'a'];
+// 1.3.13: the size of the words, k = times the note's text size, worked out exactly as the note's CSS does it. 1.3.18:
+// k = the size they're written at (`_n`: sizes multiply, nested ones add up: font[size] CARD_SIZE, headings 1.2, code
+// .8, sub / sup the browser's 1/1.2) × the resize of the app font they're in (`_fk`: CARD_FACE_SIZE[note's font][their
+// font], the note's own font 1; the innermost font counts, once: note-drawing.css `font[face]` --kf / --k).
+// store.test.js checks these against the CSS files.
+const CARD_FACE_SIZE = { round: { hand: 1.45, medieval: 1.19 }, hand: { round: 0.68, medieval: 0.8 }, medieval: { hand: 1.24, round: 0.84 } };
+const CARD_SIZE = { 1: 0.7, 2: 0.82, 3: 1, 4: 1.2, 5: 1.45, 6: 1.85, 7: 2.3 };
+const CARD_TAG_SIZE = { H1: 1.2, H2: 1.2, H3: 1.2, H4: 1.2, CODE: 0.8, PRE: 0.8, SUB: 1 / 1.2, SUP: 1 / 1.2 };
+const attrOf = (attrs, name) => {
+  const m = new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i').exec(attrs);
+  return m ? decodeEnt(m[1] ?? m[2] ?? m[3] ?? '').trim() : null;
+};
+// the look a tag adds to the words inside it (on top of `look`, the look around it)
+function cardLook(look, tag, attrs, noteFont) {
+  const add = CARD_TAGS[tag];
+  const out = { ...look };
+  out._n = (look._n || 1) * (CARD_TAG_SIZE[tag] || 1);
+  for (const k of CARD_RUN_KEYS) if (add && add[k]) out[k] = 1;
+  if (tag === 'FONT') {
+    const face = attrOf(attrs, 'face');
+    // the note's CSS matches the face exactly (font[face="Nunito"]), so only an exact name gets resized
+    const exact = face && { Caveat: 'hand', Nunito: 'round', Augusta: 'medieval' }[face];
+    if (face) { const f = CARD_FACE[face.split(',')[0].replace(/["']/g, '').trim().toLowerCase()]; if (f) out.f = f; }
+    const c = attrOf(attrs, 'color');
+    if (c && CARD_RESET.test(c)) delete out.c; else if (c && CARD_COLOR.test(c)) out.c = c;
+    if (exact) out._fk = (CARD_FACE_SIZE[noteFont] || {})[exact] || 1;
+    const sz = attrOf(attrs, 'size');
+    if (sz && CARD_SIZE[sz]) out._n *= CARD_SIZE[sz];
+  }
+  if (tag === 'SPAN') {
+    const style = attrOf(attrs, 'style') || '';
+    for (const part of style.split(';')) {
+      const i = part.indexOf(':'); if (i < 0) continue;
+      const p = part.slice(0, i).trim().toLowerCase(); const v = part.slice(i + 1).trim();
+      const key = p === 'color' ? 'c' : p === 'background-color' ? 'bg' : null;
+      if (!key) continue;
+      if (/^transparent$/i.test(v) || CARD_RESET.test(v)) delete out[key]; else if (CARD_COLOR.test(v)) out[key] = v;
+    }
+  }
+  const k = Math.round(out._n * (out._fk || 1) * 1000) / 1000;
+  if (k === 1) delete out.k; else out.k = k;
+  return out;
+}
+// 1.3.18: until 1.3.17 a size on the tag of an app font other than the note's own did nothing (that font's resize beat
+// it: the browser put both on one tag when a size or font was picked for words all in one tag, and pastes brought them).
+// Now sizes always count, so a note's old ones are taken off once, when it is read (normalize, crypt.js openAll), and
+// it looks as before. Only those: every other size still counts the same.
+const FACE_IDS = { Caveat: 'hand', Nunito: 'round', Augusta: 'medieval' };
+// a note's html read the new way (unchanged once its `sizes` is 2)
+const sizedHtml = (n) => (n.sizes === 2 ? n.html : dropDeadSizes(n.html, FONTS.includes(n.font) ? n.font : 'hand'));
+function dropDeadSizes(html, noteFont) {
+  if (typeof html !== 'string' || !/<font\b[^>]*\bsize/i.test(html)) return html;
+  return html.replace(/<font\b([^>]*)>/gi, (tag, attrs) => {
+    const id = FACE_IDS[attrOf(attrs, 'face')];
+    if (!id || id === noteFont || attrOf(attrs, 'size') === null) return tag;
+    return '<font' + attrs.replace(/\s+size\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+)/i, '') + '>';
+  });
+}
+const sameLook = (a, b) => CARD_RUN_KEYS.every((k) => a[k] === b[k]);
+function cardRuns(html, text, noteFont = 'hand') {
+  if (typeof html !== 'string' || typeof text !== 'string' || !/<(b|strong|i|em|u|s|strike|del|mark|sub|sup|code|pre|a|font|span|h[1-4]|th)\b/i.test(html)) return null;
+  const lines = []; let cur = []; let chars = 0;
+  const stack = []; let look = {};
+  const endLine = () => { if (cur.length) lines.push(cur); cur = []; };
+  const put = (t, l = look) => {
+    if (!t) return;
+    const last = cur[cur.length - 1];
+    if (last && sameLook(last, l)) last.t += t;
+    else { const run = { t }; for (const k of CARD_RUN_KEYS) if (l[k] !== undefined) run[k] = l[k]; cur.push(run); }
+    chars += t.length;
+  };
+  const re = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)([^>]*)>|([^<]+)/g; let m;
+  while ((m = re.exec(html)) && chars < 3000) { // the list gets at most 600 letters of the text
+    if (m[4] !== undefined) { put(decodeEnt(m[4]).replace(/\s+/g, ' ')); continue; }
+    const close = m[1] === '/'; const tag = m[2].toUpperCase(); const attrs = m[3] || '';
+    const kind = CARD_TAGS[tag] || {};
+    if (kind.line) endLine();
+    if (kind.cell && !close && cur.length) put(' ', {});
+    if (kind.empty || /\/\s*$/.test(attrs)) continue;
+    if (close) {
+      const at = stack.map((x) => x.tag).lastIndexOf(tag);
+      if (at >= 0) { look = stack[at].before; stack.length = at; }
+    } else {
+      stack.push({ tag, before: look });
+      look = cardLook(look, tag, attrs, noteFont);
+    }
+  }
+  endLine();
+  const html2 = lines.map((runs) => {
+    const t = normLine(runs.map((r) => r.t).join(''));
+    if (!t) return null;
+    const out = runs.map((r) => ({ ...r }));
+    out[0].t = out[0].t.replace(/^\s+/, ''); out[out.length - 1].t = out[out.length - 1].t.replace(/\s+$/, '');
+    return { t, runs: out.filter((r) => r.t), styled: runs.some((r) => CARD_RUN_KEYS.some((k) => r[k] !== undefined)) };
+  }).filter(Boolean);
+  const want = text.split('\n').map((x) => x.trim()).filter(Boolean);
+  let j = 0; let any = false;
+  const out = want.map((line) => {
+    const l = normLine(line);
+    for (let k = j; k < Math.min(html2.length, j + 4); k++) {
+      if (html2[k].t !== l) continue;
+      j = k + 1;
+      if (!html2[k].styled) return null;
+      any = true;
+      return html2[k].runs;
+    }
+    return null;
+  });
+  return any ? out : null;
+}
+
 // 1.1.23: the descriptions of a note's pictures (their alt text), one per line, for the notes list's search
 function pictureWords(html) {
   if (typeof html !== 'string' || !/<img/i.test(html)) return '';
@@ -289,20 +499,30 @@ function pictureWords(html) {
 }
 function normalize(n) {
   const now = Date.now();
+  const font = FONTS.includes(n.font) ? n.font : 'hand';
+  const html = typeof n.html === 'string' ? n.html : '';
+  const sealed = !!(n.enc && !html); // its html is in enc: cleaned when it is opened (crypt.js openAll)
+  const ink = normalizeInk(n.ink);
+  const wrapWidth = Number.isFinite(Number(n.wrapWidth)) && Number(n.wrapWidth) >= 80 ? Math.min(4000, Math.round(Number(n.wrapWidth))) : null;
+  const nowrap = n.nowrap === true;
   return {
     id: String(n.id),
     title: cleanTitle(n.title),
     coverTitle: cleanTitle(n.coverTitle), // 1.1.30: shown instead of the title while the note is locked
-    html: typeof n.html === 'string' ? n.html : '',
+    html: sealed ? html : sizedHtml({ ...n, html, font }),
     text: typeof n.text === 'string' ? n.text : '',
     firstImage: typeof n.firstImage === 'string' ? n.firstImage : null,
     color: COLORS.includes(n.color) ? n.color : 'yellow',
-    font: FONTS.includes(n.font) ? n.font : 'hand',
+    font,
+    titleFont: FONTS.includes(n.titleFont) ? n.titleFont : null, // 1.3.3: the title's own font; null = the note's font
     size: ['s', 'm', 'l'].includes(n.size) ? n.size : 'm',
     opacity: clamp(Number(n.opacity) || 1, 0.25, 1),
     zoom: clamp(Math.round((Number(n.zoom) || 1) * 10) / 10, 0.5, 3), // Ctrl + mouse wheel in the note (1.1.13)
     solidOnHover: n.solidOnHover !== false,
     pinned: !!n.pinned,
+    // 1.3.34: click-through (main/note-state.js applyClickThrough): the mouse goes through it to the window under it. Only a
+    // pinned note: turning it on pins the note (ipc-common.js applyPatch), unpinning turns it off. Not copied by Duplicate.
+    clickThrough: !!n.clickThrough && !!n.pinned,
     open: !!n.open,
     rolled: !!n.rolled,
     locked: !!n.locked,
@@ -310,12 +530,20 @@ function normalize(n) {
     fx: cleanFx(n.fx), // 1.1.16: this note's own effect / mouse follower ({ e, f }; null = same as all notes); not an edit
     fxPaused: !!n.fxPaused, // effects paused on this note; not an edit
     fxPlay: !!n.fxPlay, // 1.1.16: effects play on this note even while all effects are paused (Settings / tray); not an edit
-    ink: normalizeInk(n.ink),
+    ink,
     // text layout locked at this width (px) so text and pictures don't re-wrap; null = wraps with the note
-    wrapWidth: Number.isFinite(Number(n.wrapWidth)) && Number(n.wrapWidth) >= 80 ? Math.min(4000, Math.round(Number(n.wrapWidth))) : null,
+    wrapWidth,
     // 1.1.45: word wrap off with no limit, kept with a drawing too (then wrapWidth is only the pictures' width)
-    nowrap: n.nowrap === true,
+    nowrap,
+    // 1.3.29: word wrap off with the text kept at wrapWidth (the first drawing on a note with word wrap on does that), so
+    // the drawing stays on its words. Saved, never worked out from the drawing: erasing the last line used to turn the
+    // note into "no limit" and every table cell and paragraph un-wrapped. A note saved before 1.3.29 (no wrapFixed yet):
+    // it is what it showed then, locked when it had a drawing; a sealed one is decided when it is opened (openedLayout).
+    wrapFixed: !wrapWidth || nowrap ? false : typeof n.wrapFixed === 'boolean' ? n.wrapFixed : sealed ? null : !!ink,
     spell: n.spell === true || n.spell === false ? n.spell : null,
+    checklist: cleanChecklist(n.checklist), // 1.3.19: this note's own checklist options (null each = as in Settings); not an edit
+    evening: typeof n.evening === 'boolean' ? n.evening : null, // 1.3.27: evening colours on / off for this note (null = as in Settings); not an edit
+    panic: n.panic === false ? false : null, // 1.3.27: false = the panic button leaves this note open (null = it closes it); not an edit
     groupId: typeof n.groupId === 'string' && n.groupId ? n.groupId : null,
     bounds: normalizeBounds(n.bounds),
     createdAt: Number(n.createdAt) || now,
@@ -326,6 +554,8 @@ function normalize(n) {
     // until the PIN opens them), and the names of its sealed photo / drawing / voice files (for the attachment sweep)
     enc: cleanEnc(n.enc),
     encAtt: n.enc ? cleanEncAtt(n.encAtt) : null,
+    // 1.3.18: 2 = its sizes are read the new way (old dead sizes taken off: dropDeadSizes); null = sealed, not yet
+    sizes: n.sizes === 2 || !sealed ? 2 : null,
   };
 }
 
@@ -358,6 +588,11 @@ class Store {
     }
     this.settings.defaultColors = cleanColors(this.settings.defaultColors);
     this.settings.defaultColor = this.settings.defaultColors[0];
+    // 1.3.27: evening times and the panic button's shortcut / last closed notes, cleaned
+    this.settings.eveFrom = EVENING.cleanTime(this.settings.eveFrom, EVENING.DEFAULT_FROM);
+    this.settings.eveTo = EVENING.cleanTime(this.settings.eveTo, EVENING.DEFAULT_TO);
+    this.settings.panicKey = typeof this.settings.panicKey === 'string' ? this.settings.panicKey.slice(0, 60) : '';
+    this.settings.panicClosed = Array.isArray(this.settings.panicClosed) ? this.settings.panicClosed.filter((x) => typeof x === 'string').slice(0, 2000) : [];
     this.groups = new Map();
     const g = readJson(this.groupsFile) || readJson(this.groupsFile + '.bak') || {};
     for (const x of Array.isArray(g.groups) ? g.groups : []) {
@@ -396,6 +631,18 @@ class Store {
 
   all() {
     return [...this.notes.values()];
+  }
+
+  // 1.3.18: a sealed note just opened in memory (crypt.js openAll): its sizes read the new way, as normalize does for the rest
+  openedSizes(n) {
+    if (n.sizes === 2) return;
+    n.html = sizedHtml(n);
+    n.sizes = 2;
+  }
+
+  // 1.3.29: a sealed note from before 1.3.29 just opened in memory: its layout decided as normalize does for the rest
+  openedLayout(n) {
+    if (n.wrapFixed === null) n.wrapFixed = !!(n.wrapWidth && !n.nowrap && n.ink && n.ink.s && n.ink.s.length);
   }
 
   get(id) {
@@ -477,7 +724,7 @@ class Store {
   duplicate(id, extra = {}) {
     const src = this.notes.get(id);
     if (!src || src.deletedAt) return null;
-    const keys = ['html', 'text', 'firstImage', 'ink', 'wrapWidth', 'nowrap', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'spell', 'locked', 'groupId', 'fx', 'coverTitle'];
+    const keys = ['html', 'text', 'firstImage', 'ink', 'wrapWidth', 'nowrap', 'wrapFixed', 'color', 'font', 'titleFont', 'size', 'opacity', 'solidOnHover', 'spell', 'checklist', 'evening', 'panic', 'locked', 'groupId', 'fx', 'coverTitle'];
     const copy = {};
     for (const k of keys) copy[k] = src[k] && typeof src[k] === 'object' ? JSON.parse(JSON.stringify(src[k])) : src[k];
     copy.title = src.title ? `${src.title} (copy)` : '';
@@ -781,7 +1028,7 @@ class Store {
       const opened = raw.enc && this.opener ? this.opener(raw) : null;
       const b = opened || raw;
       const cur = this.notes.get(String(b.id));
-      const same = cur && (b.enc ? !!cur.enc && cur.enc.c === b.enc.c : !cur.enc && cur.html === b.html);
+      const same = cur && (b.enc ? !!cur.enc && cur.enc.c === b.enc.c : !cur.enc && cur.html === sizedHtml(b)); // 1.3.18: as it reads now
       if (same) {
         if (cur.deletedAt && !b.deletedAt) { this.restore(cur.id); ids.push(cur.id); restored++; }
         continue;
@@ -813,4 +1060,4 @@ function backupDayName(name) {
   return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-module.exports = { FONTS, checklistMarks, pictureWords, picturePlace, lineCount, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };
+module.exports = { FONTS, CHECK_OPTS, OVERRIDE_KEYS, overrideCounts, resetPatch, cleanChecklist, checklistMarks, cardRuns, CARD_TAGS, CARD_RUN_KEYS, CARD_FACE_SIZE, CARD_SIZE, dropDeadSizes, pictureWords, picturePlace, lineCount, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };

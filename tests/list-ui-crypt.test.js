@@ -29,15 +29,21 @@ if (app.phase === 'new-pin') {
     await page.locator('.rkeyok input').evaluate((x) => x.click()); await ui.click('#mOk');
     assert.ok(!(await ui.modalOpen()) && (await ui.get()).settings.crypt.keyShown, 'ticked: closed and saved');
     assert.ok(/Locked note/.test(await ui.text(ui.noteKey(A))) && !/secret title|bank pin/.test(await page.content()), 'the card hides the title too');
-    // the title while locked, from Edit design on the locked card
+    // the title while locked: no Edit design on the locked card (1.3.28; more in list-ui-locks-bin), only once it is unlocked
+    const cover = async () => (await ui.get()).notes.find((n) => n.id === A).coverTitle;
+    await ui.rclick(ui.noteKey(A));
+    assert.ok(!(await ui.menuLabels()).includes('Edit design…'), 'locked: no Edit design');
+    await ui.key('Escape');
+    await ui.menu(ui.noteKey(A), 'Unlock…'); await ui.modalOk(['24682468']);
     await ui.menu(ui.noteKey(A), 'Edit design…');
-    assert.equal(await page.getAttribute('#editTitle', 'placeholder'), 'Title while locked (optional)');
-    await ui.type('#editTitle', 'Bank'); await ui.key('Escape'); await ui.settle(500);
-    assert.equal((await ui.get()).notes.find((n) => n.id === A).coverTitle, 'Bank', 'saved as the title while locked');
-    assert.ok(/Bank/.test(await ui.text(ui.noteKey(A))), 'the card shows it');
+    assert.ok(!(await page.$eval('#editTitle', (x) => x.readOnly)) && await ui.visible('#editCoverRow'), 'unlocked: both titles can be changed');
+    await ui.type('#editCover', 'Bank'); await ui.key('Escape'); await ui.settle(500);
+    assert.equal(await cover(), 'Bank', 'saved as the title while locked');
+    await ui.menu(ui.noteKey(A), 'Lock again');
+    assert.ok(/Bank/.test(await ui.text(ui.noteKey(A))) && !/secret title/.test(await page.content()), 'locked again: the card shows it');
     // Settings → Locked notes
     await ui.tab('settings');
-    assert.ok(/encrypted on this computer/.test(await ui.text('#cryptInfo')));
+    assert.ok(/encrypted on this device/.test(await ui.text('#cryptInfo')));
     assert.ok(!(await ui.visible('#pinWarn')), 'an 8-digit PIN: no warning');
     assert.ok(await ui.visible('#cryptForgot') && await ui.visible('#cryptToggle') && !(await ui.visible('#cryptNow')));
     // forgot the PIN: the recovery key sets a new (short) one, and the warning shows
@@ -77,7 +83,7 @@ if (app.phase === 'old-pin') {
     const data = await ui.get();
     assert.ok(data.settings.crypt.setUp && !data.settings.crypt.needPin, 'encrypted now');
     await ui.tab('settings');
-    assert.ok(/encrypted on this computer/.test(await ui.text('#cryptInfo')));
+    assert.ok(/encrypted on this device/.test(await ui.text('#cryptInfo')));
     assert.ok(await ui.visible('#pinWarn'), 'a 4-digit PIN: the warning');
     await ui.done();
     process.exit(0);

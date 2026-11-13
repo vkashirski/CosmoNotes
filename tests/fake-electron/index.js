@@ -11,7 +11,7 @@ class BrowserWindow extends EventEmitter {
   close(){ if(this.destroyed) return; this.destroyed=true; this.emit('closed'); }
   isDestroyed(){return this.destroyed} isMinimized(){return !!this.minimized} isMaximized(){return !!this.maximized} minimize(){this.minimized=true;this.emit('minimize')} maximize(){this.maximized=true;this.emit('maximize')} unmaximize(){this.maximized=false;this.emit('unmaximize')} setMinimizable(v){this.minimizable=v} setMaximizable(){} isVisible(){return this.visible} restore(){ if(this.minimized){this.minimized=false;this.emit('restore')} }
   getBounds(){return {...this.bounds}} setBounds(b){Object.assign(this.bounds,b)} setPosition(x,y){this.bounds.x=x;this.bounds.y=y;this.emit('move')} setSize(w,h){this.bounds.width=w;this.bounds.height=h;this.emit('resize')}
-  setMinimumSize(){} setMaximumSize(){} setOpacity(v){this.opacity=v} setAlwaysOnTop(v){this.top=v} setBackgroundColor(c){this.bg=c} setTitle(t){this.title=t} moveTop(){}
+  setMinimumSize(){} setMaximumSize(){} setOpacity(v){this.opacity=v} setIgnoreMouseEvents(v,o){this.ignoreMouse=v?{forward:!!(o&&o.forward)}:false} setAlwaysOnTop(v){this.top=v} setBackgroundColor(c){this.bg=c} setTitle(t){this.title=t} moveTop(){}
   static fromWebContents(wc){ return wc.win } static getAllWindows(){ return all.filter(w=>!w.destroyed) }
 }
 const display = { workArea: { x: 0, y: 0, width: 1920, height: 1040 } };
@@ -25,6 +25,9 @@ module.exports = {
   Menu: { buildFromTemplate:(t)=>({ t, popup(){} }), setApplicationMenu(){} },
   nativeImage: { createFromPath:()=>({}) },
   shell: { openExternal(u){ module.exports.__opened = u }, openPath(){} },
+  // 1.3.27: the panic button's shortcut. reg = what is registered (accelerator -> function); a test puts an accelerator in
+  // `taken` to play another app that already has it
+  globalShortcut: { reg: {}, taken: new Set(), register(a, f){ if (this.taken.has(a)) return false; this.reg[a] = f; return true }, unregister(a){ delete this.reg[a] }, unregisterAll(){ this.reg = {} }, isRegistered(a){ return !!this.reg[a] } },
   dialog: { showMessageBox: async()=>({response:0}), showOpenDialog: async()=>({canceled:true}) },
   protocol: { registerSchemesAsPrivileged(){}, handle(s,f){ module.exports.__proto = f } },
   net: { fetch: async (u)=>({ url:u }) },

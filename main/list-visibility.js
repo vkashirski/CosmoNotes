@@ -13,6 +13,9 @@ function groupOpenInList(groupId) {
   if (S.listUnlockedAll) return true;
   return S.store.chain(groupId).every((g) => !g.locked || listOpenGroups.has(g.id) || unlockedForNow.has(g.id));
 }
+// 1.3.28 (the owner's wish): a group the list may not change: it or a group around it is locked and not open in the list.
+// Such a group (like a note hidden in the list, `hiddenInList`) can only be picked, unlocked or have its lock removed.
+const groupShut = (groupId) => !!groupId && !groupOpenInList(groupId);
 // a locked note whose own lock and every locked group around it are unlocked for now (or opened in the list):
 // the list shows it and its window opens without the password
 function openForNow(n) {
@@ -31,6 +34,19 @@ function hideNewlyLocked() {
     else win.webContents.send('note:look', viewOf(n, win));
   }
 }
+// "Lock again" for everything (the list's Locked tab; 1.3.27 the panic button): "Unlock all" and the groups opened in the
+// list, what was unlocked for now (1.1.47), and every open window that was unlocked (it saves what was typed, then hides
+// itself, like locking from the list). `keep`: ids of notes whose window is left as it is (the panic button's exceptions).
+function coverAll(keep = new Set()) {
+  S.listUnlockedAll = false;
+  listOpenGroups.clear();
+  for (const id of [...unlockedForNow]) if (!keep.has(id)) unlockedForNow.delete(id);
+  for (const [id, win] of wins) {
+    const n = S.store.get(id);
+    if (!n || win.isDestroyed() || keep.has(id)) continue;
+    if (isLocked(n) && win.revealed) { win.lockPending = true; win.webContents.send('note:lock-now'); }
+  }
+}
 // 1.1.14: a locked note that's unlocked in its own window shows in the list too, until that window is
 // closed or locked again
 function revealedNow(n) { const w = wins.get(n.id); return !!(w && !w.isDestroyed() && w.revealed && !w.lockPending); }
@@ -45,4 +61,4 @@ function pushLook(id) {
   applyState(win, n);
   win.webContents.send('note:look', viewOf(n, win));
 }
-module.exports = { groupOpenInList, hiddenInList, hideNewlyLocked, listOpenGroups, openForNow, pushLook, revealedNow, unlockedForNow };
+module.exports = { coverAll, groupOpenInList, groupShut, hiddenInList, hideNewlyLocked, listOpenGroups, openForNow, pushLook, revealedNow, unlockedForNow };

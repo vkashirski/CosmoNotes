@@ -15,24 +15,37 @@
   --pop-pick: #3B3226; --pop-pickfg: #FFF8E6; /* a picked tool, dark pills */
 }
 
-body[data-color="yellow"]   { --paper:#FFF4A3; --paper2:#FFEC85; --bar:#FBE278; --accent:#7A5C00; --ink:#3B3220; --sel:rgba(255,190,0,.42); --line:rgba(122,92,0,.28); }
-body[data-color="pink"]     { --paper:#FFD6E6; --paper2:#FFC6DB; --bar:#FFB5D0; --accent:#9C2A5B; --ink:#3D2430; --sel:rgba(255,92,150,.32); --line:rgba(156,42,91,.28); }
-body[data-color="green"]    { --paper:#D8F5C4; --paper2:#C9F0AF; --bar:#B9E79C; --accent:#3D7A1A; --ink:#25331C; --sel:rgba(90,190,40,.32);  --line:rgba(61,122,26,.28); }
-body[data-color="blue"]     { --paper:#D2ECFF; --paper2:#C1E3FF; --bar:#A9D8FF; --accent:#1F5F93; --ink:#1D2B38; --sel:rgba(40,140,240,.28); --line:rgba(31,95,147,.28); }
-body[data-color="purple"]   { --paper:#E8DDFF; --paper2:#DDCEFF; --bar:#D0BDFF; --accent:#5B3AA8; --ink:#2B2340; --sel:rgba(130,80,240,.28); --line:rgba(91,58,168,.28); }
-body[data-color="orange"]   { --paper:#FFDFBF; --paper2:#FFD2A8; --bar:#FFC38C; --accent:#9A4E0C; --ink:#3A2A1A; --sel:rgba(255,140,40,.32); --line:rgba(154,78,12,.28); }
-body[data-color="mint"]     { --paper:#CDF3E8; --paper2:#BCEDDE; --bar:#A4E5D1; --accent:#1F7560; --ink:#1C332D; --sel:rgba(30,180,140,.3);  --line:rgba(31,117,96,.28); }
-body[data-color="charcoal"] { --paper:#3A3940; --paper2:#333239; --bar:#2B2A30; --accent:#FFD86B; --ink:#F3EFE6; --sel:rgba(255,216,107,.3); --line:rgba(255,216,107,.3); }
+body[data-color="yellow"]   { --d-paper:#FFF4A3; --d-paper2:#FFEC85; --d-bar:#FBE278; --d-accent:#7A5C00; --d-ink:#3B3220; --d-sel:rgba(255,190,0,.42); --d-line:rgba(122,92,0,.28); }
+body[data-color="pink"]     { --d-paper:#FFD6E6; --d-paper2:#FFC6DB; --d-bar:#FFB5D0; --d-accent:#9C2A5B; --d-ink:#3D2430; --d-sel:rgba(255,92,150,.32); --d-line:rgba(156,42,91,.28); }
+body[data-color="green"]    { --d-paper:#D8F5C4; --d-paper2:#C9F0AF; --d-bar:#B9E79C; --d-accent:#3D7A1A; --d-ink:#25331C; --d-sel:rgba(90,190,40,.32);  --d-line:rgba(61,122,26,.28); }
+body[data-color="blue"]     { --d-paper:#D2ECFF; --d-paper2:#C1E3FF; --d-bar:#A9D8FF; --d-accent:#1F5F93; --d-ink:#1D2B38; --d-sel:rgba(40,140,240,.28); --d-line:rgba(31,95,147,.28); }
+body[data-color="purple"]   { --d-paper:#E8DDFF; --d-paper2:#DDCEFF; --d-bar:#D0BDFF; --d-accent:#5B3AA8; --d-ink:#2B2340; --d-sel:rgba(130,80,240,.28); --d-line:rgba(91,58,168,.28); }
+body[data-color="orange"]   { --d-paper:#FFDFBF; --d-paper2:#FFD2A8; --d-bar:#FFC38C; --d-accent:#9A4E0C; --d-ink:#3A2A1A; --d-sel:rgba(255,140,40,.32); --d-line:rgba(154,78,12,.28); }
+body[data-color="mint"]     { --d-paper:#CDF3E8; --d-paper2:#BCEDDE; --d-bar:#A4E5D1; --d-accent:#1F7560; --d-ink:#1C332D; --d-sel:rgba(30,180,140,.3);  --d-line:rgba(31,117,96,.28); }
+body[data-color="charcoal"] { --d-paper:#3A3940; --d-paper2:#333239; --d-bar:#2B2A30; --d-accent:#FFD86B; --d-ink:#F3EFE6; --d-sel:rgba(255,216,107,.3); --d-line:rgba(255,216,107,.3); }
 /* 1.1.15: the colours of the list themes */
-body[data-color="cream"]    { --paper:#F5EDD9; --paper2:#EFE4CB; --bar:#E8DCC0; --accent:#7D6C50; --ink:#3B3226; --sel:rgba(200,160,80,.32);  --line:rgba(125,108,80,.28); }
-body[data-color="rose"]     { --paper:#FBE1E8; --paper2:#F7D3DE; --bar:#F2CAD6; --accent:#86606B; --ink:#3F2A31; --sel:rgba(190,90,120,.28);  --line:rgba(134,96,107,.3); }
-body[data-color="sage"]     { --paper:#DCEFE4; --paper2:#CFE8D9; --bar:#C4E2D1; --accent:#4F6D5D; --ink:#25362D; --sel:rgba(60,130,95,.28);   --line:rgba(79,109,93,.3); }
-body[data-color="mist"]     { --paper:#DCEAF8; --paper2:#CEE0F3; --bar:#C5DAF0; --accent:#4F6782; --ink:#24313F; --sel:rgba(60,110,170,.26);  --line:rgba(79,103,130,.3); }
-body[data-color="lavender"] { --paper:#E7E0F9; --paper2:#DCD3F5; --bar:#D5CAF2; --accent:#5E5480; --ink:#2F2843; --sel:rgba(110,80,190,.26);  --line:rgba(94,84,128,.3); }
-body[data-color="night"]    { --paper:#2F2D35; --paper2:#2A2830; --bar:#25232A; --accent:#B3A4FF; --ink:#EDE6D8; --sel:rgba(142,123,239,.35); --line:rgba(179,164,255,.3); }
-body[data-color="midnight"] { --paper:#252B3D; --paper2:#212637; --bar:#1D2232; --accent:#9FB2FF; --ink:#E4E8F2; --sel:rgba(110,139,255,.35); --line:rgba(159,178,255,.3); }
-body[data-color="forest"]   { --paper:#232E28; --paper2:#1F2924; --bar:#1C2520; --accent:#8FD9B0; --ink:#E2ECE4; --sel:rgba(91,191,138,.33);  --line:rgba(143,217,176,.3); }
-body[data-color="plum"]     { --paper:#2D2432; --paper2:#28202D; --bar:#251D29; --accent:#E0A6EE; --ink:#EEE3F0; --sel:rgba(199,125,219,.33); --line:rgba(224,166,238,.3); }
+body[data-color="cream"]    { --d-paper:#F5EDD9; --d-paper2:#EFE4CB; --d-bar:#E8DCC0; --d-accent:#7D6C50; --d-ink:#3B3226; --d-sel:rgba(200,160,80,.32);  --d-line:rgba(125,108,80,.28); }
+body[data-color="rose"]     { --d-paper:#FBE1E8; --d-paper2:#F7D3DE; --d-bar:#F2CAD6; --d-accent:#86606B; --d-ink:#3F2A31; --d-sel:rgba(190,90,120,.28);  --d-line:rgba(134,96,107,.3); }
+body[data-color="sage"]     { --d-paper:#DCEFE4; --d-paper2:#CFE8D9; --d-bar:#C4E2D1; --d-accent:#4F6D5D; --d-ink:#25362D; --d-sel:rgba(60,130,95,.28);   --d-line:rgba(79,109,93,.3); }
+body[data-color="mist"]     { --d-paper:#DCEAF8; --d-paper2:#CEE0F3; --d-bar:#C5DAF0; --d-accent:#4F6782; --d-ink:#24313F; --d-sel:rgba(60,110,170,.26);  --d-line:rgba(79,103,130,.3); }
+body[data-color="lavender"] { --d-paper:#E7E0F9; --d-paper2:#DCD3F5; --d-bar:#D5CAF2; --d-accent:#5E5480; --d-ink:#2F2843; --d-sel:rgba(110,80,190,.26);  --d-line:rgba(94,84,128,.3); }
+body[data-color="night"]    { --d-paper:#2F2D35; --d-paper2:#2A2830; --d-bar:#25232A; --d-accent:#B3A4FF; --d-ink:#EDE6D8; --d-sel:rgba(142,123,239,.35); --d-line:rgba(179,164,255,.3); }
+body[data-color="midnight"] { --d-paper:#252B3D; --d-paper2:#212637; --d-bar:#1D2232; --d-accent:#9FB2FF; --d-ink:#E4E8F2; --d-sel:rgba(110,139,255,.35); --d-line:rgba(159,178,255,.3); }
+body[data-color="forest"]   { --d-paper:#232E28; --d-paper2:#1F2924; --d-bar:#1C2520; --d-accent:#8FD9B0; --d-ink:#E2ECE4; --d-sel:rgba(91,191,138,.33);  --d-line:rgba(143,217,176,.3); }
+body[data-color="plum"]     { --d-paper:#2D2432; --d-paper2:#28202D; --d-bar:#251D29; --d-accent:#E0A6EE; --d-ink:#EEE3F0; --d-sel:rgba(199,125,219,.33); --d-line:rgba(224,166,238,.3); }
+/* 1.3.27: the rows above are each paper's day colours (--d-*). In the evening a light paper mixes into its evening shade
+   (--e-*, from src/evening.js, put in by base.js) by --eve: 0 = day, 1 = evening (main's clock; it fades over 30 minutes).
+   The dark papers have no evening shade: they stay as they are. */
+body {
+  --eve: 0;
+  --paper: color-mix(in oklab, var(--d-paper), var(--e-paper, var(--d-paper)) calc(var(--eve) * 100%));
+  --paper2: color-mix(in oklab, var(--d-paper2), var(--e-paper2, var(--d-paper2)) calc(var(--eve) * 100%));
+  --bar: color-mix(in oklab, var(--d-bar), var(--e-bar, var(--d-bar)) calc(var(--eve) * 100%));
+  --accent: color-mix(in oklab, var(--d-accent), var(--e-accent, var(--d-accent)) calc(var(--eve) * 100%));
+  --ink: color-mix(in oklab, var(--d-ink), var(--e-ink, var(--d-ink)) calc(var(--eve) * 100%));
+  --sel: color-mix(in oklab, var(--d-sel), var(--e-sel, var(--d-sel)) calc(var(--eve) * 100%));
+  --line: color-mix(in oklab, var(--d-line), var(--e-line, var(--d-line)) calc(var(--eve) * 100%));
+}
 
 body[data-font="hand"][data-size="s"]  { --fs: 19px; }
 body[data-font="hand"][data-size="m"]  { --fs: 23px; }
@@ -87,6 +100,14 @@ body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[da
 .hb svg { width: 16px; height: 16px; }
 #btnPin[aria-pressed="true"] { opacity: 1; }
 #btnPin[aria-pressed="true"] svg { fill: currentColor; transform: rotate(-25deg); }
+/* 1.3.34: click-through (main/note-state.js): the window lets clicks through, and nothing in it reacts to the mouse but
+   its button (no hover, no drag; the top bar can't be dragged meanwhile either). The other buttons fade so it reads. */
+#btnCt[aria-pressed="true"] { opacity: 1; }
+#btnCt[aria-pressed="true"] svg { fill: currentColor; }
+body.ct * { pointer-events: none !important; }
+body.ct #btnCt { pointer-events: auto !important; }
+body.ct #bar { -webkit-app-region: no-drag; }
+body.ct #bar > :not(#btnCt, #title) { opacity: .3; }
 #title {
   flex: 1; min-width: 0;
   padding: 0 6px;
@@ -95,8 +116,9 @@ body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[da
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   opacity: 0;
 }
-body[data-font="hand"] #title { font: 700 19px var(--hand); line-height: 1; padding-bottom: 1px; }
-body[data-font="medieval"] #title { font: 400 17px var(--med); line-height: 1; padding-bottom: 1px; }
+/* 1.3.3: data-tfont = the title's own font (Title font in the ⋯ menu), else the note's font */
+body[data-tfont="hand"] #title { font: 700 19px var(--hand); line-height: 1; padding-bottom: 1px; }
+body[data-tfont="medieval"] #title { font: 400 17px var(--med); line-height: 1; padding-bottom: 1px; }
 body.has-title #title, body.rolled #title { opacity: .95; }
 .hb[hidden] { display: none; }
 #btnRoll svg { transition: transform .18s; }

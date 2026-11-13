@@ -6,6 +6,667 @@ file (`tests/release.test.js` checks that every version is in one of the two fil
 Renumbered in 1.1.41: each heading says its old number (the table is at the top of `CHANGELOG.md`). Version numbers inside
 the entries are the old ones.
 
+## 1.3.36 – 12 November 2026
+
+The search in Settings also knows other names for each section (the owner's wish): "dark mode" finds General (the
+colour themes), "dictation" finds Voice to text, "boss key" finds Panic button, "password" finds Locked notes.
+
+- Each section in `src/list.html` has a `data-find` attribute: a list of other words for what it does (dark mode,
+  startup, todo, grammar, appdata, color/colors…). `findSettings` searches them along with the section's own text, with
+  the same rule (every word typed must start one of them). A word may find more than one section ("transparent": For
+  new notes and Click-through).
+- A new Settings section needs its own `data-find`: `list-ui-settings.test.js` fails without one.
+
+## 1.3.35 – 12 November 2026
+
+Settings has a search box at the top (the owner's wish: Settings has many folded sections now). Type "evening" and only
+Evening colours shows, already open.
+
+- **Matching (`findSettings`, `src/list/actions-locks.js`, next to `foldPanels`):** a section matches when every word
+  typed starts a word in it ("eve" finds "Evening", not "never"); any case; ’ counts as '. It looks at the section's title
+  and the text it shows: not hidden parts (`hidden`, e.g. a `.reapply` row) and not About's feature list
+  (`details.fold`), so "evening" doesn't also bring up About.
+- **Folds:** the matching sections open; the rest get `.unfound` (not `hidden`, so search never clashes with code that
+  hides things). Clearing the search (X, Escape, or deleting the text) puts every section back open or closed as it
+  was before the search began (`foldsBefore`). `setFold` now opens and closes a section for both the title click and
+  the search (keeps `aria-expanded` in step). Nothing matches: "No settings match."
+- **Keys:** Ctrl+F in Settings goes to this search (it used to switch to Notes). Ctrl+F also selects what's already in
+  a search box. Escape in Settings clears it.
+- Tests: `list-ui-settings.test.js`.
+
+## 1.3.34 – 12 November 2026
+
+Click-through: a pinned note can let the mouse through, so you can read it over a video or a game and click what's
+under it (the owner's wish). A button left of the pin turns it on and off; while it's on, that button is the only thing
+on the note that works. Turn the button on in Settings → Click-through. The panic button moved to the left of the title,
+away from it.
+
+- **Why a button and not "hold Ctrl" (first plan):** Electron forwards the mouse's moves to an ignoring window with no
+  keys in them (`wParam = 0`), and Chromium reads Ctrl with `GetKeyState`, which goes stale while another app has focus.
+  So Ctrl would only have worked when CosmoNotes already had focus. A global key hook would need a native DLL (Smart
+  App Control). The owner chose the button.
+- **Main (`main/note-state.js`):** `applyClickThrough` (from `applyState`) calls `setIgnoreMouseEvents(true, { forward: true })`
+  while `note.clickThrough` and `settings.clickThroughOn` are on. The note sends `note:ct-awake` while the mouse is on its
+  button (`win.ctAwake`): the window takes clicks only until the mouse leaves the button. Settings on / off:
+  `applyClickThroughAll`. A click-through note stays see-through under the mouse (`note:hover`).
+- **The note:** `note.clickThrough` (store.js: only with `pinned`; turning it on pins the note, unpinning ends it; not
+  copied by Duplicate). It's in `WHILE_HIDDEN`, so a locked note's window can still turn it off. `body.ct`
+  (note-base.css): nothing but the button takes the mouse (no hover, no drag, no mouse follower); the other top-bar
+  buttons fade.
+- **The list:** right-click a click-through note → Turn off click-through (`list:click-through-off`, refused for a note
+  hidden in the list). Settings → Click-through has the switch (`clickThroughOn`, off at first).
+- **Top bar:** order is List, New, Panic, title … Effects, Click-through, Pin. With both Panic and Click-through, a note
+  under 225 px also hides Minimise (Maximise already goes under 250 px).
+- Tests: windows.test.js (ignoring with forward, waking on the button, unpinning, Settings off / on, the list's item),
+  locks.test.js (a hidden locked window may change it; the list may not), note-ui.test.js (the order of the buttons,
+  only the button takes the mouse, awake on and off, a 200 px note fits), list-ui-settings.test.js (the switch, the
+  right-click item). `fake-electron` has `setIgnoreMouseEvents`.
+- Needs a real Windows PC: that clicks really go through to a game or video while the mouse's moves still reach the note.
+
+## 1.3.33 – 11 November 2026
+
+In the notes list, a note card's star and lock get an outline while you point at the card, so they show over a dark or
+busy photo (the owner's report).
+
+- list-settings-fx.css: `.card:not(.group):hover > :is(.fav, .lockb) svg` gets a halo of the card's paper colour
+  (`drop-shadow`). A group's star and lock already sit on a round badge, so they are unchanged.
+- list-cards.css: the box of hover buttons at the bottom right (`.acts`: open, out of group, Bin) has a thin accent edge
+  now, instead of a faint grey one.
+
+## 1.3.32 – 11 November 2026
+
+Ctrl+Z now undoes every change the note makes itself, not only typing (the owner's wish, after 1.3.31). Redo does each
+again.
+
+- **What couldn't be undone before:** the photo's right-click menu (Remove photo / drawing, Small, Medium, Full width,
+  Keep size, the description), dragging a photo's size handle, Edit sketch (the new drawing over the old one), Remove
+  recording, Edit link, Remove link, every table option and the row Tab adds in the last cell. A web address typed into
+  a link (`autoLink`) was the worst: its link never went away, and Undo of the typing broke the text around it.
+- **One way for all of them** (panels.js): `domStep(fn)` records what `fn` changes in the note as it happens (a
+  `MutationObserver`: elements added and removed, attributes, texts) and makes it one step of ours (`ownStep`, 1.3.31).
+  Undo plays the records backwards, putting back the same elements and text nodes, so the editor's own earlier steps
+  still fit; Redo plays them forwards. The cursor goes back to where it was. `domRecord(keep)` … `.end()` does the same
+  for a change spread over many events (the size handle: only that photo's width counts).
+- `insertNodes` (photos, drawings and voice notes going in) is a `domStep` now: its own hand-made Undo from 1.3.31 is gone.
+- Tests: note-ui.test.js (each of these: it changes the note, Undo puts it back, Redo does it again; a typed address:
+  Undo takes the typing, the link, then the address, each as it was).
+
+## 1.3.31 – 11 November 2026
+
+Ctrl+Z takes back a pasted photo (the owner's report). The note's text has one Undo history again, with the note's own
+steps in order among the editor's.
+
+- **The cause.** Photos (pasted, dropped, + Add), drawings and voice notes go in through `insertNodes` (fx-format.js),
+  which changes the page itself: the editor's own insert command breaks voice notes (it unwraps the chip or moves it
+  onto a line of its own). The editor's Undo only knows its own commands, so it never saw them. The note's own steps
+  (`textUndo`, 1.3.19: checklist ticks and moves) didn't help: any typing wiped them, and `insertNodes` never made one.
+- **One history** (panels.js): `ownStep({ undo, redo, alive })` keeps a step of ours with how the note looked right
+  after it (`after`, the saved form from `collect`). Undo takes it back once the note looks like that again (the
+  editor's later steps are undone), or when the editor has nothing left. `textRedo` holds our steps and `NATIVE` (one
+  editor step undone) in Undo's order, so Redo goes back the same way. Typing no longer wipes our steps; `nativeRedo`
+  is gone. A step whose element left the note (`alive`) is skipped.
+- **insertNodes is one step:** Undo takes the elements out; in the middle of a text it joins the two halves back into
+  the first one, the text node the editor's earlier steps point at, so they keep working. Redo cuts it again and puts
+  the same second half back. Selected words are deleted by the editor first (its own step).
+- **Keys:** Ctrl+Z / Ctrl+Y always go through `undoText` / `redoText` now (editing.js), except in a text box (title,
+  Find…), which keeps its own. Redo greys out when our list is empty: the editor's own Redo may still hold steps from
+  before one of ours, which no longer fit.
+- Tests: note-ui.test.js (a pasted photo among typing, Undo / Redo order, one text again; a tick stays undoable after typing).
+
+## 1.3.30 – 11 November 2026
+
+Reopen closed note, like a browser's closed tabs (the owner's wish): Ctrl+Shift+T in the notes list, or the tray's
+"Reopen closed note", opens the note closed last again. Press again for the one before.
+
+- **What counts** is a note the owner closed: its X, Alt+F4, or Close in the list (card button, right-click, the
+  picked-cards bar). Not the panic button (it has "Reopen notes"), the Bin, locking, quitting or Windows shutting down.
+- `main/closed-notes.js` keeps the ids, newest last (up to 25; closed again = back on top). A note that is binned,
+  deleted or already open again is skipped. Only while CosmoNotes runs: after a restart the closed notes are still in
+  the list.
+- **Recorded when the window is gone** (its `closed` event, `win.byHand`, set by `note:close` and
+  `closeNoteWindow(id, { byHand: true })`; Alt+F4 after its 2.5 s wait), not when `close()` is called: Electron closes a
+  window a moment later, and the tray's item would still see it open.
+- It opens where it was (`reopenClosed`, note-window.js). A locked note asks for its PIN, as when opened from the list.
+- **Tray:** "Reopen closed note" under "Bring notes to front", grey when there is nothing to reopen
+  (`onClosedChange` rebuilds the menu). IPC `list:reopen-closed`; the key is in list/events.js.
+- Tests: `windows.test.js` (X, Alt+F4, the list's Close, newest first, not twice, skipped when open or binned, the tray
+  item), `list-ui-cards.test.js` (Ctrl+Shift+T in the list).
+
+## 1.3.29 – 11 November 2026
+
+Erasing or undoing a drawing no longer changes the text under it (the owner's bug: a table behind a line un-wrapped).
+
+- **The cause.** The first drawing on a note with word wrap on turns word wrap off and keeps the text at its width, so
+  the drawing stays on its words (`#sheet.fixed`). Which kind of "off" a note was came from the drawing itself: with a
+  drawing, the locked width; without one, "no limit" (1.1.45). So when the last line was erased or undone, the same note
+  became "no limit": every line only ended at Enter, and a table's cells grew into one long line each. Undo and the
+  eraser did their job; the layout changed under them. Undo then brought the line back over a different layout.
+- **Now** the kind is saved with the note (`note.wrapFixed`, store.js `normalize`): set by that first drawing, `false`
+  from the word wrap button. Erasing, undoing and Clear all leave the layout alone; only the word wrap button changes it.
+  `applyLayout`'s "no limit" no longer looks at the drawing (`noLimit`, lock-zoom.js). Duplicate copies it.
+- **Notes from before** get the kind they showed then: locked when they have a drawing, no limit when not (`normalize`;
+  a locked, sealed note when it is opened: `openedLayout` in crypt.js `openAll`). Nothing changes how it looks. A note
+  whose drawing was already erased before 1.3.29 stays "no limit": the word wrap button turns it back on.
+- Tests: `note-ui.test.js` (a table on a word-wrapped note: drawn, undone, redone, erased; the table keeps its width and
+  wrapping, and no layout change is saved), `store.test.js` (wrapFixed kept, older notes, sealed ones, typing after the
+  drawing is gone, Duplicate). Fails on 1.3.28.
+
+## 1.3.28 – 8 November 2026
+
+A locked note or group can't be changed until it is unlocked (the owner's wish). While its lock hides it, you can only
+select it and use its lock options.
+
+- **Notes list.** A "shut" card (`isShut`, list/base.js: a note main sends as `locked`, a group that isn't `open`) has a
+  right-click menu of just Select and the lock options (Unlock… / Lock again, Remove lock…). No buttons on the card, no
+  dragging (nothing can be dropped onto it or into it either), and its star only shows a favourite. Picked with others,
+  the bar and its menu leave it alone (`bulkParts(all)`: only Lock and Bin look at it). Edit design never opens for it,
+  and closes if its note gets locked meanwhile; its old read-only-title mode (`ed.cover`, 1.3.11) is gone, and so is
+  `cover` in `list:get` (it was the same as `locked`). Clicking the card still opens the note (its window asks for the PIN).
+- **Note window.** While a locked note is hidden, there is no ⋯ menu and no effects button (note-text.css): the lock
+  screen, Pin, Roll up and the window's own buttons stay. The read-only titles of 1.3.11 are gone with it.
+- **Main refuses it too**, so it doesn't rest on the windows. `applyPatch` takes only `WHILE_HIDDEN` (pinned, rolled) from
+  a hidden window (it used to drop only the contents and titles). Favourite, Edit design, colour/font, duplicate (also from
+  the note's own window), close, move, drag into a group, a new group: refused for a note hidden in the list
+  (`hiddenInList`) or a group that is shut (`groupShut`, main/list-visibility.js: locked and not open, or inside one).
+  Rename, look, colour of its notes, Ungroup: refused for a shut group.
+- Before, a locked card's colour, see-through, effects and favourite could change, and it could be copied, moved or put in
+  a group. Tests: locks.test.js (main), list-ui-locks-bin (list), note-ui (window); colours, crypt, duplicate and unlock
+  follow the new rule.
+
+## 1.3.27 – 8 November 2026
+
+Three new Settings, the owner's wish: evening colours, a panic button, and "Use on all notes" for every setting a note
+can change for itself.
+
+- **Evening colours** (Settings → Evening colours; off until turned on). From the evening time (19:00) until the day time
+  (07:00) a light paper turns into a softer shade of its own: Lemon → Honey, Sky → Dusk blue, Bubblegum → Dusky pink…
+  (`src/evening.js`, one list for both windows and main). Dark text stays dark, so text colours picked in a note still
+  read (a test checks contrast ≥ 7 and that each shade is clearly dimmer). The dark papers stay as they are. Each change
+  fades over 30 minutes. Main keeps the one clock (`main/evening.js`, every 30 s) and tells the windows the phase (0 – 1);
+  each window mixes its colours by it in CSS (`--d-*` day, `--e-*` evening, `--eve`; note-base.css, list-cards.css), so
+  the note, its card in the list and its window background always agree. A note can have it on or off for itself
+  (⋯ menu, `note.evening`).
+- **Panic button** (Settings → Panic button; off until turned on). A button in each note's top bar (an eye that shuts,
+  red when pointed at), "Panic: hide all notes" in the tray, and a shortcut that works in every app (none until one is
+  set; Settings suggests Alt+Z and F8; press keys to set it; a letter needs Ctrl or Alt). One press closes every open
+  note, locks again everything that was unlocked, and closes the notes list. A note with "Close with the panic button"
+  off (⋯ menu, `note.panic: false`) is left exactly as it is, unlocked too (the owner's pick). The closed notes come back,
+  still locked, when CosmoNotes is opened again: the tray icon or its "Reopen notes", starting it again, or the next start
+  (`settings.panicClosed`). Main: `main/panic.js`; the shortcut is let go while Settings waits for a new one, and on quit.
+  A note narrower than 251 px hides its Maximise button while the panic button shows (double-click still maximises).
+- **Use on all notes.** Under each setting a note can change for itself (font, see-through, turn solid, background
+  effect, mouse follower, paused effects, spelling, the three checklist options, evening colours, panic button), Settings
+  says how many notes have their own, with a button that puts Settings back on all of them (it asks first). General →
+  "Reset notes…" does several at once, with a tick for each. Font, see-through and turn solid stay "for new notes" (the
+  owner's pick): the button copies the value in. The rest follow Settings again. Paper colour has no button (it would
+  recolour every note at random), nor title font. Notes in the Bin are left alone; it isn't an edit. One table says what
+  each setting means (`store.js` `OVERRIDES`, `overrideCounts`, `resetPatch`); main: `settings:reapply`.
+- Changed on the way: "Lock again" in the Locked tab and the panic button share `coverAll` (`main/list-visibility.js`);
+  closing a note from the list and from the panic button share `closeNoteWindow` (`main/note-window.js`).
+- Only a real Windows PC can confirm the shortcut while another app has the focus, and the tray.
+- Tests: `evening.test.js` and `panic.test.js` (new areas; panic with a real restart), `settings.test.js` (Use on all
+  notes), `store.test.js` (fields, settings, the table), `list-ui-settings.test.js` (the panels, pressing a shortcut,
+  Use on all notes, Reset notes…), `note-ui.test.js` (the mix, the ⋯ switches, the button), `code-structure.test.js`
+  (`src/evening.js` in both windows).
+
+## 1.3.26 – 8 November 2026
+
+An empty, invisible line between two checklists no longer keeps them apart.
+
+- **The cause** (seen in the owner's To do note): the editor had left an empty `<div></div>` between two checklists.
+  With nothing in it (no letters, no line break) it is zero lines high: a 1 px line that can't be seen or clicked. It
+  counted as something between the lists, so they weren't one group (1.3.25), and the unticked lines of the lower list
+  stayed below the ticked ones.
+- **Now** (`src/note/content.js` `blank`): between two lists, a block with nothing in it at all counts as nothing, like
+  spaces. While the note is open the lists are one group; when it opens or is saved, the empty block goes and the lists
+  are one (`joinLists`). A real empty line (`<p><br></p>`) still keeps two lists apart.
+- Tests: `note-ui.test.js` (an empty div between: opens as one list; while open, tidied as one group). Fails on 1.3.25.
+
+## 1.3.25 – 8 November 2026
+
+Two checklists that touch (the empty line between them deleted) now work as one list: ticking and the tidy-up move
+lines across both, and the note is saved with one list. Redo also goes back in the right order.
+
+- **The cause:** deleting the line between two lists leaves two lists side by side in the editor. They look like one,
+  but ticking and the tidy-up (1.3.24) worked on each list alone.
+- **Lists that touch are one group** (`src/note/content.js` `listGroup`, `touching`; `checklists.js` `sink`, `gather`):
+  a ticked line goes below the last unticked line of the whole group; the tidy-up sorts the group as one. Same kind
+  only: checklist with checklist, bullets with bullets.
+- **Saved joined** (`joinLists`): `collect` (base.js) saves them as one list, a pasted piece is joined, and a note joins
+  them when it opens. While the note is open the editor keeps its two lists, because the editor's own Undo / Redo
+  remembers them that way (joining them live made Undo lose the deleted line, and Redo put lines in the wrong place).
+- **Redo order** (`panels.js` `nativeRedo`): Redo brought back the note's own steps (ticks, moves) before the editor's
+  steps that were undone after them. It now goes back in the order Undo went.
+- Tests: `note-ui.test.js` (the deleted line: saved as one list, tidied as one, Undo brings the line back; a tick across
+  both; Undo / Redo order; a saved note with two touching lists opens with one). Fails on 1.3.24.
+
+## 1.3.24 – 8 November 2026
+
+Turning "Move ticked items to the bottom" on in a note tidies its lists: the ticked items go below the unticked ones.
+
+- **The note's Checklists pop-up** (`src/note/checklists.js` `setChecks`, `gather`): when the switch (or Use Settings)
+  turns it on, every list in the note gets its ticked lines moved below its unticked ones, each kept in its order. Each
+  list on its own: a list after other text, and a list nested in a line, are tidied apart; a line takes its nested lines
+  with it. Lists with nothing out of place aren't touched (the note isn't saved if nothing moved). One Undo step.
+- Settings → Checklists doesn't rearrange any note: there, only what is ticked from then on moves (it would change every
+  note, locked ones too). Opening a note doesn't tidy it either (a line dragged up on purpose stays).
+- Tests: `note-ui.test.js` (three lists, one nested; Undo; off and on again; nothing to move). Fails on 1.3.23.
+
+## 1.3.23 – 8 November 2026
+
+Undo and Redo are greyed out when there is nothing to take back or put back.
+
+- **Bottom bar** (`src/note/panels.js` `paintUndo`): `#btnUndo` and `#btnRedo` are `disabled` by one rule (`canUndo` /
+  `canRedo`). While drawing: the drawing lists (`inkState.undo` / `redo`). Otherwise: our own text steps (`textUndo` /
+  `textRedo`), then the editor's own history (`queryCommandEnabled`). A locked note has nothing to undo.
+  `paintUndo` now also runs after every edit (`input`), after a checklist step and its Undo / Redo, and when a note opens,
+  locks or unlocks (`eraser-start.js`, `lock-zoom.js`, `checklists.js`). Drawing already called it on every change.
+- **Drawing pop-up** (`menus-voice-ink.js` `redraw`): its Undo greys out when nothing is drawn.
+- Style: `.tb:disabled` (`note-toolbars.css`) and `.dtool:disabled` (`note-drawing.css`): grey, no hover.
+- Tests: `note-ui.test.js` (fresh note: both grey; typing, Undo, Redo; a stroke and undoing it). Fails on 1.3.22.
+
+## 1.3.22 – 8 November 2026
+
+Dragging a pop-up or toolbar no longer lags behind the mouse, and "close all" closes every menu, also one outside the note.
+
+- **Dragging** (`src/note/draw-over.js` `movable`): every mouse move moved the toolbar or pop-up at once; outside the note
+  that is a message to main and its window moved each time. A fast mouse sends several moves a frame, they queued up,
+  and the Checklists pop-up (or any other) lagged behind. Now only the last move of each frame counts (after 100 ms
+  without a frame, the move counts anyway); letting go uses the very last one. Not reproduced in the cloud (no real
+  mouse or Windows windows there): to check on the owner's PC.
+- **Close all** (`src/note/panels.js`): pressing the button counted as a click elsewhere in the note, which closes the
+  menus inside the note. With one menu outside the note (the ⋯ menu dragged out) and one inside, that left one open,
+  the button hid (it shows only for two or more), and its click never came. The button is now left out of that rule.
+- Tests: `note-ui.test.js` (many moves in one frame move a pop-up once; pressing Close all closes nothing, its click
+  closes all). Both fail on 1.3.21.
+
+## 1.3.21 – 8 November 2026
+
+The note's checklist options moved out of the ⋯ menu into a pop-up of their own: ⋯ → Checklists… (the owner's pick, A).
+
+- **The ⋯ menu** has one row, "Checklists…", under "Effects…", instead of a heading and three switches. On its right:
+  "As in Settings", or "1 changed" / "2 changed" / "3 changed" when the note has its own choice.
+- **The pop-up** (`#ckPop`, "Checklists in this note") works like the Effects pop-up: the same place, its grip and X,
+  and it can be dragged out of the note (kind `ck`, `cosmoCkBar` in `main/ink-geometry.js`). Each switch has a short hint
+  under it; a switch that differs from Settings shows "this note". At the bottom: "Same as Settings." / "Different from
+  Settings." and **Use Settings**, which sets all three back to Settings.
+- Code: `src/note/checklists.js` (`applyChecks` paints the row and the pop-up), `note.html`, `panels.js` (`EDIT_POPS`),
+  `ink-out.js`, `note-effects-lock.css`.
+- Tests: `note-ui.test.js` (the menu row, the pop-up, "this note", Use Settings), `safety.test.js` (its window).
+
+## 1.3.20 – 8 November 2026
+
+"Move ticked items to the bottom" now moves a line only when it is ticked. Unticking leaves it where it is.
+
+- **What the owner saw:** unticking a box moved its line down. 1.3.19 also moved an unticked line to just below the other
+  unticked lines, which was never asked for.
+- **Now** (`src/note/checklists.js` `tick`): only ticking calls `sink`. Undo of a tick still puts the line back where it was.
+- Settings → Checklists hint: "A ticked item moves below the unticked ones. Unticking leaves it in place."
+- Tests: `note-ui.test.js` (an unticked line stays in place).
+
+## 1.3.19 – 8 November 2026
+
+Checklists get three options in Settings → Checklists, and each note can choose its own in its ⋯ menu.
+
+- **Reorder by dragging the box** (on by default): drag a checkbox to move its line. A bar shows where it will go; Esc
+  while dragging cancels. A click still ticks the box (on release now, so a drag doesn't tick it). Lines can move in and
+  out of nested lists and between checklists in the note; a nested list left empty goes too. Near the top or bottom
+  edge the note scrolls.
+- **Move ticked items to the bottom** (off by default): a ticked line goes right below the unticked lines of its list
+  (the newest ticked one first); unticked, it goes back up under them (undone in 1.3.20). Only when a box is clicked: turning it on moves
+  nothing in existing notes. The lines glide to their place (not with Windows' "reduce motion").
+- **Keep boxes the same size** (off by default): every box is the note's own size, whatever the size of the words after
+  it, still centred on them (`alignChecks` in `editing.js`). Off = as before (the box follows its words).
+- **Per note:** `note.checklist` = `{ drag, sink, fixed }`, each true / false or null = as in Settings. The ⋯ menu shows
+  three switches; setting one to what Settings says makes it follow Settings again (like spelling). Settings:
+  `checkDrag`, `checkSink`, `checkFixed`.
+- Ticking and moving lines are Undo / Redo steps now (they weren't the editor's own changes, so Ctrl+Z skipped them).
+  `textUndo` / `textRedo` (panels.js) held only the old font changes from before 1.1.16, which nothing made any more:
+  they are now these steps (`{ undo, redo }`).
+- A click beside the lines nested in a checklist line no longer ticks that line; the box hit test divides by the zoom.
+- Code: a new note part, `src/note/checklists.js` (part 6 of 12): the options, the box (click / drag), moving lines.
+  The tick code moved there from `content.js`.
+- Tests: `note-ui.test.js` (click, drag, Esc, nested lists, ticked to the bottom, drag off, one box size, the ⋯ menu
+  switches, Undo / Redo), `settings.test.js`, `list-ui-settings.test.js`, `store.test.js`, `code-structure.test.js`.
+
+## 1.3.18 – 8 November 2026
+
+Sizes and fonts now work together in the CSS itself, so the 1.3.15–1.3.17 workarounds are gone. Notes look as before.
+
+- **The cause** (the owner asked for proper fixes from now on): words in an app font other than the note's are drawn
+  bigger or smaller to match the note's letters, and that rule set `font-size` on the font tag. So it beat any size on
+  the same tag (1.3.17's bug), shrank a font inside the same font twice, and changed the size the checkbox measured
+  (1.3.15). 1.3.15–1.3.17 worked around it in three places.
+- **Now** (`note-drawing.css`, `note-text.css`): a font tag's size = the size around it × its own `size=` (`--sm`) × its
+  font's resize (`--kf`) ÷ the resize of the font around it (`--k`). Size and font multiply once each, on one tag or two;
+  a font inside the same font is resized once; the note's own font inside another is the note's size. Tried first:
+  `font-size-adjust`, which Chromium measured 7.5% off for Augusta and sometimes sized wrong: not used.
+- **Removed:** `withSizes` / `faceSized` / `splitSize` (panels.js), `keepSizes` (content.js), `FACE_SIZE` (editing.js:
+  the checkbox now reads `--kf` from the CSS). Cards (`store.js` `cardLook`) work sizes out the same new way.
+- **Old notes:** their sizes that showed nothing (on such font tags; every line of "To do (CosmoNotes)" had one) would
+  now count, so `store.js` `dropDeadSizes` takes them off once when a note is read (`sizes: 2`; a sealed note when it
+  is opened, `openedSizes`; restoring an old backup of the same note makes no extra copy). Checked on the owner's three
+  readable notes: all 128 words and every checkbox the same size and place as before. What does change: text that was
+  shrunk twice (a font inside the same font) now shows at its intended size.
+- `CLAUDE.md`: new golden rule 5, "Fix the cause, not the symptom" (the owner's wish).
+- Tests: `editor-code.test.js` (the CSS model), `store.test.js` (card sizes, `dropDeadSizes`, `sizes`, old backups),
+  `note-ui.test.js` (size and font on one tag, a font inside a font, the note's font inside another, paste).
+
+## 1.3.17 – 7 November 2026
+
+Small / Normal / Big work on a whole line of words in another font, and picking a font no longer undoes a size.
+
+- **What the owner saw:** a whole checklist sentence in his Medieval "To do" note (Rounded words) didn't change size. A
+  font other than the note's own is resized to match the note's letters (`note-drawing.css` `font[face]`), and that
+  rule beats `size=` on the same tag. When the words are all inside one font tag, the browser puts the new size on that
+  same tag, so it did nothing; partly selected words got a tag of their own and worked. The same happened the other way:
+  picking such a font for words all in one size tag put the font on it, and the words lost their size.
+- **Now** (`panels.js` `withSizes`, around the Size and Font buttons): such a tag (`faceSized`) gets its size moved onto
+  a new tag inside it (`splitSize`), and the selection is put back. A size that showed nothing (older pastes left
+  `<font face="Nunito" size="5">` all over that note) is taken off first, so picking that same size works too. Nothing
+  else is changed: the owner's notes look as before until he picks a size or font.
+- Pasting from a note in another font (`content.js` `keepSizes`): words keep the size they showed there; a size that
+  showed nothing there still shows nothing.
+- Tests: `note-ui.test.js` (sizes on whole lines in the other fonts, in all three note fonts; a font picked for Big words;
+  pasting from a Rounded note into a Medieval one).
+
+## 1.3.16 – 7 November 2026
+
+A checklist box no longer moves when the first letter is typed on a new or emptied line.
+
+- **What the owner saw:** after 1.3.15 the size stayed, but the box still shifted down a little with the first letter.
+  A line without its own font / size tags (Backspace took them, a new line; the browser keeps the look only for
+  typing) was placed by the note's own font, and the words came in another font that sits lower on the line (Rounded
+  in a Medieval note: 0.4 px; in Rounded or Handwritten notes with bigger words up to 5 px).
+- **Now** (`alignChecks`, `src/note/editing.js`): such a line keeps the box it had when it last had words (`lastOwn`,
+  not saved), else takes the box of the line above, same size and same place; only with neither is it measured in the
+  note's own font. A new line under words of the same font and size (Enter) copies their box exactly instead of
+  measuring its empty line. A line that starts with a line break and then a photo is measured like an empty line.
+- Tests: `note-ui.test.js` (the box's place, not only its size: Backspace, typing again, Enter, in all three fonts).
+
+## 1.3.15 – 7 November 2026
+
+Checklist boxes keep one size: on an empty line, after a font change, and no more stray box from copying a whole line.
+
+- **Empty line:** a new line's box was the note's plain size until you typed (e.g. 15.5 px, then 22.5 px for words at
+  size 5). `alignChecks` now sizes an empty line from its own font / size tags; if Backspace emptied it (the browser drops
+  the tags but keeps typing in that size), it keeps the size it had; else it takes the line above's.
+- **Font change:** words in another font are drawn bigger or smaller to match the note's letters (`note-drawing.css`
+  `font[face]`), and the box followed that, so changing only the font changed the box (Rounded words in a Medieval note:
+  15.5 px, Medieval words: 18.5 px). The box now divides that out (`FACE_SIZE`, the same numbers): same size of words,
+  same box. Medieval notes had Caveat's .78em box on an empty line: now .84em, the size of their Rounded words (`BOX`,
+  `note-text.css`); the owner's Medieval notes, all in Rounded words, look as before.
+- **Stray box** (the owner's "To do (CosmoNotes)" note, the line "utilise downloaded skills…"): copying a whole line
+  (triple-click) picks up to the start of the next line, so the copy held an empty `<li>` that pasted as a line with
+  nothing in it: no height, its box (ticked, here) drawn over the next line's. Copied and pasted HTML now loses empty list
+  lines (`dropEmptyLines` in `sanitize`), and the note drops empty checklist lines after a paste and when it opens (they
+  hold nothing; the line with the caret stays). The owner's note is mended the next time it is opened and edited.
+- Tests: `note-ui.test.js` (box sizes in all three fonts, empty line, Backspace, whole-line copy, an old empty line),
+  `editor-code.test.js` (`FACE_SIZE` and `BOX` against the CSS).
+
+## 1.3.14 – 7 November 2026
+
+A card's words are now always smaller than the note's (about 0.8×), however their sizes and fonts are nested.
+
+- The owner still saw a note's words bigger on its card than in the note. The card (1.3.12–1.3.13) gave each run one
+  size, but the note's CSS multiplies at every element: text pasted several times sits in `<font face>` inside
+  `<font face>`, and each one shrinks it again; a face resize also beats `size=` on the same element. `store.js` now works
+  out each run's size (`k`) the same way (`CARD_FACE_SIZE`, `CARD_SIZE`, `CARD_TAG_SIZE`, checked against the CSS files in
+  `store.test.js`); `cards.js` just draws it.
+- A note zoomed out (Ctrl + mouse wheel) shows its lines at that zoom on its card too (`list:get` `zoom`, `--nz`). Zooming
+  in doesn't make the card bigger.
+- Checked in Chromium: the real note window next to its card, six kinds of text (fonts inside fonts, sizes, three note
+  fonts): the card is 0.78–0.83× the note every time.
+- Tests: `store.test.js` (nested sizes, the face-beats-size rule, the tables against the CSS).
+
+## 1.3.13 – 7 November 2026
+
+Picking a title font no longer moves the menu; words in another font are no longer too big on their card.
+
+- **Nothing jumps** (the owner's wish): the title fields in the ⋯ menu (`.titlefld`), its Title font buttons and Title while
+  locked in Edit design (`.etrows .minput`) have a fixed height, so a font with taller letters doesn't push the rest down.
+- **Card sizes:** the note draws words in another font a bit bigger or smaller, so they match the note's own font
+  (`note-drawing.css`: e.g. Rounded words in a Handwritten note at 0.68×). Cards (1.3.12) drew them at full size, so a
+  Handwritten note full of Rounded lines was far too big on its card. `cards.js` `RUN_FACE_SIZE` now does the same;
+  `store.test.js` checks it matches the note's rules.
+- Tests: `note-ui.test.js` and `list-ui-cards.test.js` (nothing moves), `list-ui-cards.test.js` and `store.test.js` (sizes).
+
+## 1.3.12 – 7 November 2026
+
+A card shows a note's words as the note does (fonts, colours, sizes, bold…); the title rows sit together under the title.
+
+- **Cards in the note's look** (the owner saw a line in Rounded in the note but in Medieval on its card): a card was built
+  from the note's plain text, so every look given to some of the words (a font, colour, highlight, size, bold, italic,
+  underline, strike, heading, code, link) was lost. Now `store.js` `cardRuns` walks the note's html once, makes its lines
+  the way the note's text has them and gives each line its runs; main sends them (`list:get` `runs`, nothing for a hidden
+  locked note) and the card draws them (`cards.js` `runSpan` / `runCss`, the note's own sizes). A line whose words don't
+  match stays plain, as before. So it can't happen again with a new kind of formatting: every tag the editor keeps must be
+  known to `cardRuns`, and every look it makes must be drawn by the card (`store.test.js` checks both, and the sizes and
+  font names against the note's).
+- **Title rows together** (the owner's wish): in Edit design, Title while locked and Title font are right under the title,
+  above the tabs (they were in the Colour tab). The note's ⋯ menu has the same order: Title, Title while locked, Title font.
+  Title font is the font of both: both fields show in it.
+- Tests: `store.test.js` (cardRuns, and the checks above), `list-ui-cards.test.js` (a card's runs; the order in Edit design),
+  `note-ui.test.js` (the order in the ⋯ menu).
+
+## 1.3.11 – 7 November 2026
+
+Edit design picks the title font; a dragged note outlines the card it goes into; a locked note's titles change only while it's unlocked.
+
+- **Title font in Edit design** (the owner's wish): a Title font row (Handwritten / Rounded / Medieval) under Colour, for one
+  note (right-click → Edit design…) or several (the selection bar; "Mixed" until one is picked). Saved as the note's
+  `titleFont` (1.3.3) through `list:apply`, like the font. The preview's title shows it; an open note follows (`note:look`
+  now carries `titleFont` into the window, `lock-zoom.js`).
+- **Dragging onto a card:** the note or group it goes into has the faint outline of a right-clicked card (`.ctxon`) instead
+  of the solid ring (`.drop-on` in `list-base.css`). The label ("Make a group", "Put inside") stays.
+- **A locked note's titles** (the owner's wish): while it is locked, its "Title while locked" (and its title) can't be
+  changed from outside. Edit design on a hidden locked card shows the title read-only; the note's ⋯ menu makes both fields
+  read-only while the note is locked. Main refuses them too: `list:edit` while `hiddenInList(n)`, `applyPatch` drops
+  `coverTitle` from a hidden window. Unlocked (in its window or "Unlock…" in the list), both can be changed as before.
+  Colour, fonts, see-through and effects of a locked note can still change.
+- Tests: `list-ui-cards.test.js` (Title font, one note), `list-ui-picking.test.js` (Title font, several), `list-ui-groups.test.js`
+  (the drop outline), `note-ui.test.js` and `list-ui-crypt.test.js` (titles read-only while locked), `crypt.test.js` and
+  `colours.test.js` (main refuses them).
+
+## 1.3.10 – 7 November 2026
+
+"Device" instead of "computer" in every text: the app, `HOW TO INSTALL.txt` and `build.bat`.
+
+- The owner's wish (after 1.3.9's "PC" and "laptop"). In the app: About (saves on this device; locked notes encrypted on
+  this device), Settings → Backups ("Only on this device."), Locked notes (`actions-locks.js`: the info line and the
+  recovery key tip; `main/ipc-crypt.js`: "Keep it safe, away from this device."), and the welcome note for new installs
+  (`main/constants.js`; welcome notes already made keep their words).
+- Tests: `list-ui-crypt.test.js` (the info line).
+
+## 1.3.9 – 7 November 2026
+
+"Device", not "PC" or "laptop": the voice-to-text toast and the owner's guides.
+
+- The owner's wish. The note's toast is "On this device, the words appear when you stop." (`src/note/speech.js`).
+  `HOW TO INSTALL.txt` ("Other devices", moving notes to another device) and `build.bat`'s messages say "device" too.
+  Kept: "Windows protected your PC" in `HOW TO INSTALL.txt` (Windows' own words). "This computer" elsewhere is unchanged.
+- Tests: `note-ui.test.js` (the toast).
+
+## 1.3.8 – 7 November 2026
+
+One name: the + Add item is **Voice to text** now (was "Speak to text"), like its Settings section. Settings links to the
+model's page.
+
+- The owner's wish. `note.html` tile `data-act="speak"`, About and `HOW TO INSTALL.txt` say "Voice to text". (Code
+  comments still say "Speak to text" for the live feature; only the texts changed.)
+- Settings → Voice to text: one top line, "In a note, open + Add and pick Voice to text, or right-click a voice recording
+  and pick Transcribe." (`#sttIntro`). Under the model: "It downloads from https://huggingface.co/onnx-community/whisper-
+  small.en. Your voice never leaves this device." The link comes from the model list (`status().model.url` = `HF` +
+  `repo`) and opens in the browser (`S.openExternal`). About and `HOW TO INSTALL.txt` say "this device" too.
+- Tests: `list-ui-settings.test.js` (the line, the link, the order), `note-ui.test.js` (the tile's name), `stt.test.js` (`url`).
+
+## 1.3.7 – 7 November 2026
+
+Settings → Voice to text reads better: how to use it at the top, where the model comes from under it, the Windows 11 tip last.
+
+- The owner's wish. The top line is now "In a note, open + Add and pick Speak to text." Right after it: "Right-click a
+  voice recording and pick Transcribe to turn it into text." (no "Tip:"). "It downloads from Hugging Face. Your voice
+  never leaves this PC." (`#sttSource`) sits under the model's row. The Windows 11 Win + H line is the last line.
+- `list.html` `#sttPanel` order; `.sttintro`, `.sttsub` in `list-cards.css`. Tests: `list-ui-settings.test.js` (the order).
+
+## 1.3.6 – 7 November 2026
+
+The title font row in the ⋯ menu has no "Same" button any more: just Handwritten, Rounded and Medieval.
+
+- The owner's wish. Until a font is picked, the button of the note's own font is lit (`applyLook`: `titleFont || font`).
+  A click always saves that font (`titleFont`), also when it is the note's own font; `null` now only means "never picked"
+  (older notes, new notes), which still follows the note's font.
+- Tests: `note-ui.test.js` (Title font).
+
+## 1.3.5 – 7 November 2026
+
+Settings → Voice to text: pick if the words appear **while you talk** or **when you stop**, plus two tips (Transcribe, and
+Windows 11's own voice typing, Win + H).
+
+- New setting `sttWhen` (`live` | `stop`; missing = by the PC as in 1.3.4: graphics card live, processor when you stop).
+  Main: `stt:when` (`main/ipc-stt.js`, preload `S.stt.when`), `modeOf` reads it, `status()` sends `when` (what Speak to
+  text does now) and `whenSet`. The `ready` event has `auto`: the note says "On this PC, the words appear when you stop."
+  only when the PC picked it, not when the person did.
+- The panel (`list.html` `#sttPanel`, `paintVoice`): a "Words appear" row (`#sttWhen`, While you talk / When you stop,
+  with a short line under it: "On the processor, the words can lag behind." when live is picked there), the tip "right-
+  click a voice recording and pick Transcribe", and "Windows 11 has voice typing too. Press Win + H in any app." The
+  intro line is now only "For Speak to text, in + Add."
+- About: one more feature line. Tests: `stt.test.js` (the setting, `auto`), `note-ui.test.js` (no toast when picked),
+  `list-ui-settings.test.js` (the row and the tips).
+
+## 1.3.4 – 6 November 2026
+
+Voice to text has one model now: Whisper small.en, a download in Settings. The built-in Standard (Moonshine) and
+**Test my computer** are gone (the owner's wish).
+
+- `main/stt-models.js`: only Whisper small.en (`MODEL`); `builtIn`, `builtInDir`, `BUILD_DIR`, `setBuiltInDir` and
+  `STANDARD` are gone. No model comes with the installer: `build.bat` has two steps again (no `fetch-model.js`), and
+  `extraResources` no longer packs `build/models`. `build/fetch-model.js` is a no-op stub; it, `build/models/` and
+  `src/engine/test-clip.wav` can be deleted by hand.
+- Not downloaded: `stt:start` / `stt:transcribe` answer `nomodel` before anything starts; the note says "Voice to text
+  isn't downloaded yet. Get it in Settings." (Speak to text records nothing). A model that fails to start: the job fails
+  as any failure (the recording is kept), Settings says "Didn't start last time." No fallback.
+- Live or after you stop: by where it runs (`modeOf`): graphics card = live, processor = after you stop ("On this PC, the
+  words appear when you stop."). The engine's "more than 5 s behind" safety net stays. Gone: `stt:test`, `stt:use`, the
+  engine's `speed` and the test clip route, `verdictOf`, the quick 2-second check. `settings.sttModel` and
+  `settings.sttTests` are deleted at start.
+- Settings → Voice to text: one row, "Uses Whisper small.en", with Ready / Not downloaded, the size, where it runs and
+  Download / Cancel / Try again / Remove. No Use buttons, no Test row, no "Standard" / "Best".
+- About and `HOW TO INSTALL.txt`: the new wording. Tests: `stt.test.js` (one model, nomodel, live/after by set, old
+  settings cleaned), `note-ui.test.js` (the nomodel toast), `list-ui-settings.test.js` (the panel).
+
+## 1.3.3 – 6 November 2026
+
+A note's title can have its own font: ⋯ menu → under the title, **Same / Handwritten / Rounded / Medieval**.
+
+- New note field `titleFont` (`hand` | `round` | `medieval`; `null` = the note's font, as before). `store.js`
+  `normalize` (unknown → `null`), in `EDITABLE` (`main/constants.js`), copied by Duplicate. Not secret: it is only the
+  look of the title, so a locked note's window can still change it (the title itself stays sealed).
+- The note window: `body[data-tfont]` is `titleFont`, else the note's font (`applyLook`); the top bar's `#title` rules in
+  `note-base.css` read it instead of `data-font`. The row is `#titleFontSeg` in the ⋯ menu, under the title box; its
+  buttons size to their words, so "Handwritten" fits at the menu's narrowest (260 px).
+- The list: a card's title shows in its own font when it differs from the note's (`.t1[data-tfont]`, `cards.js`
+  `cardBody`, `list-cards.css`); main's `list:get` sends `titleFont`.
+- Tests: `note-ui.test.js` (Title font), `store.test.js` (normalize), `list-ui-cards.test.js` (the card's title).
+
+## 1.3.2 – 6 November 2026
+
+Copying a checklist line and pasting it gives a checklist line again, with its font, size, colour and the rest.
+
+- The note writes the clipboard itself now (`copy` / `cut` in `src/note/content.js`, "copy / cut"). Before, the browser
+  copied the text with its computed styles and, for part of one line, without the list; the paste cleaning (`cleanTree`)
+  then dropped every `<font>`, style and class, so a checklist line came back as a plain bullet in the note's font.
+- What is copied: the selected words plus the formatting around them (`<font>` face / colour / size, bold…, a highlight
+  span) and the nearest list line, so even part of one checklist line pastes as a checklist line, ticked or not. Pasting
+  onto a checklist line adds a line to that list; into the middle of a normal line, the line splits around it.
+- The note's own font goes with the words when the pasting note has another font (each bare piece of text gets a
+  `<font face>`; the size matching between the app's fonts in `note-drawing.css` does the rest). The note-wide text size
+  and normal ink colour are the pasting note's (they belong to the note, not to the words).
+- CosmoNotes reads its own copy from the clipboard type `application/x-cosmonotes` (JSON: `html`, `font`); `text/html`
+  carries the same, with the font on every word, for other apps (Word, mail). Pastes from other apps are cleaned as
+  before. The CosmoNotes copy is cleaned too, a little less strictly (`RICH`): only the app's three font faces, colours,
+  sizes 1–7, `color` / `background-color` styles, `checklist` and `done` classes.
+- Ctrl+Shift+V still pastes plain text. Cut is the same, then deletes the selection (one Undo step).
+- Tests: `note-ui.test.js` (copy / cut / paste).
+
+## 1.3.1 – 4 November 2026
+
+Voice to text, offline: + Add → **Speak to text**, right-click a voice note → **Transcribe**, and Settings → **Voice to text**.
+
+- The owner's pick: there is no 1.3.0. Step 3 of `claude/voice-to-text-1.3.1-planning.md` (Project doc); the prototype
+  (Step 1, `tools/stt-prototype/`) chose Moonshine Base q8 for **Standard** (comes with the app, ~64 MB) and Whisper
+  small.en for **Best** (a download). Nothing ever goes to the cloud; CosmoNotes itself only goes online when you press
+  Download for Best (and build.bat, for Standard).
+- **The engine** (`main/stt-engine.js`): one hidden window, made on first use and closed after 3 idle minutes, runs
+  Transformers.js 4.3.1 (vendored unchanged in `src/engine/lib/`, with a fixed import map: no scanning at run time).
+  Its page, library and models come only from `cosmomodel://engine/` on its own in-memory session: a fixed list of
+  files, COOP/COEP on every answer (multi-threaded WASM), a strict CSP (no `blob:`, the import map by its hash), no
+  permissions, no navigation, and every other request blocked. The note windows' CSP is unchanged.
+- **Speak to text** (`src/note/speech.js`, a new note part, 7 of 11) is the voice recorder with a second path: the same
+  recording goes to disk as in 1.2.4 (the safety net), and an AudioWorklet (`src/mic-worklet.js`) sends 16 kHz pieces
+  to main, then to the engine. The bar says "Listening…" with Stop and Cancel. Words go where the caret was: grey drafts
+  while you talk, then the settled text (one Undo step per piece). The marker and the drafts are only attributes, never
+  saved. **Stop** finishes what was heard ("Finishing…"), then the clip is deleted. **Cancel**, an error, closing or
+  locking the note: the text so far stays, and the recording stays as a voice note where the text was. Esc = Stop.
+  One Speak to text at a time ("Voice to text is busy in another note.").
+- **Transcribe**: the text goes on the line after the chip, in `<span class="stt-text" data-of="<clip>">` (no look of
+  its own), one Undo step. Again on the same chip: "Replace the text from last time? Changes you made to it will be
+  lost." Closing or locking the note while it runs: nothing is added. Main reads the clip (a sealed one through
+  `attachmentBytes`) and checks that it belongs to that note.
+- **Live or after you stop**: Test my computer runs a bundled 12.8 s clip (`src/engine/test-clip.wav`) through each
+  model on this PC: ≥ 2× Live, 0.5–2× After you stop, below Too slow. Never tested: a quiet 2-second check the first
+  time. A slow PC: "This PC is slow for live text. The words appear when you stop." More than 5 s behind: the drafts
+  stop and the words come at Stop.
+- **Models** (`main/stt-models.js`, one fixed list: files at a fixed Hugging Face commit with size and sha256). Standard:
+  `build.bat` fetches it into `build/models/` (`build/fetch-model.js`, every hash checked); the installer packs it into
+  `resources/models/`. Best: Settings → Download puts it in `<data>/models/whisper-small-en/` (`.part` → hash → rename,
+  `ready.json` last). Only the set this PC will use is downloaded (decided here, the plan left it open): the graphics
+  card's (563 MB) when WebGPU works, else the processor's (int8, 242 MB). Cancel leaves nothing; a failed download keeps
+  the good files for Try again; Remove deletes the folder. Not in backups; the uninstaller leaves it. Best picked but
+  not there: "This model isn't downloaded yet." and Standard is used. Best on the graphics card that fails to start:
+  Standard is used, and Settings says so.
+- Memory trim tried (decision of the plan: keep it only if speed holds): ONNX Runtime's CPU memory arena off saved
+  nothing and was slower here, so it is not used. The thread count stays ONNX Runtime's own choice.
+- Checked in the cloud workspace with the real Moonshine Base model in Chromium (no graphics card there): the engine page
+  loads under its CSP, Transcribe of the 37 s sample is word for word, live drafts and finals arrive, all through the
+  real main process. Only a real Windows PC can confirm the microphone, the graphics card (Best) and the installer.
+- New texts: "Speak to text", "Listening…", "Writing it down…", "Writing it down… 40%", "Finishing…", "Writing it down
+  when you stop", "Transcribe", the toasts above, "Couldn't write it down.", "No words found in this recording.",
+  Settings → Voice to text.
+- Tests: `stt.test.js` (new area: a stub engine for the jobs, the queue, close / lock / crash, the model choice and
+  fallback, live or after Stop, Test my computer, `cosmomodel://` refusing `..` and unknown names, the engine session,
+  the download against a local server with hash checks, Cancel, Try again, Remove, `.part` cleanup; the live session
+  logic under Node); `note-ui` (Speak to text and Transcribe in Chromium: marker, drafts never saved, Undo, Stop, Cancel,
+  failure, busy, close, lock, Replace, paste). `code-structure` knows the new part and the engine's preload.
+- `tools/stt-prototype/` can be deleted once Speak to text works on the owner's PC (its code now lives in the app).
+
+## 1.2.4 – 3 November 2026
+
+Voice recordings are saved while you talk. Closing the note, locking it, quitting or a crash keeps what was recorded.
+
+- Before, the note window kept a recording in memory until Save. Closing the note, a crash or a power cut lost it, and
+  locking the note threw it away. Now each 250 ms piece goes to main and is written to `attachments/<name>.part` at
+  once, next to `<stem>.rec.json` (`{ noteId, file, startedAt, endedAt }`: whose recording it is). Save renames the
+  `.part` file; the `.rec.json` goes once the note points at the file (`main/recordings.js`).
+- Closed mid-recording: the chip goes into the note's last save (beforeunload), and main finishes the file. Locked
+  mid-recording ("Lock again", the lock button, or locked from the list): the same, before the window hides. If the
+  window can't save any more, or its page crashed, main adds the chip at the end of the note itself.
+- Quitting finishes any recording still running (`will-quit`, before the last save of all notes).
+- A crash: at the next start, every recording left behind gets its chip at the end of its note, before any window opens.
+  A note that was deleted gets a new closed note, "Recovered recording". An empty one is just removed.
+- A locked note that is still sealed at start (PIN not typed yet): its clip is sealed at once (`crypt.sealLoose`), and
+  its chip arrives after the PIN (`retryPending`, run by `notifyList`). It waits across restarts if needed.
+- The sweep never deletes a file that has a `.rec.json` next to it. The unfinished `.part` file can't be served or
+  opened (only finished attachment names are).
+- If main can't write the file, the window still keeps every piece in memory and saves it the old way at the end.
+- **Esc now saves a recording** (before, it threw it away). Only the X throws a recording away.
+- Docs: the owner is a programmer, so `CLAUDE.md` and `CONTEXT.md` no longer say otherwise. Technical detail is fine;
+  texts inside the app stay short and plain.
+- Tests: `recordings.test.js` (new: Save, the X, another window, close, page crash, lock, sweep, quit, a real crash
+  and the next start, a deleted note, a locked note sealed until the PIN, across restarts); `note-ui` (the recorder
+  in Chromium with a fake microphone: pieces sent while recording, Save, X, Esc, close, lock, the in-memory fallback).
+- Only a real Windows PC can check the microphone itself.
+
 ## 1.2.3 – 3 November 2026
 
 The notes list redraws less after a note changes: its own work on each refresh is 2–4 times faster. It looks the same.

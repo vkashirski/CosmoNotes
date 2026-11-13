@@ -121,7 +121,7 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
   Intl, Date, Math, JSON, Object, Array, Set, Map, WeakMap, String, Number, Boolean, Promise, RegExp, Error, parseFloat, parseInt, isFinite, Uint8Array, encodeURIComponent };
 {
   const sticky = fake('sticky'); sticky.getNote = () => Promise.resolve(null); // the window then stops before it shows a note
-  const { K, parts } = checkKit('note', 'note', ['base', 'fx-format', 'panels', 'content', 'editing', 'menus-voice-ink', 'speech', 'lock-zoom', 'draw-over', 'ink-out', 'eraser-start'], 'COSMO_NOTE_KIT', true,
+  const { K, parts } = checkKit('note', 'note', ['base', 'fx-format', 'panels', 'content', 'editing', 'checklists', 'menus-voice-ink', 'speech', 'lock-zoom', 'draw-over', 'ink-out', 'eraser-start'], 'COSMO_NOTE_KIT', true,
     { ...base, document: doc(), window: { sticky, COSMO_FX: fake('COSMO_FX'), addEventListener() {}, matchMedia: () => ({ matches: true }) }, getSelection: () => fake('selection'), innerWidth: 400, innerHeight: 400, devicePixelRatio: 1,
       localStorage: { getItem: () => null, setItem() {}, removeItem() {} }, navigator: fake('navigator'), CSS: fake('CSS'), Highlight: class {},
       Node: { TEXT_NODE: 3, ELEMENT_NODE: 1 }, NodeFilter: { SHOW_TEXT: 4, SHOW_ELEMENT: 1, FILTER_ACCEPT: 1, FILTER_REJECT: 2 } },
@@ -142,8 +142,15 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
 {
   const ORDER = ['kit', 'effects-classic', 'effects-lab', 'effects-magic', 'followers-classic', 'followers-lab', 'followers-magic', 'engine'];
   const want = ORDER.map((n) => `fx/${n}.js`);
-  assert.deepEqual(tagsIn('note'), [...want, ...src.files.note], 'note.html: the effects, then its own code');
-  assert.deepEqual(tagsIn('list'), ['about.js', ...want, ...src.files.list], 'list.html: about.js, the effects, then its own code');
+  assert.deepEqual(tagsIn('note'), [...want, 'evening.js', ...src.files.note], 'note.html: the effects, the evening colours (1.3.27), then its own code');
+  assert.deepEqual(tagsIn('list'), ['about.js', ...want, 'evening.js', ...src.files.list], 'list.html: about.js, the effects, the evening colours, then its own code');
+  // 1.3.27: src/evening.js is shared by both windows and main: strict, LF, only window.COSMO_EVENING in a window, module.exports in Node
+  const eve = read('src/evening.js');
+  assert.ok(eve.startsWith("'use strict';") && isLF(eve), 'src/evening.js: strict, LF');
+  const box = { window: {} }; box.window.window = box.window; vm.createContext(box);
+  vm.runInContext(eve, box, { filename: 'src/evening.js' });
+  assert.deepEqual(Object.keys(box.window).filter((k) => k !== 'window'), ['COSMO_EVENING'], 'src/evening.js: only COSMO_EVENING on window');
+  assert.equal(typeof require('../src/evening').phase, 'function', 'src/evening.js: main and store.js require it');
   assert.deepEqual(src.files.fx, want, 'the tests load what the windows load');
   assert.deepEqual(fs.readdirSync(path.join(SRC, 'fx')).sort(), want.map((f) => f.slice(3)).sort(), 'every file in src/fx/ is loaded');
   const sandbox = { window: {}, document: { hidden: false, createElement: () => ({ width: 0, height: 0, getContext: () => fake('ctx') }) }, performance: { now: () => 0 },

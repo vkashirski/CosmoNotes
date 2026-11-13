@@ -88,6 +88,21 @@ const assert = require('assert');
   await ui.click('#btnBack');
 
   // ---- drag & drop
+  // 1.3.11: while a note is dragged over another note or a group, that card has the faint outline of a right-clicked card
+  const overLook = (from, to) => page.evaluate(([fs, ts]) => {
+    const src = document.querySelector(fs); const dst = document.querySelector(ts);
+    const dt = new DataTransfer(); const o = { bubbles: true, cancelable: true, dataTransfer: dt };
+    src.dispatchEvent(new DragEvent('dragstart', o)); dst.dispatchEvent(new DragEvent('dragenter', o));
+    const cs = getComputedStyle(dst); const over = [dst.classList.contains('drop-on'), cs.outlineStyle, cs.outlineWidth, cs.outlineColor];
+    src.dispatchEvent(new DragEvent('dragend', o));
+    dst.classList.add('ctxon'); const c2 = getComputedStyle(dst); const ctx = [true, c2.outlineStyle, c2.outlineWidth, c2.outlineColor]; dst.classList.remove('ctxon');
+    return { over, ctx, left: dst.classList.contains('drop-on') };
+  }, [from, to]);
+  for (const to of [ui.noteKey(E1), ui.groupKey(HOME)]) {
+    const r = await overLook(ui.noteKey(D), to);
+    assert.deepEqual(r.over, r.ctx, `dragged over ${to}: the right-click outline`);
+    assert.ok(!r.left, 'gone when the drag ends');
+  }
   await ui.drag(ui.noteKey(D), ui.noteKey(E1));
   const pair = await where(D);
   assert.ok(pair && pair === await where(E1), 'a note dropped on a note: the two make a new group');

@@ -20,9 +20,12 @@ const BIG = 16384;
 const ASSETS = path.join(__dirname, '..', 'assets');
 const WIN_ICON = path.join(ASSETS, process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const PRELOAD = path.join(__dirname, '..', 'preload.js');
-const EDITABLE = ['title', 'coverTitle', 'html', 'text', 'firstImage', 'ink', 'wrapWidth', 'nowrap', 'color', 'font', 'size', 'opacity', 'solidOnHover', 'pinned', 'rolled', 'spell', 'zoom', 'fx', 'fxPaused', 'fxPlay'];
+const EDITABLE = ['title', 'coverTitle', 'html', 'text', 'firstImage', 'ink', 'wrapWidth', 'nowrap', 'color', 'font', 'titleFont', 'size', 'opacity', 'solidOnHover', 'pinned', 'clickThrough', 'rolled', 'spell', 'checklist', 'evening', 'panic', 'zoom', 'fx', 'fxPaused', 'fxPlay'];
 // 1.1.30: the title too (a locked note shows its coverTitle instead); these are what main/crypt.js seals
 const SECRET = ['title', 'html', 'text', 'firstImage', 'ink'];
+// 1.3.28 (the owner's wish): all that the window of a hidden locked note may change: where its window sits, not the note
+// (1.3.34: and click-through, its window's mouse: the button stays the one thing that works on it)
+const WHILE_HIDDEN = ['pinned', 'clickThrough', 'rolled'];
 const ATT_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'webm', 'ogg', 'mp3', 'm4a', 'wav'];
 
 const WELCOME_HTML =
@@ -33,5 +36,5 @@ const WELCOME_HTML =
   '<li>Click ⋯ for a title, colours, see-through and the lock</li>' +
   '<li>Click <b>Add</b> at the bottom for photos, voice, drawings and more</li>' +
   '</ul>' +
-  '<div>Everything saves on this computer, instantly.</div>';
-module.exports = { APP_NAME, ASSETS, ATT_EXT, BIG, DEFAULT_H, DEFAULT_W, EDITABLE, MIN_H, MIN_W, OLD_DATA_DIR, PAPER, PRELOAD, ROLLED_H, SECRET, WELCOME_HTML, WIN_ICON };
+  '<div>Everything saves on this device, instantly.</div>';
+module.exports = { APP_NAME, ASSETS, ATT_EXT, BIG, DEFAULT_H, DEFAULT_W, EDITABLE, MIN_H, MIN_W, OLD_DATA_DIR, PAPER, PRELOAD, ROLLED_H, SECRET, WELCOME_HTML, WHILE_HIDDEN, WIN_ICON };

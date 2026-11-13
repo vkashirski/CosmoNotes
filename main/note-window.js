@@ -1,7 +1,8 @@
 'use strict';
 const { BrowserWindow, screen } = require('electron');
 const path = require('path');
-const { BIG, DEFAULT_H, MIN_H, MIN_W, PAPER, PRELOAD, ROLLED_H, WIN_ICON } = require('./constants');
+const { BIG, DEFAULT_H, MIN_H, MIN_W, PRELOAD, ROLLED_H, WIN_ICON } = require('./constants');
+const { paperOf } = require('./evening');
 const { isLocked, viewOf } = require('./locks');
 const { fitBounds, visibleOnSomeDisplay } = require('./display');
 const { hardenContents } = require('./web');
@@ -9,6 +10,7 @@ const { watchInkBar } = require('./ink-window');
 const { notifyList } = require('./list-notify');
 const { applyState, setRolled, titleOf } = require('./note-state');
 const { groupOpenInList, openForNow } = require('./list-visibility');
+const { closedChanged, noteClosed, takeClosed } = require('./closed-notes');
 const { S, wins } = require('./state');
 
 function openNoteWindow(n, { focus = false } = {}) {
@@ -34,7 +36,7 @@ function openNoteWindow(n, { focus = false } = {}) {
     show: false,
     title: titleOf(n),
     icon: WIN_ICON,
-    backgroundColor: PAPER[n.color] || PAPER.yellow,
+    backgroundColor: paperOf(n), // 1.3.27: its evening colour in the evening
     minimizable: false, // only the note's own minimise button minimises it (see 'note:minimize')
     maximizable: true, // 1.1.13: maximise button, and double-clicking the top bar
     fullscreenable: false,
@@ -56,6 +58,7 @@ function openNoteWindow(n, { focus = false } = {}) {
   // 1.1.47: a locked note unlocked for now from the list opens without the password too
   win.revealed = !isLocked(n) || openForNow(n);
   wins.set(n.id, win);
+  closedChanged(); // 1.3.30: opened again some other way: the tray may have nothing left to reopen
   hardenContents(win.webContents, { inkBarFor: win });
   watchInkBar(win);
 
@@ -120,13 +123,16 @@ function openNoteWindow(n, { focus = false } = {}) {
     const id = win.noteId;
     if (wins.get(id) === win) wins.delete(id);
     const cur = S.store.get(id);
+    // 1.3.30: closed by the owner (its X, the list's Close): Ctrl+Shift+T / the tray can bring it back. Remembered only
+    // once the window is gone, so the tray's item counts it (Electron closes a window a moment after close()).
+    if (win.byHand) noteClosed(id);
     if (cur && cur.open && !S.quitting) {
       // Closed some other way than the X button (e.g. Alt+F4). If the app is
       // still running a moment later it was not a shutdown, so remember it closed.
       setTimeout(() => {
         if (S.quitting || wins.has(id)) return;
         const m = S.store.get(id);
-        if (m && m.open) { m.open = false; S.store.save(id); notifyList(); }
+        if (m && m.open) { m.open = false; S.store.save(id); noteClosed(id); notifyList(); }
       }, 2500);
     }
     notifyList();
@@ -181,6 +187,28 @@ function duplicateNote(id) {
   return n.id;
 }
 
+// close a note's window and remember it closed (the list's close button, the panic button)
+// byHand (1.3.30): the owner closed it, so "Reopen closed note" can bring it back; the panic button has its own
+function closeNoteWindow(id, { byHand = false } = {}) {
+  const n = S.store.get(id);
+  if (n) { n.open = false; S.store.writeNow(n.id); }
+  const win = wins.get(id);
+  if (win && !win.isDestroyed()) { if (byHand) win.byHand = true; win.close(); }
+}
+
+// 1.3.30: Ctrl+Shift+T in the list, the tray's "Reopen closed note": the note closed last opens again where it was
+// (main/closed-notes.js). A locked note asks for its PIN, as when it is opened from the list.
+function reopenClosed() {
+  const id = takeClosed();
+  const n = id && S.store.get(id);
+  if (!n) return null;
+  n.open = true;
+  S.store.save(n.id);
+  openNoteWindow(n, { focus: true });
+  notifyList();
+  return n.id;
+}
+
 // unroll a rolled-up note's window (the note shows its text and bars again)
 function unrollWin(win, n) {
   S.store.update(n.id, { rolled: false });
@@ -221,4 +249,4 @@ function refitAll() {
     }
   }
 }
-module.exports = { bringToFront, createNote, duplicateNote, enforcePinned, openNoteWindow, refitAll, unrollWin };
+module.exports = { bringToFront, closeNoteWindow, createNote, duplicateNote, enforcePinned, openNoteWindow, refitAll, reopenClosed, unrollWin };

@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 7 of 11: voice to text (1.3.1): + Add → Speak to text, and right-click a voice note → Transcribe
+// CosmoNotes note window, part 8 of 12: voice to text (1.3.1): + Add → Speak to text, and right-click a voice note → Transcribe
 // (the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 // The engine runs in main (main/ipc-stt.js, main/stt-engine.js); this window only sends audio and puts the text in.
 // - Speak to text is the voice recorder of part 6 (rec.stt): the recording goes to disk as always (the safety net), and
@@ -17,8 +17,8 @@
   const toast = K.later('toast'), ask = K.later('ask');
 
   const say = {
-    slow: 'This PC is slow for live text. The words appear when you stop.',
-    missing: "This model isn't downloaded yet.",
+    slow: 'On this device, the words appear when you stop.',
+    missing: "Voice to text isn't downloaded yet. Get it in Settings.",
     kept: 'Stopped. Your recording is saved as a voice note.',
     failed: "Couldn't write it down. Your recording is saved.",
     busy: 'Voice to text is busy in another note.',
@@ -96,6 +96,7 @@
     stt.starting = api.sttStart().catch(() => null).then((res) => {
       if (!res || res.error) {
         if (res && res.error === 'busy') toast(say.busy);
+        if (res && res.error === 'nomodel') toast(say.missing);
         return null;
       }
       stt.job = res.jobId;
@@ -108,7 +109,7 @@
       endLive();
       return;
     }
-    if (!(await stt.starting)) { // main said no (busy in another note): nothing was said yet
+    if (!(await stt.starting)) { // main said no (busy in another note, or not downloaded): nothing was said yet
       stopRecording(false);
       endLive();
     }
@@ -261,8 +262,7 @@
     jobs.delete(id);
     if (!j || V.hidden || !editor.contains(m)) return; // closed or locked meanwhile: nothing is added
     if (!res || res.cancelled) { removeMarker(m); return; }
-    if (res.error) { removeMarker(m); toast(res.error === 'busy' ? say.busy : say.noText); return; }
-    if (res.fallback === 'missing') toast(say.missing);
+    if (res.error) { removeMarker(m); toast(res.error === 'busy' ? say.busy : res.error === 'nomodel' ? say.missing : say.noText); return; }
     const text = String(res.text || '').trim();
     if (!text) { removeMarker(m); toast(say.nothing); return; }
     putText(j, text);
@@ -315,8 +315,7 @@
     const m = stt.marker;
     if (e.type === 'ready') {
       stt.mode = e.mode;
-      if (e.fallback === 'missing') toast(say.missing);
-      if (e.mode === 'after') { setLabel(m, 'Writing it down when you stop'); if (e.fallback !== 'missing') toast(say.slow); }
+      if (e.mode === 'after') { setLabel(m, 'Writing it down when you stop'); if (e.auto) toast(say.slow); } // not when the person picked it
     } else if (e.type === 'draft') {
       if (!stt.stopping) setDraft(m, e.text || '');
     } else if (e.type === 'final') {

@@ -1,11 +1,16 @@
 'use strict';
 const { ipcMain, shell } = require('electron');
-const { FONTS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity } = require('../store');
+const { FONTS, CHECK_OPTS, OVERRIDE_KEYS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity, resetPatch } = require('../store');
+const EVENING = require('../src/evening');
 const { PAPER } = require('./constants');
 const { broadcastSettings, spellLanguages } = require('./settings');
 const { notifyList } = require('./list-notify');
 const { LIST_THEMES, paintListFrame } = require('./list-window');
 const { buildTray, setStartup } = require('./tray');
+const { pushLook } = require('./list-visibility');
+const { applyClickThroughAll } = require('./note-state');
+const { pushEvening } = require('./evening');
+const { panicNow, pauseShortcut, syncShortcut, validKey } = require('./panic');
 const { S } = require('./state');
 
 function registerSettingsIpc() {
@@ -45,6 +50,22 @@ function registerSettingsIpc() {
     if ('fxPaused' in patch) { S.store.settings.fxPaused = !!patch.fxPaused; fxChanged = true; buildTray(); }
     if ('spellCheck' in patch) S.store.settings.spellCheck = !!patch.spellCheck;
     if ('spellCyrillic' in patch) { S.store.settings.spellCyrillic = !!patch.spellCyrillic; spellLanguages(); }
+    // 1.3.19: Settings → Checklists
+    const checkKeys = Object.values(CHECK_OPTS).filter((k) => k in patch);
+    for (const k of checkKeys) S.store.settings[k] = !!patch[k];
+    // 1.3.27: evening colours (src/evening.js) and the panic button (main/panic.js)
+    let eveChanged = false;
+    if ('eveOn' in patch) { S.store.settings.eveOn = !!patch.eveOn; eveChanged = true; }
+    for (const k of ['eveFrom', 'eveTo']) {
+      const v = EVENING.cleanTime(patch[k], null);
+      if (v !== null) { S.store.settings[k] = v; eveChanged = true; }
+    }
+    let panicChanged = false;
+    if ('panicOn' in patch) { S.store.settings.panicOn = !!patch.panicOn; panicChanged = true; }
+    if (typeof patch.panicKey === 'string' && (patch.panicKey === '' || validKey(patch.panicKey))) { S.store.settings.panicKey = patch.panicKey; panicChanged = true; }
+    // 1.3.34: the click-through button (off: every click-through note takes the mouse again; each keeps its choice)
+    const ctChanged = 'clickThroughOn' in patch;
+    if (ctChanged) S.store.settings.clickThroughOn = !!patch.clickThroughOn;
     if (patch.listSort && typeof patch.listSort === 'object') {
       const ls = { ...S.store.settings.listSort };
       if (['updated', 'created'].includes(patch.listSort.by)) ls.by = patch.listSort.by;
@@ -53,12 +74,35 @@ function registerSettingsIpc() {
       S.store.settings.listSort = ls;
     }
     S.store.saveSettings();
-    if ('spellCheck' in patch || 'spellCyrillic' in patch || 'listTheme' in patch || fxChanged) broadcastSettings();
+    if (panicChanged) { syncShortcut(); buildTray(); }
+    if (eveChanged) pushEvening(true);
+    if (ctChanged) applyClickThroughAll();
+    if ('spellCheck' in patch || 'spellCyrillic' in patch || 'listTheme' in patch || fxChanged || checkKeys.length || eveChanged || panicChanged || ctChanged) broadcastSettings();
     // The list already shows a new sort order itself; telling it again made it redraw twice.
     const onlySort = Object.keys(patch).every((k) => k === 'listSort' || k === 'listSize' || k === 'listTheme');
     if (!onlySort) notifyList();
     return true;
   });
+
+  // 1.3.27: Settings → "Use on all notes" (one setting) or "Reset notes…" (several): every note (not in the Bin) with its own
+  // value of these gets the one in Settings (store.js OVERRIDES says what that means for each). Open windows change at once.
+  ipcMain.handle('settings:reapply', (e, keys = []) => {
+    keys = [].concat(keys).filter((k) => OVERRIDE_KEYS.includes(k));
+    let count = 0;
+    for (const n of S.store.all()) {
+      if (n.deletedAt) continue;
+      const patch = resetPatch(n, S.store.settings, keys);
+      if (!Object.keys(patch).length) continue;
+      S.store.update(n.id, patch); // not an edit: "last edited" stays the same
+      pushLook(n.id);
+      count++;
+    }
+    if (count) notifyList();
+    return count;
+  });
+  // 1.3.27: the panic button (a note's top bar), and Settings waiting for a new shortcut (the old one must not fire meanwhile)
+  ipcMain.handle('panic:now', () => panicNow());
+  ipcMain.handle('panic:capture', (e, on) => { pauseShortcut(on); notifyList(); });
 
   ipcMain.handle('backups:list', () => S.store.listBackups());
   ipcMain.handle('backups:now', () => { S.store.backupNow(); return S.store.listBackups(); });

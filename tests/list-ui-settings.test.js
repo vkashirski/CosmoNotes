@@ -5,6 +5,9 @@
 // effect; three tabs), Enter / Escape / outside click close it, and a change made elsewhere shows in it. About: the version
 // and date, the feature list, no version history (1.1.41). Settings scrolls smoothly: a solid background that moves with
 // the page, nothing reacts to the mouse while it scrolls, and Ctrl + wheel only changes card sizes outside it (1.1.43).
+// 1.3.27: Evening colours (switch, times, the shades), the panic button and its shortcut (press keys: a letter alone is
+// refused; quick picks; another app has it; none), "Use on all notes" under a setting and "Reset notes…" (General).
+// 1.3.34: the click-through switch, and right-click → Turn off click-through on a card.
 const assert = require('assert');
 
 (async () => {
@@ -26,6 +29,67 @@ const assert = require('assert');
   assert.equal(await ui.count('#viewSettings .panel.open'), heads, 'a click on the title opens each');
   await page.locator('#viewSettings .phead >> nth=0').dispatchEvent('keydown', { key: 'Enter' }); await ui.settle();
   assert.equal(await page.getAttribute('#viewSettings .phead >> nth=0', 'aria-expanded'), 'false', 'Enter closes it again (keyboard)');
+
+  // ---- search in Settings (1.3.35): only the sections that match show, open; clearing puts the folds back as they were
+  const shown = () => page.evaluate(() => [...document.querySelectorAll('#viewSettings .panel:not(.unfound) > .phead')].map((h) => (h.querySelector('h3') || h).textContent.trim()));
+  const openNow = () => page.evaluate(() => [...document.querySelectorAll('#viewSettings .panel')].map((p) => p.classList.contains('open')));
+  const foldsAtStart = await openNow();
+  await ui.type('#sq', 'evening');
+  assert.deepEqual(await shown(), ['Evening colours'], '“evening” shows only Evening colours');
+  assert.ok(await ui.visible('#viewSettings .panel.open #sEve'), 'and opens it');
+  assert.ok(await ui.visible('#sqClear') && !(await ui.visible('#sqNone')), 'a clear button, no “nothing found”');
+  await ui.type('#sq', 'EVENING  Colours');
+  assert.deepEqual(await shown(), ['Evening colours'], 'any case, every word must match');
+  await ui.type('#sq', 'ever');
+  assert.ok(!(await shown()).includes('For new notes'), 'a word must start with it (“never” is no match)');
+  await ui.type('#sq', 'spell');
+  assert.deepEqual(await shown(), ['Spelling'], 'the start of a word is enough');
+  // 1.3.36: other names for a section find it too (data-find), and every section has some
+  assert.equal(await ui.count('#viewSettings .panel:not([data-find])'), 0, 'every section has search words');
+  for (const [q, want] of [['dark mode', 'General'], ['startup', 'General'], ['dictation', 'Voice to text'], ['boss key', 'Panic button'],
+    ['password', 'Locked notes'], ['todo', 'Checklists'], ['grammar', 'Spelling'], ['appdata', 'Where your notes live'], ['version', 'About CosmoNotes']]) {
+    await ui.type('#sq', q);
+    assert.deepEqual(await shown(), [want], `“${q}” finds ${want}`);
+  }
+  await ui.type('#sq', 'transparent');
+  assert.deepEqual(await shown(), ['For new notes', 'Click-through'], 'a word can find more than one section');
+  await ui.type('#sq', 'everything');
+  assert.deepEqual(await shown(), [], 'About’s feature list is not searched');
+  assert.ok(await ui.visible('#sqNone'), '“No settings match.”');
+  await ui.click('#sqClear');
+  assert.equal(await page.inputValue('#sq'), '', 'the clear button empties it');
+  assert.equal(await ui.count('#viewSettings .panel.unfound'), 0, 'every section shows again');
+  assert.deepEqual(await openNow(), foldsAtStart, 'each open or closed as before the search');
+  await ui.type('#sq', 'backups');
+  assert.deepEqual(await shown(), ['Backups'], 'Backups');
+  await page.keyboard.press('Escape'); await ui.settle();
+  assert.equal(await page.inputValue('#sq'), '', 'Escape clears it');
+  assert.deepEqual(await openNow(), foldsAtStart, 'and puts the folds back');
+  await page.keyboard.press('Control+f'); await ui.settle();
+  assert.ok(await page.evaluate(() => document.activeElement.id === 'sq' && !document.getElementById('viewSettings').hidden), 'Ctrl+F in Settings goes to its search');
+
+  // ---- Voice to text (1.3.4): one model, named, with its download; no choice, no Test my computer
+  const vt = await ui.text('#sttModels');
+  assert.ok(vt.includes('Uses Whisper small.en') && vt.includes('Not downloaded'), `says which model and that it isn't here (${vt})`);
+  assert.equal(await ui.count('#sttModels button:has-text("Download")'), 1, 'a Download button');
+  assert.equal(await ui.count('#sttUse, #sttTest, #sttTestInfo, #sttUsing'), 0, 'no model choice, no Test my computer');
+  assert.ok(!/Standard|Best/.test(await ui.text('#sttPanel')), 'no Standard / Best');
+  // "Words appear": while you talk / when you stop (not set: by the PC; no WebGPU here = when you stop)
+  assert.equal(await ui.text('#sttWhen button.on'), 'When you stop', 'not set: the PC\'s pick shows');
+  await ui.click('#sttWhen [data-v="live"]');
+  assert.equal((await settings()).sttWhen, 'live', 'saved');
+  assert.equal(await ui.text('#sttWhen button.on'), 'While you talk');
+  assert.ok((await ui.text('#sttWhenInfo')).includes('lag'), 'on the processor: it can lag');
+  // the hints
+  assert.equal(await ui.text('#sttIntro'), 'In a note, open + Add and pick Voice to text, or right-click a voice recording and pick Transcribe.', 'one name everywhere, Transcribe in the same sentence');
+  assert.ok(!/Speak to text/.test(await ui.text('#sttPanel')), 'no "Speak to text"');
+  const src = await ui.text('#sttSource');
+  assert.ok(src.includes('https://huggingface.co/onnx-community/whisper-small.en') && src.includes('never leaves this device'), `the model's page and "this device" (${src})`);
+  assert.equal(await page.getAttribute('#sttSource a', 'href'), 'https://huggingface.co/onnx-community/whisper-small.en', 'a link to it');
+  assert.ok((await ui.text('#sttTipWindows')).includes('Win + H'), 'Windows 11 voice typing and its keys');
+  // the order (1.3.7): how to use it (and Transcribe) at the top, where it comes from under the model, Windows 11 last
+  const order = await page.evaluate(() => [...document.querySelectorAll('#sttPanel .pinner > *')].map((e) => e.id || e.className));
+  assert.deepEqual(order.slice(order.indexOf('sttIntro')), ['sttIntro', 'sttModels', 'sttSource', 'row col', 'sttTipWindows'], `the order (${order})`);
 
   // ---- the window's colour
   await ui.click('#sTheme [data-theme="night"], #sTheme button:has-text("Night")');
@@ -69,7 +133,9 @@ const assert = require('assert');
   await ui.type('#sOpacity', '70');
   assert.equal((await settings()).defaultOpacity, 0.7, 'see-through for new notes');
   assert.equal(await ui.text('#sOpVal'), '70%');
-  for (const [id, key] of [['#sStartup', 'startWithWindows'], ['#sSolidHover', 'defaultSolidOnHover'], ['#sNoRepeat', 'newColorNoRepeat'], ['#sSpell', 'spellCheck']]) {
+  for (const [id, key] of [['#sStartup', 'startWithWindows'], ['#sSolidHover', 'defaultSolidOnHover'], ['#sNoRepeat', 'newColorNoRepeat'], ['#sSpell', 'spellCheck'],
+    ['#sCheckDrag', 'checkDrag'], ['#sCheckSink', 'checkSink'], ['#sCheckFixed', 'checkFixed']]) { // 1.3.19: Checklists
+    assert.equal(await page.isChecked(id), !!(await settings())[key], `${id} shows ${key}`);
     const was = !!(await settings())[key];
     await ui.check(id);
     assert.equal(!!(await settings())[key], !was, `${id} switches ${key}`);
@@ -144,6 +210,90 @@ const assert = require('assert');
   assert.ok(/^Version [\d.]+ · Last updated /.test(line), `About says the version and the date (${line})`);
   assert.equal(await ui.count('#foldVersions'), 0, 'no Version history fold');
   assert.ok(await ui.count('#features .fgroup') >= 8, 'the feature list is there');
+  await ui.tab('notes');
+
+  // ---- 1.3.27: Evening colours
+  await ui.tab('settings');
+  await page.evaluate(() => document.querySelectorAll('#viewSettings .phead[aria-expanded="false"]').forEach((h) => h.click()));
+  await ui.settle();
+  assert.deepEqual([await page.inputValue('#sEveFrom'), await page.inputValue('#sEveTo')], ['19:00', '07:00'], '19:00 to 07:00');
+  await ui.check('#sEve');
+  assert.equal((await settings()).eveOn, true, 'turned on');
+  await ui.type('#sEveFrom', '20:30');
+  assert.equal((await settings()).eveFrom, 20 * 60 + 30, 'a new evening time');
+  assert.equal(await ui.count('#sEveStrip i'), 12, 'each light paper, by day and by evening');
+  await ui.check('#sEve');
+
+  // ---- 1.3.27: the panic button and its shortcut (no shortcut until one is set)
+  const GS = ui.E.globalShortcut;
+  assert.ok(!(await ui.visible('#sPanicKeyRow')), 'no shortcut row while it is off');
+  await ui.check('#sPanic');
+  assert.equal((await settings()).panicOn, true);
+  assert.equal(await ui.text('#sPanicKeyNow'), 'None', 'no shortcut yet');
+  assert.ok((await ui.text('#sPanicHint')).includes('Alt+Z or F8'), 'it suggests Alt+Z and F8');
+  await ui.click('#sPanicKey');
+  assert.ok((await ui.text('#sPanicKey')).includes('Press the keys'), 'waiting for keys');
+  await page.keyboard.press('KeyZ'); await ui.settle();
+  assert.ok((await ui.text('#sPanicHint')).includes('Ctrl or Alt'), 'a letter alone is refused');
+  assert.equal((await settings()).panicKey, '');
+  await page.keyboard.press('Alt+KeyZ'); await ui.settle();
+  assert.equal((await settings()).panicKey, 'Alt+Z', 'Alt+Z is taken as the shortcut');
+  assert.ok(GS.reg['Alt+Z'], 'and registered once Settings stops waiting');
+  assert.equal(await ui.text('#sPanicKeyNow'), 'Alt+Z');
+  await ui.click('#sPanicKeyRow [data-key="F8"]');
+  assert.equal((await settings()).panicKey, 'F8', 'a quick pick');
+  GS.taken.add('Alt+Z');
+  await ui.click('#sPanicKeyRow [data-key="Alt+Z"]');
+  assert.ok((await ui.text('#sPanicHint')).includes('Another app'), 'it says when another app has it');
+  GS.taken.clear();
+  await ui.click('#sPanicClear');
+  assert.equal((await settings()).panicKey, '', 'no shortcut');
+  assert.deepEqual(Object.keys(GS.reg), []);
+
+  // ---- 1.3.34: click-through: the switch, and right-click → Turn off click-through on a card (only while it is on)
+  const { S } = require('../main/state');
+  assert.ok(!(await page.isChecked('#sClickThrough')), 'click-through starts off');
+  await ui.check('#sClickThrough');
+  assert.equal((await settings()).clickThroughOn, true);
+  S.store.update(A, { pinned: true, clickThrough: true });
+  await ui.H['list:apply']({}, [A], { color: 'yellow' }); // (tells the list)
+  await ui.tab('notes');
+  await ui.rclick(ui.noteKey(A));
+  assert.ok((await ui.menuLabels()).includes('Turn off click-through'), 'right-click offers to turn it off');
+  await ui.key('Escape');
+  await ui.menu(ui.noteKey(A), 'Turn off click-through');
+  assert.ok(!(await note(A)).clickThrough && (await note(A)).pinned, 'off, still pinned');
+  await ui.rclick(ui.noteKey(A));
+  assert.ok(!(await ui.menuLabels()).includes('Turn off click-through'), 'not offered when it is off');
+  await ui.key('Escape');
+  await ui.tab('settings');
+  await ui.check('#sClickThrough');
+  assert.equal((await settings()).clickThroughOn, false);
+
+  // ---- 1.3.27: "Use on all notes" and "Reset notes…"
+  await ui.H['settings:reapply'](null, Object.keys((await settings()).overrides)); // (earlier parts gave notes their own looks)
+  await ui.settle();
+  assert.equal(await ui.count('.reapply:not([hidden])'), 0, 'nothing to put back yet');
+  assert.ok(await page.isDisabled('#sResetNotes'), 'Reset notes… has nothing to do');
+  await ui.H['list:apply']({}, [A], { font: 'medieval' });
+  S.store.update(A, { spell: true, panic: false });
+  await ui.H['list:apply']({}, [A], { color: 'yellow' }); // (tells the list)
+  await ui.settle();
+  assert.equal(await ui.text('.reapply[data-o="font"] span'), '1 note uses its own.', 'under Font: one note has its own');
+  assert.equal(await ui.text('.reapply[data-o="panic"] span'), '1 note stays open.', 'under the panic button: one stays open');
+  await ui.click('.reapply[data-o="font"] button');
+  assert.equal(await ui.modalTitle(), 'Use this on all notes?', 'it asks first');
+  await ui.modalOk();
+  assert.equal((await note(A)).font, (await settings()).defaultFont, 'the note gets the font set here');
+  assert.ok(!(await ui.visible('.reapply[data-o="font"]')), 'and the line goes');
+  assert.ok((await ui.text('#sOwnNow')).includes('2 settings'), 'General: two settings differ on some notes');
+  await ui.click('#sResetNotes');
+  assert.equal(await ui.count('#mInputs .resetlist input:checked'), 2, 'Reset notes…: one tick per setting, all ticked');
+  await page.locator('#mInputs .resetlist input[data-o="panic"]').evaluate((x) => x.click());
+  await ui.modalOk();
+  assert.deepEqual([S.store.get(A).spell, S.store.get(A).panic], [null, false], 'only the ticked one is put back');
+  await ui.check('#sPanic');
+  await page.evaluate(() => { document.querySelector('#viewSettings').scrollTop = 0; });
   await ui.tab('notes');
 
   // ---- smooth scrolling in Settings (1.1.43)

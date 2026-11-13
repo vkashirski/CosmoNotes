@@ -5,7 +5,7 @@
   const K = window.COSMO_LIST_KIT;
   const { V, S, $, $$, GCOLORS, THEMES, SIZES, sizeNow, themeNow, ICON, cardsTabNow, navBack, sel, h, when, full,
     plural, tilt, live, groupById, childGroups, chainOf, subtreeIds, notesInTree, isInside, noteIsLocked,
-    groupIsLocked, lockedOnes, favourites, sortItems } = K;
+    groupIsLocked, isShut, noteById, lockedOnes, favourites, sortItems } = K;
   // defined in a later part:
   const selItems = K.later('selItems'), starBtn = K.later('starBtn'), lockBtn = K.later('lockBtn'),
     pickCard = K.later('pickCard'), clearSel = K.later('clearSel'), paintCards = K.later('paintCards'),
@@ -15,6 +15,13 @@
     paintLockBar = K.later('paintLockBar'), openGroupView = K.later('openGroupView'),
     closePanel = K.later('closePanel'), paintPanel = K.later('paintPanel'), newNote = K.later('newNote'),
     clearSearch = K.later('clearSearch');
+  // 1.3.27: evening colours (src/evening.js): each light paper's evening shade for the cards. --evp on the body says how far
+  // into the evening it is (main's clock); a card whose note has them on (.eve) mixes in by it (list-cards.css)
+  const EVE = window.COSMO_EVENING;
+  if (EVE) document.head.append(Object.assign(document.createElement('style'), { textContent: EVE.css('.card') }));
+  const paintEvening = () => document.body.style.setProperty('--evp', String(Number(V.state.settings.evePhase) || 0));
+  if (S.list.onEvening) S.list.onEvening((p) => { V.state.settings.evePhase = p; paintEvening(); });
+
   // ---------- rendering
   function render(animate = false) {
     const liveNotes = live();
@@ -31,6 +38,7 @@
       V.shownGroup = V.openGroup;
     }
     document.body.dataset.theme = themeNow();
+    paintEvening();
     document.body.classList.toggle('dark', !!THEMES.find((t) => t.id === themeNow()).dark);
     $('#cNotes').textContent = liveNotes.length;
     $('#cBin').textContent = binned.length;
@@ -82,28 +90,67 @@
     const body = img.closest('.body');
     if (body) markMore([body]);
   }
+  // 1.3.11: one run of words in the look the note gives it (store.js cardRuns makes the runs; CARD_RUN_KEYS there).
+  // The same rules as the note's own CSS (src/css/note-text.css: code, links; the browser's own <mark>, <sub>…). The size
+  // (k, 1.3.13) is worked out in store.js exactly as the note's CSS does it, nested elements and all.
+  // Every value is checked again here: only the app's fonts, colours as #hex / rgb(), a size from 0.2 to 6.
+  const RUN_FONT = { hand: 'var(--hand)', round: 'var(--ui)', medieval: 'var(--med)' };
+  const RUN_COLOR = /^(#[0-9a-f]{3,8}|rgba?\([\d.,\s%]+\))$/i;
+  const runCss = {
+    f: (v) => (RUN_FONT[v] ? `font-family:${RUN_FONT[v]}` : ''),
+    c: (v) => (RUN_COLOR.test(v) ? `color:${v}` : ''),
+    bg: (v) => (RUN_COLOR.test(v) ? `background-color:${v}` : ''),
+    k: (v) => (Number(v) > 0.2 && Number(v) < 6 ? `font-size:${Number(v)}em` : ''), // 1.3.13: the size, as the note works it out (store.js)
+    b: () => 'font-weight:700',
+    i: () => 'font-style:italic',
+    u: () => 'text-decoration-line:underline',
+    s: () => 'text-decoration-line:line-through',
+    mk: () => 'background-color:Mark;color:MarkText',
+    sub: () => 'vertical-align:sub',
+    sup: () => 'vertical-align:super',
+    code: () => 'font-family:Consolas,monospace;background-color:rgba(0,0,0,.06);border-radius:4px;padding:0 .2em',
+    h: () => 'font-weight:700',
+    a: () => 'color:var(--accent);text-decoration-line:underline',
+  };
+  function runSpan(r, noteFont) {
+    if (!r || typeof r.t !== 'string') return '';
+    const css = [];
+    for (const k of Object.keys(runCss)) if (r[k] !== undefined && r[k] !== null) css.push(runCss[k](r[k]));
+    if (r.f === 'hand' && noteFont !== 'hand') css.push('line-height:1.1'); // as note-drawing.css
+    // underline and strike together: one text-decoration-line with both
+    const deco = ['u', 's', 'a'].filter((k) => r[k]).length > 1 ? `text-decoration-line:${r.s ? 'line-through ' : ''}underline` : '';
+    const style = css.filter(Boolean).filter((x) => !deco || !x.startsWith('text-decoration-line')).concat(deco || []).join(';');
+    return style ? h('span', { class: 'run', style }, r.t) : r.t;
+  }
   function cardBody(n) {
     const body = h('div', { class: 'body' });
     const title = (n.title || '').trim();
+    // 1.3.3: a title with its own font (Title font in the note's ⋯ menu) shows in it here too
+    const tfont = n.titleFont && n.titleFont !== n.font ? n.titleFont : null;
     if (n.locked) {
-      body.append(h('div', { class: 'txt' }, h('span', { class: 't1' }, title || 'Locked note')));
+      body.append(h('div', { class: 'txt' }, h('span', { class: 't1', 'data-tfont': title ? tfont : null }, title || 'Locked note')));
       body.append(h('div', { class: 'lockmark', html: ICON.lockA }));
       return body;
     }
     const lines = (n.text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    // 1.3.11: each line in the look it has in the note (store.js cardRuns; null = plain)
+    const runs = Array.isArray(n.runs) && n.runs.length === lines.length ? n.runs : null;
+    const words = (i) => (runs && Array.isArray(runs[i]) ? runs[i].map((r) => runSpan(r, n.font || 'hand')) : [lines[i]]);
     // 1.1.22: checklist lines get their box (ticked or not) like in the note; `checks` has one letter per line (main.js)
     const marks = typeof n.checks === 'string' ? n.checks : '';
     // 1.1.46: each line is its own row (`.ln`), so the card can tell how many fit (markMore)
     const line = (i, cls) => {
       const mk = marks[i]; const box = mk === 'o' || mk === 'x' ? h('span', { class: 'cb' + (mk === 'x' ? ' done' : ''), 'aria-hidden': 'true' }) : null;
-      const txt = box ? h('span', { class: 'ck' + (mk === 'x' ? ' done' : '') }, lines[i]) : lines[i];
-      return h('span', { class: 'ln' + (cls ? ` ${cls}` : '') }, box, txt);
+      const txt = box ? h('span', { class: 'ck' + (mk === 'x' ? ' done' : '') }, ...words(i)) : words(i);
+      return h('span', { class: 'ln' + (cls ? ` ${cls}` : '') }, box, ...[].concat(txt));
     };
     // A note that is just a picture or drawing gets the stand-in text "🖼️ Photo" / "✏️ Drawing" (for search and
     // the window title). The card already shows the picture, so it doesn't repeat that line.
     if (n.firstImage && lines.length === 1 && PICTURE_ONLY.includes(lines[0])) lines.length = 0;
     const total = lines.length ? Math.max(lines.length, n.lines || 0) : 0; // n.lines: the whole note (text is cut at 600 letters)
     body.dataset.lines = String(total);
+    // 1.3.13: a note zoomed out (Ctrl + wheel) shows its words smaller on its card too (never bigger: the card is a preview)
+    const z = Number(n.zoom); if (z > 0 && z < 1) body.style.setProperty('--nz', String(z));
     if (n.firstImage && !lines.length && !title) {
       // only a picture: it fills the card as before (1.1.22: a small one keeps its own size)
       body.append(h('img', { class: 'thumb wait only', src: n.firstImage, alt: '', draggable: 'false', onerror: (e) => e.target.remove(), onload: (e) => fitThumb(e.target) }));
@@ -114,7 +161,7 @@
       return body;
     }
     const rows = [];
-    if (title) rows.push(h('span', { class: 'ln t1 tt' }, title));
+    if (title) rows.push(h('span', { class: 'ln t1 tt', 'data-tfont': tfont }, title));
     lines.forEach((_, i) => rows.push(line(i, !title && i === 0 ? 't1' : '')));
     // 1.1.46: the picture sits where it is in the note, between the same lines. Further down than the words the list
     // gets (600 letters), it isn't shown at all; further down than the card shows, it is cut off like the words.
@@ -164,7 +211,8 @@
     // dragging one of several selected cards moves all of them
     const key = (item.kind === 'group' ? 'g:' : 'n:') + item.id;
     if (sel.size > 1 && sel.has(key)) {
-      V.drag.many = selItems().map((it) => ({ id: it.id, kind: it.kind }));
+      // 1.3.28: shut ones (isShut) stay where they are
+      V.drag.many = selItems().filter((it) => !isShut(it.kind, it.note || it.group)).map((it) => ({ id: it.id, kind: it.kind }));
       const chip = h('div', { class: 'dragchip' }, `${V.drag.many.length} selected`);
       document.body.append(chip);
       e.dataTransfer.setDragImage(chip, 20, 16);
@@ -199,9 +247,10 @@
   }
   // where a dragged thing currently lives
   const locationOf = (d) => (d.kind === 'group' ? (groupById(d.id)?.parentId || null) : (V.state.notes.find((n) => n.id === d.id)?.groupId || null));
-  // can the dragged thing move into group `gid` (null = top level)?
+  // can the dragged thing move into group `gid` (null = top level)? (1.3.28: never a shut one, nor into one)
+  const shutDrag = (d) => isShut(d.kind, d.kind === 'group' ? groupById(d.id) : noteById(d.id));
   function canMoveInto(d, gid) {
-    if (locationOf(d) === (gid || null)) return false;
+    if (locationOf(d) === (gid || null) || shutDrag(d) || (gid && isShut('group', groupById(gid)))) return false;
     if (d.kind === 'group' && gid && (gid === d.id || isInside(gid, d.id))) return false;
     return true;
   }
@@ -218,7 +267,8 @@
   }
 
   function noteCard(n, i, { inGroup = false } = {}) {
-    const acts = h('div', { class: 'acts' },
+    const shut = isShut('note', n); // 1.3.28: no buttons, no dragging; a click still opens it (its window asks for the PIN)
+    const acts = shut ? null : h('div', { class: 'acts' },
       n.open
         ? h('button', { class: 'act', title: 'Close this note (keeps it here)', html: ICON.hide, onclick: (e) => { e.stopPropagation(); S.list.closeNote(n.id); } })
         : h('button', { class: 'act', title: 'Open on desktop', html: ICON.open, onclick: (e) => { e.stopPropagation(); S.list.openNote(n.id); } }),
@@ -232,11 +282,11 @@
       n.forNow || n.openUnlocked ? h('span', { class: 'ulk', title: n.forNow ? 'Unlocked until CosmoNotes restarts' : 'Unlocked for now. It locks again when you close the note', html: ICON.unlock }) : null,
       acts);
     const card = h('div', {
-      class: 'card',
+      class: 'card' + (n.eve ? ' eve' : ''), // 1.3.27: evening colours
       'data-color': n.color,
       'data-font': n.font,
       'data-key': key,
-      draggable: 'true',
+      draggable: shut ? 'false' : 'true',
       style: `--r:${tilt(n.id)}deg; animation-delay:${Math.min(i, 12) * 18}ms`,
       title: n.open ? 'Click to bring to front · Ctrl+click to select · right-click for more' : 'Click to open · Ctrl+click to select · right-click for more',
       onclick: (e) => { if (pickCard(e, key)) return; S.list.openNote(n.id); },
@@ -245,7 +295,7 @@
     card.addEventListener('dragstart', (e) => startDrag(e, { id: n.id, kind: 'note' }, card));
     card.addEventListener('dragend', endDrag);
     dropTarget(card,
-      () => (V.drag.many ? !V.drag.many.some((x) => x.id === n.id) : V.drag.kind === 'note' && V.drag.id !== n.id),
+      () => !shut && (V.drag.many ? !V.drag.many.some((x) => x.id === n.id) : V.drag.kind === 'note' && V.drag.id !== n.id && !shutDrag(V.drag)),
       async (d) => {
         if (!d.many) return S.groups.make(d.id, n.id);
         await S.groups.makeFrom([n.id, ...d.many.map((x) => x.id)], n.groupId || null);
@@ -311,7 +361,7 @@
     const card = h('div', {
       class: `card group look-${g.style || 'stack'}${g.open ? '' : ' locked'}`,
       'data-key': key,
-      draggable: 'true',
+      draggable: isShut('group', g) ? 'false' : 'true',
       style: `--r:${tilt(g.id) * 0.5}deg; --gc:${GCOLORS[g.color] || GCOLORS.kraft}; animation-delay:${Math.min(i, 12) * 18}ms`,
       title: `${g.name || 'Group'} · ${plural(notes.length, 'note')}${subs ? ` · ${plural(subs, 'group')} inside` : ''}${g.locked ? ' · locked' : ''}\nClick to open · Ctrl+click to select · drop a note here to add it · right-click for more`,
       onclick: (e) => { if (pickCard(e, key)) return; openGroupView(g); },

@@ -27,11 +27,11 @@ const app = require('./helpers/app');
   E.__perm(null, 'media', (v) => { perm = v; }, { mediaTypes: ['video'] }); assert.equal(perm, false, 'no camera');
   E.__perm(null, 'geolocation', (v) => { perm = v; }, {}); assert.equal(perm, false);
 
-  // ---- extra windows: a note may open its four toolbar / pop-up windows, nothing else
+  // ---- extra windows: a note may open its five toolbar / pop-up windows, nothing else
   const open = w.webContents.openHandler;
   assert.equal(open({ url: 'https://example.com', frameName: '' }).action, 'deny', 'other windows stay blocked');
   assert.equal(open({ url: 'about:blank', frameName: 'other' }).action, 'deny');
-  const bars = { cosmoInkBar: { focusable: false }, cosmoTextBar: { focusable: false, title: 'Text' }, cosmoMenuBar: { focusable: true, title: 'Note settings' }, cosmoFxBar: { focusable: false } };
+  const bars = { cosmoInkBar: { focusable: false }, cosmoTextBar: { focusable: false, title: 'Text' }, cosmoMenuBar: { focusable: true, title: 'Note settings' }, cosmoFxBar: { focusable: false }, cosmoCkBar: { focusable: false, title: 'Checklists' } };
   for (const [frameName, want] of Object.entries(bars)) {
     const r = open({ url: 'about:blank', frameName });
     assert.equal(r.action, 'allow', `${frameName} may open`);

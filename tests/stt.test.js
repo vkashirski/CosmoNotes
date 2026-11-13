@@ -2,10 +2,12 @@
 // Voice to text (1.3.1): main's side with a stub engine (the test answers the engine window's messages), and the
 // engine's plain logic (src/engine/engine-core.mjs) under Node. Speak to text: audio waits while the model loads, the
 // text goes only to its own window, Stop finishes, one at a time, closing or locking ends it (nothing more is sent);
-// Transcribe: only a clip of this note, closing ends it; which model (fallback when Best isn't there), live or after
-// Stop (the quick check, Test my computer); cosmomodel:// serves only its fixed list (no "..", no unknown names) with
-// COOP/COEP and a strict CSP, the engine's session allows nothing and blocks the internet; the Best download checks
-// every hash against a local server, leaves no .part, Cancel leaves nothing, Remove; .part files left at start go.
+// Transcribe: only a clip of this note, closing ends it; one model (1.3.4): not downloaded = nothing starts, live on the
+// graphics card, after Stop on the processor, a model that doesn't start = an error (no other model); the old model
+// choice and Test my computer's results leave settings.json; cosmomodel:// serves only its fixed list (no "..", no
+// unknown names) with COOP/COEP and a strict CSP, the engine's session allows nothing and blocks the internet; the
+// download checks every hash against a local server, leaves no .part, Cancel leaves nothing, Remove; .part files left
+// at start go.
 // Recording side (clip kept or deleted, the marker, Undo, the Replace pop-up): note-ui.test.js.
 const assert = require('assert');
 const crypto = require('crypto');
@@ -19,7 +21,7 @@ const ROOT = app.ROOT;
 const tmp = fs.mkdtempSync(path.join(require('os').tmpdir(), 'cosmo-stt-'));
 
 // ---- the stub engine: whatever window loads cosmomodel://engine/ gets these answers
-const eng = { msgs: [], speed: 10, webgpu: false, failLoad: null, text: 'Hello there.', finals: ['Hello there.'], hold: null, wins: [] };
+const eng = { msgs: [], webgpu: false, failLoad: null, text: 'Hello there.', finals: ['Hello there.'], hold: null, wins: [] };
 const E0 = app.E;
 const load0 = E0.BrowserWindow.prototype.loadURL;
 E0.BrowserWindow.prototype.loadURL = function (u) {
@@ -39,7 +41,6 @@ E0.BrowserWindow.prototype.loadURL = function (u) {
     const event = (e) => reply({ type: 'event', jobId: m.jobId, e });
     if (m.type === 'probe') ok({ isolated: true, webgpu: eng.webgpu });
     else if (m.type === 'load') { if (eng.failLoad && m.modelId === eng.failLoad) fail('WebGPU broke'); else ok({ loadMs: 1 }); }
-    else if (m.type === 'speed') ok({ speed: eng.speed });
     else if (m.type === 'live-start') ok(true);
     else if (m.type === 'live-stop') { for (const t of eng.finals) event({ type: 'final', text: t }); event({ type: 'done' }); setTimeout(() => ok({ failed: false }), 5); }
     else if (m.type === 'transcribe') {
@@ -53,24 +54,30 @@ E0.BrowserWindow.prototype.loadURL = function (u) {
 const sent = (type) => eng.msgs.filter((m) => m.type === type);
 const until = async (fn, what) => { for (let i = 0; i < 400; i++) { if (fn()) return; await app.tick(5); } throw new Error('waited too long for ' + what); };
 
-// ---- a Standard model "on this PC": files of the right sizes (only sizes are checked when it loads)
+// ---- the model "on this PC": files of the right sizes (only sizes are checked when it loads) and its ready.json
 const models = require('../main/stt-models');
-const STD = models.findModel('moonshine-base');
-const BEST = models.findModel('whisper-small-en');
-const builtIn = path.join(tmp, 'models');
-for (const x of models.filesOf(STD, STD.runs[0])) {
-  const p = path.join(builtIn, STD.id, ...x.path.split('/'));
-  fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, '');
-  fs.truncateSync(p, x.size); // sparse
+const BEST = models.findModel(models.MODEL);
+assert.equal(BEST.id, 'whisper-small-en', 'one model: Whisper small.en');
+assert.equal(models.MODELS.length, 1, 'no Standard (Moonshine) any more');
+function fakeInstall(runName) {
+  const dir = path.join(app.DATA, 'models', BEST.id);
+  fs.rmSync(dir, { recursive: true, force: true });
+  for (const x of models.filesOf(BEST, models.runOf(BEST, runName))) {
+    const p = path.join(dir, ...x.path.split('/'));
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, '');
+    fs.truncateSync(p, x.size); // sparse
+  }
+  fs.writeFileSync(path.join(dir, 'ready.json'), JSON.stringify({ run: runName }));
 }
-models.setBuiltInDir(builtIn);
+// settings from 1.3.1–1.3.3: the model choice and Test my computer's results
+fs.mkdirSync(app.DATA, { recursive: true });
+fs.writeFileSync(path.join(app.DATA, 'settings.json'), JSON.stringify({ sttModel: 'moonshine-base', sttTests: { 'moonshine-base/cpu': { speed: 3, verdict: 'live' } } }));
 
 (async () => {
   // ---------------------------------------------------------------- the engine's logic under plain Node
   const core = await import(pathToFileURL(path.join(ROOT, 'src', 'engine', 'engine-core.mjs')).href);
   assert.equal(core.cleanText('  [BLANK_AUDIO] Hello (music) <|en|> there.  '), 'Hello there.', 'tags dropped, spaces trimmed');
-  assert.deepEqual([core.verdictOf(21), core.verdictOf(2), core.verdictOf(1.2), core.verdictOf(0.3), core.verdictOf(0)], ['live', 'live', 'after', 'slow', null], 'Live ≥ 2×, After you stop 0.5–2×, Too slow < 0.5×');
   {
     // a live session: voice, a pause, voice, Stop. Live: drafts + one final per piece. After Stop (live: false): no
     // drafts, all the text at the end.
@@ -110,24 +117,28 @@ models.setBuiltInDir(builtIn);
   const { S } = require('../main/state');
   const engine = require('../main/stt-engine');
   const dl = require('../main/stt-download');
+  const set0 = app.readJSON('settings.json');
+  assert.ok(!('sttModel' in set0) && !('sttTests' in set0), 'the old model choice and test results are gone from settings.json');
 
   // ---- cosmomodel://engine/: a fixed list
   const R = (u) => engine.route(u);
   assert.ok(R('cosmomodel://engine/').page && R('cosmomodel://engine/index.html').page, 'the page');
-  for (const f of ['engine.mjs', 'engine-core.mjs', 'test-clip.wav']) assert.ok(fs.existsSync(R(`cosmomodel://engine/${f}`).file), f);
+  for (const f of ['engine.mjs', 'engine-core.mjs']) assert.ok(fs.existsSync(R(`cosmomodel://engine/${f}`).file), f);
   for (const f of engine.LIB_FILES) assert.ok(fs.existsSync(R(`cosmomodel://engine/lib/${f}`).file), `lib/${f}`);
   const libOnDisk = [];
   const walk = (d, pre) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { if (e.isDirectory()) walk(path.join(d, e.name), pre + e.name + '/'); else libOnDisk.push(pre + e.name); } };
   walk(path.join(ROOT, 'src', 'engine', 'lib'), '');
   assert.deepEqual(libOnDisk.filter((f) => !/^(README|LICENSES)/.test(f)).sort(), [...engine.LIB_FILES].sort(), 'src/engine/lib/ holds exactly the served files (+ README, LICENSES)');
-  assert.ok(R('cosmomodel://engine/models/moonshine-base/onnx/encoder_model_quantized.onnx').file, 'a file of the installed model');
+  assert.equal(R('cosmomodel://engine/models/whisper-small-en/config.json'), null, 'not downloaded: nothing to serve');
+  fakeInstall('gpu');
+  assert.ok(R('cosmomodel://engine/models/whisper-small-en/onnx/encoder_model.onnx').file, 'a file of the installed model');
   for (const bad of [
     'cosmomodel://engine/lib/../main.js', 'cosmomodel://engine/lib/%2e%2e/%2e%2e/main.js', 'cosmomodel://engine/lib/x.js',
-    'cosmomodel://engine/models/moonshine-base/../../../settings.json', 'cosmomodel://engine/models/moonshine-base/%2e%2e%2fconfig.json',
-    'cosmomodel://engine/models/moonshine-base/onnx/encoder_model.onnx', // a file of the model, but not of the installed set
-    'cosmomodel://engine/models/whisper-small-en/config.json', // not downloaded
+    'cosmomodel://engine/models/whisper-small-en/../../../settings.json', 'cosmomodel://engine/models/whisper-small-en/%2e%2e%2fconfig.json',
+    'cosmomodel://engine/models/whisper-small-en/onnx/encoder_model_int8.onnx', // a file of the model, but not of the installed set
+    'cosmomodel://engine/models/moonshine-base/config.json', 'cosmomodel://engine/test-clip.wav', // gone in 1.3.4
     'cosmomodel://engine/models/nope/config.json', 'cosmomodel://other/engine.js', 'cosmomodel://engine/engine.mjs?x=1',
-    'cosmomodel://engine/preload.js', 'cosmomodel://engine/lib\\transformers.web.js', 'stickyfile://att/x.png', 'cosmomodel://engine/models/moonshine-base/config.json%00',
+    'cosmomodel://engine/preload.js', 'cosmomodel://engine/lib\\transformers.web.js', 'stickyfile://att/x.png', 'cosmomodel://engine/models/whisper-small-en/config.json%00',
   ]) assert.equal(R(bad), null, `refused: ${bad}`);
   {
     const res = await engine.handle({ url: 'cosmomodel://engine/', method: 'GET' });
@@ -162,13 +173,12 @@ models.setBuiltInDir(builtIn);
   assert.ok(ew && ew.o.show === false && ew.o.webPreferences.sandbox && ew.o.webPreferences.contextIsolation && !ew.o.webPreferences.nodeIntegration, 'a hidden, sandboxed engine window');
   assert.ok(ew.o.webPreferences.preload.endsWith(path.join('src', 'engine', 'preload.js')), 'with its own small preload');
   const ld = sent('load')[0];
-  assert.deepEqual([ld.modelId, ld.device, ld.dtype], ['moonshine-base', 'wasm', 'q8'], 'Standard: Moonshine Base q8 on the processor');
-  assert.equal(sent('speed')[0].seconds, 2, 'never measured: the quiet 2-second check');
-  assert.equal(app.readJSON('settings.json').sttTests['moonshine-base/cpu'].verdict, 'live', '…saved');
+  assert.deepEqual([ld.modelId, ld.device], ['whisper-small-en', 'webgpu'], 'Whisper small.en on the graphics card');
+  assert.equal(sent('speed').length, 0, 'no speed check (Test my computer is gone)');
   assert.equal(sent('live-start')[0].live, true);
   await until(() => sent('audio').length === 2, 'queued audio');
   assert.ok(sent('audio').every((m) => m.jobId === s1.jobId), 'the audio that came while it loaded went on, in order');
-  assert.equal(stt(wa).find((e) => e.type === 'ready').mode, 'live');
+  assert.equal(stt(wa).find((e) => e.type === 'ready').mode, 'live', 'graphics card: live text');
   // the engine's session: no permissions, no internet
   const P = E.__partitions['cosmonotes-stt'];
   assert.ok(P && P.protocols.cosmomodel, 'cosmomodel:// only on the engine\'s own session');
@@ -219,7 +229,7 @@ models.setBuiltInDir(builtIn);
   const c = await app.newNote({ html: `<div><span class="voice" data-src="${clip}"></span></div>` });
   const wc = app.winOf(c);
   const t1 = await H['stt:transcribe'](ev(wc), clip, 'tr-1');
-  assert.deepEqual(t1, { text: 'Hello there.', fallback: null }, 'the text comes back to the window (it puts it in)');
+  assert.deepEqual(t1, { text: 'Hello there.' }, 'the text comes back to the window (it puts it in)');
   const tm = sent('transcribe').pop();
   assert.equal(Buffer.from(tm.bytes).toString(), 'fake webm', 'main read the clip and sent its bytes');
   assert.ok(app.sent(wc, 'stt:event').some((e) => e.jobId === 'tr-1' && e.type === 'progress' && e.pct === 50), 'progress');
@@ -235,27 +245,42 @@ models.setBuiltInDir(builtIn);
   assert.deepEqual(await p4, { cancelled: true }, 'closed: cancelled');
   assert.ok(sent('cancel').some((m) => m.jobId === 'tr-4'), 'the engine was told');
 
-  // ---- which model: Best picked but not downloaded → Standard, and the window is told
-  await H['stt:use']({}, BEST.id);
-  assert.equal(app.readJSON('settings.json').sttModel, BEST.id);
+  // ---- the processor's set: the words appear when you stop
+  fakeInstall('cpu');
   const d = await app.newNote({ html: '<div>d</div>' });
   const wd = app.winOf(d);
-  const s5 = await H['stt:start'](ev(wd));
-  await until(() => app.sent(wd, 'stt:event').some((e) => e.type === 'ready'), 'ready 5');
-  assert.equal(app.sent(wd, 'stt:event').find((e) => e.type === 'ready').fallback, 'missing', '"This model isn\'t downloaded yet."');
-  await H['stt:cancel'](ev(wd), s5.jobId);
-  // a slow PC: Test my computer said "after you stop"
-  eng.speed = 1.1;
-  const t = await H['stt:test']({});
-  assert.equal(t.models[0].test.verdict, 'after', 'Test my computer: After you stop');
-  assert.equal(sent('speed').pop().seconds, 0, 'the whole clip');
-  assert.equal(app.readJSON('settings.json').sttTests['moonshine-base/cpu'].quick, false);
   const s6 = await H['stt:start'](ev(wd));
   await until(() => app.sent(wd, 'stt:event').some((e) => e.type === 'ready' && e.jobId === s6.jobId), 'ready 6');
-  assert.equal(app.sent(wd, 'stt:event').find((e) => e.jobId === s6.jobId).mode, 'after', 'the words appear when you stop');
-  assert.equal(sent('live-start').pop().live, false);
-  assert.deepEqual(await H['stt:test']({}).then((r) => r.error), 'busy', 'no test while a job runs');
+  assert.equal(app.sent(wd, 'stt:event').find((e) => e.jobId === s6.jobId).mode, 'after', 'processor: the words appear when you stop');
+  assert.deepEqual([sent('load').pop().device, sent('live-start').pop().live], ['wasm', false]);
+  assert.equal(app.sent(wd, 'stt:event').find((e) => e.jobId === s6.jobId).auto, true, 'picked by the PC (the window says why)');
   await H['stt:cancel'](ev(wd), s6.jobId);
+  // Settings → "Words appear": the person's pick wins over the PC's
+  { const r0 = await H['stt:status'](); assert.deepEqual([r0.when, r0.whenSet], ['stop', false], 'not set: by the PC (processor = when you stop)'); }
+  assert.equal((await H['stt:when']({}, 'live')).when, 'live');
+  await H['stt:when']({}, 'nonsense');
+  assert.equal(app.readJSON('settings.json').sttWhen, 'live', 'saved; a wrong value is ignored');
+  const s6b = await H['stt:start'](ev(wd));
+  await until(() => app.sent(wd, 'stt:event').some((e) => e.type === 'ready' && e.jobId === s6b.jobId), 'ready 6b');
+  const r6b = app.sent(wd, 'stt:event').find((e) => e.jobId === s6b.jobId);
+  assert.deepEqual([r6b.mode, r6b.auto, sent('live-start').pop().live], ['live', false, true], 'While you talk, on the processor too');
+  await H['stt:cancel'](ev(wd), s6b.jobId);
+  await H['stt:when']({}, 'stop');
+  const s6c = await H['stt:start'](ev(wd));
+  await until(() => app.sent(wd, 'stt:event').some((e) => e.type === 'ready' && e.jobId === s6c.jobId), 'ready 6c');
+  assert.equal(sent('live-start').pop().live, false, 'When you stop');
+  await H['stt:cancel'](ev(wd), s6c.jobId);
+  delete S.store.settings.sttWhen;
+
+  // ---- not downloaded: nothing starts, the window is told
+  fs.rmSync(path.join(app.DATA, 'models', BEST.id), { recursive: true, force: true });
+  const nJobs = sent('live-start').length;
+  assert.deepEqual(await H['stt:start'](ev(wd)), { error: 'nomodel' }, 'Speak to text: "isn\'t downloaded yet"');
+  const e0 = await app.newNote({ html: `<div><span class="voice" data-src="${clip}"></span></div>` });
+  assert.deepEqual(await H['stt:transcribe'](ev(app.winOf(e0)), clip, 'tr-5'), { error: 'nomodel' }, 'Transcribe too');
+  assert.equal(sent('live-start').length, nJobs, 'no job reached the engine');
+  assert.equal((await H['stt:status']()).model.state, 'none');
+  fakeInstall('cpu');
 
   // ---- the engine goes away mid-job: the window hears it
   const s7 = await H['stt:start'](ev(wd));
@@ -266,7 +291,7 @@ models.setBuiltInDir(builtIn);
   assert.ok(app.sent(wd, 'stt:event').some((e) => e.jobId === s7.jobId && e.type === 'error'), 'an engine crash: the window is told (it keeps the recording)');
   assert.ok(ew2.destroyed, 'the engine window is gone; the next use starts a new one');
 
-  // ---------------------------------------------------------------- the Best download, against a local server
+  // ---------------------------------------------------------------- the download, against a local server
   // (a small stand-in model: the same code, files with known hashes)
   const files = { 'config.json': '{"a":1}', 'tok.json': '{"t":2}', 'onnx/enc_gpu.onnx': 'GPU-ENC'.repeat(1000), 'onnx/enc_cpu.onnx': 'CPU-ENC'.repeat(900) };
   const meta = (p) => ({ path: p, size: Buffer.byteLength(files[p]), sha256: crypto.createHash('sha256').update(files[p]).digest('hex') });
@@ -287,12 +312,15 @@ models.setBuiltInDir(builtIn);
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   dl.setEndpoint(`http://127.0.0.1:${server.address().port}`);
+  if (engine.isOpen()) engine.close();
+  fs.rmSync(path.join(app.DATA, 'models', BEST.id), { recursive: true, force: true });
   const bestDir = path.join(DATA(), 'models', BEST.id);
-  const statusOf = async () => (await H['stt:status']()).models.find((m) => m.id === BEST.id);
+  const statusOf = async () => (await H['stt:status']()).model;
   const waitState = async (want) => { let s; for (let i = 0; i < 400; i++) { s = await statusOf(); if (s.state === want) return s; await app.tick(5); } throw new Error(`download never got to ${want}: ${JSON.stringify(s)} served ${served.join(" ")}`); };
   const parts = () => { const out = []; const w = (x) => { if (!fs.existsSync(x)) return; for (const e of fs.readdirSync(x, { withFileTypes: true })) { if (e.isDirectory()) w(path.join(x, e.name)); else if (/\.(part|tmp)$/.test(e.name)) out.push(e.name); } }; w(bestDir); return out; };
 
   assert.equal((await statusOf()).state, 'none');
+  assert.equal((await statusOf()).url, 'https://huggingface.co/onnx-community/whisper-small.en', 'the model\'s page, for Settings');
   // a wrong file: the download stops, nothing half-written stays, the good files are kept for Try again
   breakFile = 'tok.json';
   await H['stt:download']({}, BEST.id);
@@ -310,16 +338,16 @@ models.setBuiltInDir(builtIn);
   assert.equal(ready.device, 'cpu');
   assert.ok(served.every((u) => u.includes('/resolve/482fb8ba081b6e906f92efe103622316b2a0cc69/')), 'always the fixed commit');
   assert.ok(R(`cosmomodel://engine/models/${BEST.id}/onnx/enc_cpu.onnx`).file && !R(`cosmomodel://engine/models/${BEST.id}/onnx/enc_gpu.onnx`), 'the engine may read the downloaded set only');
-  // it is used now (Best picked); a graphics card that fails falls back to Standard, and Settings says so
+  // it is used now
   const s8 = await H['stt:start'](ev(wd));
   await until(() => app.sent(wd, 'stt:event').some((e) => e.type === 'ready' && e.jobId === s8.jobId), 'ready 8');
-  assert.equal(sent('load').pop().modelId, BEST.id, 'Best is used');
+  assert.equal(sent('load').pop().modelId, BEST.id, 'the downloaded model is used');
   await H['stt:cancel'](ev(wd), s8.jobId);
-  // Remove: the folder goes, Standard is picked again
+  // Remove: the folder goes, and voice to text says it isn't downloaded
   const rm = await H['stt:remove']({}, BEST.id);
-  assert.equal(rm.models.find((m) => m.id === BEST.id).state, 'none');
-  assert.ok(!fs.existsSync(bestDir) && rm.selected === STD.id, 'removed; Standard picked');
-  assert.equal((await H['stt:remove']({}, STD.id)).models[0].state, 'ready', 'the built-in model can\'t be removed');
+  assert.equal(rm.model.state, 'none');
+  assert.ok(!fs.existsSync(bestDir), 'removed');
+  assert.deepEqual(await H['stt:start'](ev(wd)), { error: 'nomodel' }, 'removed: nothing starts');
   // with WebGPU: the graphics card's set; Cancel leaves nothing behind
   eng.webgpu = true;
   slow = true;
@@ -333,15 +361,14 @@ models.setBuiltInDir(builtIn);
   await H['stt:download']({}, BEST.id);
   await waitState('ready');
   assert.equal(JSON.parse(fs.readFileSync(path.join(bestDir, 'ready.json'), 'utf8')).run, 'gpu', 'WebGPU works: the graphics card\'s set');
-  assert.equal((await statusOf()).device, 'gpu', '"Using: graphics card"');
-  await H['stt:use']({}, BEST.id);
+  assert.equal((await statusOf()).device, 'gpu', '"Runs on the graphics card"');
+  // a model that doesn't start: an error for the window (it keeps the recording), and Settings says so
   eng.failLoad = BEST.id;
   const s9 = await H['stt:start'](ev(wd));
-  await until(() => app.sent(wd, 'stt:event').some((e) => e.type === 'ready' && e.jobId === s9.jobId), 'ready 9');
-  assert.equal(app.sent(wd, 'stt:event').find((e) => e.type === 'ready' && e.jobId === s9.jobId).fallback, 'failed', 'Best didn\'t start: Standard instead');
-  assert.equal(sent('load').pop().modelId, STD.id);
+  await until(() => app.sent(wd, 'stt:event').some((e) => e.type === 'error' && e.jobId === s9.jobId), 'error 9');
+  assert.ok(!app.sent(wd, 'stt:event').some((e) => e.type === 'ready' && e.jobId === s9.jobId), 'no other model instead');
   assert.ok((await H['stt:status']()).startError, 'Settings says so');
-  await H['stt:cancel'](ev(wd), s9.jobId);
+  eng.failLoad = null;
   // a .part left by a quit mid-download goes at the next start
   fs.writeFileSync(path.join(bestDir, 'onnx', 'x.onnx.part'), 'half');
   dl.cleanParts(path.join(DATA(), 'models'));

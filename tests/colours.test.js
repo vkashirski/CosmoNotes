@@ -40,11 +40,11 @@ const app = require('./helpers/app');
   assert.ok(app.sent(w, 'note:look').some((x) => x.color === 'night'));
   assert.equal(w.bg, '#2F2D35', 'window background follows');
   assert.equal(await H['list:edit'](null, id, { color: 'neon' }), null, 'nothing valid: nothing changes');
-  // a locked note: its colour can still change (and its title while locked: crypt.test.js)
+  // a locked note: neither its colour nor its titles change while it is locked (1.3.28, the owner's wish; more in locks.test.js)
   await H['lock:set'](null, { current: '', next: '2468', kind: 'pin' });
   await H['list:set-locked'](null, id, true);
-  await H['list:edit'](null, id, { color: 'plum', title: 'Still mine' });
-  assert.equal((await app.card(id)).color, 'plum'); assert.equal((await app.card(id)).title, 'Still mine');
+  assert.equal(await H['list:edit'](null, id, { color: 'plum', title: 'Still mine' }), null);
+  assert.equal((await app.card(id)).color, 'night'); assert.equal((await app.card(id)).title, '', 'nothing changed');
   await H['list:set-locked'](null, id, false, '2468');
 
   // ---- new notes: a random one of the picked colours

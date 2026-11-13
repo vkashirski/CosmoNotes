@@ -102,7 +102,7 @@
 .ehead { display: flex; align-items: center; justify-content: space-between; }
 .ehead h3 { margin: 0; font: 700 25px/1.1 var(--hand); color: var(--ink); }
 .epaper {
-  --paper: #FFF4A3; --bar: #FBE278; --accent: #7A5C00; --cink: #3B3220; /* yellow, like .card */
+  --d-paper: #FFF4A3; --d-bar: #FBE278; --d-accent: #7A5C00; --d-cink: #3B3220; /* yellow, like .card (1.3.27: its day colours) */
   padding: 9px 12px;
   border-radius: 3px 3px 3px 14px;
   background: var(--paper); color: var(--cink);
@@ -115,6 +115,17 @@
   font: 800 15px var(--ui);
 }
 .etitle::placeholder { color: inherit; opacity: .45; font-weight: 700; }
+/* 1.3.11: the preview's title in the Title font picked (round = the default above); read-only on a locked card */
+.etitle[data-tfont="hand"] { font: 700 21px/20px var(--hand); }
+.etitle[data-tfont="medieval"] { font: 400 17px/20px var(--med); }
+.etitle[data-tfont="hand"]::placeholder, .etitle[data-tfont="medieval"]::placeholder { font-weight: inherit; }
+.etitle[readonly] { cursor: default; }
+.minput[data-tfont="hand"] { font: 700 19px/1 var(--hand); }
+.minput[data-tfont="medieval"] { font: 400 15px/1 var(--med); }
+/* 1.3.11: Title while locked + Title font, between the title and the tabs */
+.etrows { flex: none; }
+.etrows .ecover { margin-bottom: 6px; }
+.etrows .minput { height: 40px; padding-top: 0; padding-bottom: 0; } /* 1.3.12: the same height in every font: nothing below it moves */
 .ecover { display: block; margin-bottom: 8px; }
 .ecover[hidden] { display: none; }
 .ecover .minput { width: 100%; margin: 4px 0 0; box-sizing: border-box; }

@@ -6,6 +6,12 @@ body.rolled #fxCanvas { display: none; }
 #btnFx.off { opacity: .45; } /* paused */
 #btnFx.off svg { stroke-dasharray: 2 2.2; }
 @media (max-width: 279px) { #btnFx { display: none; } }
+/* 1.3.27: the panic button: like the other top-bar buttons, red when pointed at so it reads as "hide everything" */
+#btnPanic:hover, #btnPanic:focus-visible { opacity: 1; color: #fff; background: #E5484D; }
+/* with it, a narrow note has no room for every button: Maximise goes (double-clicking the top bar still maximises) */
+@media (max-width: 250px) { #bar:has(#btnPanic:not([hidden])) #btnMax, #bar:has(#btnCt:not([hidden])) #btnMax { display: none; } }
+/* 1.3.34: with the click-through button too, the narrowest notes lose Minimise as well */
+@media (max-width: 224px) { #bar:has(#btnPanic:not([hidden])):has(#btnCt:not([hidden])) #btnMin { display: none; } }
 .mi .mival { margin-left: auto; padding-left: 8px; font: 700 11.5px var(--ui); color: var(--pop-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
 #fxPop > .ix { top: 8px; right: 8px; }
 .fxsub { margin: 10px 2px 6px; font: 800 12px var(--ui); color: var(--pop-ink); }
@@ -182,14 +188,25 @@ body.inkbar-out #textPop.tbar {
 .fxi .nt, .fxi .nm small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 1.1.16: the ⋯ menu and Effects pop-up have the same top bar as the toolbars: a grip to drag them (also out of
    the note) and the X at the top right */
-#menu > .igrip, #fxPop > .igrip { height: 18px; margin: -4px 24px 4px; }
-#menu > .ix, #fxPop > .ix { top: 4px; right: 5px; }
-#menu > .igrip + h4, #fxPop > .igrip + h4 { margin-top: 0; }
+#menu > .igrip, #fxPop > .igrip, #ckPop > .igrip { height: 18px; margin: -4px 24px 4px; }
+#menu > .ix, #fxPop > .ix, #ckPop > .ix { top: 4px; right: 5px; }
+#menu > .igrip + h4, #fxPop > .igrip + h4, #ckPop > .igrip + h4 { margin-top: 0; }
 #fxPop .fxtabs { margin-right: 0; }
 /* outside the note, in their own windows */
-body.inkbar-out #menu, body.inkbar-out #fxPop {
+body.inkbar-out #menu, body.inkbar-out #fxPop, body.inkbar-out #ckPop {
   position: absolute; left: 12px !important; top: 8px !important; right: auto !important; bottom: auto !important;
   max-height: none !important; overflow: visible; animation: none;
   box-shadow: 0 4px 12px rgba(60,40,10,.26), 0 1px 3px rgba(0,0,0,.12);
 }
-
+/* 1.3.21: this note's checklists, a pop-up of its own (⋯ → Checklists…), placed like the Effects pop-up (src/note/checklists.js) */
+#ckPop { left: auto; right: 4px; top: 34px; width: clamp(260px, 78vw, calc(100vw - 8px)); max-width: 300px; max-height: min(calc(100vh - 42px), 440px); }
+#ckPop .switches { grid-template-columns: minmax(0, 1fr) auto; } /* the words take the room, the switch keeps its size */
+#ckPop .ckopt { padding: 5px 2px; }
+#ckPop .ckopt b { font-weight: 700; }
+#ckPop .ckopt small { display: block; margin-top: 1px; font: 700 11.5px/1.35 var(--ui); color: var(--pop-mute); }
+.cktag { display: inline-block; margin-right: 5px; padding: 0 6px; border-radius: 999px; background: var(--pop-soft); font: 800 10px/16px var(--ui); font-style: normal; color: var(--pop-ink2); vertical-align: 1px; }
+.cktag[hidden] { display: none; }
+.ckfoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--pop-soft2); font: 700 11.5px/1.35 var(--ui); color: var(--pop-mute); }
+#ckReset { border: 0; padding: 4px 7px; border-radius: 7px; background: transparent; color: var(--pop-ink); font: 800 11.5px var(--ui); cursor: pointer; }
+#ckReset:hover { background: var(--pop-soft); }
+#ckReset:disabled { opacity: .45; cursor: default; background: transparent; }

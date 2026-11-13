@@ -52,7 +52,7 @@ module.exports = async function openList(seedFn) {
   const fresh = async (before, now) => [...(await now())].find((x) => !before.has(x));
   const seed = {
     H, E,
-    // a note: { title, html, color, font, group, favorite, open }  →  its id
+    // a note: { title, html, color, font, titleFont, group, favorite, open }  →  its id
     async note(o = {}) {
       const before = await ids();
       await H['list:new']({}, o.group || null);
@@ -62,6 +62,7 @@ module.exports = async function openList(seedFn) {
       const patch = {}; if (o.title) patch.title = o.title; if (o.color) patch.color = o.color;
       if (Object.keys(patch).length) await H['list:edit']({}, id, patch);
       if (o.font) await H['list:apply']({}, [id], { font: o.font });
+      if (o.titleFont) await H['note:update']({ sender: w.webContents }, { titleFont: o.titleFont }); // 1.3.3
       if (o.favorite) await H['list:favorite']({}, [id], true);
       if (!o.open) await H['list:close-note']({}, id);
       return id;

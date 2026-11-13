@@ -1,10 +1,9 @@
 'use strict';
 // 1.3.1: voice to text. The models, as one fixed list: each one's files at a fixed Hugging Face commit, with their size
 // and sha256 (copied from the prototype's models.lock.json, Step 1). Changing models = editing this list only.
-// - Standard (Moonshine Base, q8 = the "_quantized" files) comes with the app: build.bat downloads it into build/models/
-//   (build/fetch-model.js checks every hash) and the installer packs it into resources/models/.
-// - Best (Whisper small.en) is downloaded on request into <data>/models/<id>/ (main/stt-download.js): the set for the
-//   graphics card when WebGPU works, else the processor's (int8). ready.json there says which set it is.
+// 1.3.4: one model, Whisper small.en (the built-in Moonshine "Standard" is gone, the owner's wish). Nothing comes with
+// the app: it is downloaded on request into <data>/models/<id>/ (main/stt-download.js): the set for the graphics card
+// when WebGPU works, else the processor's (int8). ready.json there says which set it is. The first entry is the one used.
 // Macedonian later: a multilingual Whisper is one more entry here (languages: ['mk']).
 const fs = require('fs');
 const path = require('path');
@@ -15,40 +14,10 @@ const f = (p, size, sha256) => ({ path: p, size, sha256 });
 
 const MODELS = [
   {
-    id: 'moonshine-base',
-    level: 'standard',
-    name: 'Standard',
-    family: 'moonshine',
-    languages: ['en'],
-    builtIn: true,
-    repo: 'onnx-community/moonshine-base-ONNX',
-    commit: 'b1e9b6aae3c3c7298f10c3798393fdf38e8fbbad',
-    common: [
-      f('config.json', 922, 'fab7241d1e9fc6c2370c4c6dfb5da79bb54d67ed9ab6b507ac51d29d2abe01d1'),
-      f('generation_config.json', 147, 'f9b3f711b57be7def2e50a8942f64f36ee0a55fad5b84ff93a687b6c5bcc1d44'),
-      f('preprocessor_config.json', 128, 'fa43a7017ef85cd1d0fba0d9aae77c8adb16990ae6f11115631f41ec5d8aa679'),
-      f('special_tokens_map.json', 3, 'ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356'),
-      f('tokenizer.json', 3761754, '7b913404bdd039af4756783218af4440bc07fb7d6d8258d677e34f95b3ec416f'),
-      f('tokenizer_config.json', 135735, 'edaee394565d428ea98a663ae7209cdcfeefc5585c42d7a570ff7c986df2cd15'),
-    ],
-    // Moonshine always runs on the processor: the graphics card made it no faster (prototype, Step 1)
-    runs: [{
-      name: 'cpu',
-      device: 'wasm',
-      dtype: 'q8',
-      files: [
-        f('onnx/encoder_model_quantized.onnx', 20513063, '1dd9ab0a7f987113d30affcba5a068d11c8f90fa0223caa3e491ade431ad9751'),
-        f('onnx/decoder_model_merged_quantized.onnx', 42498870, 'cc9f3cd6698a369c6008b41aa60aa3fb3322e7f03c9bdf19d8e6b7200afca4f3'),
-      ],
-    }],
-  },
-  {
     id: 'whisper-small-en',
-    level: 'best',
-    name: 'Best',
+    name: 'Whisper small.en',
     family: 'whisper',
     languages: ['en'],
-    builtIn: false,
     repo: 'onnx-community/whisper-small.en',
     commit: '482fb8ba081b6e906f92efe103622316b2a0cc69',
     common: [
@@ -88,12 +57,11 @@ const MODELS = [
     ],
   },
 ];
-const STANDARD = MODELS[0].id;
+const MODEL = MODELS[0].id; // the model voice to text uses
 
 // The engine page's library (src/engine/lib/, vendored from Transformers.js 4.3.1 and ONNX Runtime Web, see the README
 // there): the only files served under cosmomodel://engine/lib/. The import map in the engine page points at these.
 const LIB_DIR = path.join(__dirname, '..', 'src', 'engine', 'lib');
-const BUILD_DIR = path.join(__dirname, '..', 'build', 'models'); // build.bat puts Standard here (git-ignored)
 const ENGINE_DIR = path.join(__dirname, '..', 'src', 'engine');
 const IMPORT_MAP = {
   imports: {
@@ -108,28 +76,18 @@ const runOf = (m, name) => (m && m.runs.find((r) => r.name === name)) || null;
 const filesOf = (m, run) => [...m.common, ...run.files];
 const bytesOf = (m, run) => filesOf(m, run).reduce((n, x) => n + x.size, 0);
 
-// where the models are (a test can point these somewhere else)
-let builtInRoot = null;
-function builtInDir() {
-  if (builtInRoot) return builtInRoot;
-  const { app } = require('electron'); // here, not at the top: build/fetch-model.js reads this list under plain Node
-  return app.isPackaged ? path.join(process.resourcesPath, 'models') : BUILD_DIR;
-}
+// where the models are
 const userDir = () => path.join(S.store.root, 'models');
-const dirOf = (m) => path.join(m.builtIn ? builtInDir() : userDir(), m.id);
-function setBuiltInDir(d) { builtInRoot = d; }
+const dirOf = (m) => path.join(userDir(), m.id);
 
 const sizeOk = (p, size) => { try { const st = fs.statSync(p); return st.isFile() && st.size === size; } catch { return false; } };
 
 // The run of a model that is on this PC (its files there, with the right sizes), or null.
-// Sizes only: hashes are checked when a file is downloaded (and by build/fetch-model.js).
+// Sizes only: hashes are checked when a file is downloaded.
 function installed(m) {
   if (!m) return null;
   let run = null;
-  if (m.builtIn) run = m.runs[0];
-  else {
-    try { run = runOf(m, JSON.parse(fs.readFileSync(path.join(dirOf(m), 'ready.json'), 'utf8')).run); } catch { run = null; }
-  }
+  try { run = runOf(m, JSON.parse(fs.readFileSync(path.join(dirOf(m), 'ready.json'), 'utf8')).run); } catch { run = null; }
   if (!run) return null;
   const dir = dirOf(m);
   return filesOf(m, run).every((x) => sizeOk(path.join(dir, ...x.path.split('/')), x.size)) ? run : null;
@@ -143,4 +101,4 @@ function modelFile(id, rel) {
   return path.join(dirOf(m), ...rel.split('/'));
 }
 
-module.exports = { BUILD_DIR, ENGINE_DIR, HF, IMPORT_MAP, LIB_DIR, MODELS, STANDARD, builtInDir, bytesOf, dirOf, filesOf, findModel, installed, modelFile, runOf, setBuiltInDir, userDir };
+module.exports = { ENGINE_DIR, HF, IMPORT_MAP, LIB_DIR, MODEL, MODELS, bytesOf, dirOf, filesOf, findModel, installed, modelFile, runOf, userDir };

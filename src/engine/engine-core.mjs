@@ -281,9 +281,3 @@ export class LiveSession {
     return { ...s, failed: !!this.failed, speed: s.workSec ? s.audioSec / s.workSec : null, draftSpeed: s.draftWorkSec ? s.draftAudioSec / s.draftWorkSec : null };
   }
 }
-
-// Test my computer (1.3.1): the speed (× real time) says how a model can be used on this PC.
-export function verdictOf(speed) {
-  if (!(speed > 0)) return null;
-  return speed >= 2 ? 'live' : speed >= 0.5 ? 'after' : 'slow';
-}

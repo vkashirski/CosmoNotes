@@ -6,7 +6,7 @@
   const { V, S, $, $$, SIZES, SIZE_NAMES, sizeNow, ICON, cardsTabNow, sel, load, groupById, sortPrefs, render,
     dropTarget, canMove, moveInto, visibleKeys, clearSel, paintCards, bulkTrash, renderSettings, renderBackups,
     pickBackup, modal, toast, hideCtx, closeFxSheet, closeEdit, emptyBin, NEW_INPUTS, checkNew, savedLock, closePanel,
-    showKeyIfNeeded } = K;
+    showKeyIfNeeded, clearSettingsSearch } = K;
   // ================================================================ events
   // Settings is a toggle: clicking it while it's open goes back to Notes or Bin, whichever was open before
   function setTab(v) {
@@ -131,12 +131,25 @@
   $('#sStartup').addEventListener('change', (e) => S.settings.set({ startWithWindows: e.target.checked }));
   $('#sSpell').addEventListener('change', (e) => S.settings.set({ spellCheck: e.target.checked }));
   $('#sCyr').addEventListener('change', (e) => S.settings.set({ spellCyrillic: e.target.checked }));
+  for (const [id, key] of [['#sCheckDrag', 'checkDrag'], ['#sCheckSink', 'checkSink'], ['#sCheckFixed', 'checkFixed']]) { // 1.3.19
+    $(id).addEventListener('change', (e) => S.settings.set({ [key]: e.target.checked }));
+  }
   $$('#sFont button').forEach((b) => b.addEventListener('click', () => S.settings.set({ defaultFont: b.dataset.font })));
   // see-through for new notes: shown while dragging, saved when let go
   $('#sOpacity').addEventListener('input', (e) => { $('#sOpVal').textContent = `${e.target.value}%`; });
   $('#sOpacity').addEventListener('change', (e) => { V.state.settings.defaultOpacity = Number(e.target.value) / 100; S.settings.set({ defaultOpacity: Number(e.target.value) / 100 }); });
   $('#sSolidHover').addEventListener('change', (e) => S.settings.set({ defaultSolidOnHover: e.target.checked }));
   $('#sNoRepeat').addEventListener('change', (e) => S.settings.set({ newColorNoRepeat: e.target.checked }));
+  // 1.3.27: evening colours (times as minutes after midnight) and the panic button (its shortcut: list/settings-menus.js)
+  $('#sEve').addEventListener('change', (e) => S.settings.set({ eveOn: e.target.checked }));
+  for (const [id, key] of [['#sEveFrom', 'eveFrom'], ['#sEveTo', 'eveTo']]) {
+    $(id).addEventListener('change', (e) => {
+      const m = /^(\d{2}):(\d{2})/.exec(e.target.value);
+      if (m) S.settings.set({ [key]: Number(m[1]) * 60 + Number(m[2]) });
+    });
+  }
+  $('#sPanic').addEventListener('change', (e) => S.settings.set({ panicOn: e.target.checked }));
+  $('#sClickThrough').addEventListener('change', (e) => S.settings.set({ clickThroughOn: e.target.checked })); // 1.3.34
   // password or PIN: set / change in an app-styled pop-up
   $('#pwSave').addEventListener('click', async () => {
     const has = !!V.state.settings.hasPassword;
@@ -178,10 +191,13 @@
     if (!$('#editSheet').hidden) { if (e.key === 'Escape') { e.preventDefault(); closeEdit(); } return; }
     if (!$('#fxSheet').hidden) { if (e.key === 'Escape') { e.preventDefault(); closeFxSheet(); } return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); newNote(); }
+    // 1.3.30: the note closed last opens again, like a browser's closed tabs (also the tray's "Reopen closed note")
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 't') { e.preventDefault(); S.list.reopenClosed(); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
       e.preventDefault();
-      if (V.tab === 'settings') setTab('notes');
-      $(V.tab === 'bin' ? '#bq' : '#q').focus();
+      const box = $(V.tab === 'settings' ? '#sq' : V.tab === 'bin' ? '#bq' : '#q');
+      box.focus();
+      box.select();
     }
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
     const cardsTab = cardsTabNow();
@@ -199,6 +215,7 @@
       else if (!$('#sizePop').hidden) { $('#sizePop').hidden = true; $('#btnSize').classList.remove('on'); }
       else if (V.tab === 'bin' && V.binQuery) { clearBinSearch(); render(); }
       else if (cardsTab && V.query) { clearSearch(); render(); }
+      else if (V.tab === 'settings' && $('#sq').value) clearSettingsSearch();
       else if (!$('#groupPanel').hidden) closePanel();
       else if (V.tab === 'notes' && V.openGroup && document.activeElement !== $('#groupName')) { V.openGroup = upLevel(); render(true); }
     }

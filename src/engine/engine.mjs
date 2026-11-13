@@ -108,11 +108,6 @@ async function decode(bytes) {
   }
   return out;
 }
-async function clip() {
-  const r = await fetch('/test-clip.wav');
-  if (!r.ok) throw new Error(`test clip: ${r.status}`);
-  return decode(await r.arrayBuffer());
-}
 
 // Transcribe: the whole clip. Moonshine: pieces of at most 20 s cut at pauses (its cost grows with length).
 // Whisper: one call; Transformers.js windows it (chunk_length_s / stride_length_s).
@@ -128,23 +123,10 @@ async function transcribe({ jobId, bytes }) {
   return { text: joinTexts(texts), audioSec: pcm.length / RATE };
 }
 
-// How fast this model is on this PC (× real time): seconds of the bundled clip (all of it: Test my computer;
-// 2 s: the quiet check the first time a model is used).
-async function speed({ seconds }) {
-  const pcm = await clip();
-  const part = seconds ? pcm.subarray(0, Math.min(pcm.length, Math.round(seconds * RATE))) : pcm;
-  await asr(part.subarray(0, Math.min(part.length, RATE))); // the first call is always slow (warm-up)
-  const t0 = performance.now();
-  await asr(part);
-  const workSec = (performance.now() - t0) / 1000;
-  return { audioSec: part.length / RATE, workSec, speed: workSec > 0 ? part.length / RATE / workSec : null };
-}
-
 // ------------------------------------------------------------------ messages from main
 const handlers = {
   probe: () => probe(),
   load: (m) => load(m),
-  speed: (m) => speed(m),
   async transcribe(m) { try { return await transcribe(m); } finally { cancelled.delete(m.jobId); } },
   cancel(m) { cancelled.add(m.jobId); return true; },
   'live-start'(m) {

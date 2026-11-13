@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('sticky', {
   onSettings: (cb) => ipcRenderer.on('settings:changed', (e, s) => cb(s)),
   onLook: (cb) => ipcRenderer.on('note:look', (e, v) => cb(v)),
   onLockNow: (cb) => ipcRenderer.on('note:lock-now', () => cb()),
+  onEvening: (cb) => ipcRenderer.on('note:evening', (e, p) => cb(p)), // 1.3.27: how far into the evening it is (0 – 1)
+  panic: () => inv('panic:now'), // 1.3.27: the panic button in the top bar
   update: (patch) => inv('note:update', patch),
   updateSync: (patch) => ipcRenderer.sendSync('note:update-sync', patch),
   newNote: () => inv('note:new'),
@@ -24,6 +26,7 @@ contextBridge.exposeInMainWorld('sticky', {
   maximize: () => inv('note:maximize'),
   onWinState: (cb) => ipcRenderer.on('note:win-state', (e, s) => cb(s)),
   hover: (over) => ipcRenderer.send('note:hover', !!over),
+  ctAwake: (on) => ipcRenderer.send('note:ct-awake', !!on), // 1.3.34: the mouse is on the click-through button
   saveAttachment: (bytes, ext) => inv('att:save', bytes, ext),
   // 1.2.4: a voice recording is written to disk while it is made
   recStart: () => inv('rec:start'),
@@ -57,6 +60,8 @@ contextBridge.exposeInMainWorld('sticky', {
     duplicate: (id) => inv('list:duplicate', id),
     openNote: (id) => inv('list:open-note', id),
     closeNote: (id) => inv('list:close-note', id),
+    clickThroughOff: (id) => inv('list:click-through-off', id), // 1.3.34
+    reopenClosed: () => inv('list:reopen-closed'), // 1.3.30: Ctrl+Shift+T
     trash: (id) => inv('list:trash', id),
     restore: (id) => inv('list:restore', id),
     destroy: (id) => inv('list:destroy', id),
@@ -64,6 +69,7 @@ contextBridge.exposeInMainWorld('sticky', {
     bringToFront: () => inv('list:bring-front'),
     onChanged: (cb) => ipcRenderer.on('notes:changed', () => cb()),
     onNav: (cb) => ipcRenderer.on('list:nav', (e, dir) => cb(dir)), // mouse back / forward buttons
+    onEvening: (cb) => ipcRenderer.on('list:evening', (e, p) => cb(p)), // 1.3.27: evening colours on the cards
     setLocked: (id, locked, pw) => inv('list:set-locked', id, !!locked, pw),
     favorite: (ids, on) => inv('list:favorite', ids, !!on),
     apply: (ids, patch) => inv('list:apply', ids, patch),
@@ -88,7 +94,11 @@ contextBridge.exposeInMainWorld('sticky', {
     hide: (groupId) => inv('groups:hide', groupId),
     makeFrom: (ids, parentId) => inv('groups:make-from', ids, parentId || null),
   },
-  settings: { set: (patch) => inv('settings:set', patch) },
+  settings: {
+    set: (patch) => inv('settings:set', patch),
+    reapply: (keys) => inv('settings:reapply', keys), // 1.3.27: Use on all notes / Reset notes…
+    capturePanicKey: (on) => inv('panic:capture', !!on), // 1.3.27: while a new panic shortcut is being pressed
+  },
   // 1.1.30: encryption of locked notes (Settings → Locked notes)
   crypt: {
     takeKey: () => inv('crypt:take-key'),
@@ -109,11 +119,10 @@ contextBridge.exposeInMainWorld('sticky', {
   // 1.3.1: Settings → Voice to text
   stt: {
     status: () => inv('stt:status'),
-    use: (id) => inv('stt:use', id),
+    when: (v) => inv('stt:when', v),
     download: (id) => inv('stt:download', id),
     cancelDownload: (id) => inv('stt:download-cancel', id),
     remove: (id) => inv('stt:remove', id),
-    test: () => inv('stt:test'),
     onChanged: (cb) => ipcRenderer.on('stt:changed', (e, s) => cb(s)),
   },
 });

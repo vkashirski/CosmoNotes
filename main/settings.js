@@ -1,6 +1,7 @@
 'use strict';
 const { session } = require('electron');
-const { cleanFxOpacity } = require('../store');
+const { CHECK_OPTS, cleanFxOpacity } = require('../store');
+const { evePhase } = require('./evening');
 const { S, wins } = require('./state');
 
 function spellLanguages() {
@@ -15,7 +16,19 @@ function spellLanguages() {
 
 function noteSettings() {
   // appTheme (1.1.16): the notes list's colours; a note's pop-ups and toolbars use them too
-  return { spellCheck: !!S.store.settings.spellCheck, hasPassword: !!S.store.settings.lock, ...lockInfo(), ...fxSettings(), appTheme: S.store.settings.listTheme || 'cream' };
+  return { spellCheck: !!S.store.settings.spellCheck, hasPassword: !!S.store.settings.lock, ...lockInfo(), ...fxSettings(), ...checkSettings(), ...eveningAndPanic(), appTheme: S.store.settings.listTheme || 'cream' };
+}
+// 1.3.27: evening colours (on for notes that follow Settings, and how far into the evening it is now) and the panic button
+// (1.3.34: and the click-through button)
+function eveningAndPanic() {
+  const s = S.store.settings;
+  return { eveOn: !!s.eveOn, evePhase: evePhase(), panicOn: !!s.panicOn, panicKey: s.panicOn ? s.panicKey : '', clickThroughOn: !!s.clickThroughOn };
+}
+// 1.3.19: checklists in every note (Settings → Checklists): checkDrag, checkSink, checkFixed
+function checkSettings() {
+  const out = {};
+  for (const k of Object.values(CHECK_OPTS)) out[k] = !!S.store.settings[k];
+  return out;
 }
 // 1.1.16: effects for all notes (Settings → Effects), sent to every note window
 function fxSettings() {

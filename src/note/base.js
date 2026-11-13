@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 1 of 11: the colour row, saving, dates, look & settings, effects on the note
+// CosmoNotes note window, part 1 of 12: the colour row, saving, dates, look & settings, effects on the note
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   // K: the names the parts share. V: variables more than one part changes (V.note etc.). K.later('f'): a function a later part
@@ -9,7 +9,8 @@
   // defined in a later part:
   const paintFxPop = K.later('paintFxPop'), setFxPlaying = K.later('setFxPlaying'),
     applySpell = K.later('applySpell'), decorate = K.later('decorate'), applyZoom = K.later('applyZoom'),
-    applyLayout = K.later('applyLayout'), fitSideways = K.later('fitSideways'), stopRecordingNow = K.later('stopRecordingNow');
+    applyLayout = K.later('applyLayout'), fitSideways = K.later('fitSideways'), stopRecordingNow = K.later('stopRecordingNow'),
+    applyChecks = K.later('applyChecks'), joinLists = K.later('joinLists');
   const api = window.sticky;
   // 1.1.15: while the drawing toolbar is outside the note, it lives in its own little window (inkOut below);
   // $ and $$ look there too, so the code that paints and wires up the toolbar works the same either way.
@@ -19,6 +20,9 @@
   const $$ = (s) => { const all = [...document.querySelectorAll(s)]; for (const d of outDocs) all.push(...d.querySelectorAll(s)); return all; };
   const editor = $('#editor');
   const body = document.body;
+  // 1.3.27: evening colours (src/evening.js): each light paper's evening shade (--e-*), mixed in by --eve (note-base.css)
+  const EVE = window.COSMO_EVENING;
+  if (EVE) document.head.append(Object.assign(document.createElement('style'), { textContent: EVE.css('body') }));
 
   V.note = null;
   V.hidden = false; // locked note whose contents are not shown
@@ -26,6 +30,7 @@
   V.dirty = false;
   V.saveTimer = null;
   V.savedRange = null;
+  V.ctAwake = false; // 1.3.34: main was told the mouse is on the click-through button (panels.js)
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = (sec) => { sec = Math.max(0, Math.round(sec || 0)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
@@ -117,12 +122,14 @@
       if (t) t.textContent = fmt(+v.dataset.dur);
     });
     clone.querySelectorAll('.sel-img').forEach((i) => i.classList.remove('sel-img'));
+    clone.querySelectorAll('.cb-moving').forEach((li) => li.classList.remove('cb-moving')); // 1.3.19: a line being dragged
     clone.querySelectorAll('.stt-pending').forEach((m) => m.remove()); // 1.3.1: where voice to text's words go (src/note/speech.js)
     clone.querySelectorAll('.caret-near').forEach((i) => i.classList.remove('caret-near'));
     clone.querySelectorAll('.find-hit, .find-cur').forEach((i) => i.classList.remove('find-hit', 'find-cur'));
     // 1.1.22 (sixth round): the checkbox size / place measured for the screen (alignChecks) isn't saved
     clone.querySelectorAll('[style]').forEach((el) => { for (const v of K.CB_VARS) el.style.removeProperty(v); if (!el.getAttribute('style')) el.removeAttribute('style'); });
     clone.querySelectorAll('[class=""]').forEach((el) => el.removeAttribute('class'));
+    joinLists(clone); // 1.3.25: lists that touch are saved as one (content part)
     const img = clone.querySelector('img');
     let text = editor.innerText.replace(/ /g, ' ').replace(/\n{3,}/g, '\n\n').trim();
     if (!text) {
@@ -205,6 +212,7 @@
   function applyLook() {
     body.dataset.color = V.note.color;
     body.dataset.font = V.note.font;
+    body.dataset.tfont = V.note.titleFont || V.note.font; // 1.3.3: the title's own font, else the note's
     body.dataset.size = V.note.size;
     body.classList.toggle('rolled', !!V.note.rolled);
     body.classList.toggle('has-title', V.hidden ? !!(V.note.coverTitle && V.note.coverTitle.trim()) : !!(V.note.title && V.note.title.trim()));
@@ -220,9 +228,10 @@
     $('#miDelete').disabled = !!V.note.lockedBy;
     $('#miDeleteText').innerHTML = V.note.lockedBy ? 'Delete note <small>(remove the lock first)</small>' : 'Delete note <small>(goes to the bin)</small>';
     if (document.activeElement !== $('#titleInput')) $('#titleInput').value = V.note.title || '';
-    $('#coverRow').hidden = !V.note.lockedBy;
+    $('#coverRow').hidden = !V.note.lockedBy; // (1.3.28: the ⋯ menu doesn't open while the note is hidden: note-text.css)
     if (document.activeElement !== $('#coverInput')) $('#coverInput').value = V.note.coverTitle || '';
     applySpell();
+    applyChecks();
     applyZoom();
     applyLayout();
     showDates();
@@ -232,12 +241,56 @@
     $('#title').textContent = titleText();
     $$('#colors .sw').forEach((b) => b.classList.toggle('on', b.dataset.color === V.note.color));
     $$('#fontSeg button').forEach((b) => b.classList.toggle('on', b.dataset.font === V.note.font));
+    $$('#titleFontSeg button').forEach((b) => b.classList.toggle('on', b.dataset.tfont === (V.note.titleFont || V.note.font)));
     $$('#sizeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.size === V.note.size));
     const pct = Math.round(V.note.opacity * 100);
     $('#opacity').value = String(pct);
     $('#opVal').textContent = pct === 100 ? 'Solid' : `${pct}%`;
     $('#solidHover').checked = !!V.note.solidOnHover;
+    applyEvening();
+    applyPanic();
+    applyClickThrough();
     applyFx();
+  }
+
+  // ================================================================ evening colours and the panic button (1.3.27)
+  // Both are Settings that a note can choose for itself: note.evening (true / false, null = as in Settings) and
+  // note.panic (false = the panic button leaves this note open, null = it closes it).
+  const eveOn = () => (typeof V.note.evening === 'boolean' ? V.note.evening : !!V.settings.eveOn);
+  function applyEvening() {
+    if (!V.note) return;
+    body.style.setProperty('--eve', String(eveOn() ? Number(V.settings.evePhase) || 0 : 0)); // main says how far into the evening
+    $('#eveSwitch').checked = eveOn();
+    $('#eveTag').hidden = typeof V.note.evening !== 'boolean';
+    $('#eveRow').hidden = DARK_PAPERS.includes(V.note.color); // the dark papers have no evening shade
+  }
+  if (api.onEvening) api.onEvening((p) => { V.settings.evePhase = p; applyEvening(); });
+  function applyPanic() {
+    const on = !!V.settings.panicOn;
+    const stays = !!V.note && V.note.panic === false;
+    const b = $('#btnPanic');
+    b.hidden = !on;
+    b.title = `Panic: close your notes, lock them, hide CosmoNotes${V.settings.panicKey ? ` (${V.settings.panicKey})` : ''}${stays ? '. This note stays open.' : ''}`;
+    $('#panicRow').hidden = !on;
+    $('#panicSwitch').checked = !stays;
+    $('#panicTag').hidden = !stays;
+  }
+
+  // ================================================================ click-through (1.3.34)
+  // note.clickThrough, only while Settings → Click-through is on; main lets the mouse through the window (note-state.js
+  // applyClickThrough). body.ct switches off everything but the button (note-base.css), the mouse follower too; the button
+  // wakes the window while the mouse is on it (panels.js).
+  function applyClickThrough() {
+    const shown = !!V.settings.clickThroughOn;
+    const on = shown && !!V.note && !!V.note.clickThrough;
+    const b = $('#btnCt');
+    b.hidden = !shown;
+    b.setAttribute('aria-pressed', String(on));
+    b.title = on ? 'Click-through is on. Click to use the note again' : 'Click-through: the mouse goes through this note. It pins it.';
+    if (on === body.classList.contains('ct')) return;
+    body.classList.toggle('ct', on);
+    V.ctAwake = false; // main starts every click-through asleep, and forgets it when it ends
+    if (on && fxLayer) fxLayer.leave();
   }
 
   // ================================================================ effects (1.1.16)
@@ -268,11 +321,11 @@
     if (!$('#fxPop').hidden) paintFxPop();
   }
   window.addEventListener('resize', () => { if (fxLayer) fxLayer.resize(); });
-  document.addEventListener('pointermove', (e) => { if (fxLayer) fxLayer.move(e.clientX, e.clientY); }, { passive: true });
+  document.addEventListener('pointermove', (e) => { if (fxLayer && !body.classList.contains('ct')) fxLayer.move(e.clientX, e.clientY); }, { passive: true });
   document.documentElement.addEventListener('mouseleave', () => { if (fxLayer) fxLayer.leave(); });
   $('#btnFx').addEventListener('click', () => {
     setFxPlaying(FX.resolve(V.note.fx, V.settings, V.note.fxPaused, V.note.fxPlay).paused);
   });
-  Object.assign(K, { api, outDocs, $, $$, editor, body, esc, fmt, swatchStrip, changed, saveNow, observer,
-    updateEmpty, titleText, gotDates, applyLook, FX, fxName, applyFx });
+  Object.assign(K, { api, outDocs, $, $$, editor, body, esc, fmt, swatchStrip, changed, saveNow, collect, observer,
+    updateEmpty, titleText, gotDates, applyLook, applyEvening, applyPanic, applyClickThrough, FX, fxName, applyFx });
 })();

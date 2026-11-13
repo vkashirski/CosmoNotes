@@ -8,7 +8,9 @@ const { migrateOldData } = require('./main/migrate');
 const { spellLanguages } = require('./main/settings');
 const { bringToFront, enforcePinned, openNoteWindow, refitAll } = require('./main/note-window');
 const { showList } = require('./main/list-window');
-const { buildTray, syncLoginItem } = require('./main/tray');
+const { buildTray, comeBack, syncLoginItem } = require('./main/tray');
+const { reopenPanicked, stopShortcut, syncShortcut } = require('./main/panic');
+const { startEveningClock } = require('./main/evening');
 const { registerIpc } = require('./main/ipc');
 const { S } = require('./main/state');
 const { attachmentBytes, clearOpenCopies, install: installCrypt, mimeOf } = require('./main/crypt');
@@ -64,11 +66,14 @@ function start() {
   }
   syncLoginItem();
   buildTray();
+  syncShortcut(); // 1.3.27: the panic button's shortcut (main/panic.js)
+  startEveningClock(); // 1.3.27: evening colours (main/evening.js)
 
   const atLogin = process.argv.includes('--startup');
   const toOpen = S.store.all().filter((n) => n.open && !n.deletedAt);
   for (const n of toOpen) openNoteWindow(n, { focus: false });
-  if (!atLogin && toOpen.length === 0) showList();
+  const back = reopenPanicked(); // 1.3.27: notes the panic button closed before CosmoNotes quit
+  if (!atLogin && toOpen.length === 0 && !back) showList();
 
   S.store.backupIfNeeded();
   setInterval(() => S.store.backupIfNeeded(), 3 * 3600e3);
@@ -83,7 +88,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => {
     if (!S.store) return;
     bringToFront();
-    showList();
+    comeBack(); // the list, and (1.3.27) the notes the panic button closed
   });
   app.whenReady().then(start);
   // Keep running in the tray when every window is closed.
@@ -95,6 +100,7 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
   app.on('will-quit', () => {
+    stopShortcut(); // 1.3.27: Windows gets the panic shortcut back
     if (S.store) { recordings.finishAll(); S.store.flush(); } // 1.2.4: a recording still running is kept
     clearOpenCopies(); // 1.1.31: no plain photo copies left in temp
   });

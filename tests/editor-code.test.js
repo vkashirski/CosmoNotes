@@ -19,6 +19,25 @@ assert.ok(/top: var\(--cb-t, \.3em\)/.test(nc) && /width: var\(--cb-s, \.78em\)/
 assert.ok(/for \(const v of (K\.)?CB_VARS\) el\.style\.removeProperty\(v\)/.test(nj), 'collect() strips the measured values');
 const al = between('function alignChecks()', 'function paintStrikes()');
 assert.ok(/out\.push\(\[li, size, top, pad\]\)/.test(al) && al.indexOf('setVar(li') > al.indexOf('out.push'), 'checklist boxes: measure all lines, then write (no layout per line per key)');
+// 1.3.18: a word's size and its font multiply once each (note-drawing.css `font[face]`): its own size= (--sm) counts, and
+// the font around it is taken out (--k = that font's --kf, set on the tag's children). The box reads --kf from the CSS.
+{
+  assert.ok(nc.includes('#editor font[face] { --kf: 1; font-size: calc(1em * var(--sm, 1) * var(--kf) / var(--k, 1)); }') && nc.includes('#editor font[face] > * { --k: 1; }'), 'the font tag rule');
+  const kf = [...nc.matchAll(/(body\[data-font="\w+"\] #editor font\[face="\w+"\]) \{ --kf: ([.\d]+); \}/g)];
+  assert.equal(kf.length, 6, 'six font resizes');
+  for (const [, sel, v] of kf) assert.ok(nc.includes(`${sel} > * { --k: ${v}; }`), `${sel}: its children see --k ${v}`);
+  for (const m of nc.matchAll(/#editor font\[size="\d"\] \{ font-size: ([.\d]+)em; --sm: ([.\d]+); \}/g)) assert.equal(m[1], m[2], 'size= also in --sm');
+  assert.ok(!/#editor font\[face[^{]*\{[^}]*font-size: [.\d]+em/.test(nc), 'no font tag sets its own font-size (it would beat size=)');
+  assert.ok(/getPropertyValue\('--kf'\)/.test(nj) && !/FACE_SIZE/.test(nj), 'the box takes the font resize from the CSS, no copy of it');
+  const box = JSON.parse(/const BOX = (\{.*?\});/.exec(nj)[1].replace(/(\w+):/g, '"$1":').replace(/: \./g, ': 0.'));
+  const em = (re) => Number((re.exec(nc) || [])[1]);
+  assert.equal(box.hand.k, em(/#editor ul\.checklist li::before \{[^}]*width: var\(--cb-s, ([.\d]+)em\)/), 'hand box = CSS');
+  assert.equal(box.round.k, em(/body\[data-font="round"\] #editor ul\.checklist li::before \{[^}]*width: var\(--cb-s, ([.\d]+)em\)/), 'round box = CSS');
+  assert.equal(box.medieval.k, em(/body\[data-font="medieval"\] #editor ul\.checklist li::before \{[^}]*width: var\(--cb-s, ([.\d]+)em\)/), 'medieval box = CSS');
+  assert.equal(box.hand.pad, em(/#editor ul\.checklist li \{ position: relative; padding-left: var\(--cb-p, ([.\d]+)em\)/), 'indent = CSS');
+  assert.equal(box.medieval.pad, box.hand.pad, 'medieval indent = CSS');
+  assert.equal(box.round.pad, em(/body\[data-font="round"\] #editor ul\.checklist li \{ padding-left: var\(--cb-p, ([.\d]+)em\)/), 'round indent = CSS');
+}
 
 // ---- Backspace / Delete
 assert.ok(/checkLineStart\(s\)/.test(nj) && /execCommand\('outdent'\)/.test(nj), 'Backspace at the start of a checklist line takes the box away');

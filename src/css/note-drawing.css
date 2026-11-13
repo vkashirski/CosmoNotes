@@ -86,6 +86,9 @@
 body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .size.on, body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .dtool.on { background: rgba(255,255,255,.14); }
 .dtool { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--accent); display: grid; place-items: center; cursor: pointer; }
 .dtool:hover, .size:hover { background: rgba(0,0,0,.07); }
+.dtool:disabled { color: #9a9a9a; cursor: default; }
+.dtool:disabled svg { opacity: .55; }
+.dtool:disabled:hover { background: transparent; }
 #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
 body.erasing #cv { cursor: cell; }
 
@@ -326,13 +329,21 @@ body.rolled #textPop { display: none !important; }
 .tscope b { font-weight: 800; color: var(--pop-ink); }
 .tbar .iact { width: 27px; height: 25px; flex: none; }
 .tbar .iact:disabled { opacity: .35; cursor: default; }
-/* a different font on part of the text keeps about the same size as the note's own font */
-body[data-font="round"] #editor font[face="Caveat"] { font-size: 1.45em; line-height: 1.1; }
-body[data-font="hand"] #editor font[face="Nunito"] { font-size: .68em; }
-body[data-font="round"] #editor font[face="Augusta"] { font-size: 1.19em; }
-body[data-font="hand"] #editor font[face="Augusta"] { font-size: .8em; }
-body[data-font="medieval"] #editor font[face="Caveat"] { font-size: 1.24em; line-height: 1.1; }
-body[data-font="medieval"] #editor font[face="Nunito"] { font-size: .84em; }
+/* a different font on part of the text is drawn about the same size as the note's own font: --kf = how big, next to
+   the note's font (store.js CARD_FACE_SIZE, the card's copy, is checked against these). 1.3.18: the words' size and
+   their font multiply once each. A font tag's size = the size around it (1em), without the font around it (÷ --k),
+   × its own size= (--sm, note-text.css) × its font's --kf. --k (the --kf of the font the words are in) is set on the
+   tag's children, so the tag itself still sees its parent's. The note's own font has --kf 1: words in it inside
+   another font come back to the note's size. */
+#editor font[face] { --kf: 1; font-size: calc(1em * var(--sm, 1) * var(--kf) / var(--k, 1)); }
+#editor font[face] > * { --k: 1; }
+body[data-font="round"] #editor font[face="Caveat"] { --kf: 1.45; } body[data-font="round"] #editor font[face="Caveat"] > * { --k: 1.45; }
+body[data-font="round"] #editor font[face="Augusta"] { --kf: 1.19; } body[data-font="round"] #editor font[face="Augusta"] > * { --k: 1.19; }
+body[data-font="hand"] #editor font[face="Nunito"] { --kf: .68; } body[data-font="hand"] #editor font[face="Nunito"] > * { --k: .68; }
+body[data-font="hand"] #editor font[face="Augusta"] { --kf: .8; } body[data-font="hand"] #editor font[face="Augusta"] > * { --k: .8; }
+body[data-font="medieval"] #editor font[face="Caveat"] { --kf: 1.24; } body[data-font="medieval"] #editor font[face="Caveat"] > * { --k: 1.24; }
+body[data-font="medieval"] #editor font[face="Nunito"] { --kf: .84; } body[data-font="medieval"] #editor font[face="Nunito"] > * { --k: .84; }
+body[data-font="round"] #editor font[face="Caveat"], body[data-font="medieval"] #editor font[face="Caveat"] { line-height: 1.1; }
 .tlab { flex: none; width: 20px; display: grid; place-items: center; color: var(--pop-mute); }
 .tlab svg { width: 16px; height: 16px; }
 .tlab .cbar { stroke: #E5484D; stroke-width: 3; }

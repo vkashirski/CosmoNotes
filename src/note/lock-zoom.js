@@ -1,10 +1,10 @@
 'use strict';
-// CosmoNotes note window, part 8 of 11: locking, password or PIN, the "are you sure?" pop-up, word wrap, zoom
+// CosmoNotes note window, part 9 of 12: locking, password or PIN, the "are you sure?" pop-up, word wrap, zoom
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
   const { V, api, $, $$, editor, body, saveNow, observer, updateEmpty, applyLook, setProp, caretAtEnd, closePop,
-    closePops, openPop, closeText, decorate, stopPlay, rec, stopRecording, stopRecordingNow, closeDraw, handle, placeHandle, sttHide } = K;
+    closePops, openPop, closeText, paintUndo, decorate, stopPlay, rec, stopRecording, stopRecordingNow, closeDraw, handle, placeHandle, sttHide, dropEmptyLines, joinLists } = K;
   // defined in a later part:
   const renderInk = K.later('renderInk'), inkBounds = K.later('inkBounds'), exitInk = K.later('exitInk'),
     toast = K.later('toast');
@@ -59,12 +59,15 @@
     V.hidden = false;
     V.note = { ...V.note, ...n, hidden: false };
     editor.innerHTML = V.note.html || '';
+    dropEmptyLines(editor, 'ul.checklist li'); // 1.3.15: invisible empty lines whose box covered the next one
+    joinLists(editor); // 1.3.25: lists that touch are one
     decorate();
     observer.observe(editor, { childList: true, subtree: true, characterData: true });
     V.dirty = false;
     applyLook();
     renderInk();
     updateEmpty();
+    paintUndo();
     if (fly) { body.append(fly); setTimeout(() => fly.remove(), 800); }
     playLockAnim('unlock');
   }
@@ -89,6 +92,7 @@
     V.hidden = true;
     editor.innerHTML = '';
     V.note.html = '';
+    paintUndo();
     V.note.title = ''; // 1.1.30: the title is hidden (and encrypted) while locked too
     if (document.activeElement !== $('#titleInput')) $('#titleInput').value = '';
     observer.observe(editor, { childList: true, subtree: true, characterData: true });
@@ -108,10 +112,12 @@
   }
   // Locked from the notes list: save what's typed, then hide.
   api.onLockNow(() => { if (!V.hidden) relock(); });
-  // Colour/font/lock changed from the notes list.
+  // Colour/font/lock changed from the notes list (1.3.11: the title font too, from Edit design).
   api.onLook((v) => {
     if (!V.note || !v) return;
-    for (const k of ['color', 'font', 'size', 'title', 'coverTitle', 'locked', 'lockedBy', 'pinned', 'opacity', 'rolled', 'fx', 'fxPaused', 'fxPlay']) if (k in v) V.note[k] = v[k];
+    // 1.3.27: and what Settings → "Use on all notes" puts back (solid on hover, spelling, checklists, evening, panic)
+    for (const k of ['color', 'font', 'titleFont', 'size', 'title', 'coverTitle', 'locked', 'lockedBy', 'pinned', 'clickThrough', 'opacity', 'rolled', 'fx', 'fxPaused', 'fxPlay',
+      'solidOnHover', 'spell', 'checklist', 'evening', 'panic']) if (k in v) V.note[k] = v[k];
     if (v.hidden && !V.hidden) { hideContent(); return; }
     // the lock was removed from the notes list while this window still asked for the password/PIN:
     // show the note straight away (1.1.47: or it was unlocked there until CosmoNotes restarts; its lock stays)
@@ -244,9 +250,10 @@
   // Word wrap on = normal: text wraps with the note. Word wrap off (note.wrapWidth set) = no limit (1.1.45): a line
   // only ends where you pressed Enter, however wide or narrow the note is (#sheet.nowrap), and a long line
   // scrolls sideways. Pictures still fit the note; with a drawing they keep the width they had (wrapWidth), so the
-  // drawing stays on them (note.nowrap marks that). An older note with a drawing and no note.nowrap (drawing on a
-  // note with word wrap on turns it off like that too) keeps its text at the width wrapWidth (#sheet.fixed), so the
-  // drawing stays on the words it marked.
+  // drawing stays on them (note.nowrap marks that). The first drawing on a note with word wrap on turns it off the
+  // other way (note.wrapFixed, 1.3.29): the text keeps the width wrapWidth (#sheet.fixed), so the drawing stays on the
+  // words it marked. Which one is saved with the note: erasing or undoing the drawing never changes it (it did before
+  // 1.3.29, and every table cell un-wrapped); only the word wrap button does.
   const sheet = $('#sheet');
 
   // ---- zoom (1.1.13): Ctrl + mouse wheel makes the writing bigger or smaller (text, pictures and drawing together),
@@ -292,8 +299,8 @@
   // the visible width of the writing area, in the note's own pixels
   const viewWidth = () => Math.max(80, Math.floor((scroller.clientWidth - (parseFloat(getComputedStyle(scroller).paddingLeft) || 0)
     - (parseFloat(getComputedStyle(scroller).paddingRight) || 0)) / zoomNow()));
-  // word wrap off with no limit (see above); otherwise off = the text keeps the width wrapWidth
-  const noLimit = () => !!(V.note && V.note.wrapWidth && (V.note.nowrap || !hasInk()));
+  // word wrap off with no limit (see above); otherwise off = the text keeps the width wrapWidth (note.wrapFixed)
+  const noLimit = () => !!(V.note && V.note.wrapWidth && !V.note.wrapFixed);
   // how wide "full width" is for pictures (Small / Medium, Keep size, resizing)
   const textWidth = () => (noLimit() ? (hasInk() ? V.note.wrapWidth : viewWidth()) : editor.clientWidth);
   // the first drawing on a note with word wrap off: pictures keep the width they have now, so the drawing stays on them
@@ -367,11 +374,11 @@
   async function toggleWrap() {
     if (V.note.wrapWidth) {
       if (hasInk() && !(await ask('Turn word wrap on?', 'Text may move away from your drawing.', 'Turn on'))) return;
-      setProp({ wrapWidth: null, nowrap: false });
+      setProp({ wrapWidth: null, nowrap: false, wrapFixed: false });
       toast('Word wrap on');
     } else {
       if (hasInk() && !(await ask('Turn word wrap off?', 'Text may move away from your drawing.', 'Turn off'))) return;
-      setProp({ wrapWidth: viewWidth(), nowrap: true });
+      setProp({ wrapWidth: viewWidth(), nowrap: true, wrapFixed: false });
       toast('Word wrap off');
     }
   }

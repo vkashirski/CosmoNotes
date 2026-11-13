@@ -1,8 +1,8 @@
 'use strict';
 // 1.3.1: voice to text. The engine: one shared, hidden window that runs Transformers.js (src/engine/engine.mjs), made on
 // first use and closed after 3 idle minutes. Its page and everything it loads come from cosmomodel://engine/ on its own
-// in-memory session: a fixed list of files (the page, src/engine/*.js, src/engine/lib/, the test clip, and the files of
-// the installed models), every response with COOP/COEP/CORP (multi-threaded WASM needs them) and the page with a strict
+// in-memory session: a fixed list of files (the page, src/engine/*.js, src/engine/lib/ and the files of the installed
+// model), every response with COOP/COEP/CORP (multi-threaded WASM needs them) and the page with a strict
 // CSP (the import map's sha256). That session allows no permissions, no navigation, no other window, and blocks every
 // request that is not cosmomodel: (so http/https/ws never leave it). The note windows can't reach cosmomodel:// at all.
 // Only main talks to it ('engine:msg' both ways, src/engine/preload.js); jobs and their rules are in main/ipc-stt.js.
@@ -49,7 +49,6 @@ function route(url) {
   if (p.includes('\0') || p.includes('\\')) return null;
   if (p === '/' || p === '/index.html') return { page: true };
   if (p === '/engine.mjs' || p === '/engine-core.mjs') return { file: path.join(ENGINE_DIR, p.slice(1)) };
-  if (p === '/test-clip.wav') return { file: path.join(ENGINE_DIR, 'test-clip.wav') };
   if (p.startsWith('/lib/')) return LIB_FILES.has(p.slice(5)) ? { file: path.join(LIB_DIR, ...p.slice(5).split('/')) } : null;
   if (p.startsWith('/models/')) {
     const [id, ...rest] = p.slice(8).split('/');

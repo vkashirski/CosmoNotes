@@ -41,7 +41,7 @@ function registerCryptIpc() {
       '',
       'This opens your locked notes if you forget your PIN or password:',
       'Notes list > Settings > Locked notes > "Forgot it? Use the recovery key".',
-      'Keep it safe, away from this computer.',
+      'Keep it safe, away from this device.',
       `Made on ${new Date().toLocaleString()}.`,
       '',
     ].join('\r\n');

@@ -8,10 +8,11 @@
 //   gets nothing and never saves).
 // - One Speak to text at a time (another note gets "busy"); Transcribe jobs wait for each other. The model runs one
 //   piece at a time (the engine), so a Transcribe can run during a Speak to text.
-// - The model: the one picked in Settings if it is on this PC, else Standard ("fallback"). While a job runs, the next
-//   one uses the model already loaded. Best on the graphics card that fails to start falls back to Standard too.
-// - Live text or "after you stop": Test my computer's verdict for that model and set, or the first time a quiet
-//   2-second check while it warms up (settings.sttTests).
+// - The model (1.3.4): one, Whisper small.en, downloaded in Settings. Not downloaded: Speak to text and Transcribe say so
+//   and start nothing ('nomodel'). It doesn't start: the job fails (the recording is kept) and Settings says so.
+// - Live text or "after you stop" (1.3.4): Settings → "Words appear" (settings.sttWhen: 'live' | 'stop'). Not set =
+//   by the PC: live on the graphics card, after you stop on the processor (Whisper's live pieces are padded to 30 s,
+//   too slow there: prototype, Step 1). The engine's safety net (more than 5 s behind: no more live drafts) stays.
 const crypto = require('crypto');
 const fs = require('fs');
 const { ipcMain } = require('electron');
@@ -20,14 +21,13 @@ const { senderNote } = require('./ipc-common');
 const { isLocked } = require('./locks');
 const engine = require('./stt-engine');
 const dl = require('./stt-download');
-const { MODELS, STANDARD, bytesOf, findModel, installed, runOf, userDir } = require('./stt-models');
+const { HF, MODEL, bytesOf, findModel, installed, runOf, userDir } = require('./stt-models');
 const { S } = require('./state');
 
 const jobs = new Map(); // jobId -> { id, kind: 'live' | 'transcribe', win, ready, ended, queue }
 const downloads = new Map(); // model id -> { ctl, pct }
 const failed = new Map(); // model id -> true: the last download failed (Try again)
-let testing = false;
-let startError = null; // Best didn't start on this PC last time (Settings says so)
+let startError = null; // the model didn't start on this PC last time (Settings says so)
 const watched = new WeakSet();
 const newId = () => crypto.randomBytes(6).toString('hex');
 const MB = 1048576;
@@ -38,27 +38,14 @@ const mayShow = (win) => {
   return !!n && !n.deletedAt && (!isLocked(n) || !!win.revealed);
 };
 const settings = () => S.store.settings;
-const tests = () => (settings().sttTests && typeof settings().sttTests === 'object' ? settings().sttTests : {});
-const keyOf = (m, run) => `${m.id}/${run.name}`;
-const verdictOf = (speed) => (!(speed > 0) ? null : speed >= 2 ? 'live' : speed >= 0.5 ? 'after' : 'slow');
-function saveTest(m, run, speed, quick) {
-  settings().sttTests = { ...tests(), [keyOf(m, run)]: { speed: Math.round(speed * 100) / 100, verdict: verdictOf(speed), quick: !!quick, at: Date.now() } };
-  S.store.saveSettings();
-}
+const theModel = () => findModel(MODEL);
+const ready = () => !!installed(theModel());
 
 // ------------------------------------------------------------------ the model for a job
 let chain = Promise.resolve();
 const serial = (fn) => { const r = chain.then(fn, fn); chain = r.catch(() => {}); return r; };
 const loadedJobs = () => [...jobs.values()].filter((j) => j.loaded && !j.ended);
 
-function pick() {
-  const want = findModel(settings().sttModel) || findModel(STANDARD);
-  const run = installed(want);
-  if (run) return { m: want, run, fallback: null };
-  const std = findModel(STANDARD);
-  const r = installed(std);
-  return r ? { m: std, run: r, fallback: want.id === STANDARD ? null : 'missing' } : null;
-}
 function noteWebgpu(info) {
   if (info && typeof info.webgpu === 'boolean' && settings().sttWebgpu !== info.webgpu) { settings().sttWebgpu = info.webgpu; S.store.saveSettings(); }
 }
@@ -69,33 +56,28 @@ function ensureModel() {
     if (cur && loadedJobs().length) {
       const [id, rn] = cur.split('/');
       const m = findModel(id);
-      return { m, run: runOf(m, rn), fallback: null };
+      return { m, run: runOf(m, rn) };
     }
-    let p = pick();
-    if (!p) throw new Error('nomodel');
+    const m = theModel();
+    const run = installed(m);
+    if (!run) throw new Error('nomodel');
     try {
-      const r = await engine.load(p.m, p.run);
+      const r = await engine.load(m, run);
       noteWebgpu(r.info);
-      if (p.m.id !== STANDARD && startError) { startError = null; notifyStt(); }
+      if (startError) { startError = null; notifyStt(); }
     } catch (e) {
-      if (p.m.id === STANDARD) throw e;
-      console.error('voice to text: Best did not start', e);
+      console.error('voice to text: the model did not start', e);
       startError = String(e.message || e).slice(0, 200);
       notifyStt();
-      const std = findModel(STANDARD);
-      const run = installed(std);
-      if (!run) throw e;
-      await engine.load(std, run);
-      p = { m: std, run, fallback: 'failed' };
+      throw e;
     }
-    // never measured on this PC: a quiet 2-second check now (it warms the model up too)
-    if (!tests()[keyOf(p.m, p.run)]) {
-      try { const s = await engine.call('speed', { seconds: 2 }, 120e3); if (s && s.speed) saveTest(p.m, p.run, s.speed, true); } catch (e) { console.error(e); }
-    }
-    return p;
+    return { m, run };
   });
 }
-const modeOf = (p) => { const t = tests()[keyOf(p.m, p.run)]; return t && t.verdict && t.verdict !== 'live' ? 'after' : 'live'; };
+const WHEN = ['live', 'stop'];
+const whenSet = () => (WHEN.includes(settings().sttWhen) ? settings().sttWhen : null);
+const autoWhen = (device) => (device === 'webgpu' ? 'live' : 'stop');
+const modeOf = (p) => ((whenSet() || autoWhen(p.run.device)) === 'live' ? 'live' : 'after');
 
 // ------------------------------------------------------------------ jobs
 function toWin(job, e) {
@@ -130,7 +112,7 @@ async function startLive(job) {
     job.ready = true;
     for (const a of job.queue) engine.post('audio', { jobId: job.id, pcm: a.pcm, rms: a.rms });
     job.queue = [];
-    toWin(job, { type: 'ready', mode, fallback: p.fallback });
+    toWin(job, { type: 'ready', mode, auto: !whenSet() }); // auto: the window says why it waits
     if (job.readyWait) job.readyWait(true);
   } catch (e) {
     if (job.ended) return;
@@ -142,7 +124,9 @@ async function startLive(job) {
 
 function registerSttIpc() {
   try { dl.cleanParts(userDir()); } catch (e) { console.error(e); }
-  engine.wire({ isBusy: () => jobs.size > 0 || testing });
+  // 1.3.4: the model choice and Test my computer's results are gone (the choice, Standard's, is gone too)
+  if ('sttModel' in settings() || 'sttTests' in settings()) { delete settings().sttModel; delete settings().sttTests; S.store.saveSettings(); }
+  engine.wire({ isBusy: () => jobs.size > 0 });
   engine.onEvent((m) => { const job = jobs.get(m.jobId); if (job && m.e) toWin(job, m.e); });
   engine.onGone(() => { for (const j of [...jobs.values()]) { toWin(j, { type: 'error', message: 'failed' }); end(j, false); } });
 
@@ -150,7 +134,7 @@ function registerSttIpc() {
   ipcMain.handle('stt:start', (e) => {
     const { win, note } = senderNote(e);
     if (!note || !mayShow(win)) return { error: 'locked' };
-    if (testing) return { error: 'busy' };
+    if (!ready()) return { error: 'nomodel' };
     for (const j of [...jobs.values()]) if (j.kind === 'live') { if (j.win === win) end(j, true); else return { error: 'busy' }; }
     const job = { id: newId(), kind: 'live', win, noteId: note.id, queue: [], ready: false, ended: false };
     jobs.set(job.id, job);
@@ -196,7 +180,7 @@ function registerSttIpc() {
     if (typeof url !== 'string' || !String(note.html || '').includes(url)) return { error: 'gone' };
     const p = S.store.attachmentPathFromUrl(url);
     if (!p || !/\.(webm|ogg|mp3|m4a|wav)$/i.test(p) || !fs.existsSync(p)) return { error: 'gone' };
-    if (testing) return { error: 'busy' };
+    if (!ready()) return { error: 'nomodel' };
     const id = typeof jobId === 'string' && /^[\w-]{1,40}$/.test(jobId) && !jobs.has(jobId) ? jobId : newId();
     const job = { id, kind: 'transcribe', win, noteId: note.id, ended: false };
     jobs.set(id, job);
@@ -207,12 +191,12 @@ function registerSttIpc() {
         let bytes = attachmentBytes(p);
         if (bytes === false) return { error: 'locked' };
         if (!bytes) bytes = await fs.promises.readFile(p);
-        const pm = await ensureModel();
+        await ensureModel();
         if (job.ended) return { cancelled: true };
         job.loaded = true;
         const r = await engine.call('transcribe', { jobId: id, bytes: new Uint8Array(bytes) });
         if (job.ended || !mayShow(win)) return { cancelled: true };
-        return { text: String((r && r.text) || ''), fallback: pm.fallback };
+        return { text: String((r && r.text) || '') };
       } catch (err) {
         if (job.ended) return { cancelled: true };
         console.error('voice to text: transcribe failed', err);
@@ -226,13 +210,14 @@ function registerSttIpc() {
 
   // ---- Settings → Voice to text (the list)
   ipcMain.handle('stt:status', () => status());
-  ipcMain.handle('stt:use', (e, id) => {
-    if (findModel(id)) { settings().sttModel = id; S.store.saveSettings(); }
+  // "Words appear": while you talk / when you stop (the next Speak to text uses it)
+  ipcMain.handle('stt:when', (e, v) => {
+    if (WHEN.includes(v)) { settings().sttWhen = v; S.store.saveSettings(); }
     return status();
   });
   ipcMain.handle('stt:download', (e, id) => {
     const m = findModel(id);
-    if (!m || m.builtIn || installed(m) || downloads.has(m.id)) return status();
+    if (!m || installed(m) || downloads.has(m.id)) return status();
     const ctl = new AbortController();
     const d = { ctl, pct: 0, last: 0 };
     downloads.set(m.id, d);
@@ -242,7 +227,7 @@ function registerSttIpc() {
       // which set: the graphics card's if WebGPU works here (the engine page asks the GPU), else the processor's
       let webgpu = settings().sttWebgpu;
       try { const info = await engine.open(); noteWebgpu(info); webgpu = !!info.webgpu; } catch { webgpu = !!webgpu; }
-      if (!jobs.size && !testing) engine.close(); // it was opened only to ask
+      if (!jobs.size) engine.close(); // it was opened only to ask
       const run = runFor(m, webgpu);
       await dl.download(m, run, {
         signal: ctl.signal,
@@ -269,44 +254,12 @@ function registerSttIpc() {
   });
   ipcMain.handle('stt:remove', (e, id) => {
     const m = findModel(id);
-    if (!m || m.builtIn) return status();
-    if (jobs.size || testing || downloads.has(m.id)) return { ...status(), error: 'busy' };
+    if (!m) return status();
+    if (jobs.size || downloads.has(m.id)) return { ...status(), error: 'busy' };
     if (String(engine.current() || '').startsWith(m.id + '/')) engine.close();
     dl.remove(m);
     failed.delete(m.id);
-    if (settings().sttModel === m.id) { settings().sttModel = STANDARD; S.store.saveSettings(); }
-    for (const r of m.runs) delete tests()[keyOf(m, r)];
-    S.store.saveSettings();
-    return status();
-  });
-  // Test my computer: the bundled clip through every model on this PC
-  ipcMain.handle('stt:test', async () => {
-    if (testing || jobs.size) return { ...status(), error: 'busy' };
-    testing = true;
-    notifyStt();
-    try {
-      await serial(async () => {
-        for (const m of MODELS) {
-          const run = installed(m);
-          if (!run) continue;
-          try {
-            const r = await engine.load(m, run);
-            noteWebgpu(r.info);
-            const s = await engine.call('speed', { seconds: 0 }, 5 * 60e3);
-            if (s && s.speed) saveTest(m, run, s.speed, false);
-          } catch (err) {
-            console.error('voice to text: test failed', m.id, err);
-            settings().sttTests = { ...tests(), [keyOf(m, run)]: { speed: 0, verdict: 'failed', at: Date.now() } };
-            S.store.saveSettings();
-            if (m.id !== STANDARD) startError = String(err.message || err).slice(0, 200);
-          }
-        }
-      });
-    } finally {
-      testing = false;
-      engine.touch();
-      notifyStt();
-    }
+    startError = null;
     return status();
   });
 }
@@ -316,26 +269,24 @@ function runFor(m, webgpu) { return m.runs.find((r) => !r.needs || (r.needs === 
 function status() {
   const s = settings();
   const webgpu = typeof s.sttWebgpu === 'boolean' ? s.sttWebgpu : null;
+  const m = theModel();
+  const run = installed(m);
+  const d = downloads.get(m.id);
+  const next = run || runFor(m, !!webgpu);
   return {
-    selected: findModel(s.sttModel) ? s.sttModel : STANDARD,
-    testing,
     startError,
-    models: MODELS.map((m) => {
-      const run = installed(m);
-      const d = downloads.get(m.id);
-      const next = run || runFor(m, !!webgpu);
-      const t = run ? tests()[keyOf(m, run)] : null;
-      return {
-        id: m.id, level: m.level, name: m.name, builtIn: m.builtIn,
-        state: run ? 'ready' : d ? 'downloading' : failed.has(m.id) ? 'failed' : m.builtIn ? 'missing' : 'none',
-        pct: d ? d.pct : null,
-        mb: Math.round(bytesOf(m, next) / MB),
-        // not downloaded and WebGPU not known yet: the size is one of two
-        mbMax: !run && webgpu === null && m.runs.length > 1 ? Math.round(Math.max(...m.runs.map((r) => bytesOf(m, r))) / MB) : null,
-        device: next.device === 'webgpu' ? 'gpu' : 'cpu',
-        test: t ? { verdict: t.verdict, speed: t.speed } : null,
-      };
-    }),
+    when: whenSet() || autoWhen(next.device), // what Speak to text does now
+    whenSet: !!whenSet(),
+    model: {
+      id: m.id, name: m.name,
+      url: `${HF}/${m.repo}`, // the model's page (Settings links to it)
+      state: run ? 'ready' : d ? 'downloading' : failed.has(m.id) ? 'failed' : 'none',
+      pct: d ? d.pct : null,
+      mb: Math.round(bytesOf(m, next) / MB),
+      // not downloaded and WebGPU not known yet: the size is one of two
+      mbMax: !run && webgpu === null && m.runs.length > 1 ? Math.round(Math.max(...m.runs.map((r) => bytesOf(m, r))) / MB) : null,
+      device: next.device === 'webgpu' ? 'gpu' : 'cpu',
+    },
   };
 }
 let notifyTimer = null;

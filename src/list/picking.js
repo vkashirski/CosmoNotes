@@ -4,7 +4,7 @@
 (() => {
   const K = window.COSMO_LIST_KIT;
   const { V, S, $, ICON, cardsTabNow, sel, h, when, plural, tilt, groupById,
-    notesInTree, isInside, noteIsLocked, groupIsLocked, LOCKED_NO_DELETE, favourites, cardBody, markMore, emptyState,
+    notesInTree, isInside, noteIsLocked, groupIsLocked, isShut, LOCKED_NO_DELETE, favourites, cardBody, markMore, emptyState,
     noteById } = K;
   // defined in a later part:
   const modal = K.later('modal'), toast = K.later('toast'), showCtx = K.later('showCtx'),
@@ -18,10 +18,12 @@
     return k[0] === 'g' ? { kind: 'group', id, group: groupById(id) } : { kind: 'note', id, note: ((n) => (n && !n.deletedAt ? n : undefined))(noteById(id)) };
   }
   const thingOf = (k) => { const it = itemOfKey(k); return it.group || it.note || null; };
+  const shutKey = (k) => isShut(k[0] === 'g' ? 'group' : 'note', thingOf(k)); // 1.3.28: see isShut (base.js)
   const isFav = (k) => !!(thingOf(k) || {}).favorite;
   const selItems = () => [...sel].map(itemOfKey).filter((it) => it.group || it.note);
 
   // the star in a card's top-right corner: an outline while you point at the card, filled once it's a favourite
+  // (1.3.28: on a shut card it only shows, filled or not at all: paintCards turns it off)
   function starBtn(key) {
     return h('button', {
       class: 'fav',
@@ -60,7 +62,7 @@
   }
   async function setFav(keys, on, btn) {
     const ids = [];
-    for (const k of keys) { const t = thingOf(k); if (t) { t.favorite = on; ids.push(t.id); } }
+    for (const k of keys) { const t = thingOf(k); if (t && !shutKey(k)) { t.favorite = on; ids.push(t.id); } }
     if (!ids.length) return;
     paintCards();
     const btns = btn ? [btn] : keys.map((k) => $(`#cards [data-key="${k}"] > .fav`)).filter(Boolean);
@@ -104,8 +106,8 @@
   function lockStateOf(k) {
     const t = thingOf(k);
     if (!t) return 0;
-    if (k[0] === 'g') return !t.open ? 2 : t.locked ? 1 : 0; // 2 = shut, 1 = locked but opened in the list
-    return t.locked ? 2 : 0;
+    if (shutKey(k)) return 2; // shut
+    return k[0] === 'g' && t.locked ? 1 : 0; // 1 = a locked group opened in the list
   }
   function paintCards(freshFx = null) { // freshFx (1.2.3): the cards a background refresh built again (see paintFx)
     const box = $('#cards');
@@ -120,7 +122,8 @@
       const b = c.querySelector(':scope > .fav');
       if (b) {
         b.classList.toggle('on', fav);
-        b.title = fav ? 'Remove from favourites' : 'Add to favourites';
+        b.disabled = shutKey(k);
+        b.title = b.disabled ? '' : fav ? 'Remove from favourites' : 'Add to favourites';
       }
       c.classList.toggle('sel', sel.has(k));
       const ls = lockStateOf(k);
@@ -189,8 +192,10 @@
     bb('bBin', ICON.trash, 'Bin', 'Move the selected notes to the Bin (Delete key)', 'danger'),
     h('button', { class: 'bb x', id: 'bX', title: 'Clear the selection (Esc)', html: ICON.x }));
   document.body.append(bulk);
-  function bulkParts() {
-    const items = selItems();
+  // the picked notes and groups. 1.3.28: shut ones (isShut) only count, and only locking and the Bin (which keeps
+  // locked ones) look at them: `all`. Everything else in the bar and its menu works on the others.
+  function bulkParts(all = false) {
+    const items = selItems().filter((it) => all || !isShut(it.kind, it.note || it.group));
     const notes = items.filter((it) => it.note).map((it) => it.note);
     const groups = items.filter((it) => it.group).map((it) => it.group);
     return { items, notes, groups };
@@ -199,45 +204,48 @@
   function designNotes() {
     const { notes, groups } = bulkParts();
     const out = new Map(notes.map((n) => [n.id, n]));
-    for (const g of groups) if (g.open) for (const n of notesInTree(g.id)) out.set(n.id, n);
+    for (const g of groups) for (const n of notesInTree(g.id)) if (!isShut('note', n)) out.set(n.id, n);
     return [...out.values()];
   }
   const bulkEdit = () => openEditMany(designNotes());
   function paintBulk() {
-    const { items, notes, groups } = bulkParts();
-    const show = items.length > 0 && cardsTabNow();
+    const every = bulkParts(true);
+    const { items, notes } = bulkParts();
+    const show = every.items.length > 0 && cardsTabNow();
     bulk.hidden = !show;
     document.body.classList.toggle('selecting', show);
     if (!show) return;
-    $('#bulkCount').textContent = `${items.length} selected`;
+    $('#bulkCount').textContent = `${every.items.length} selected`;
     $('#bOpen').hidden = !notes.some((n) => !n.open);
     $('#bClose').hidden = !notes.some((n) => n.open);
     const allFav = items.every((it) => (it.note || it.group).favorite);
+    $('#bFav').hidden = !items.length;
     $('#bFav').classList.toggle('on', allFav);
     $('#bFav').querySelector('span').textContent = allFav ? 'Unfavourite' : 'Favourite';
     $('#bFav').title = allFav ? 'Remove the selected ones from your favourites' : 'Add the selected ones to your favourites';
     $('#bEdit').hidden = !designNotes().length;
     $('#bGroup').hidden = items.length < 2;
-    $('#bLock').hidden = !notes.some((n) => !n.ownLock) && !groups.some((g) => !g.locked);
-    const canBin = notes.some((n) => !noteIsLocked(n)) || groups.some((g) => !groupIsLocked(g));
+    $('#bLock').hidden = !every.notes.some((n) => !n.ownLock) && !every.groups.some((g) => !g.locked);
+    const canBin = every.notes.some((n) => !noteIsLocked(n)) || every.groups.some((g) => !groupIsLocked(g));
     $('#bBin').disabled = !canBin;
     $('#bBin').title = canBin ? 'Move the selected notes to the Bin (Delete key)' : LOCKED_NO_DELETE;
   }
   // right-click on one of several selected cards: the same actions as the bar
   function bulkMenu(e, key) {
     if (sel.size > 1 && sel.has(key)) {
-      const { items, notes, groups } = bulkParts();
+      const { items, notes } = bulkParts();
+      const every = bulkParts(true);
       const allFav = items.every((it) => (it.note || it.group).favorite);
       showCtx(e, [
         notes.some((n) => !n.open) ? { label: 'Open on desktop', icon: ICON.open, run: bulkOpen } : null,
         notes.some((n) => n.open) ? { label: 'Close notes', icon: ICON.hide, run: bulkClose } : null,
-        { label: allFav ? 'Remove from favourites' : 'Add to favourites', icon: ICON.star, run: () => setFav([...sel], !allFav) },
+        items.length ? { label: allFav ? 'Remove from favourites' : 'Add to favourites', icon: ICON.star, run: () => setFav([...sel], !allFav) } : null,
         designNotes().length ? { label: 'Edit design…', icon: ICON.edit, run: bulkEdit } : null,
         '-',
-        { label: 'Put together in a new group', icon: ICON.folder, run: bulkGroup },
-        notes.some((n) => !n.ownLock) || groups.some((g) => !g.locked) ? { label: 'Lock', icon: ICON.lock, run: bulkLock } : null,
+        items.length >= 2 ? { label: 'Put together in a new group', icon: ICON.folder, run: bulkGroup } : null,
+        every.notes.some((n) => !n.ownLock) || every.groups.some((g) => !g.locked) ? { label: 'Lock', icon: ICON.lock, run: bulkLock } : null,
         '-',
-        { label: `Move to Bin (${items.length})`, icon: ICON.trash, danger: true, run: () => bulkTrash(false), disabled: $('#bBin').disabled },
+        { label: `Move to Bin (${every.items.length})`, icon: ICON.trash, danger: true, run: () => bulkTrash(false), disabled: $('#bBin').disabled },
         { label: 'Clear selection', icon: ICON.x, run: clearSel },
       ]);
       return true;
@@ -255,7 +263,7 @@
     toast(id ? 'Put together in a new group' : 'Could not make a group');
   }
   async function bulkLock() {
-    const { notes, groups } = bulkParts();
+    const { notes, groups } = bulkParts(true);
     if (!(await ensurePassword())) return;
     for (const n of notes) if (!n.ownLock) await S.list.setLocked(n.id, true);
     for (const g of groups) if (!g.locked) await S.groups.setLocked(g.id, true);
@@ -264,7 +272,7 @@
     toast('Locked 🔒');
   }
   async function bulkTrash(skipAsk) {
-    const { notes, groups } = bulkParts();
+    const { notes, groups } = bulkParts(true);
     const okNotes = notes.filter((n) => !noteIsLocked(n));
     const okGroups = groups.filter((g) => !groupIsLocked(g));
     const kept = notes.length + groups.length - okNotes.length - okGroups.length;

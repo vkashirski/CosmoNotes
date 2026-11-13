@@ -4,7 +4,7 @@
 (() => {
   const K = window.COSMO_LIST_KIT;
   const { V, S, $, $$, COLORS, DARK_COLORS, COLOR_NAMES, SWATCH, THEMES, themeNow, ICON, sel, h, plural, noteIsLocked,
-    groupIsLocked, render, setFav, paintCards, unlockedNow } = K;
+    groupIsLocked, isShut, render, setFav, paintCards, unlockedNow } = K;
   // defined in a later part:
   const fxSummary = K.later('fxSummary'), openEdit = K.later('openEdit'), trashNote = K.later('trashNote'),
     dissolveGroup = K.later('dissolveGroup'), trashGroup = K.later('trashGroup'), lockNote = K.later('lockNote'),
@@ -70,6 +70,9 @@
     $('#sStartup').checked = !!s.startWithWindows;
     $('#sSpell').checked = !!s.spellCheck;
     $('#sCyr').checked = !!s.spellCyrillic;
+    $('#sCheckDrag').checked = !!s.checkDrag; // 1.3.19: Settings → Checklists
+    $('#sCheckSink').checked = !!s.checkSink;
+    $('#sCheckFixed').checked = !!s.checkFixed;
     paintNewColors();
     $$('#sFont button').forEach((b) => b.classList.toggle('on', b.dataset.font === s.defaultFont));
     const op = Math.round((Number(s.defaultOpacity) || 1) * 100);
@@ -102,72 +105,188 @@
     $('#dataPath').textContent = s.dataPath || '';
     $('#version').textContent = `CosmoNotes ${s.version || ''} - Made with love.`;
     renderAbout(s.version);
+    paintEve();
+    paintPanic();
+    $('#sClickThrough').checked = !!s.clickThroughOn; // 1.3.34
+    paintReapply();
     paintVoice(await S.stt.status());
     renderBackups(await S.backups.list());
   }
 
-  // ---- Settings → Voice to text (1.3.1; main/ipc-stt.js): which model, its download, Test my computer
-  const VERDICT = { live: 'Live', after: 'After you stop', slow: 'Too slow', failed: "Didn't start" };
-  let sttNow = null;
-  function paintVoice(st) {
-    if (!st || !st.models) return;
-    sttNow = st;
-    const use = $('#sttUse');
-    use.innerHTML = '';
-    for (const m of st.models) {
-      use.append(h('button', {
-        class: st.selected === m.id ? 'on' : '',
-        'data-id': m.id,
-        onclick: async () => { if (sttNow.selected !== m.id) paintVoice(await S.stt.use(m.id)); },
-      }, m.name));
+  // ---- 1.3.27: "Use on all notes". Settings a note can change for itself (store.js OVERRIDES says what each puts back):
+  // under each one, how many notes have their own and a button; "Reset notes…" (General) does several at once.
+  const OWN = {
+    font: ['Font', 'font'], opacity: ['See-through', 'see-through'], solidOnHover: ['Turn solid on hover', '“turn solid” choice'],
+    effect: ['Background effect', 'background effect'], follower: ['Mouse follower', 'mouse follower'],
+    fxPause: ['Paused effects', 'choice to pause or play effects'], spell: ['Spelling', 'spelling choice'],
+    checkDrag: ['Reorder by dragging', 'choice for dragging boxes'], checkSink: ['Ticked items to the bottom', 'choice for ticked items'],
+    checkFixed: ['Boxes the same size', 'choice for box sizes'], evening: ['Evening colours', 'evening colours choice'],
+    panic: ['Panic button', 'panic button choice'],
+  };
+  const FOR_NEW = ['font', 'opacity', 'solidOnHover']; // "for new notes": Settings' value is copied in (the rest follow Settings again)
+  const ownCount = (k) => Number((V.state.settings.overrides || {})[k]) || 0;
+  const ownLine = (k, n) => (k === 'panic' ? `${plural(n, 'note')} stay${n === 1 ? 's' : ''} open.` : `${plural(n, 'note')} use${n === 1 ? 's' : ''} ${n === 1 ? 'its' : 'their'} own.`);
+  function paintReapply() {
+    for (const row of $$('.reapply')) {
+      const k = row.dataset.o;
+      const n = ownCount(k);
+      row.hidden = !n;
+      row.innerHTML = '';
+      if (n) row.append(h('span', {}, ownLine(k, n)), h('button', { class: 'pill ghost small', onclick: () => reapply(k) }, 'Use on all notes'));
     }
+    const keys = Object.keys(OWN).filter(ownCount);
+    $('#sOwnNow').textContent = keys.length ? `${plural(keys.length, 'setting')} differ${keys.length === 1 ? 's' : ''} on some notes.` : 'Every note uses Settings.';
+    $('#sResetNotes').disabled = !keys.length;
+  }
+  const done = (count) => toast(count ? `Done. ${plural(count, 'note')} changed.` : 'Nothing to change.');
+  async function reapply(k) {
+    const n = ownCount(k);
+    const text = k === 'panic' ? `${plural(n, 'note')} stay${n === 1 ? 's' : ''} open on panic. They will close with it again.`
+      : `${plural(n, 'note')} ${n === 1 ? 'has its' : 'have their'} own ${OWN[k][1]}. ${FOR_NEW.includes(k) ? 'They get the one set here.' : 'They follow Settings again.'}`;
+    if (!(await modal({ title: 'Use this on all notes?', text, okLabel: 'Use on all notes' }))) return;
+    done(await S.settings.reapply([k]));
+  }
+  $('#sResetNotes').addEventListener('click', async () => {
+    const keys = Object.keys(OWN).filter(ownCount);
+    if (!keys.length) { toast('Every note uses Settings.'); return; }
+    const box = h('div', { class: 'resetlist' }, ...keys.map((k) => h('label', { class: 'check' },
+      h('input', { type: 'checkbox', checked: true, 'data-o': k }), h('span', {}, OWN[k][0]), h('em', {}, plural(ownCount(k), 'note')))));
+    const ok = await modal({ title: 'Reset notes to Settings', text: 'Notes with their own choice get the one set here. Pick which.', content: box, okLabel: 'Reset', icon: ICON.info });
+    if (!ok) return;
+    const picked = [...box.querySelectorAll('input:checked')].map((x) => x.dataset.o);
+    if (picked.length) done(await S.settings.reapply(picked));
+  });
+
+  // ---- 1.3.27: Settings → Evening colours (times are minutes after midnight; main keeps the clock: main/evening.js)
+  const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  function paintEve() {
+    const s = V.state.settings;
+    const EVE = window.COSMO_EVENING;
+    $('#sEve').checked = !!s.eveOn;
+    if (document.activeElement !== $('#sEveFrom')) $('#sEveFrom').value = hhmm(Number.isInteger(s.eveFrom) ? s.eveFrom : 1140);
+    if (document.activeElement !== $('#sEveTo')) $('#sEveTo').value = hhmm(Number.isInteger(s.eveTo) ? s.eveTo : 420);
+    const strip = $('#sEveStrip');
+    // each light paper: its day colour, and the evening shade it turns into
+    if (EVE && !strip.childElementCount) for (const p of Object.values(EVE.PALETTE)) strip.append(h('i', { style: `--a:${p.day}; --b:${p.paper}`, title: p.name }));
+  }
+
+  // ---- 1.3.27: Settings → Panic button → Shortcut. "Set a shortcut…", then press the keys (Esc stops). Meanwhile main lets
+  // go of the old shortcut (capturePanicKey), so pressing it here doesn't hide everything. A letter, digit or sign needs Ctrl
+  // or Alt with it (main checks the same: main/panic.js validKey); an F key may be on its own. No shortcut until one is set.
+  const KEYS = { Space: 'Space', Minus: '-', Equal: '=', Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: "'", BracketLeft: '[',
+    BracketRight: ']', Backslash: '\\', Backquote: '`', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Home: 'Home',
+    End: 'End', PageUp: 'PageUp', PageDown: 'PageDown', Insert: 'Insert', Delete: 'Delete', Backspace: 'Backspace' };
+  function shortcutOf(e) {
+    const m = /^(?:Key([A-Z])|Digit(\d))$/.exec(e.code);
+    const key = m ? m[1] || m[2] : /^F([1-9]|1\d|2[0-4])$/.test(e.code) ? e.code : KEYS[e.code];
+    if (!key) return null; // a modifier on its own (or a key a shortcut can't use): keep waiting
+    const mods = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Super'].filter(Boolean);
+    if (!/^F\d/.test(key) && !mods.some((x) => x !== 'Shift')) return { error: 'Hold Ctrl or Alt with it, or use an F key.' };
+    return { key: [...mods, key].join('+') };
+  }
+  let capturing = false;
+  let captureHint = '';
+  function setPanicKey(key) {
+    V.state.settings.panicKey = key;
+    V.state.settings.panicKeyError = null; // main says again after it tried (the list reloads)
+    S.settings.set({ panicKey: key });
+    paintPanic();
+  }
+  function onCaptureKey(e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.key === 'Escape') { stopCapture(); return; }
+    const r = shortcutOf(e);
+    if (!r) return;
+    if (r.error) { captureHint = r.error; paintPanic(); return; }
+    setPanicKey(r.key);
+    stopCapture();
+  }
+  function startCapture() {
+    if (capturing) return;
+    capturing = true;
+    captureHint = '';
+    window.addEventListener('keydown', onCaptureKey, true);
+    window.addEventListener('blur', stopCapture);
+    S.settings.capturePanicKey(true);
+    paintPanic();
+  }
+  function stopCapture() {
+    if (!capturing) return;
+    capturing = false;
+    window.removeEventListener('keydown', onCaptureKey, true);
+    window.removeEventListener('blur', stopCapture);
+    S.settings.capturePanicKey(false);
+    paintPanic();
+  }
+  function paintPanic() {
+    const s = V.state.settings;
+    $('#sPanic').checked = !!s.panicOn;
+    $('#sPanicKeyRow').hidden = !s.panicOn;
+    $('#sPanicKeyNow').textContent = s.panicKey || 'None';
+    const b = $('#sPanicKey');
+    b.classList.toggle('on', capturing);
+    b.textContent = capturing ? 'Press the keys… (Esc: stop)' : s.panicKey ? 'Change…' : 'Set a shortcut…';
+    $$('#sPanicKeyRow [data-key]').forEach((x) => x.classList.toggle('on', x.dataset.key === s.panicKey));
+    $('#sPanicClear').disabled = !s.panicKey;
+    const bad = !capturing && s.panicKeyError;
+    $('#sPanicHint').classList.toggle('warn', !!bad || (capturing && !!captureHint));
+    $('#sPanicHint').textContent = capturing ? (captureHint || 'Hold Ctrl or Alt and press a letter, or press an F key.')
+      : s.panicKeyError === 'taken' ? `Another app already uses ${s.panicKey}. Pick another.`
+        : s.panicKeyError === 'bad' ? 'That shortcut can’t be used. Pick another.'
+          : s.panicKey ? 'Works in every app, even when CosmoNotes is hidden.' : 'No shortcut yet. Alt+Z or F8 are good picks.';
+  }
+  $('#sPanicKey').addEventListener('click', () => (capturing ? stopCapture() : startCapture()));
+  $$('#sPanicKeyRow [data-key]').forEach((x) => x.addEventListener('click', () => { stopCapture(); setPanicKey(x.dataset.key); }));
+  $('#sPanicClear').addEventListener('click', () => { stopCapture(); setPanicKey(''); });
+
+  // ---- Settings → Voice to text (1.3.1; main/ipc-stt.js): the model it uses and its download (1.3.4: one model, no
+  // choice and no Test my computer)
+  function paintVoice(st) {
+    if (!st || !st.model) return;
+    const m = st.model;
     const box = $('#sttModels');
     box.innerHTML = '';
-    for (const m of st.models) {
-      const size = m.mbMax ? `${m.mb}–${m.mbMax} MB` : `${m.mb} MB`;
-      const bits = [];
-      let btn = null;
-      if (m.state === 'ready') {
-        bits.push(m.builtIn ? `Built in · ${size}` : size, 'Ready');
-        if (m.test && VERDICT[m.test.verdict]) bits.push(VERDICT[m.test.verdict]);
-        if (!m.builtIn) btn = h('button', { class: 'pill ghost small', onclick: () => removeModel(m) }, 'Remove');
-      } else if (m.state === 'downloading') {
-        bits.push(`Downloading ${m.pct || 0}%`);
-        btn = h('button', { class: 'pill ghost small', onclick: async () => paintVoice(await S.stt.cancelDownload(m.id)) }, 'Cancel');
-      } else if (m.state === 'failed') {
-        bits.push(size, 'The download stopped');
-        btn = h('button', { class: 'pill small', onclick: async () => paintVoice(await S.stt.download(m.id)) }, 'Try again');
-      } else if (m.state === 'missing') {
-        bits.push('Not found. build.bat adds it.');
-      } else {
-        bits.push(size);
-        btn = h('button', { class: 'pill small', onclick: async () => paintVoice(await S.stt.download(m.id)) }, 'Download');
-      }
-      const err = !m.builtIn && st.startError && m.state === 'ready' ? h('small', { class: 'err' }, "Didn't start last time. Standard was used.") : null;
-      box.append(h('div', { class: 'row sttm', 'data-id': m.id },
-        h('span', {}, h('b', {}, m.name), h('small', {}, bits.join(' · ')), err),
-        btn,
-        m.state === 'downloading' ? h('div', { class: 'sttbar' }, h('i', { style: `width:${m.pct || 0}%` })) : null));
+    const size = m.mbMax ? `${m.mb}–${m.mbMax} MB` : `${m.mb} MB`;
+    const where = m.device === 'gpu' ? 'graphics card' : 'processor';
+    const bits = [];
+    let btn = null;
+    if (m.state === 'ready') {
+      bits.push('Ready', size, `Runs on the ${where}`);
+      btn = h('button', { class: 'pill ghost small', onclick: () => removeModel(m) }, 'Remove');
+    } else if (m.state === 'downloading') {
+      bits.push(`Downloading ${m.pct || 0}%`);
+      btn = h('button', { class: 'pill ghost small', onclick: async () => paintVoice(await S.stt.cancelDownload(m.id)) }, 'Cancel');
+    } else if (m.state === 'failed') {
+      bits.push(size, 'The download stopped');
+      btn = h('button', { class: 'pill small', onclick: async () => paintVoice(await S.stt.download(m.id)) }, 'Try again');
+    } else {
+      bits.push('Not downloaded', size);
+      btn = h('button', { class: 'pill small', onclick: async () => paintVoice(await S.stt.download(m.id)) }, 'Download');
     }
-    const sel = st.models.find((m) => m.id === st.selected) || st.models[0];
-    $('#sttUsing').textContent = `Using: ${sel.state === 'ready' && sel.device === 'gpu' ? 'graphics card' : 'processor'}.`;
-    $('#sttTest').disabled = !!st.testing;
-    $('#sttTest').textContent = st.testing ? 'Testing…' : 'Test';
-    $('#sttTestInfo').textContent = st.testing ? 'This takes a few seconds.' : 'Checks if words can appear while you talk.';
+    const err = st.startError && m.state === 'ready' ? h('small', { class: 'err' }, "Didn't start last time.") : null;
+    box.append(h('div', { class: 'row sttm', 'data-id': m.id },
+      h('span', {}, h('b', {}, `Uses ${m.name}`), h('small', {}, bits.join(' · ')), err),
+      btn,
+      m.state === 'downloading' ? h('div', { class: 'sttbar' }, h('i', { style: `width:${m.pct || 0}%` })) : null));
+    // where it comes from: the model's page, opened in the browser
+    const src = $('#sttSource');
+    src.textContent = '';
+    src.append('It downloads from ', h('a', { href: m.url, onclick: (e) => { e.preventDefault(); S.openExternal(m.url); } }, m.url), '. Your voice never leaves this device.');
+    for (const b of document.querySelectorAll('#sttWhen button')) b.classList.toggle('on', b.dataset.v === st.when);
+    $('#sttWhenInfo').textContent = st.when === 'live' && m.device === 'cpu' ? 'On the processor, the words can lag behind.'
+      : st.when === 'stop' ? 'The words appear when you press Stop.' : 'The words appear as you speak.';
+  }
+  for (const b of document.querySelectorAll('#sttWhen button')) {
+    b.addEventListener('click', async () => paintVoice(await S.stt.when(b.dataset.v)));
   }
   async function removeModel(m) {
-    const ok = await modal({ title: `Remove ${m.name}?`, text: 'You can download it again later.', okLabel: 'Remove', danger: true });
+    const ok = await modal({ title: `Remove ${m.name}?`, text: 'Voice to text stops working until you download it again.', okLabel: 'Remove', danger: true });
     if (!ok) return;
     const st = await S.stt.remove(m.id);
     if (st && st.error === 'busy') toast('Voice to text is busy. Try again in a moment.');
     paintVoice(st);
   }
-  $('#sttTest').addEventListener('click', async () => {
-    if (sttNow) paintVoice({ ...sttNow, testing: true });
-    const st = await S.stt.test();
-    if (st && st.error === 'busy') toast('Voice to text is busy. Try again in a moment.');
-    paintVoice(st);
-  });
   S.stt.onChanged((st) => { if (V.tab === 'settings') paintVoice(st); });
 
   const niceDate = (iso) => {
@@ -369,7 +488,17 @@
   window.addEventListener('blur', hideCtx);
   $('#viewNotes').addEventListener('scroll', hideCtx, { passive: true });
 
+  // "Select" in both menus (and nothing else but the lock options on a shut card: isShut, 1.3.28)
+  const pickItem = (key) => ({ label: 'Select (Ctrl+click)', icon: ICON.check, run: () => { sel.add(key); V.selAnchor = key; paintCards(); } });
   function noteMenu(n, e) {
+    // 1.1.47 (the owner's wish): "Unlock…" lasts until CosmoNotes restarts; "Remove lock…" under it is for good
+    const locks = [
+      !n.ownLock ? { label: 'Lock note', icon: ICON.lock, run: () => lockNote(n), disabled: false }
+        : unlockedNow('note', n) ? { label: 'Lock again', icon: ICON.lock, run: () => relockNote(n) }
+          : { label: 'Unlock…', icon: ICON.unlock, run: () => unlockNoteNow(n) },
+      n.ownLock ? { label: 'Remove lock…', icon: ICON.unlock, run: () => unlockNote(n) } : null,
+    ];
+    if (isShut('note', n)) { showCtx(e, [pickItem(`n:${n.id}`), '-', ...locks]); return; }
     showCtx(e, [
       // 1.1.22 (sixth round, the owner's order): favourites first, then Edit design; "Open on desktop" / "Bring to front"
       // is gone (clicking the card opens it)
@@ -378,14 +507,12 @@
         : { label: 'Add to favourites', icon: ICON.star, run: () => setFav([`n:${n.id}`], true) },
       { label: 'Edit design…', icon: ICON.edit, run: () => openEdit(n) },
       n.open ? { label: 'Close note', icon: ICON.hide, run: () => S.list.closeNote(n.id) } : null,
+      // 1.3.34: the one way back besides the note's own button (only while Settings → Click-through is on: else it's off anyway)
+      n.clickThrough && V.state.settings.clickThroughOn ? { label: 'Turn off click-through', icon: ICON.through, run: () => S.list.clickThroughOff(n.id) } : null,
       { label: 'Duplicate note', icon: ICON.copy, run: async () => { await S.list.duplicate(n.id); toast('Note duplicated'); } },
-      { label: 'Select (Ctrl+click)', icon: ICON.check, run: () => { sel.add(`n:${n.id}`); V.selAnchor = `n:${n.id}`; paintCards(); } },
+      pickItem(`n:${n.id}`),
       '-',
-      // 1.1.47 (the owner's wish): "Unlock…" lasts until CosmoNotes restarts; "Remove lock…" under it is for good
-      !n.ownLock ? { label: 'Lock note', icon: ICON.lock, run: () => lockNote(n), disabled: false }
-        : unlockedNow('note', n) ? { label: 'Lock again', icon: ICON.lock, run: () => relockNote(n) }
-          : { label: 'Unlock…', icon: ICON.unlock, run: () => unlockNoteNow(n) },
-      n.ownLock ? { label: 'Remove lock…', icon: ICON.unlock, run: () => unlockNote(n) } : null,
+      ...locks,
       n.groupId ? { label: 'Take out of group', icon: ICON.out, run: () => S.groups.moveUp(n.id) } : null,
       '-',
       noteIsLocked(n)
@@ -394,18 +521,22 @@
     ]);
   }
   function groupMenu(g, e) {
-    showCtx(e, [
-      { label: 'Open group', icon: ICON.folder, run: () => openGroupView(g) },
-      g.open ? { label: 'Group settings…', icon: ICON.palette, run: async () => { await openGroupView(g); openPanel(); } } : null,
-      g.favorite
-        ? { label: 'Remove from favourites', icon: ICON.star, run: () => setFav([`g:${g.id}`], false) }
-        : { label: 'Add to favourites', icon: ICON.star, run: () => setFav([`g:${g.id}`], true) },
-      { label: 'Select (Ctrl+click)', icon: ICON.check, run: () => { sel.add(`g:${g.id}`); V.selAnchor = `g:${g.id}`; paintCards(); } },
-      '-',
+    const locks = [
       !g.locked ? { label: 'Lock group', icon: ICON.lock, run: () => lockGroup(g) }
         : unlockedNow('group', g) ? { label: 'Lock again', icon: ICON.lock, run: () => relockGroup(g) }
           : { label: 'Unlock…', icon: ICON.unlock, run: () => unlockGroupNow(g) },
       g.locked ? { label: 'Remove lock…', icon: ICON.unlock, run: () => unlockGroup(g) } : null,
+    ];
+    if (isShut('group', g)) { showCtx(e, [pickItem(`g:${g.id}`), '-', ...locks]); return; }
+    showCtx(e, [
+      { label: 'Open group', icon: ICON.folder, run: () => openGroupView(g) },
+      { label: 'Group settings…', icon: ICON.palette, run: async () => { await openGroupView(g); openPanel(); } },
+      g.favorite
+        ? { label: 'Remove from favourites', icon: ICON.star, run: () => setFav([`g:${g.id}`], false) }
+        : { label: 'Add to favourites', icon: ICON.star, run: () => setFav([`g:${g.id}`], true) },
+      pickItem(`g:${g.id}`),
+      '-',
+      ...locks,
       g.parentId ? { label: 'Move up one level', icon: ICON.out, run: () => S.groups.moveUp(g.id) } : null,
       { label: 'Ungroup…', icon: ICON.ungroup, run: () => dissolveGroup(g) },
       '-',

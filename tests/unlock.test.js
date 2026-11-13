@@ -100,7 +100,7 @@ if (app.phase === 'main') app.phases(__filename, ['first', 'restart']);
 
   // ---- "Unlock…" from the list (1.1.47): only until a restart; the lock stays, also on disk
   const A = id;
-  for (const x of app.noteWins()) await H['list:close-note'](null, x.noteId);
+  for (const x of app.noteWins()) await H['note:close'](ev(x));
   assert.equal((await H['list:unlock-now'](null, A, '0000')).error, 'wrong');
   assert.ok((await app.card(A)).locked, 'a wrong PIN changes nothing');
   assert.ok((await H['list:unlock-now'](null, A, '2580')).ok);

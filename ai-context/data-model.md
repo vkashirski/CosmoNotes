@@ -8,10 +8,9 @@ attachments/<name>     photos (png/jpg/gif/webp/bmp), drawings (png), voice (web
 attachments/<name>.part + <stem>.rec.json   1.2.4: a voice recording being made (pieces appended every 250 ms) and whose it is
                        ({ noteId, file, startedAt, endedAt }); see "Voice recordings" below
 backups/YYYY-MM-DD[_HH-MM-SS]/   <uuid>.json…, groups.json, meta.json {created,count} (copies of locked notes sealed, 1.1.31)
-models/<id>/           1.3.1: a downloaded voice-to-text model (Best = whisper-small-en): its files as in main/stt-models.js, then
+models/<id>/           1.3.1: the downloaded voice-to-text model (whisper-small-en, the only one since 1.3.4): its files as in main/stt-models.js, then
                        ready.json { run: 'gpu'|'cpu', at } written last (no ready.json = not complete). Not in backups; the
                        uninstaller leaves it. A .part left by a quit mid-download is removed at the next start.
-                       (Standard comes with the app: <install>/resources/models/moonshine-base/, from build/models/.)
 groups.json            { groups: [{ id, name, createdAt, parentId, style, color, locked, favorite }] }
 settings.json          see below
 ```
@@ -23,12 +22,15 @@ save 350ms after typing stops, on blur, and synchronously on unload. Main flushe
 **Note fields** (`normalize()` in store.js is the schema; it always fills defaults):
 `id, title, html, text (plain text for list/search), firstImage, color (yellow|pink|green|blue|purple|
 orange|mint|charcoal, and since 1.1.15 the list themes' colours cream|rose|sage|mist|lavender|night|midnight|forest|plum;
-dark ones = `DARK_COLORS`: charcoal, night, midnight, forest, plum), font (hand|round|medieval; `FONTS` in store.js, unknown → hand), size (s|m|l), ink (draw-over, see below), wrapWidth (px or null:
-locked text layout), opacity (0.25–1), solidOnHover, pinned, open
-(window open → reopens at start), rolled, zoom (0.5–3, Ctrl + wheel in the note; not an edit), locked, favorite (starred in the list; not an edit), spell (null = follow Settings | true | false),
+dark ones = `DARK_COLORS`: charcoal, night, midnight, forest, plum), font (hand|round|medieval; `FONTS` in store.js, unknown → hand), titleFont (1.3.3: the top-bar title's own font, hand|round|medieval, null/unknown = the note's font; not secret), size (s|m|l), ink (draw-over, see below), wrapWidth (px or null:
+locked text layout), nowrap / wrapFixed (which kind of word wrap off, see below), opacity (0.25–1), solidOnHover, pinned, clickThrough (1.3.34: only with pinned, see feature-map; not copied by Duplicate), open
+(window open → reopens at start), rolled, zoom (0.5–3, Ctrl + wheel in the note; not an edit), locked, favorite (starred in the list; not an edit), spell (null = follow Settings | true | false), checklist (1.3.19: { drag, sink, fixed }, each
+true / false or null = as in Settings: checkDrag / checkSink / checkFixed; `cleanChecklist`; not an edit; copied by Duplicate),
 groupId, bounds {x,y,width,height} (unrolled height), createdAt, updatedAt, deletedAt (null or in Bin),
-restoredFrom, coverTitle (1.1.30: "Title while locked", shown instead of the title while locked; not secret), enc / encAtt (1.1.30: a locked note's sealed title/html/text/firstImage/ink and the names of its sealed attachment files; main/crypt.js), fx ({ e, f, ea, fa, eo, fo }: the note's own effect / mouse follower, null = same as all notes, 'none' = nothing; ea /
-fa = how much, low | mid | high or null; eo / fo = opacity 0.1–1 in 5 % steps or null (1.1.17, `cleanFxOpacity`); mi = the mouse plays with the background, true / false / null (1.1.21); not an edit; 1.1.16), fxPaused (effects paused on this note; not an edit)`.
+restoredFrom, sizes (1.3.18: 2 = its sizes read the new way: `store.js` `dropDeadSizes` took off the old sizes that showed nothing, once; null = still sealed, done when opened), coverTitle (1.1.30: "Title while locked", shown instead of the title while locked; not secret), enc / encAtt (1.1.30: a locked note's sealed title/html/text/firstImage/ink and the names of its sealed attachment files; main/crypt.js), fx ({ e, f, ea, fa, eo, fo }: the note's own effect / mouse follower, null = same as all notes, 'none' = nothing; ea /
+fa = how much, low | mid | high or null; eo / fo = opacity 0.1–1 in 5 % steps or null (1.1.17, `cleanFxOpacity`); mi = the mouse plays with the background, true / false / null (1.1.21); not an edit; 1.1.16), fxPaused (effects paused on this note; not an edit), evening (1.3.27: evening colours on / off for this note, null = as in
+Settings; not an edit; copied by Duplicate), panic (1.3.27: false = the panic button leaves this note open, null = it closes it; not an edit; copied by Duplicate)`.
+Which of these a note can have its own value of, and what Settings → "Use on all notes" puts back, is one table: `OVERRIDES` in store.js.
 
 **Draw-over ink** (`note.ink`): `{ s: [ { t: pen|hl|line|arrow|rect|ellipse, c: '#rrggbb', w: 1–40, l: 'a'|'b',
 d: 'dash'|'dot' (optional, 1.1.13; missing = solid), o: dash offset in px (1.1.14, only on pieces left by the partial eraser, so
@@ -42,7 +44,15 @@ notes, and patches can't change it while hidden. It counts as an edit for `updat
 **Word wrap off = no limit (1.1.45):** with `wrapWidth` set and no drawing, or with `note.nowrap` true, `#sheet.nowrap`:
 lines only end at Enter, the sheet is `max-content` wide, pictures cap at `--picW` (the visible width; with a drawing,
 `wrapWidth`). `nowrap` is set by the toggle and by the first stroke on such a note (`keepForInk`, which also sets
-`wrapWidth` to the visible width). Without `nowrap`, a note with a drawing keeps the older lock described next.
+`wrapWidth` to the visible width). With `note.wrapFixed` true instead, the note keeps the lock described next.
+
+**`wrapFixed` (1.3.29):** word wrap off with the text kept at `wrapWidth` (`#sheet.fixed`). Set by the first stroke on a
+note with word wrap on (`saveInk`); `false` from the word wrap button. It is saved, never worked out from the drawing:
+before 1.3.29 the kind was "locked if it has a drawing", so erasing or undoing the last line turned the note into
+"no limit" and every paragraph and table cell un-wrapped. `normalize` gives a note saved before 1.3.29 the kind it
+showed then (locked if `wrapWidth`, no `nowrap`, and a drawing); a sealed one gets `null` until it is opened
+(`openedLayout`, called from crypt.js `openAll`). Without a drawing, a locked note's pictures still shrink to the
+visible width (`#sheet.fixed:not(.inked)`).
 
 **Text layout lock** (`note.wrapWidth`; called **"Word wrap" off** in the UI since 1.1.6): when set, `#sheet` has that fixed width (`applyLayout` in note.js), so text
 and pictures never re-wrap; `#scroller` is `overflow: auto` and shows a sideways scrollbar when the note is
@@ -70,9 +80,15 @@ each note's own choice is kept), fxPaused (pause all effects; also the tray's "P
 defaultOpacity (0.25–1: see-through of new notes), defaultSolidOnHover (true: new notes turn solid on hover),
 listTheme (cream|rose|mint|sky|lilac, dark: night|midnight|forest|plum: colours of the list window; doesn't trigger a reload either),
 madeGroup (true once any group was ever made; hides the "drag to make a group" tip for good),
-sttModel (1.3.1: the voice-to-text model picked in Settings, a model id; missing = Standard), sttTests (1.3.1: { '<model id>/<set>':
-{ speed (× real time), verdict: live | after | slow | failed, quick (true = the 2-second check at first use, false = Test my
-computer), at } }), sttWebgpu (1.3.1: whether the engine found WebGPU last time; decides which set of Best is downloaded),
+checkDrag (1.3.19, true: drag a checkbox to move its line), checkSink (false: a ticked line moves below the unticked ones; unticking moves nothing),
+checkFixed (false: every checkbox the note's own size), all three sent to note windows (`noteSettings`) and changed per note by `note.checklist`,
+eveOn (1.3.27, false: evening colours for notes that follow Settings), eveFrom / eveTo (minutes after midnight, 1140 / 420 = 19:00 / 07:00; anything else
+is put back at load), panicOn (1.3.27, false: the panic button), panicKey ('' = no shortcut; an Electron accelerator such as 'Alt+Z' or 'F8', checked by
+`validKey` in main/panic.js), panicClosed (ids of the notes the last panic closed; they reopen when CosmoNotes is opened again, then it is emptied),
+clickThroughOn (1.3.34, false: the click-through button in each note; off = no note is click-through, each keeps note.clickThrough),
+sttWhen (1.3.5: Settings → Voice to text → "Words appear": 'live' = while you talk, 'stop' = when you stop; missing =
+by the PC: graphics card live, processor stop), sttWebgpu (1.3.1: whether the engine found WebGPU last time; decides which set of the model is downloaded; sttModel and
+sttTests, 1.3.1–1.3.3, are deleted at start since 1.3.4),
 lock ("salt:hash" scrypt, or null; since 1.1.30 the marker 'encrypted' while crypt exists), crypt (1.1.30: { v, pub, byPw, byRec, keyShown, off, backupsSealed (1.1.31) }: the
 encryption keys, see architecture.md; never sent to a window), lockKind ('pin'|'password', null = password from before 1.1.6),
 lockLen (PIN length, so a PIN can open by itself)`.

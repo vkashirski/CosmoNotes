@@ -49,6 +49,11 @@ body.dark .phead:hover { background: var(--card2); }
 .pinner { min-height: 0; overflow: hidden; padding: 0 16px; opacity: 0; transform: translateY(-4px); transition: opacity .25s ease, transform .32s ease, padding .32s ease; }
 .panel.open .pinner { opacity: 1; transform: none; padding-top: 6px; padding-bottom: 14px; }
 .abouthead.phead { padding: 10px 16px; }
+/* 1.3.35: search in Settings (the Notes tab's search row; .settings already spaces its rows) */
+#viewSettings .searchrow { margin-bottom: -8px; } /* its 8px solid edge + the 12px gap = 12px, as in Notes */
+#viewSettings .panel.unfound { display: none; }
+.snone { margin: 6px 0; text-align: center; color: var(--mute); font: 700 13px var(--ui); }
+.snone[hidden] { display: none; }
 /* backups: the newest one, and the picker pop-up */
 /* General: "For new notes" heading, said once for colour, font and see-through */
 .oprow { display: flex; align-items: baseline; justify-content: space-between; }
@@ -192,6 +197,9 @@ body.dark #editSheet { background: transparent; }
 }
 .card:hover > .fav, .card > .fav:focus-visible, .card > .fav.on { opacity: 1; }
 .card > .fav:hover { transform: scale(1.15); background: rgba(255,255,255,.45); }
+/* 1.3.28: on a shut card (locked, hidden) the star only shows a favourite; clicks go to the card */
+.card > .fav:disabled { pointer-events: none; }
+.card:hover > .fav:disabled:not(.on) { opacity: 0; }
 /* bigger than at first (+15 %, then +10 % in 1.1.14), and tilted a little to the left */
 .card > .fav svg { width: 21.5px; height: 21.5px; stroke-width: 2; rotate: -9deg; transition: fill .2s, stroke .2s; }
 .card > .fav.on { color: #D9A10A; }
@@ -225,6 +233,10 @@ body.dark #editSheet { background: transparent; }
 .card > .lockb svg { width: 17px; height: 17px; stroke-width: 2.2; }
 .card.group > .lockb { top: -2px; right: 31px; z-index: 6; background: var(--card); box-shadow: 0 2px 6px rgba(0,0,0,.18); color: var(--ink3); }
 .card.group > .lockb:hover { background: var(--card); }
+/* 1.3.33: on a note card the star and the lock sit right on the card, often over a photo: while you point at the card
+   their icons get an outline of the card's paper colour, so they show on a dark or busy picture (the owner's wish).
+   A group's star and lock already sit on a round badge. */
+.card:not(.group):hover > :is(.fav, .lockb) svg { filter: drop-shadow(0 0 1px var(--paper)) drop-shadow(0 0 1px var(--paper)) drop-shadow(0 0 1px var(--paper)); }
 
 /* picked cards (Ctrl+click): a violet outline and a tick */
 .card.sel { outline: 3px solid #8E7BEF; outline-offset: 3px; transform: rotate(0deg); }
@@ -241,3 +253,27 @@ body.dark #editSheet { background: transparent; }
 .card.group.ctxon:not(.sel) { outline-offset: 1px; border-radius: 10px; }
 .dragchip { position: fixed; left: -500px; top: 0; padding: 7px 13px; border-radius: 999px; background: #8E7BEF; color: #fff; font: 800 12px var(--ui); }
 
+
+/* ---------- 1.3.27: "Use on all notes" under a setting some notes changed for themselves (list/settings-menus.js paintReapply) */
+.reapply { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; padding: 6px 8px 6px 10px; border-radius: 10px; background: var(--soft); font: 700 12px var(--ui); color: var(--ink2); }
+.reapply[hidden] { display: none; }
+.reapply > span { flex: 1; }
+.reapply .pill.small { height: 24px; padding: 0 10px; }
+/* the "Reset notes…" pop-up: one line per setting, ticked */
+.resetlist { display: flex; flex-direction: column; gap: 2px; margin: 0 0 6px; text-align: left; }
+.resetlist .check { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; font: 700 13px var(--ui); color: var(--ink); cursor: pointer; }
+.resetlist .check:hover { background: var(--soft); }
+.resetlist .check span { flex: 1; }
+.resetlist .check em { font-style: normal; color: var(--mute); font-size: 12px; }
+/* ---------- 1.3.27: Evening colours: the two times, and each light paper by day and by evening */
+.row.evetimes { gap: 18px; flex-wrap: wrap; }
+.evetimes label { display: flex; align-items: center; gap: 8px; }
+.evetimes .minput { width: auto; height: 32px; margin: 0; padding: 0 8px; font: 700 13px var(--ui); }
+.evestrip { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px; }
+.evestrip i { width: 26px; height: 26px; border-radius: 4px 4px 4px 9px; background: linear-gradient(135deg, var(--a) 50%, var(--b) 50%); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+/* ---------- 1.3.27: Panic button → Shortcut */
+.pickbtns .pill.on { box-shadow: inset 0 0 0 2px var(--ink); }
+.keyfield.on { box-shadow: inset 0 0 0 2px var(--brand); color: var(--brand); animation: keywait 1.2s ease-in-out infinite; }
+@keyframes keywait { 50% { box-shadow: inset 0 0 0 2px transparent; } }
+.shint.warn { color: var(--danger); }
+#sPanicKeyRow[hidden] { display: none; }

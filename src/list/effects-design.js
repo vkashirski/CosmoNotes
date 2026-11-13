@@ -3,7 +3,7 @@
 // (src/list.js until 1.1.28; the parts load in order from list.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_LIST_KIT;
-  const { V, S, $, $$, COLORS, DARK_COLORS, COLOR_NAMES, SWATCH, h, toast, hideCtx, noteIsLocked, noteById } = K;
+  const { V, S, $, $$, COLORS, DARK_COLORS, COLOR_NAMES, SWATCH, h, toast, hideCtx, noteIsLocked, isShut, noteById } = K;
   // ================================================================ effects (1.1.16)
   // A note's effect plays on its card too, behind the card's writing (a canvas .fxc as the card's first child,
   // z-index -1), and its mouse follower trails the pointer over the card. Same rules as the note window
@@ -172,7 +172,9 @@
   // 1.2.2: several notes at once (the selection bar's Edit design): ed.ids holds them all, ed.id is the first one (the
   // preview shows its look). No title then. A change goes to every note; a setting the notes don't share shows
   // "Mixed" (ed.mixed) until it is picked. Effect changes send only the changed setting (fxKeys, main 'list:edit').
-  const ed = { id: null, ids: [], mixed: new Set(), saving: 0, color: 'yellow', font: 'hand', title: '', opacity: 1, fx: null, timer: null, pending: null, tab: 'look', anchor: null };
+  // 1.3.11: Title font (ed.tfont = the note's titleFont, else its font), for one note or several, sent like the font.
+  // 1.3.28 (the owner's wish): never for a shut note (isShut: its lock hides it); one that gets shut closes the sheet.
+  const ed = { id: null, ids: [], mixed: new Set(), saving: 0, color: 'yellow', font: 'hand', tfont: 'hand', title: '', opacity: 1, fx: null, timer: null, pending: null, tab: 'look', anchor: null };
   const many = () => ed.ids.length > 1;
   for (const c of COLORS) {
     $('#editColors').append(h('button', {
@@ -241,6 +243,10 @@
     $('#editFontRow').hidden = !many();
     for (const b of $$('#editFonts button')) b.classList.toggle('on', !mix('font') && b.dataset.font === ed.font);
     $('#editFontName').textContent = mix('font') ? 'Mixed' : '';
+    for (const b of $$('#editTFonts button')) b.classList.toggle('on', !mix('tfont') && b.dataset.tfont === ed.tfont);
+    $('#editTFontName').textContent = mix('tfont') ? 'Mixed' : '';
+    // the font of both titles: the preview's title and Title while locked
+    for (const el of [$('#editTitle'), $('#editCover')]) if (mix('tfont') || many()) delete el.dataset.tfont; else el.dataset.tfont = ed.tfont;
     if (!FX) return;
     const s = V.state.settings; const mine = ed.fx || blankFx();
     for (const [box, kind, key, all] of [[$('#editFxEffects'), 'effect', 'e', s.fxEffect], [$('#editFxFollowers'), 'follower', 'f', s.fxFollower]]) {
@@ -274,12 +280,15 @@
   function openEdit(n) {
     const anchor = V.ctxCard && V.ctxCard.isConnected ? V.ctxCard : null; // the card that was right-clicked
     hideCtx();
+    if (isShut('note', n)) return;
     if (ed.id) closeEdit();
     ed.id = n.id;
     ed.ids = [n.id];
     ed.mixed = new Set();
     ed.pending = null;
     ed.color = n.color;
+    ed.font = n.font || 'hand';
+    ed.tfont = n.titleFont || ed.font;
     ed.title = n.title || '';
     ed.opacity = Number(n.opacity) || 1;
     ed.fx = { ...blankFx(), ...(n.fx || {}) };
@@ -289,7 +298,7 @@
   }
   // 1.2.2: the selection bar's Edit design: the same sheet for all the picked notes (no title, no anchor card)
   function openEditMany(notes) {
-    notes = notes.filter((n) => n && !n.deletedAt);
+    notes = notes.filter((n) => n && !n.deletedAt && !isShut('note', n));
     if (!notes.length) return;
     if (notes.length === 1) { V.ctxCard = null; openEdit(notes[0]); return; }
     hideCtx();
@@ -312,6 +321,9 @@
     if (differs((n) => n.color)) ed.mixed.add('color');
     ed.font = lead.font || 'hand';
     if (differs((n) => n.font || 'hand')) ed.mixed.add('font');
+    const tfOf = (n) => n.titleFont || n.font || 'hand';
+    ed.tfont = tfOf(lead);
+    if (differs(tfOf)) ed.mixed.add('tfont');
     if (!keepOpacity) ed.opacity = Number(lead.opacity) || 1;
     if (differs((n) => Number(n.opacity) || 1)) ed.mixed.add('opacity');
     ed.fx = fxOf(lead);
@@ -350,8 +362,8 @@
     ed.pending = null;
     ed.saving++;
     try {
-      const { font, ...rest } = patch; // the font goes the way the old Colour pop-up sent it ('list:apply')
-      if (font) await S.list.apply(ids, { font });
+      const { font, tfont, ...rest } = patch; // the fonts go the way the old Colour pop-up sent the font ('list:apply')
+      if (font || tfont) await S.list.apply(ids, { ...(font ? { font } : {}), ...(tfont ? { titleFont: tfont } : {}) });
       if (Object.keys(rest).length) for (const id of ids) await S.list.edit(id, rest);
     } finally { ed.saving--; }
   }
@@ -390,10 +402,12 @@
     if (!ed.id) return;
     if (many()) return editRefreshMany();
     const n = V.state.notes.find((x) => x.id === ed.id);
-    if (!n || n.deletedAt) { ed.pending = null; closeEdit(); return; }
+    if (!n || n.deletedAt || isShut('note', n)) { ed.pending = null; closeEdit(); return; } // 1.3.28: locked meanwhile
     if (ed.pending) return; // our own change is on its way
     let changed = false;
     if (n.color !== ed.color) { ed.color = n.color; changed = true; }
+    const tf = n.titleFont || n.font || 'hand';
+    if (tf !== ed.tfont) { ed.tfont = tf; changed = true; }
     if (Number.isFinite(Number(n.opacity)) && Number(n.opacity) !== ed.opacity && document.activeElement !== $('#editOpacity')) { ed.opacity = Number(n.opacity); changed = true; }
     if (n.fx && JSON.stringify({ ...blankFx(), ...n.fx }) !== JSON.stringify(ed.fx)) { ed.fx = { ...blankFx(), ...n.fx }; changed = true; }
     editPaint(); // also when only Settings changed ("Same as all notes" shows its name)
@@ -403,9 +417,9 @@
     return changed;
   }
   function editRefreshMany() {
-    const notes = ed.ids.map((id) => V.state.notes.find((x) => x.id === id)).filter((n) => n && !n.deletedAt);
+    const notes = ed.ids.map((id) => V.state.notes.find((x) => x.id === id)).filter((n) => n && !n.deletedAt && !isShut('note', n));
     if (!notes.length) { ed.pending = null; closeEdit(); return; }
-    if (notes.length !== ed.ids.length) { // some went to the Bin
+    if (notes.length !== ed.ids.length) { // some went to the Bin (or got locked, 1.3.28)
       ed.ids = notes.map((n) => n.id); ed.id = ed.ids[0];
       $('#editBox h3').textContent = `Edit design · ${ed.ids.length} notes`;
       $('#editTitle').value = `${ed.ids.length} notes`;
@@ -413,11 +427,10 @@
     if (!ed.pending && !ed.saving) editLoadMany(notes, document.activeElement === $('#editOpacity'));
     editPaint();
   }
-  // 1.1.30: a locked card's title field is its "title while locked" (main sends that as its title, cover: true); a locked
-  // note that is unlocked right now shows its real title there and the cover title in its own field
+  // 1.1.30: a locked note (unlocked right now: a shut one never gets the sheet, 1.3.28) has its "title while locked" in
+  // its own field, under its real title
   function paintCover(n) {
-    $('#editTitle').placeholder = n.cover ? 'Title while locked (optional)' : 'Title (optional)';
-    $('#editCoverRow').hidden = !!n.cover || !noteIsLocked(n);
+    $('#editCoverRow').hidden = !noteIsLocked(n);
     if (document.activeElement !== $('#editCover')) $('#editCover').value = n.coverTitle || '';
   }
   $('#editCover').addEventListener('input', () => editQueue({ coverTitle: $('#editCover').value }));
@@ -448,6 +461,7 @@
     range.addEventListener('change', () => editFlush());
   }
   $$('#editFonts button').forEach((b) => b.addEventListener('click', () => editSet({ font: b.dataset.font })));
+  $$('#editTFonts button').forEach((b) => b.addEventListener('click', () => editSet({ tfont: b.dataset.tfont })));
   $('#editFxInteract').addEventListener('change', (e) => editFx('mi', e.target.checked));
   // the follower plays when the mouse moves over the paper
   $('#editPaper').addEventListener('pointermove', (e) => { if (!edFxLayer) return; const r = $('#editFxCanvas').getBoundingClientRect(); edFxLayer.move(e.clientX - r.left, e.clientY - r.top); });

@@ -1,12 +1,13 @@
 'use strict';
-// CosmoNotes note window, part 2 of 11: the Effects pop-up, spelling, selection helpers, formatting
+// CosmoNotes note window, part 2 of 12: the Effects pop-up, spelling, selection helpers, formatting
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
-  const { V, api, $, $$, editor, body, changed, gotDates, applyLook, FX, fxName, applyFx } = K;
+  const { V, api, $, $$, editor, body, changed, gotDates, applyLook, applyEvening, applyPanic, applyClickThrough, FX, fxName, applyFx } = K;
   // defined in a later part:
-  const closePop = K.later('closePop'), openPop = K.later('openPop'), paintTextPanel = K.later('paintTextPanel'),
-    placeHandle = K.later('placeHandle'), paintUnlock = K.later('paintUnlock'), toast = K.later('toast');
+  const closePop = K.later('closePop'), domStep = K.later('domStep'), openPop = K.later('openPop'), paintTextPanel = K.later('paintTextPanel'),
+    placeHandle = K.later('placeHandle'), paintUnlock = K.later('paintUnlock'), toast = K.later('toast'),
+    applyChecks = K.later('applyChecks');
   // ---- the Effects pop-up (⋯ menu → Effects…): a list of icons and names
   const CHECK = '<svg class="ok" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
   const fxIcon = ([col, inner]) => `<span class="ic"${col ? ` style="--ic:${col}"` : ''}><svg viewBox="0 0 24 24">${inner}</svg></span>`;
@@ -129,7 +130,7 @@
   api.onSettings((s) => {
     V.settings = { ...V.settings, ...s };
     applyTheme();
-    if (V.note) { applySpell(); applyFx(); }
+    if (V.note) { applySpell(); applyFx(); applyChecks(); applyEvening(); applyPanic(); applyClickThrough(); }
     paintUnlock();
   });
 
@@ -172,26 +173,31 @@
     document.execCommand('insertHTML', false, html);
     changed();
   }
-  // For photos, drawings and voice notes: put the elements in exactly as written
-  // (the browser's own insert command sometimes strips the voice-note wrapper).
+  // For photos, drawings and voice notes: put the elements in exactly as written (the browser's own insert command
+  // breaks voice notes: it unwraps them or moves them onto a line of their own). That isn't the editor's own change, so
+  // it is one Undo step of ours (domStep, panels part; before 1.3.31, Undo couldn't take a pasted photo back).
+  // Selected words are deleted by the editor first: its own step.
   function insertNodes(html) {
     restoreSel();
     const s = getSelection();
     if (!s.rangeCount) caretAtEnd();
-    const r = s.getRangeAt(0);
-    r.deleteContents();
-    const frag = r.createContextualFragment(html);
-    const last = frag.lastChild;
-    r.insertNode(frag);
-    if (last) {
+    if (!s.isCollapsed) document.execCommand('delete');
+    const last = domStep(() => {
+      const r = s.getRangeAt(0);
+      const frag = r.createContextualFragment(html);
+      const end = frag.lastChild;
+      if (!end) return null;
+      r.insertNode(frag);
       const after = document.createRange();
-      after.setStartAfter(last);
+      after.setStartAfter(end);
       after.collapse(true);
       s.removeAllRanges();
       s.addRange(after);
       V.savedRange = after.cloneRange();
-      (last.nodeType === 1 ? last : last.parentElement)?.scrollIntoView({ block: 'nearest' });
-    }
+      return end;
+    });
+    if (!last) return;
+    (last.nodeType === 1 ? last : last.parentElement)?.scrollIntoView({ block: 'nearest' });
     changed();
   }
 

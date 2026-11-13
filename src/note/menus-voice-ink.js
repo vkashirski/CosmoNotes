@@ -1,10 +1,10 @@
 'use strict';
-// CosmoNotes note window, part 6 of 11: right-click menus, voice notes, drawing, photo resizing
+// CosmoNotes note window, part 7 of 12: right-click menus, voice notes, drawing, photo resizing
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
   const { V, api, $, $$, editor, body, esc, fmt, changed, saveNow, saveSel, insertNodes, closePops, openLinkForm, openDesc,
-    tableOp, copyPhoto, openPhoto } = K;
+    tableOp, copyPhoto, openPhoto, domStep, domRecord } = K;
   // defined in a later part:
   const zoomNow = K.later('zoomNow'), hasInk = K.later('hasInk'), needsResizeWarning = K.later('needsResizeWarning'),
     resizeWarning = K.later('resizeWarning'), toast = K.later('toast'), textWidth = K.later('textWidth'),
@@ -49,12 +49,14 @@
       } : {
         label: (fixed ? '✓ ' : '') + 'Keep size when the note gets narrower',
         run: () => {
-          if (fixed) img.classList.remove('fixed');
-          else {
-            // remember the size it has with the note at full width (not a squeezed size)
-            if (!img.getAttribute('width')) img.setAttribute('width', String(Math.round(Math.min(img.naturalWidth || Infinity, textWidth()))));
-            img.classList.add('fixed');
-          }
+          domStep(() => {
+            if (fixed) img.classList.remove('fixed');
+            else {
+              // remember the size it has with the note at full width (not a squeezed size)
+              if (!img.getAttribute('width')) img.setAttribute('width', String(Math.round(Math.min(img.naturalWidth || Infinity, textWidth()))));
+              img.classList.add('fixed');
+            }
+          });
           changed();
           toast(fixed ? 'This picture now shrinks with the note' : 'This picture keeps its size; scroll sideways if the note gets narrower');
         },
@@ -70,17 +72,17 @@
           '-',
           { label: 'Small', run: guarded(() => setImgWidth(img, textWidth() * 0.4)) },
           { label: 'Medium', run: guarded(() => setImgWidth(img, textWidth() * 0.7)) },
-          { label: 'Full width', run: guarded(() => { img.classList.remove('w-s', 'w-m', 'fixed'); img.removeAttribute('width'); changed(); placeHandle(); }) },
+          { label: 'Full width', run: guarded(() => { domStep(() => { img.classList.remove('w-s', 'w-m', 'fixed'); img.removeAttribute('width'); }); changed(); placeHandle(); }) },
           '-',
           keep,
         ];
-      items.push('-', { label: drawing ? 'Remove drawing' : 'Remove photo', danger: true, run: () => { img.remove(); changed(); } });
+      items.push('-', { label: drawing ? 'Remove drawing' : 'Remove photo', danger: true, run: () => { domStep(() => img.remove()); changed(); } });
     } else if (voice) {
       items = [
         { label: playingChip === voice ? 'Pause' : 'Play', run: () => togglePlay(voice) },
         { label: 'Transcribe', run: () => transcribe(voice) }, // 1.3.1: the text goes on the line after it (src/note/speech.js)
         '-',
-        { label: 'Remove recording', danger: true, run: () => { if (playingChip === voice) stopPlay(); voice.remove(); changed(); } },
+        { label: 'Remove recording', danger: true, run: () => { if (playingChip === voice) stopPlay(); domStep(() => voice.remove()); changed(); } },
       ];
     } else if (a) {
       items = [
@@ -88,7 +90,7 @@
         { label: 'Edit link', run: () => openLinkForm(a) },
         { label: 'Copy link address', run: () => navigator.clipboard.writeText(a.getAttribute('href')).catch(() => {}) },
         '-',
-        { label: 'Remove link (keep text)', run: () => { a.replaceWith(...a.childNodes); changed(); } },
+        { label: 'Remove link (keep text)', run: () => { domStep(() => a.replaceWith(...a.childNodes)); changed(); } },
       ];
     } else if (cell) {
       items = [
@@ -366,6 +368,7 @@
     if (draw.bg) g.drawImage(draw.bg.img, 0, 0, draw.bg.w, draw.bg.h);
     draw.strokes.forEach(paintStroke);
     $('#dHint').hidden = draw.strokes.length > 0 || !!draw.bg;
+    $('#dUndo').disabled = !draw.strokes.length; // 1.3.23: nothing drawn, nothing to undo
   }
   const ptOf = (e) => ({ x: e.offsetX, y: e.offsetY, p: e.pointerType === 'pen' ? (e.pressure || 0.5) : 0.5 });
   cv.addEventListener('pointerdown', (e) => {
@@ -446,8 +449,7 @@
       const cssW = Math.round(box.w / draw.dpr);
       closeDraw();
       if (target && editor.contains(target)) {
-        target.setAttribute('src', url);
-        target.setAttribute('width', String(cssW));
+        domStep(() => { target.setAttribute('src', url); target.setAttribute('width', String(cssW)); }); // one Undo step: the old sketch back
         changed();
       } else {
         insertNodes(`<img class="att-drawing" src="${esc(url)}" width="${cssW}">`);
@@ -488,8 +490,7 @@
   function setImgWidth(img, w) {
     const max = textWidth();
     w = Math.round(Math.max(Math.min(MIN_IMG, max), Math.min(max, w)));
-    img.classList.remove('w-s', 'w-m');
-    img.setAttribute('width', String(w));
+    domStep(() => { img.classList.remove('w-s', 'w-m'); img.setAttribute('width', String(w)); });
     changed();
     placeHandle();
   }
@@ -501,6 +502,8 @@
     handle.setPointerCapture(e.pointerId);
     V.resizing = true;
     body.classList.add('resizing');
+    // the whole drag is one Undo step: only this photo's size counts (not its selection look)
+    const rec = domRecord((r) => r.target === img && (r.attributeName === 'width' || (r.attributeName === 'class' && /\bw-[sm]\b/.test(r.oldValue || ''))));
     const startX = e.clientX;
     const startW = img.getBoundingClientRect().width;
     const max = textWidth();
@@ -517,6 +520,7 @@
       handle.removeEventListener('pointercancel', up);
       V.resizing = false;
       body.classList.remove('resizing');
+      rec.end();
       changed();
       placeHandle();
     };

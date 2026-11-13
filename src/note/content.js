@@ -1,10 +1,10 @@
 'use strict';
-// CosmoNotes note window, part 4 of 11: links, picture descriptions, tables, photos (paste / drop), clicks inside the note
+// CosmoNotes note window, part 4 of 12: links, picture descriptions, tables, photos (paste / drop), clicks inside the note
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
   const { V, api, $, editor, esc, changed, closestIn, saveSel, caretAtEnd, restoreSel, insertHTML, insertNodes,
-    closePop, openPop } = K;
+    closePop, openPop, FACE, domStep } = K;
   // defined in a later part:
   const togglePlay = K.later('togglePlay'), openDraw = K.later('openDraw'), selectImage = K.later('selectImage'),
     toast = K.later('toast');
@@ -35,8 +35,7 @@
     const text = $('#linkText').value.trim() || $('#linkUrl').value.trim();
     closePop('#linkPop');
     if (editingLink && editor.contains(editingLink)) {
-      editingLink.setAttribute('href', url);
-      editingLink.textContent = text;
+      domStep(() => { editingLink.setAttribute('href', url); editingLink.textContent = text; }); // one Undo step (1.3.32)
       changed();
     } else {
       restoreSel();
@@ -64,7 +63,8 @@
     closePop('#descPop');
     if (descImg && editor.contains(descImg)) {
       const had = !!descImg.getAttribute('alt');
-      if (v) { descImg.setAttribute('alt', v); descImg.setAttribute('title', v); } else { descImg.removeAttribute('alt'); descImg.removeAttribute('title'); }
+      const img = descImg;
+      domStep(() => { if (v) { img.setAttribute('alt', v); img.setAttribute('title', v); } else { img.removeAttribute('alt'); img.removeAttribute('title'); } });
       changed();
       if (v || had) toast(v ? 'Description saved' : 'Description removed');
     }
@@ -88,15 +88,19 @@
     r.setEnd(node, start + url.length);
     const a = document.createElement('a');
     a.href = url.toLowerCase().startsWith('www.') ? 'https://' + url : url;
-    try { r.surroundContents(a); } catch { return; }
-    const after = document.createRange();
-    const trailing = raw.length - url.length;
-    if (trailing && a.nextSibling && a.nextSibling.nodeType === 3) after.setStart(a.nextSibling, trailing);
-    else after.setStartAfter(a);
-    after.collapse(true);
-    s.removeAllRanges();
-    s.addRange(after);
-    changed();
+    // one Undo step (1.3.32): Undo gives back the same text, so the editor's Undo of the typing still works (it broke the text)
+    const done = domStep(() => {
+      try { r.surroundContents(a); } catch { return false; }
+      const after = document.createRange();
+      const trailing = raw.length - url.length;
+      if (trailing && a.nextSibling && a.nextSibling.nodeType === 3) after.setStart(a.nextSibling, trailing);
+      else after.setStartAfter(a);
+      after.collapse(true);
+      s.removeAllRanges();
+      s.addRange(after);
+      return true;
+    });
+    if (done) changed();
   }
 
   // ================================================================ tables
@@ -120,7 +124,11 @@
     s.removeAllRanges();
     s.addRange(r);
   }
-  function tableOp(cell, op) {
+  function tableOp(cell, op) { // one Undo step (1.3.32)
+    domStep(() => tableChange(cell, op));
+    changed();
+  }
+  function tableChange(cell, op) {
     const tr = cell.parentElement;
     const table = cell.closest('table');
     const idx = [...tr.children].indexOf(cell);
@@ -153,7 +161,6 @@
       case 'delTable': table.remove(); break;
       default: break;
     }
-    changed();
   }
   function moveCell(cell, dir) {
     const table = cell.closest('table');
@@ -185,26 +192,153 @@
     TABLE: [], TBODY: [], THEAD: [], TR: [], TD: ['colspan', 'rowspan'], TH: ['colspan', 'rowspan'], H1: [], H2: [], H3: [], H4: [],
   };
   const DROP = new Set(['SCRIPT', 'STYLE', 'META', 'LINK', 'TITLE', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'TEMPLATE', 'NOSCRIPT', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'FORM', 'VIDEO', 'AUDIO', 'CANVAS', 'HEAD']);
-  function cleanTree(el) {
+  // rich = text copied from a note (1.3.2, see "copy / cut" below): its formatting may come too, but only the kinds the
+  // note itself makes: <font> face (the app's fonts) / colour / size, a highlight or colour style, checklist boxes.
+  const COLOR = /^(#[0-9a-f]{3,8}|rgba?\([\d.,\s%]+\)|transparent)$/i;
+  const RICH = { FONT: ['face', 'color', 'size'], SPAN: ['style'], UL: ['class'], LI: ['class'] };
+  function richAttrs(ch, tag) {
+    const face = ch.getAttribute('face');
+    if (face !== null && !Object.values(FACE).includes(face)) ch.removeAttribute('face');
+    if (ch.hasAttribute('color') && !COLOR.test(ch.getAttribute('color').trim())) ch.removeAttribute('color');
+    if (ch.hasAttribute('size') && !/^[1-7]$/.test(ch.getAttribute('size').trim())) ch.removeAttribute('size');
+    if (tag === 'SPAN' && ch.hasAttribute('style')) {
+      const s = ch.style; const keep = [];
+      for (const p of ['color', 'background-color']) { const v = s.getPropertyValue(p).trim(); if (v && COLOR.test(v)) keep.push(`${p}: ${v}`); }
+      if (keep.length) ch.setAttribute('style', keep.join('; ')); else ch.removeAttribute('style');
+    }
+    if (tag === 'UL' || tag === 'LI') {
+      const ok = tag === 'UL' ? 'checklist' : 'done';
+      if (ch.classList.contains(ok)) ch.className = ok; else ch.removeAttribute('class');
+    }
+  }
+  function cleanTree(el, rich) {
     for (const ch of [...el.childNodes]) {
       if (ch.nodeType === 3) continue;
       if (ch.nodeType !== 1) { ch.remove(); continue; }
       const tag = ch.tagName;
       if (DROP.has(tag)) { ch.remove(); continue; }
-      if (!(tag in ALLOWED)) { cleanTree(ch); ch.replaceWith(...ch.childNodes); continue; }
-      for (const a of [...ch.attributes]) if (!ALLOWED[tag].includes(a.name)) ch.removeAttribute(a.name);
+      const allow = rich && RICH[tag] ? [...(ALLOWED[tag] || []), ...RICH[tag]] : ALLOWED[tag];
+      if (!allow) { cleanTree(ch, rich); ch.replaceWith(...ch.childNodes); continue; }
+      for (const a of [...ch.attributes]) if (!allow.includes(a.name)) ch.removeAttribute(a.name);
+      if (rich && RICH[tag]) richAttrs(ch, tag);
       if (tag === 'A' && !/^(https?:|mailto:)/i.test(ch.getAttribute('href') || '')) ch.removeAttribute('href');
       if (tag === 'IMG') {
         if (!/^(https?:|data:image\/|stickyfile:)/i.test(ch.getAttribute('src') || '')) { ch.remove(); continue; }
         ch.className = 'att-img';
       }
-      cleanTree(ch);
+      cleanTree(ch, rich);
+      if (tag === 'FONT' && !ch.attributes.length) ch.replaceWith(...ch.childNodes);
     }
   }
-  function sanitize(html) {
+  function sanitize(html, rich) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    cleanTree(doc.body);
+    cleanTree(doc.body, rich);
+    dropEmptyLines(doc.body, 'li');
+    joinLists(doc.body);
     return doc.body.innerHTML;
+  }
+  // 1.3.15: a list line with nothing in it at all (no letters, line break, photo…) is zero lines high, so in a checklist
+  // its box sat on top of the next line's box. Copying a whole line (triple-click) took the start of the next line along
+  // as one. Copied and pasted HTML loses them; the note drops the checklist ones when it opens and after a paste (they
+  // hold nothing). The line with the caret in it stays.
+  function dropEmptyLines(root, sel) {
+    const s = root === editor ? getSelection() : null;
+    for (const li of [...root.querySelectorAll(sel)].reverse()) {
+      if (/[^\n\r\t\u200b]/.test(li.textContent) || li.querySelector('br,img,hr,table,li,.voice,[contenteditable="false"]')) continue;
+      if (s && s.rangeCount && li.contains(s.anchorNode)) continue;
+      const list = li.parentElement;
+      li.remove();
+      if (list && /^(UL|OL)$/.test(list.nodeName) && !list.children.length && !/[^\s\u200b]/.test(list.textContent)) list.remove();
+    }
+  }
+
+  // 1.3.25: two lists of the same kind that touch (the line between them deleted, or pasted next to each other) look
+  // like one list, so they are one group: ticked lines to the bottom and dragging use listGroup (checklists part). The
+  // note keeps them as the editor made them while it is open (the editor's own Undo / Redo remembers them that way);
+  // what is saved has them joined (collect, base part), and so has a pasted piece and a note as it opens.
+  const LIST_KIND = (x) => (x && x.nodeType === 1 && /^(UL|OL)$/.test(x.nodeName) ? x.nodeName + (x.classList.contains('checklist') ? '.c' : '') : null);
+  // between two lists, nothing that shows: spaces, or a block with nothing in it at all (1.3.26: an empty <div> the
+  // editor left behind is zero lines high, a 1 px line no one can see or click, and kept the lists apart)
+  const NOTHING = /^(DIV|P|SPAN|FONT|B|I|U|S|STRIKE|EM|STRONG)$/;
+  const blank = (x) => !!x && (x.nodeType === 3 ? !/[^\s\u200b]/.test(x.data)
+    : x.nodeType === 1 && NOTHING.test(x.nodeName) && !/[^\s\u200b]/.test(x.textContent) && !x.querySelector('br,img,hr,table,li,video,audio,.voice,[contenteditable="false"]'));
+  function touching(a, dir) { // the list right after (dir 'nextSibling') or before a, with only spaces between
+    let b = a[dir];
+    while (blank(b)) b = b[dir];
+    return b && LIST_KIND(b) === LIST_KIND(a) ? b : null;
+  }
+  function listGroup(list) {
+    let first = list;
+    for (let p = touching(first, 'previousSibling'); p; p = touching(first, 'previousSibling')) first = p;
+    const out = [first];
+    for (let n = touching(first, 'nextSibling'); n; n = touching(n, 'nextSibling')) out.push(n);
+    return out;
+  }
+  // join in place: the second list's lines go into the first (not for the note while it is open: see above)
+  function joinLists(root) {
+    for (const a of [...root.querySelectorAll('ul, ol')].reverse()) { // from the last: a list joined into is already whole
+      const b = touching(a, 'nextSibling');
+      if (!b) continue;
+      while (blank(a.nextSibling)) a.nextSibling.remove();
+      a.append(...b.childNodes);
+      b.remove();
+    }
+  }
+
+
+  // ================================================================ copy / cut (1.3.2)
+  // The note writes the clipboard itself: the words keep their font, size, colour, highlight, bold… and a checklist line
+  // stays a checklist line (ticked or not), even when only part of one line is selected. The note's own font goes with
+  // the words when it isn't the pasting note's font. CLIP holds it for CosmoNotes; text/html is the same for other apps.
+  const CLIP = 'application/x-cosmonotes';
+  const INLINE = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'DEL', 'MARK', 'SUB', 'SUP', 'CODE', 'FONT', 'SPAN', 'A']);
+  function copiedHtml(r) {
+    let box = document.createElement('div');
+    box.append(r.cloneContents());
+    const c = r.commonAncestorContainer;
+    // the selection's own formatting and its list line sit above it (cloneContents only copies what is inside)
+    for (let a = c.nodeType === 1 ? c : c.parentElement; a && a !== editor && editor.contains(a); a = a.parentElement) {
+      const tag = a.tagName;
+      if (tag === 'TD' || tag === 'TH') break;
+      if (!INLINE.has(tag) && tag !== 'LI' && tag !== 'UL' && tag !== 'OL') continue;
+      const w = a.cloneNode(false);
+      w.append(...box.childNodes);
+      box = document.createElement('div');
+      box.append(w);
+      if (tag === 'UL' || tag === 'OL') break; // the nearest list only
+      if (tag === 'LI' && a.parentElement) { const l = a.parentElement.cloneNode(false); l.append(...box.childNodes); box.append(l); break; }
+    }
+    return box.innerHTML;
+  }
+  // every piece of text without a font of its own gets the note's font
+  function withFace(html, face) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const tw = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    const bare = [];
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) if (n.data.trim() && !(n.parentElement && n.parentElement.closest('font[face]'))) bare.push(n);
+    for (const n of bare) { const f = doc.createElement('font'); f.setAttribute('face', face); n.replaceWith(f); f.append(n); }
+    return doc.body.innerHTML;
+  }
+  function onCopy(e, cut) {
+    const s = getSelection();
+    if (!e.clipboardData || !s.rangeCount || s.isCollapsed) return;
+    const r = s.getRangeAt(0);
+    if (!editor.contains(r.commonAncestorContainer)) return;
+    const html = sanitize(copiedHtml(r), true);
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', s.toString());
+    e.clipboardData.setData('text/html', withFace(html, FACE[V.note.font] || 'Caveat'));
+    e.clipboardData.setData(CLIP, JSON.stringify({ html, font: V.note.font }));
+    if (cut) { document.execCommand('delete'); changed(); }
+  }
+  editor.addEventListener('copy', (e) => onCopy(e, false));
+  editor.addEventListener('cut', (e) => onCopy(e, true));
+  function richPaste(raw) {
+    let c;
+    try { c = JSON.parse(raw); } catch { return null; }
+    if (!c || typeof c.html !== 'string') return null;
+    const html = sanitize(c.html, true);
+    return c.font && c.font !== V.note.font && FACE[c.font] ? sanitize(withFace(html, FACE[c.font]), true) : html;
   }
 
   V.plainPaste = false;
@@ -215,9 +349,12 @@
     if (files.length) { e.preventDefault(); saveSel(); insertImageFiles(files); return; }
     const html = cd.getData('text/html');
     const text = cd.getData('text/plain');
+    const rich = !V.plainPaste && cd.getData(CLIP) ? richPaste(cd.getData(CLIP)) : null;
     e.preventDefault();
     const t = (text || '').trim();
-    if (/^(https?:\/\/|www\.)\S+$/i.test(t)) {
+    if (rich) {
+      document.execCommand('insertHTML', false, rich);
+    } else if (/^(https?:\/\/|www\.)\S+$/i.test(t)) {
       const href = t.toLowerCase().startsWith('www.') ? 'https://' + t : t;
       document.execCommand('insertHTML', false, `<a href="${esc(href)}">${esc(t)}</a>&nbsp;`);
     } else if (html && !V.plainPaste) {
@@ -226,6 +363,7 @@
       document.execCommand('insertText', false, text);
     }
     V.plainPaste = false;
+    dropEmptyLines(editor, 'ul.checklist li');
     changed();
   });
 
@@ -264,18 +402,8 @@
       edgeDown = true;
       editor.focus();
       caretAt(pic, false);
-      return;
     }
-    const li = e.target.closest && e.target.closest('ul.checklist li');
-    if (li && editor.contains(li)) {
-      const rect = li.getBoundingClientRect();
-      const pad = parseFloat(getComputedStyle(li).paddingLeft) || 24;
-      if (e.clientX < rect.left + pad && e.button === 0) {
-        e.preventDefault();
-        li.classList.toggle('done');
-        changed();
-      }
-    }
+    // a checklist line's box (click to tick, drag to move): the checklists part
   });
   editor.addEventListener('click', (e) => {
     const voice = e.target.closest('.voice');
@@ -372,5 +500,5 @@
     editor.querySelectorAll('img.caret-near').forEach((i) => { if (overImg(i)) i.classList.remove('caret-near'); });
   });
 
-  Object.assign(K, { openLinkForm, openDesc, autoLink, insertTable, tableOp, moveCell, copyPhoto, openPhoto });
+  Object.assign(K, { openLinkForm, openDesc, autoLink, insertTable, tableOp, moveCell, copyPhoto, openPhoto, dropEmptyLines, joinLists, listGroup });
 })();

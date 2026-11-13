@@ -1,15 +1,15 @@
 'use strict';
-// CosmoNotes note window, part 5 of 11: editing helpers (checklists, strike-through…), Ctrl+F find, the keyboard
+// CosmoNotes note window, part 5 of 12: editing helpers (checklists, strike-through…), Ctrl+F find, the keyboard
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
-  const { V, api, $, editor, body, changed, saveNow, anchor, closestIn, runCmd, closePops, textUndo, textRedo,
+  const { V, api, $, editor, body, changed, saveNow, anchor, closestIn, runCmd, closePops,
     undoText, redoText, openLinkForm, autoLink, moveCell } = K;
   // defined in a later part:
   const hideCtx = K.later('hideCtx'), stopRecording = K.later('stopRecording'), closeDraw = K.later('closeDraw'),
     drawUndo = K.later('drawUndo'), zoomNow = K.later('zoomNow'), setZoom = K.later('setZoom'),
     exitInk = K.later('exitInk'), inkUndo = K.later('inkUndo'), inkRedo = K.later('inkRedo'), toast = K.later('toast'),
-    sttStop = K.later('sttStop');
+    sttStop = K.later('sttStop'), checkOn = K.later('checkOn');
   // ================================================================ 1.1.22 (sixth round): editing helpers
   // the next / previous thing you can see from the caret: a text with letters in it, a photo, a line break, a voice
   // note… (empty wrappers and line ends in between are skipped, also across lines)
@@ -80,39 +80,71 @@
   // font: the box used to be one size at one height, so it sat too high or low). Measured on screen, kept in
   // --cb-s / --cb-t / --cb-p on the line (not saved: collect() strips them). And a ticked line's photos get a line
   // struck through them, like its text (an overlay over the text, #strikes).
+  // 1.3.15: the box goes by the size the words are written at, not by their font. Words in another font are drawn
+  // bigger or smaller to match the note's own letters, so the box takes that back out: their size ÷ their font's
+  // --kf (note-drawing.css, read from the CSS: the numbers live there only). An empty line gets the box its
+  // words will have: measured on its line break inside its own font / size tags; with none (Backspace took them, or a
+  // new line: the browser keeps the look only for typing), the box it had when it last had words, else the line
+  // above's: same size AND same place, as the words may be in another font, which sits higher or lower on the line
+  // (the box moved when the first letter came). BOX = note-text.css: box and indent, in the note's em
+  // (Caveat and Augusta letters are small for their size: their box is smaller, like Rounded words in that note).
+  // 1.3.19: "Keep boxes the same size" (checkOn('fixed'), checklists part): every box is the note's own size, still
+  // centred on its words.
   const CB_VARS = ['--cb-s', '--cb-t', '--cb-p'];
-  function firstWords(li) {
+  const BOX = { hand: { k: 0.78, pad: 1.3 }, round: { k: 1, pad: 1.55 }, medieval: { k: 0.84, pad: 1.3 } };
+  function boxSize(el, nf) {
+    const cs = getComputedStyle(el);
+    return Math.max(10, parseFloat(cs.fontSize) / (parseFloat(cs.getPropertyValue('--kf')) || 1) * BOX[nf].k);
+  }
+  // where a line's own words start (the lines nested in it don't count): { t: the text of its first letters }, or { br: the
+  // line break of a line with nothing typed at its start yet (a photo may come after) }, else null (it starts with a photo…)
+  function lineStart(li) {
     for (let x = deepFirst(li.firstChild || li); x && li.contains(x); ) {
       if (x.nodeType === 1 && /^(UL|OL)$/.test(x.nodeName)) { x = stepAfter(x); continue; }
-      if (x.nodeType === 3) { if (seen(x.data)) return x; } else if (ATOM(x)) return null;
+      if (x.nodeType === 3) { if (seen(x.data)) return { t: x }; } else if (x.nodeName === 'BR') return { br: x }; else if (ATOM(x)) return null;
       x = (x.nodeType === 1 && !ATOM(x) && x.firstChild) ? deepFirst(x) : stepAfter(x);
     }
     return null;
   }
+  const lastOwn = new WeakMap(); // a line → its box when it was last measured from its own words or tags { sz, top }
   function setVar(el, k, v) { if (v === null) { if (el.style.getPropertyValue(k)) el.style.removeProperty(k); } else if (el.style.getPropertyValue(k) !== v) el.style.setProperty(k, v); if (!el.getAttribute('style')) el.removeAttribute('style'); }
   function alignChecks() {
     const lis = editor.querySelectorAll('ul.checklist li');
     if (!lis.length) return;
     const er = editor.getBoundingClientRect(); const k = er.width ? editor.offsetWidth / er.width : 1; // the note's zoom
-    const round = body.dataset.font !== 'hand'; // Rounded and Medieval: ordinary-sized letters (Caveat's are small)
+    const nf = BOX[body.dataset.font] ? body.dataset.font : 'hand';
+    const fixed = checkOn('fixed');
     // 1.1.23 (speed): measure every line first, then write: writing between two measurements made the browser lay the
     // whole note out again for each checklist line, on every key press
-    const out = [];
+    const out = []; const boxes = new Map();
     for (const li of lis) {
-      const t = firstWords(li); let size = null; let top = null; let pad = null;
-      if (t) {
-        const i = t.data.search(/[^\s​]/); const r = document.createRange(); r.setStart(t, Math.max(0, i)); r.setEnd(t, Math.max(0, i) + 1);
+      let size = null; let top = null; let pad = null; let sz = null; let at = null; // at: the box's top, from the line's top
+      const lr = li.getBoundingClientRect();
+      const s = lr.height ? lineStart(li) : null;
+      let mid = null; let key = null; // key: the words' font and size
+      const keyOf = (el) => { const cs = getComputedStyle(el); return `${cs.fontFamily}|${cs.fontSize}`; };
+      const prev = li.previousElementSibling;
+      if (s && s.t) {
+        const t = s.t; const i = t.data.search(/[^\s​]/); const r = document.createRange(); r.setStart(t, Math.max(0, i)); r.setEnd(t, Math.max(0, i) + 1);
         const rr = r.getClientRects()[0];
-        if (rr && rr.height) {
-          const cs = getComputedStyle(t.parentElement); const fs = parseFloat(cs.fontSize);
-          const caveat = /caveat/i.test(cs.fontFamily.split(',')[0]);
-          const liFs = parseFloat(getComputedStyle(li).fontSize);
-          const base = round ? liFs : liFs * 0.78; // the box at the note's own size (as before)
-          const sz = Math.max(10, fs * (caveat ? 0.78 : 1));
-          const mid = ((rr.top + rr.bottom) / 2 - li.getBoundingClientRect().top) * k;
-          size = `${sz.toFixed(1)}px`; top = `${(mid - sz / 2).toFixed(1)}px`;
-          pad = sz > base + 0.5 ? `${((round ? 1.55 : 1.3) * liFs + (sz - base)).toFixed(1)}px` : null;
-        }
+        if (rr && rr.height) { sz = boxSize(t.parentElement, nf); mid = (rr.top + rr.bottom) / 2; key = keyOf(t.parentElement); }
+      } else if (s && s.br && s.br.parentElement !== li) { // its own font / size tags: the break has their size and font
+        const p = prev && boxes.get(prev); const kk = keyOf(s.br.parentElement);
+        if (p && p.key === kk) ({ sz, at } = p); // under words of the same look (Enter): their box, exactly
+        else { const br = s.br.getBoundingClientRect(); if (br.height) { sz = boxSize(s.br.parentElement, nf); mid = (br.top + br.bottom) / 2; } }
+      } else if (s && s.br) { // nothing on the line says how its words will look
+        const was = lastOwn.get(li) || (prev && boxes.get(prev));
+        if (was) ({ sz, at } = was);
+        else { const br = s.br.getBoundingClientRect(); if (br.height) { sz = boxSize(li, nf); mid = (br.top + br.bottom) / 2; } } // the note's own font, then
+      }
+      if (sz && mid !== null) { at = (mid - lr.top) * k - sz / 2; lastOwn.set(li, { sz, at }); }
+      if (sz && at !== null) {
+        const liFs = parseFloat(getComputedStyle(li).fontSize);
+        const base = liFs * BOX[nf].k; // the box at the note's own size
+        boxes.set(li, { sz, at, key });
+        if (fixed) { at += (sz - base) / 2; sz = base; } // same middle, the note's own size
+        size = `${sz.toFixed(1)}px`; top = `${at.toFixed(1)}px`;
+        pad = sz > base + 0.5 ? `${(BOX[nf].pad * liFs + (sz - base)).toFixed(1)}px` : null;
       }
       out.push([li, size, top, pad]);
     }
@@ -327,15 +359,18 @@
     if (mod && e.key === '-') { e.preventDefault(); setZoom(zoomNow() - 0.1); }
     if (mod && e.key.toLowerCase() === 'w') { e.preventDefault(); saveNow(); api.close(); }
     if (mod && e.key.toLowerCase() === 'z' && !$('#draw').hidden) { e.preventDefault(); drawUndo(); }
+    // the note's text: one history, ours and the editor's in order (undoText / redoText, panels part). A text box (the
+    // title, Find…) keeps its own.
+    const inBox = /^(INPUT|TEXTAREA)$/.test(e.target.nodeName) && !/^(checkbox|radio|range|button|color)$/.test(e.target.type);
     if (mod && !e.shiftKey && e.key.toLowerCase() === 'z' && $('#draw').hidden) {
       if (K.inkState.on && !K.inkState.paused) { e.preventDefault(); inkUndo(); }
-      else if (textUndo.length) { e.preventDefault(); undoText(); } // a font change; text undo is the editor's own
+      else if (!inBox) { e.preventDefault(); undoText(); }
     }
-    // Redo: Ctrl+Y or Ctrl+Shift+Z (text redo is the editor's own, except a font change)
+    // Redo: Ctrl+Y or Ctrl+Shift+Z
     const redoKey = mod && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'));
     if (redoKey && $('#draw').hidden) {
       if (K.inkState.on && !K.inkState.paused) { e.preventDefault(); inkRedo(); }
-      else if (textRedo.length) { e.preventDefault(); redoText(); }
+      else if (!inBox) { e.preventDefault(); redoText(); }
     }
   });
 

@@ -23,9 +23,15 @@
 <header id="bar">
   <button class="hb" id="btnList" title="All notes"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
   <button class="hb" id="btnNew" title="New note (Ctrl+N)"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  <!-- 1.3.27: the panic button (Settings → Panic button; main/panic.js): an eye that shuts, red when pointed at.
+       1.3.34: on the left, away from the click-through button (the owner's wish) -->
+  <button class="hb" id="btnPanic" title="Panic: close your notes, lock them, hide CosmoNotes" hidden><svg viewBox="0 0 24 24"><path d="M17.9 17.9A10 10 0 0 1 12 20c-7 0-11-8-11-8a18.4 18.4 0 0 1 5.1-5.9M9.9 4.2A9 9 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.2 3.2m-6.7-1.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/></svg></button>
   <div id="title"></div>
   <button class="hb" id="btnRelock" title="Unlocked for now. Click to lock it again" hidden><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></svg></button>
   <button class="hb" id="btnFx" title="Pause effects on this note" aria-pressed="false" hidden><svg viewBox="0 0 24 24"><path d="M12 3c.6 3.6 2.4 5.4 6 6-3.6.6-5.4 2.4-6 6-.6-3.6-2.4-5.4-6-6 3.6-.6 5.4-2.4 6-6z"/><path d="M18.5 15c.3 1.6 1 2.3 2.5 2.5-1.5.3-2.2 1-2.5 2.5-.3-1.5-1-2.2-2.5-2.5 1.5-.2 2.2-.9 2.5-2.5z"/></svg></button>
+  <!-- 1.3.34: click-through (Settings → Click-through; main/note-state.js): the mouse goes through the note to the window
+       under it. While it is on, this is the one button that works (note-base.css body.ct) -->
+  <button class="hb" id="btnCt" title="Click-through: the mouse goes through this note" aria-pressed="false" hidden><svg viewBox="0 0 24 24"><path d="M4.04 4.69a.5.5 0 0 1 .65-.65l16 6.5a.5.5 0 0 1-.06.95l-6.13 1.58a2 2 0 0 0-1.43 1.43l-1.58 6.13a.5.5 0 0 1-.95.06z"/></svg></button>
   <button class="hb" id="btnPin" title="Pin on top of other windows" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
   <button class="hb" id="btnRoll" title="Roll up to just the top bar"><svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></button>
   <!-- 1.1.20: menus no longer close each other; this closes every open one at once (shows when two or more are open) -->
@@ -97,9 +103,16 @@
   <div class="igrip" title="Drag to move, also out of the note (double-click: back)"><i></i></div>
   <h4>Title</h4>
   <input class="titlefld" id="titleInput" maxlength="120" placeholder="(optional)" autocomplete="off" spellcheck="false">
-  <!-- 1.1.30: shown instead of the title while the note is locked (the title itself is encrypted then) -->
+  <!-- 1.1.30: shown instead of the title while the note is locked (the title itself is encrypted then).
+       1.3.11 (the owner's wish): right after the title, with Title font under both (it is the font of both) -->
   <div id="coverRow" hidden><h4>Title while locked</h4>
   <input class="titlefld" id="coverInput" maxlength="120" placeholder="(optional) shown while it’s locked" autocomplete="off" spellcheck="false"></div>
+  <!-- 1.3.3: the title's font (1.3.6: no "Same" button; until one is picked, the note's font is the one lit) -->
+  <div class="seg" id="titleFontSeg" title="Title font">
+    <button data-tfont="hand" class="hand" title="Handwritten title">Handwritten</button>
+    <button data-tfont="round" title="Rounded title">Rounded</button>
+    <button data-tfont="medieval" class="med" title="Medieval title">Medieval</button>
+  </div>
   <h4>Colour</h4>
   <div class="swstrip"><div class="swatches" id="colors">
     <button class="sw" data-color="yellow" title="Lemon"></button>
@@ -123,7 +136,13 @@
   <h4>See-through <span id="opVal" class="val">100%</span></h4>
   <input type="range" id="opacity" min="25" max="100" step="5" value="100">
   <label class="check switch"><span>Turn solid when my mouse is over it</span><input type="checkbox" id="solidHover"><i></i></label>
+  <!-- 1.3.27: this note's own choice of two settings ("this note" = differs from Settings; set it like Settings and it follows
+       Settings again). Evening colours only for light papers; the panic switch only while the panic button is on -->
+  <label class="check switch" id="eveRow"><span><em class="cktag" id="eveTag" hidden>this note</em>Softer colours in the evening</span><input type="checkbox" id="eveSwitch"><i></i></label>
+  <label class="check switch" id="panicRow" hidden><span><em class="cktag" id="panicTag" hidden>this note</em>Close with the panic button</span><input type="checkbox" id="panicSwitch"><i></i></label>
   <button class="mi" id="miFx"><svg viewBox="0 0 24 24"><path d="M12 3c.6 3.6 2.4 5.4 6 6-3.6.6-5.4 2.4-6 6-.6-3.6-2.4-5.4-6-6 3.6-.6 5.4-2.4 6-6z"/><path d="M18.5 15c.3 1.6 1 2.3 2.5 2.5-1.5.3-2.2 1-2.5 2.5-.3-1.5-1-2.2-2.5-2.5 1.5-.2 2.2-.9 2.5-2.5z"/></svg><span>Effects…</span><small class="mival" id="miFxVal"></small></button>
+  <!-- 1.3.21: this note's checklists open their own pop-up (#ckPop), like Effects… (the owner's pick) -->
+  <button class="mi" id="miChecks"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="6" height="6" rx="1.5"/><path d="m4.5 7 1.2 1.2L8 5.8M12 7h9M12 17h9"/><rect x="3" y="14" width="6" height="6" rx="1.5"/></svg><span>Checklists…</span><small class="mival" id="miChecksVal"></small></button>
   <div class="divider"></div>
   <button class="mi" id="miDuplicate"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2.5"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg><span>Duplicate note</span></button>
   <button class="mi" id="miLock"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="miLockText">Lock note</span></button>
@@ -152,6 +171,18 @@
   <label class="check switch"><span>Pause effects on this note</span><input type="checkbox" id="fxPause"><i></i></label>
 </div>
 
+<!-- 1.3.19: this note's checklists (src/note/checklists.js); 1.3.21: a pop-up of their own, opened from ⋯ → Checklists….
+     A switch set to what Settings says follows Settings again -->
+<div class="pop" id="ckPop" hidden>
+  <button class="ix" id="ckX" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  <div class="igrip" title="Drag to move, also out of the note (double-click: back)"><i></i></div>
+  <h4>Checklists in this note</h4>
+  <label class="check switch ckopt"><span><b>Reorder by dragging the box</b><small><em class="cktag" data-k="drag" hidden>this note</em>Drag a box to move its item.</small></span><input type="checkbox" id="ckDrag"><i></i></label>
+  <label class="check switch ckopt"><span><b>Move ticked items to the bottom</b><small><em class="cktag" data-k="sink" hidden>this note</em>Unticking leaves it in place.</small></span><input type="checkbox" id="ckSink"><i></i></label>
+  <label class="check switch ckopt"><span><b>Keep boxes the same size</b><small><em class="cktag" data-k="fixed" hidden>this note</em>Big text keeps a normal box.</small></span><input type="checkbox" id="ckFixed"><i></i></label>
+  <div class="ckfoot"><span id="ckFoot"></span><button type="button" id="ckReset">Use Settings</button></div>
+</div>
+
 <!-- create the one password for locked notes -->
 <form class="pop" id="pwPop" hidden autocomplete="off">
   <h4>Choose a password or PIN</h4>
@@ -168,7 +199,7 @@
   <div class="grid">
     <button class="tile" data-act="photo"><span class="ic" style="--tc:#FFD6E6"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg></span>Photo</button>
     <button class="tile" data-act="voice"><span class="ic" style="--tc:#FFDFBF"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>Voice</button>
-    <button class="tile" data-act="speak"><span class="ic" style="--tc:#FFE8A3"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="5" height="9" rx="2.5"/><path d="M2.5 10a5 5 0 0 0 10 0M7.5 15v3"/><path d="M14 7h7M14 11h7M14 15h5M11 19h10"/></svg></span>Speak to text</button>
+    <button class="tile" data-act="speak"><span class="ic" style="--tc:#FFE8A3"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="5" height="9" rx="2.5"/><path d="M2.5 10a5 5 0 0 0 10 0M7.5 15v3"/><path d="M14 7h7M14 11h7M14 15h5M11 19h10"/></svg></span>Voice to text</button>
     <button class="tile" data-act="drawing"><span class="ic" style="--tc:#D2ECFF"><svg viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/><path d="m15 5 4 4"/></svg></span>Sketch</button>
     <button class="tile" data-act="link"><span class="ic" style="--tc:#D8F5C4"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span>Link</button>
     <button class="tile" data-act="table"><span class="ic" style="--tc:#E8DDFF"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></span>Table</button>
@@ -344,12 +375,14 @@
 <script src="fx/followers-lab.js"></script>
 <script src="fx/followers-magic.js"></script>
 <script src="fx/engine.js"></script>
+<script src="evening.js"></script>
 <!-- this window's own code (1.1.44: note.js split into src/note/, in this order; see ai-context/splitting-code.md) -->
 <script src="note/base.js"></script>
 <script src="note/fx-format.js"></script>
 <script src="note/panels.js"></script>
 <script src="note/content.js"></script>
 <script src="note/editing.js"></script>
+<script src="note/checklists.js"></script>
 <script src="note/menus-voice-ink.js"></script>
 <script src="note/speech.js"></script>
 <script src="note/lock-zoom.js"></script>

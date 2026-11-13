@@ -53,10 +53,14 @@ const app = require('./helpers/app');
   assert.ok(!list.notes.find((n) => n.id === id) && !(list.bin || []).find((n) => n.id === id), 'original deleted for good');
   assert.ok(list.notes.find((n) => n.id === id4), 'copy kept');
 
-  // ---- a locked note's copy is locked too, and its window doesn't show the content
+  // ---- a locked note can't be copied while it is locked (1.3.28); unlocked, its copy is locked too and opens hidden
   await H['lock:set'](null, { current: '', next: '1234' });
   await H['list:set-locked'](null, id4, true, '1234');
   await H['note:relock'](ev(app.winOf(id4))); // (the open window hides itself when told to lock)
+  assert.equal(await H['list:duplicate'](null, id4), null, 'locked: the list can’t copy it');
+  assert.equal(await H['note:duplicate'](ev(app.winOf(id4))), null, 'nor its hidden window');
+  await H['note:close'](ev(app.winOf(id4)));
+  await H['list:unlock-now'](null, id4, '1234');
   const id5 = await H['list:duplicate'](null, id4);
   assert.equal((await app.card(id5)).locked, true, 'copy of a locked note is locked');
   assert.equal((await H['note:get'](ev(app.winOf(id5)))).html, '', 'locked copy opens hidden');

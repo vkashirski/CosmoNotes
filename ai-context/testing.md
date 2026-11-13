@@ -20,10 +20,10 @@ code (regex) is for rules a test can't easily click through (each such line says
 |---|---|
 | `store.test.js` | store.js alone: saving, .bak recovery, backups (daily, restore, prune), attachments, normalize / normalizeInk / checklistMarks / pictureWords / picturePlace |
 | `upgrade.test.js` | Sticky Pins → CosmoNotes: copied data, notes reopen, dates and old settings kept |
-| `windows.test.js` | note windows: welcome note, see-through / hover / pinned / colour / rolled, placement, moved = remembered, min / max, title, Bring to front, second start, mouse back button, X vs Alt+F4 vs quit |
+| `windows.test.js` | note windows: welcome note, see-through / hover / pinned / colour / rolled, placement, moved = remembered, min / max, title, Bring to front, second start, mouse back button, X vs Alt+F4 vs quit, reopen closed note (1.3.30) |
 | `safety.test.js` | attachments (images only, no path tricks), links (web only), permissions (microphone only), which child windows may open |
 | `toolbars.test.js` | drawing / text toolbars outside the note: 12 px sticking, following, screen edges, rolled, pinned, back inside |
-| `stt.test.js` | voice to text (1.3.1), main's side with a stub engine: jobs and the queue, close / lock / engine crash, the model and its fallback, live or after Stop, Test my computer, `cosmomodel://` (fixed list, COOP/COEP, CSP), the engine's session, the Best download against a local server; the live session logic (`engine-core.mjs`) under Node |
+| `stt.test.js` | voice to text (1.3.1), main's side with a stub engine: jobs and the queue, close / lock / engine crash, one model (not downloaded = nothing starts, fails to start = error), live (graphics card) or after Stop (processor), old settings cleaned, `cosmomodel://` (fixed list, COOP/COEP, CSP), the engine's session, the download against a local server; the live session logic (`engine-core.mjs`) under Node |
 | `recordings.test.js` | voice recordings on disk while made (1.2.4): Save, the X, close / page crash / lock / quit mid-recording, a real crash and the next start, a deleted note, a sealed note (chip after the PIN), the sweep |
 | `notes.test.js` | editing a note: title and what is an edit, drawing (cleaned, kept exactly while typing), dashes, zoom, word wrap off, favourites, Edit… title, the Bin |
 | `colours.test.js` | paper colours, several notes / Edit… colour, new notes' colours (picked list, no repeat, old settings) |
@@ -33,7 +33,9 @@ code (regex) is for rules a test can't easily click through (each such line says
 | `unlock.test.js` | unlocking: in its window, lock removed from the list, Unlock all / Lock again, Unlock… for now (with a real restart) |
 | `crypt.test.js` | encryption on disk across restarts: setup, recovery key, sealed until the PIN, backups, Duplicate, sweep, forgot PIN, off / on, groups, pre-1.1.30 notes |
 | `crypt-old-data.test.js` | encryption meets old data: old backups sealed, a crypto library that can't, 1.1.30's format |
-| `settings.test.js` | theme (also to notes), card size, sort, new notes' see-through / solid on hover, spelling |
+| `settings.test.js` | theme (also to notes), card size, sort, new notes' see-through / solid on hover, spelling, checklists (1.3.19: settings and a note's own), Use on all notes (1.3.27) |
+| `evening.test.js` | evening colours (1.3.27): the fade (`src/evening.js` under Node), each shade (dimmer, readable, day = `PAPER`), main's phase, window background, a note's own choice, cards, Duplicate |
+| `panic.test.js` | the panic button (1.3.27): off / on, shortcut rules, taken, let go while Settings waits and on quit, what closes and what stays, locks, the list, reopening (tray icon, Reopen notes, second start, next start: a real restart), the Bin |
 | `effects-settings.test.js` | effects as main saves them: settings for all, a note's own, tray pause, Edit design |
 | `effects-rules.test.js` | effect lists and order (src/fx/ = store.js), removed ones, resolve, cleaning, the Layer, paper tint, speed rules |
 | `effects-draw.test.js` | every background and follower drawn in many sizes / papers / pointer moves: no NaN, colours exist, followers go quiet |
@@ -44,7 +46,7 @@ code (regex) is for rules a test can't easily click through (each such line says
 | `texts.test.js` | short texts and the owner's wording |
 | `list-logic.test.js` | the list's rules without a browser (tests/helpers/list-kit.js) |
 | `list-ui-cards` / `-pictures` / `-groups` / `-picking` / `-locks-bin` / `-unlock` / `-crypt` / `-settings` | the notes list in Chromium against the real main process |
-| `note-ui.test.js` | a note window in Chromium: text toolbar keeps the selection, word wrap off, the voice recorder (fake microphone), Speak to text and Transcribe (1.3.1, a stand-in main and engine) |
+| `note-ui.test.js` | a note window in Chromium: text toolbar keeps the selection, word wrap off, the voice recorder (fake microphone), Speak to text and Transcribe (1.3.1, a stand-in main and engine), copy / cut / paste of checklist lines and formatting (1.3.2), checklist box sizes and empty lines (1.3.15), checklist options (1.3.19: click, drag, ticked to the bottom, one box size, the ⋯ menu switches, Undo) |
 
 ## Helpers (`tests/helpers/`)
 - `app.js`: the real main process in the test's process, under `tests/fake-electron`. `const app = require('./helpers/app')`

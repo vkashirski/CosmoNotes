@@ -6,9 +6,9 @@ COSMONOTES - how to build and install
    - Wait until it says "Done!".
    - A folder opens with the installer, "CosmoNotes Setup X.Y.Z.exe"
      (X.Y.Z is the version number, shown in the "Done!" message).
-   (This needs Node.js. If the computer has none, or an old one, build.bat
+   (This needs Node.js. If the device has none, or an old one, build.bat
    downloads its own copy into a "tools" folder here the first time.
-   Nothing else on the computer is changed.)
+   Nothing else on the device is changed.)
 
 2. Install
    - Double-click "CosmoNotes Setup X.Y.Z.exe".
@@ -19,21 +19,21 @@ COSMONOTES - how to build and install
      the old Sticky Pins folder (the old folder is left untouched as a
      safety copy).
 
-Other laptops
+Other devices
    Copy "CosmoNotes Setup X.Y.Z.exe" over and run it. Nothing else needed.
 
 
 WHERE ARE MY NOTES SAVED?
-   Only on this computer, in:  %APPDATA%\CosmoNotes
+   Only on this device, in:  %APPDATA%\CosmoNotes
    (paste that into the File Explorer address bar to open it)
    - notes        one small file per note, saved the moment you type
    - attachments  your photos, drawings and voice recordings
    - backups      a full copy of your notes from each of the last 30 days
    - groups.json  your groups and their names
 
-   To move ALL your notes to another laptop: quit CosmoNotes on both
+   To move ALL your notes to another device: quit CosmoNotes on both
    (right-click the note icon near the clock > Quit), then copy the whole
-   "CosmoNotes" folder above to the same place on the other laptop.
+   "CosmoNotes" folder above to the same place on the other device.
 
    Uninstalling the app does NOT delete your notes.
 
@@ -41,14 +41,14 @@ WHERE ARE MY NOTES SAVED?
 LOCKED NOTES
    The lock hides a note behind your password or PIN, in the note itself
    and in the notes list. Since version 1.1.30 locked notes are also
-   ENCRYPTED on this computer: their title, words, drawings, photos and
+   ENCRYPTED on this device: their title, words, drawings, photos and
    voice clips can't be read from the files without your PIN or password.
    (Give a locked note a "Title while locked" in its menu, or in Edit
    design in the list, to see which note it is while it's locked.)
 
    You can choose a PIN (numbers only: the note opens as soon as you type
    it) or a password. A short PIN is the weak spot: someone who copies
-   your notes folder can try every PIN on their own computer. A PIN of 8
+   your notes folder can try every PIN on their own device. A PIN of 8
    or more digits, or a password, is much safer.
 
    Updating from an older version? Your locked notes are encrypted the
@@ -57,7 +57,7 @@ LOCKED NOTES
 
    RECOVERY KEY: when encryption starts, the list shows a recovery key of
    25 letters and digits. Print it or write it down and keep it away
-   from this computer.
+   from this device.
 
    Forgot the password or PIN? Notes list > Settings > Locked notes >
    "Forgot it? Use the recovery key", then choose a new one.
@@ -104,12 +104,11 @@ QUICK TIPS
      newest or oldest first, groups first or mixed in.
    - Spelling is ignored by default. Turn it on for all notes in
      Settings, or per note with its spelling button.
-   - Voice to text: [+] > Speak to text writes what you say into the
+   - Voice to text: [+] > Voice to text writes what you say into the
      note. Right-click a voice note > Transcribe turns it into text.
-     It all runs on this computer. Settings > Voice to text: Standard
-     comes with the app; Best downloads from Hugging Face (only when you
-     press Download). Your voice never leaves this PC.
-     Test my computer shows if words can appear while you talk.
+     It all runs on this device. First download the model in
+     Settings > Voice to text (from huggingface.co, only when you press
+     Download). Your voice never leaves this device.
    - Shortcuts: Ctrl+N new note, Ctrl+B/I/U bold/italic/underline,
      Ctrl+T strikethrough, Ctrl+Shift+L bullets, Ctrl+Shift+C checklist,
      Ctrl+K link, Ctrl+W close note.

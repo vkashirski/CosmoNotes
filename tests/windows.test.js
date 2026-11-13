@@ -1,8 +1,8 @@
 'use strict';
 // Note windows, in the main process: the welcome note of a first start, what a window shows (see-through, solid while
 // the mouse is over it, pinned on top, paper colour, rolled up), where a new note opens and that a moved note is
-// remembered, minimise / maximise, the window title, "Bring notes to front" and a second start, the mouse's back button
-// in the list, and closing (X) vs quitting (notes reopen where they were).
+// remembered, click-through (1.3.34), minimise / maximise, the window title, "Bring notes to front" and a second start,
+// the mouse's back button in the list, closing (X) vs quitting (notes reopen where they were), and reopening a closed note (1.3.30).
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -40,6 +40,35 @@ const app = require('./helpers/app');
   assert.equal(calls.title, titles, 'an unchanged title is not set again');
   await H['note:update'](ev(w), { pinned: false }); await H['note:update'](ev(w), { pinned: true });
   assert.equal(calls.top, 2, 'a real change still applies'); assert.equal(w.top, true);
+
+  // ---- click-through (1.3.34): only with Settings → Click-through on; turning it on pins the note; only the button wakes it
+  const ST = require('../main/state').S;
+  await H['note:update'](ev(w), { pinned: false });
+  let v = await H['note:update'](ev(w), { clickThrough: true });
+  assert.ok(v.clickThrough && v.pinned && w.top, 'turning it on pins the note');
+  assert.ok(!w.ignoreMouse, 'Settings → Click-through is off: the note takes the mouse');
+  await H['settings:set'](null, { clickThroughOn: true });
+  assert.deepEqual(w.ignoreMouse, { forward: true }, 'on: the mouse goes through, its moves still come (forward)');
+  assert.ok(w.webContents.sentArgs.some(([ch, s]) => ch === 'settings:changed' && s.clickThroughOn === true), 'the notes are told (they show the button)');
+  L['note:hover'](ev(w), true); assert.equal(w.opacity, 0.5, 'it stays see-through under the mouse'); L['note:hover'](ev(w), false);
+  L['note:ct-awake'](ev(w), true); assert.equal(w.ignoreMouse, false, 'the mouse on its button: it takes clicks');
+  await H['note:update'](ev(w), { color: 'mint' }); assert.equal(w.ignoreMouse, false, 'other changes don’t put it back to sleep');
+  L['note:ct-awake'](ev(w), false); assert.deepEqual(w.ignoreMouse, { forward: true }, 'the mouse left the button: through again');
+  v = await H['note:update'](ev(w), { pinned: false });
+  assert.ok(!v.clickThrough && !w.ignoreMouse && !w.top, 'unpinning ends it');
+  L['note:ct-awake'](ev(w), true); L['note:ct-awake'](ev(w), false); assert.equal(w.ignoreMouse, false, 'not click-through: the button changes nothing');
+  await H['note:update'](ev(w), { clickThrough: true });
+  assert.ok((await H['list:get']()).notes.find((x) => x.id === w.noteId).clickThrough, 'the list knows (right-click → Turn off)');
+  await H['settings:set'](null, { clickThroughOn: false });
+  assert.ok(!w.ignoreMouse && ST.store.get(w.noteId).clickThrough, 'Settings off: the mouse is back, the note keeps its choice');
+  await H['settings:set'](null, { clickThroughOn: true });
+  assert.deepEqual(w.ignoreMouse, { forward: true }, 'and on again');
+  await H['list:click-through-off'](null, w.noteId);
+  assert.ok(!ST.store.get(w.noteId).clickThrough && !w.ignoreMouse && w.top, 'right-click → Turn off click-through: it stays pinned');
+  assert.ok(w.webContents.sentArgs.some(([ch, x]) => ch === 'note:look' && x.clickThrough === false), 'its window is told');
+  await H['note:update'](ev(w), { color: 'mint' });
+  await H['settings:set'](null, { clickThroughOn: false });
+
   let prevented = false;
   w.emit('page-title-updated', { preventDefault() { prevented = true; } }, 'CosmoNotes');
   assert.ok(prevented, 'the page title never replaces the note title');
@@ -99,6 +128,31 @@ const app = require('./helpers/app');
   assert.equal(S.store.get(other).open, true, 'not at once (it may be Windows shutting down)');
   await tick(2700);
   assert.equal(S.store.get(other).open, false, 'Alt+F4: remembered as closed');
+
+  // ---- 1.3.30: reopen closed note (Ctrl+Shift+T in the list, the tray), newest first, like a browser's closed tabs
+  const reopenItem = () => E.__tray.menu.t.find((x) => x.label === 'Reopen closed note');
+  assert.equal(reopenItem().enabled, true, 'the tray offers the note closed with Alt+F4');
+  assert.equal(await H['list:reopen-closed'](), other, 'Alt+F4 counts');
+  assert.equal(S.store.get(other).open, true); assert.ok(app.winOf(other), 'its window is open again');
+  assert.equal(reopenItem().enabled, false, 'nothing left: the tray item is grey');
+  assert.equal(await H['list:reopen-closed'](), null, 'nothing to reopen: nothing happens');
+  // closed with its X, then from the list: the list's one comes back first
+  await H['list:close-note'](null, other);
+  await H['note:close'](ev(app.winOf(firstId)));
+  assert.equal(reopenItem().enabled, true, 'the item counts a window only once it is gone');
+  await H['list:close-note'](null, other); // already closed: not counted twice
+  assert.equal(await H['list:reopen-closed'](), firstId, 'newest first');
+  assert.equal(await H['list:reopen-closed'](), other);
+  // opened again by hand, or binned: skipped
+  await H['list:close-note'](null, other);
+  await H['list:open-note'](null, other);
+  assert.equal(reopenItem().enabled, false, 'opened again from the list: nothing to reopen');
+  assert.equal(await H['list:reopen-closed'](), null);
+  await H['list:close-note'](null, other);
+  await H['list:trash'](null, other);
+  assert.equal(await H['list:reopen-closed'](), null, 'a note in the Bin stays there');
+  await H['list:restore'](null, other);
+  // quitting, Windows shutting down and the panic button don't count (panic.test.js: it has "Reopen notes")
 
   // ---- the last save when a window goes away, then quitting: open notes stay open for next time
   const e3 = ev(app.winOf(firstId)); L['note:update-sync'](e3, { html: 'final words', text: 'final words' }); assert.equal(e3.returnValue, true);

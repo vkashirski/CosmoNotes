@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 10 of 11: the toolbars outside the note (their own little windows), the eraser for whole strokes
+// CosmoNotes note window, part 11 of 12: the toolbars outside the note (their own little windows), the eraser for whole strokes
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -140,7 +140,8 @@
   const textMove = movable($('#textPop'), { key: 'textBarPos', out: textOut });
   // 1.1.16: the ⋯ menu (note settings) and the Effects pop-up: dragged by their grip, inside or out of the note.
   // The menu's window can take the keyboard (for its title field); Esc there closes it.
-  for (const [id, kind, frame, title] of [['#menu', 'menu', 'cosmoMenuBar', 'Note settings'], ['#fxPop', 'fx', 'cosmoFxBar', 'Effects']]) {
+  // 1.3.21: the Checklists pop-up too ('ck')
+  for (const [id, kind, frame, title] of [['#menu', 'menu', 'cosmoMenuBar', 'Note settings'], ['#fxPop', 'fx', 'cosmoFxBar', 'Effects'], ['#ckPop', 'ck', 'cosmoCkBar', 'Checklists']]) {
     const el = $(id);
     const po = { out: null, move: null };
     po.out = barOut({ el, kind, frame, title, key: `${kind}PopOut`, mover: () => po.move, onEsc: () => closePop(id) });
@@ -159,7 +160,7 @@
     box.addEventListener('scroll', keep, { passive: true });
     if (window.ResizeObserver) new ResizeObserver(keep).observe(box); // also when it opens again (back at the top)
   }
-  [$('#menu'), $('#fxPop'), $('#textPop'), inkBar].forEach(pinX);
+  [$('#menu'), $('#fxPop'), $('#ckPop'), $('#textPop'), inkBar].forEach(pinX);
 
   $('#btnInk').addEventListener('mousedown', (e) => e.preventDefault());
   // Drawing ⇄ typing: using the bottom bar or the text toolbar puts drawing on hold so you can
@@ -222,10 +223,13 @@
     inkState.dirty = false;
     const patch = { ink: V.note.ink };
     if (inkState.layout) { Object.assign(patch, inkState.layout); inkState.layout = null; } // 1.1.45: see keepForInk
-    // the first drawing turns word wrap off (locks the layout) so it stays lined up with what was drawn
+    // the first drawing turns word wrap off (locks the layout) so it stays lined up with what was drawn; it stays
+    // locked when the drawing is erased or undone (1.3.29: wrapFixed is saved, see applyLayout)
     if (hasInk() && !V.note.wrapWidth) {
       V.note.wrapWidth = Math.round(editor.clientWidth);
+      V.note.wrapFixed = true;
       patch.wrapWidth = V.note.wrapWidth;
+      patch.wrapFixed = true;
       applyLayout();
       toast('Word wrap off, so your drawing stays in place');
     }

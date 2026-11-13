@@ -64,6 +64,12 @@ const assert = require('assert');
   assert.ok(await ui.visible('#editFontRow'), 'a Font row for several notes');
   await ui.click('#editFonts [data-font="medieval"]');
   assert.equal((await note(A)).font, 'medieval'); assert.equal((await note(B)).font, 'medieval', 'Font: both');
+  // Title font (1.3.11): Mixed until one is picked, then both
+  await ui.H['list:apply']({}, [A], { titleFont: 'hand' }); await ui.settle(); await ui.settle();
+  assert.equal(await ui.text('#editTFontName'), 'Mixed', 'different title fonts show as Mixed');
+  await ui.click('#editTFonts [data-tfont="round"]');
+  assert.equal((await note(A)).titleFont, 'round'); assert.equal((await note(B)).titleFont, 'round', 'Title font: both');
+  assert.equal((await note(A)).font, 'medieval', 'the note’s font stays');
   await ui.click('#editTabs [data-tab="f"]');
   await ui.click('#editFxFAmt button[data-a="high"]');
   const fa = await note(A); const fb = await note(B);

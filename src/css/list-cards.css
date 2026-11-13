@@ -7,7 +7,7 @@
   gap: 14px; padding: 4px 2px;
 }
 .card {
-  --paper: #FFF4A3; --bar: #FBE278; --accent: #7A5C00; --cink: #3B3220;
+  --d-paper: #FFF4A3; --d-bar: #FBE278; --d-accent: #7A5C00; --d-cink: #3B3220;
   position: relative;
   display: flex; flex-direction: column;
   height: var(--ch);
@@ -24,23 +24,34 @@
 .cards.anim .card { animation: drop .22s ease-out backwards; }
 @keyframes drop { from { opacity: 0; transform: translateY(6px) rotate(var(--r, 0deg)); } }
 .card:hover { transform: rotate(0deg) translateY(-3px); box-shadow: 0 2px 2px rgba(0,0,0,.08), 0 14px 22px -8px rgba(80,60,20,.4); }
-.card[data-color="pink"], .epaper[data-color="pink"]     { --paper:#FFD6E6; --bar:#FFB5D0; --accent:#9C2A5B; --cink:#3D2430; }
-.card[data-color="green"], .epaper[data-color="green"]    { --paper:#D8F5C4; --bar:#B9E79C; --accent:#3D7A1A; --cink:#25331C; }
-.card[data-color="blue"], .epaper[data-color="blue"]     { --paper:#D2ECFF; --bar:#A9D8FF; --accent:#1F5F93; --cink:#1D2B38; }
-.card[data-color="purple"], .epaper[data-color="purple"]   { --paper:#E8DDFF; --bar:#D0BDFF; --accent:#5B3AA8; --cink:#2B2340; }
-.card[data-color="orange"], .epaper[data-color="orange"]   { --paper:#FFDFBF; --bar:#FFC38C; --accent:#9A4E0C; --cink:#3A2A1A; }
-.card[data-color="mint"], .epaper[data-color="mint"]     { --paper:#CDF3E8; --bar:#A4E5D1; --accent:#1F7560; --cink:#1C332D; }
-.card[data-color="charcoal"], .epaper[data-color="charcoal"] { --paper:#3A3940; --bar:#2B2A30; --accent:#FFD86B; --cink:#F3EFE6; }
+.card[data-color="pink"], .epaper[data-color="pink"]     { --d-paper:#FFD6E6; --d-bar:#FFB5D0; --d-accent:#9C2A5B; --d-cink:#3D2430; }
+.card[data-color="green"], .epaper[data-color="green"]    { --d-paper:#D8F5C4; --d-bar:#B9E79C; --d-accent:#3D7A1A; --d-cink:#25331C; }
+.card[data-color="blue"], .epaper[data-color="blue"]     { --d-paper:#D2ECFF; --d-bar:#A9D8FF; --d-accent:#1F5F93; --d-cink:#1D2B38; }
+.card[data-color="purple"], .epaper[data-color="purple"]   { --d-paper:#E8DDFF; --d-bar:#D0BDFF; --d-accent:#5B3AA8; --d-cink:#2B2340; }
+.card[data-color="orange"], .epaper[data-color="orange"]   { --d-paper:#FFDFBF; --d-bar:#FFC38C; --d-accent:#9A4E0C; --d-cink:#3A2A1A; }
+.card[data-color="mint"], .epaper[data-color="mint"]     { --d-paper:#CDF3E8; --d-bar:#A4E5D1; --d-accent:#1F7560; --d-cink:#1C332D; }
+.card[data-color="charcoal"], .epaper[data-color="charcoal"] { --d-paper:#3A3940; --d-bar:#2B2A30; --d-accent:#FFD86B; --d-cink:#F3EFE6; }
 /* 1.1.15: the colours of the list themes */
-.card[data-color="cream"], .epaper[data-color="cream"]    { --paper:#F5EDD9; --bar:#E8DCC0; --accent:#7D6C50; --cink:#3B3226; }
-.card[data-color="rose"], .epaper[data-color="rose"]     { --paper:#FBE1E8; --bar:#F2CAD6; --accent:#86606B; --cink:#3F2A31; }
-.card[data-color="sage"], .epaper[data-color="sage"]     { --paper:#DCEFE4; --bar:#C4E2D1; --accent:#4F6D5D; --cink:#25362D; }
-.card[data-color="mist"], .epaper[data-color="mist"]     { --paper:#DCEAF8; --bar:#C5DAF0; --accent:#4F6782; --cink:#24313F; }
-.card[data-color="lavender"], .epaper[data-color="lavender"] { --paper:#E7E0F9; --bar:#D5CAF2; --accent:#5E5480; --cink:#2F2843; }
-.card[data-color="night"], .epaper[data-color="night"]    { --paper:#2F2D35; --bar:#25232A; --accent:#B3A4FF; --cink:#EDE6D8; }
-.card[data-color="midnight"], .epaper[data-color="midnight"] { --paper:#252B3D; --bar:#1D2232; --accent:#9FB2FF; --cink:#E4E8F2; }
-.card[data-color="forest"], .epaper[data-color="forest"]   { --paper:#232E28; --bar:#1C2520; --accent:#8FD9B0; --cink:#E2ECE4; }
-.card[data-color="plum"], .epaper[data-color="plum"]     { --paper:#2D2432; --bar:#251D29; --accent:#E0A6EE; --cink:#EEE3F0; }
+.card[data-color="cream"], .epaper[data-color="cream"]    { --d-paper:#F5EDD9; --d-bar:#E8DCC0; --d-accent:#7D6C50; --d-cink:#3B3226; }
+.card[data-color="rose"], .epaper[data-color="rose"]     { --d-paper:#FBE1E8; --d-bar:#F2CAD6; --d-accent:#86606B; --d-cink:#3F2A31; }
+.card[data-color="sage"], .epaper[data-color="sage"]     { --d-paper:#DCEFE4; --d-bar:#C4E2D1; --d-accent:#4F6D5D; --d-cink:#25362D; }
+.card[data-color="mist"], .epaper[data-color="mist"]     { --d-paper:#DCEAF8; --d-bar:#C5DAF0; --d-accent:#4F6782; --d-cink:#24313F; }
+.card[data-color="lavender"], .epaper[data-color="lavender"] { --d-paper:#E7E0F9; --d-bar:#D5CAF2; --d-accent:#5E5480; --d-cink:#2F2843; }
+.card[data-color="night"], .epaper[data-color="night"]    { --d-paper:#2F2D35; --d-bar:#25232A; --d-accent:#B3A4FF; --d-cink:#EDE6D8; }
+.card[data-color="midnight"], .epaper[data-color="midnight"] { --d-paper:#252B3D; --d-bar:#1D2232; --d-accent:#9FB2FF; --d-cink:#E4E8F2; }
+.card[data-color="forest"], .epaper[data-color="forest"]   { --d-paper:#232E28; --d-bar:#1C2520; --d-accent:#8FD9B0; --d-cink:#E2ECE4; }
+.card[data-color="plum"], .epaper[data-color="plum"]     { --d-paper:#2D2432; --d-bar:#251D29; --d-accent:#E0A6EE; --d-cink:#EEE3F0; }
+/* 1.3.27: the rows above are each paper's day colours (--d-*). A card whose note has evening colours on (.eve) mixes into
+   its evening shade (--e-*, from src/evening.js, put in by list/cards.js) by --evp: how far into the evening it is (main's
+   clock, set on the body). The Edit design paper (.epaper) always shows the day colour it is picking. */
+.card, .epaper {
+  --eve: 0;
+  --paper: color-mix(in oklab, var(--d-paper), var(--e-paper, var(--d-paper)) calc(var(--eve) * 100%));
+  --bar: color-mix(in oklab, var(--d-bar), var(--e-bar, var(--d-bar)) calc(var(--eve) * 100%));
+  --accent: color-mix(in oklab, var(--d-accent), var(--e-accent, var(--d-accent)) calc(var(--eve) * 100%));
+  --cink: color-mix(in oklab, var(--d-cink), var(--e-cink, var(--d-cink)) calc(var(--eve) * 100%));
+}
+.card.eve { --eve: var(--evp, 0); }
 .card .strip { height: 9px; flex: none; background: var(--bar); }
 .card .pin {
   position: absolute; top: -1px; left: 50%;
@@ -109,6 +120,11 @@
 .card[data-font="medieval"] .t1:not(.tt), .sheet[data-font="medieval"] .t1:not(.tt) { font-weight: 400; }
 .card[data-font="round"] .txt { font: 400 12.5px/1.4 var(--ui); }
 .card[data-font="medieval"] .txt { font: 400 14.5px/1.3 var(--med); }
+.card .t1[data-tfont="hand"] { font: 700 21px/1.12 var(--hand); }
+.card .t1[data-tfont="round"] { font: 800 13.4px/1.4 var(--ui); }
+.card .t1[data-tfont="medieval"] { font: 400 15.5px/1.3 var(--med); }
+/* 1.3.13: a zoomed-out note: its card's lines at the same zoom (cards.js sets --nz below 1 only) */
+.card .txt > .ln:not(.tt) { zoom: var(--nz, 1); }
 .card .thumb { display: block; width: 100%; height: 70px; object-fit: cover; border-radius: 4px; margin-top: 6px; background: rgba(255,255,255,.6); }
 .card .thumb.only { margin-top: 2px; height: 90px; }
 /* 1.1.22 (sixth round): a small picture keeps its own size (never stretched past it); its box is only as big as it is */
@@ -125,7 +141,8 @@
 .badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px 1px 5px; border-radius: 999px; background: rgba(255,255,255,.55); font-size: 10.5px; }
 .card:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .badge { background: rgba(255,255,255,.12); }
 .badge i { width: 6px; height: 6px; border-radius: 50%; background: #34A853; }
-.card .acts { position: absolute; right: 5px; bottom: 5px; display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--paper); box-shadow: 0 0 0 1px rgba(0,0,0,.06); opacity: 0; transition: opacity .12s; }
+/* 1.3.33: the hover buttons' box: its edge is a thin line of the card's accent (was a faint grey), so the box shows over a photo */
+.card .acts { position: absolute; right: 5px; bottom: 5px; display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--paper); box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent); opacity: 0; transition: opacity .12s; }
 .card:hover .acts, .card:focus-within .acts { opacity: 1; }
 .act {
   width: 26px; height: 24px;
@@ -194,12 +211,14 @@
 .row > span { flex: 1; }
 /* 1.3.1: Settings → Voice to text */
 .sttm { flex-wrap: wrap; }
-#sttModels > .row:first-child, #sttModels + .row { border-top: 1px solid var(--soft); }
+#sttModels > .row:first-child { border-top: 1px solid var(--soft); }
 .sttm .pill { flex: none; }
 .sttbar { flex-basis: 100%; height: 6px; border-radius: 999px; background: var(--soft); overflow: hidden; }
 .sttbar i { display: block; height: 100%; background: #3DAA5C; transition: width .25s; }
 .sttm small.err { color: var(--danger); }
 .panel .muted.sttfoot { margin: 8px 0 0; }
+.panel .muted.sttsub { margin: 0 0 10px; overflow-wrap: anywhere; }
+.sttsub a { color: inherit; text-decoration: underline; cursor: pointer; }
 .toggle { cursor: pointer; }
 /* 1.1.20: a switch sits right after its text (it used to be pushed to the far right). Switches one after another
    are grouped (.switches, made by list.js groupSwitches) so they still line up under each other */

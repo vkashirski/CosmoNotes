@@ -12,10 +12,10 @@ const { S } = require('./state');
 // visible toolbar starts inside its window: l, t, r, b).
 // 1.1.16: the text toolbar does the same, in a window of its own: win.textWin, win.textOut, win.textState. Every
 // function and message below takes the toolbar's kind, 'ink' (the default) or 'text' (messages: `bar: 'text'`).
-// The ⋯ menu ('menu') and the Effects pop-up ('fx') can go outside too (1.1.16, same rules).
-const BAR_FRAMES = { cosmoInkBar: 'ink', cosmoTextBar: 'text', cosmoMenuBar: 'menu', cosmoFxBar: 'fx' };
-const BAR_KINDS = ['ink', 'text', 'menu', 'fx'];
-const BAR_TITLES = { ink: 'Drawing', text: 'Text', menu: 'Note settings', fx: 'Effects' };
+// The ⋯ menu ('menu') and the Effects pop-up ('fx') can go outside too (1.1.16, same rules), and the Checklists pop-up ('ck', 1.3.21).
+const BAR_FRAMES = { cosmoInkBar: 'ink', cosmoTextBar: 'text', cosmoMenuBar: 'menu', cosmoFxBar: 'fx', cosmoCkBar: 'ck' };
+const BAR_KINDS = ['ink', 'text', 'menu', 'fx', 'ck'];
+const BAR_TITLES = { ink: 'Drawing', text: 'Text', menu: 'Note settings', fx: 'Effects', ck: 'Checklists' };
 const barKind = (k) => (BAR_KINDS.includes(k) ? k : 'ink');
 const INK_GAP = 4; // px between the note and a toolbar stuck to it
 const INK_SNAP = 12; // px: this close to a side, it sticks (1.1.20: was 40, it grabbed toolbars and menus from too far away)

@@ -69,6 +69,8 @@
     lockA: '<svg viewBox="0 0 24 24"><g clip-path="url(#lockClip)"><path class="shackle" d="M8 16.5V7a4 4 0 0 1 8 0v4"/></g><rect x="4" y="11" width="16" height="10" rx="2.5"/></svg>',
     star: '<svg viewBox="0 0 24 24"><path d="M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9L3.4 9.4l6-.7z"/></svg>',
     check: '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+    // 1.3.34: click-through (the note's top-bar button has the same arrow)
+    through: '<svg viewBox="0 0 24 24"><path d="M4.04 4.69a.5.5 0 0 1 .65-.65l16 6.5a.5.5 0 0 1-.06.95l-6.13 1.58a2 2 0 0 0-1.43 1.43l-1.58 6.13a.5.5 0 0 1-.95.06z"/></svg>',
     x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
     warn: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
   };
@@ -266,6 +268,10 @@
     return V.state.groups.some((x) => ids.has(x.id) && x.locked) || notesInTree(g.id).some((n) => n.ownLock);
   }
   const LOCKED_NO_DELETE = 'Locked notes and groups can’t be deleted. Remove the lock first.';
+  // 1.3.28 (the owner's wish): a "shut" card is a locked note or group its lock hides right now (main sends it as
+  // `locked`; a group isn't `open`). It can only be picked, unlocked or have its lock removed. Everything else (favourite,
+  // Edit design, copy, close, move, group…) waits until it is unlocked; main refuses those too.
+  const isShut = (kind, t) => !!t && (kind === 'group' ? !t.open : !!t.locked);
   // shown in the list, i.e. not inside a locked group that hasn't been opened with the password
   const noteShown = (n) => !n.groupId || !groupById(n.groupId) || groupById(n.groupId).open;
   const groupShown = (g) => !g.parentId || !groupById(g.parentId) || groupById(g.parentId).open;
@@ -310,5 +316,5 @@
   Object.assign(K, { S, $, $$, COLORS, DARK_COLORS, COLOR_NAMES, SWATCH, GCOLORS, GNAMES, THEMES, SIZES, SIZE_NAMES,
     sizeNow, themeNow, ICON, cardsTabNow, navBack, sel, h, when, full, plural, tilt, swatchStrip, load, live, noteById,
     groupById, childGroups, chainOf, subtreeIds, notesInTree, isInside, noteIsLocked, groupIsLocked, LOCKED_NO_DELETE,
-    lockedOnes, favourites, sortPrefs, sortItems });
+    isShut, lockedOnes, favourites, sortPrefs, sortItems });
 })();

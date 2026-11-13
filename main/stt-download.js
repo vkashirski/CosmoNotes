@@ -86,7 +86,6 @@ async function download(m, run, { signal, onProgress = () => {} } = {}) {
 }
 
 function remove(m) {
-  if (m.builtIn) return false;
   fs.rmSync(dirOf(m), { recursive: true, force: true });
   return true;
 }

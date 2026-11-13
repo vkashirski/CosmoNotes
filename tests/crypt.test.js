@@ -80,8 +80,13 @@ if (app.phase === 'older') { // a note locked with a version before 1.1.30 (a "s
     // the app itself still shows it (the PIN was typed this session)
     const served = await proto(name);
     assert.ok(Buffer.from(served.body).equals(PNG), 'the photo still shows in the app');
-    // a cover title, typed in the note's menu
+    // a cover title, typed in the note's menu: not while its window is locked (hidden), only once it is unlocked
+    await H['note:update'](ev(w), { coverTitle: 'Nope' });
+    assert.equal(S.store.get(id).coverTitle, '', 'a hidden window can’t change the title while locked');
+    assert.ok(await H['note:unlock'](ev(w), '258025'));
     await H['note:update'](ev(w), { coverTitle: 'Bank' });
+    assert.equal(S.store.get(id).coverTitle, 'Bank', 'unlocked: it can');
+    await H['note:relock'](ev(w));
     // typing in the unlocked window of a locked note: sealed again on every save
     await H['note:update'](ev(w), { html: html + '<div>more</div>', text: 'bank pin is 1234\nmore' });
     S.store.flush();
@@ -105,17 +110,19 @@ if (app.phase === 'older') { // a note locked with a version before 1.1.30 (a "s
     assert.ok(n.enc && n.title === '' && n.html === '' && n.ink === null, 'nothing readable in memory before the PIN');
     const c = await card(id);
     assert.equal(c.title, 'Bank', 'the card shows the title while locked');
-    assert.ok(c.cover && c.text === '' && c.firstImage === null);
+    assert.ok(c.locked && c.text === '' && c.firstImage === null);
     assert.equal((await proto(name)).status, 403, 'the photo can’t be fetched before the PIN');
-    // a duplicate of a sealed note keeps the sealed contents (and is locked)
-    const dupId = await H['list:duplicate'](null, id);
-    assert.ok(S.store.get(dupId).enc && S.store.get(dupId).locked, 'Duplicate keeps it sealed');
+    // 1.3.28: a note its lock hides can't be copied from the list (unlock it first)
+    const count = S.store.all().length;
+    assert.equal(await H['list:duplicate'](null, id), null, 'Duplicate is refused while it is locked');
+    assert.equal(S.store.all().length, count, '(no copy)');
     // the sweep keeps the photo of a sealed note
     S.store.sweepAttachments(0);
     assert.ok(fs.existsSync(path.join(DATA, 'attachments', name)), 'the attachment sweep keeps a sealed note’s photo');
-    // the Edit sheet on a locked card changes the cover title, never the (sealed) title
-    await H['list:edit'](null, id, { title: 'Bank (2026)' });
-    assert.equal(S.store.get(id).coverTitle, 'Bank (2026)');
+    // Edit design on a locked card (hidden): nothing can be changed from the list until it is unlocked (1.3.28)
+    const colour = S.store.get(id).color;
+    assert.equal(await H['list:edit'](null, id, { title: 'Bank (2026)', coverTitle: 'Bank (2026)', color: 'mint' }), null);
+    assert.ok(S.store.get(id).coverTitle === 'Bank' && S.store.get(id).color === colour, 'the title while locked and the colour stay');
     assert.ok(S.store.get(id).enc, 'still sealed');
     // restoring the backup before the PIN: comes back sealed, nothing lost
     const before = S.store.all().length;
@@ -128,14 +135,13 @@ if (app.phase === 'older') { // a note locked with a version before 1.1.30 (a "s
     const w = winOf(id);
     const v = await H['note:get'](ev(w));
     assert.ok(v.hidden && v.title === '' && v.html === '' && v.enc === undefined, 'the window gets nothing');
-    assert.equal(w.title, 'Bank (2026)', 'the window title is the title while locked');
+    assert.equal(w.title, 'Bank', 'the window title is the title while locked');
     assert.equal(await H['note:unlock'](ev(w), '000000'), null, 'wrong PIN');
     const open = await H['note:unlock'](ev(w), '258025');
     assert.ok(open && open.html.includes('bank pin is 1234') && open.title === 'Bank stuff secret title', 'the right PIN opens it');
     assert.equal(open.ink.s[0].t, 'pen', 'with its drawing');
     assert.equal(w.title, 'Bank stuff secret title', 'the window shows its real title again');
     assert.ok(Buffer.from((await proto(name)).body).equals(PNG), 'and the photo');
-    assert.ok(S.store.get(dupId).html.includes('bank pin is 1234'), 'the copy opened too');
     assert.ok(back.every((x) => x.html.includes('bank pin is 1234')), 'and the restored ones');
     // ---- forgot the PIN: the recovery key and a new PIN
     assert.equal((await H['crypt:recover'](null, { code: 'AAAAA-AAAAA-AAAAA-AAAAA-AAAAA', next: '97531', kind: 'pin' })).error, 'That recovery key is not right.');
