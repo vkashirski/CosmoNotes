@@ -297,4 +297,7 @@ function notifyStt() {
   }, 30);
 }
 
-module.exports = { registerSttIpc };
+// 1.4.0: an update waits while voice to text is working (main/ipc-update.js)
+const sttBusy = () => jobs.size > 0;
+
+module.exports = { registerSttIpc, sttBusy };

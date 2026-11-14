@@ -108,8 +108,10 @@
     paintEve();
     paintPanic();
     $('#sClickThrough').checked = !!s.clickThroughOn; // 1.3.34
+    $('#sUpdateCheck').checked = s.updateCheck !== false; // 1.4.0
     paintReapply();
     paintVoice(await S.stt.status());
+    paintUpdate(await S.update.status());
     renderBackups(await S.backups.list());
   }
 
@@ -304,6 +306,47 @@
       h('h5', {}, f.title),
       h('ul', {}, f.items.map((it) => h('li', {}, it))))));
   }
+
+  // ---- Settings → About → updates (1.4.0; main/ipc-update.js, main/updater.js). A newer version that is ready (or whose
+  // download or start failed) also puts a dot on the Settings tab and on About's heading, wherever the list is.
+  const UPD_LINE = {
+    idle: () => '', checking: () => 'Checking…', none: () => 'You have the newest version.',
+    checkfailed: () => 'Couldn’t check for updates.', available: (u) => `Version ${u.latest} is ready.`,
+    downloading: (u) => `Downloading… ${u.pct || 0}%`, installing: () => 'Installing. CosmoNotes will open again.',
+    failed: (u) => (u.failure === 'start' ? 'Couldn’t start the update.' : 'Couldn’t download the update.'),
+  };
+  function paintUpdate(u) {
+    if (!u || !UPD_LINE[u.state]) return;
+    const ready = u.state === 'available' || u.state === 'failed';
+    $('.tab[data-tab="settings"]').classList.toggle('hasupd', ready);
+    $('.abouthead h3').classList.toggle('hasupd', ready);
+    const line = $('#updLine');
+    line.textContent = UPD_LINE[u.state](u);
+    line.classList.toggle('err', u.state === 'failed' || u.state === 'checkfailed');
+    $('#updBar').hidden = u.state !== 'downloading';
+    $('#updBar i').style.width = `${u.pct || 0}%`;
+    const btn = (label, run, ghost) => h('button', { class: `pill small${ghost ? ' ghost' : ''}`, onclick: run }, label);
+    const box = $('#updBtns');
+    box.innerHTML = '';
+    if (u.state === 'available') box.append(btn('Install', installUpdate));
+    else if (u.state === 'downloading') box.append(btn('Cancel', async () => paintUpdate(await S.update.cancel()), true));
+    else if (u.state === 'failed') box.append(btn('Open the download page', () => S.update.openPage(), true), btn('Try again', installUpdate));
+    else if (u.state !== 'installing') {
+      const b = btn(u.state === 'checkfailed' ? 'Try again' : 'Check for updates', async () => paintUpdate(await S.update.check()), true);
+      b.disabled = u.state === 'checking';
+      box.append(b);
+    }
+  }
+  async function installUpdate() {
+    const ok = await modal({ title: 'Install the update?', text: 'CosmoNotes saves your notes, closes and opens again.', okLabel: 'Install' });
+    if (!ok) return;
+    const u = await S.update.install();
+    if (u && u.error === 'busy') toast('Wait for the voice recording or voice to text to finish.');
+    else if (u && u.error === 'notinstalled') toast('Updates work in the installed app.');
+    paintUpdate(u);
+  }
+  S.update.onChanged(paintUpdate);
+  (async () => paintUpdate(await S.update.status()))(); // the dot, as soon as the list opens
 
   // Backups aren't listed in Settings any more: just the newest one, and a button that opens a
   // pop-up to pick the day to restore.

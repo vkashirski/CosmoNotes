@@ -45,7 +45,7 @@ echo.
 echo   Step 2 of 2: building the installer...
 echo.
 set CSC_IDENTITY_AUTO_DISCOVERY=false
-call npx electron-builder --win nsis --x64
+call npx electron-builder --win nsis --x64 --publish never
 if not errorlevel 1 goto :done
 
 rem The last build step runs a small helper the builder just made. Windows Security
@@ -54,7 +54,7 @@ echo.
 echo   Windows stopped one build step (usually Windows Security checking a brand-new file).
 echo   Trying again in 15 seconds...
 timeout /t 15 /nobreak >nul
-call npx electron-builder --win nsis --x64
+call npx electron-builder --win nsis --x64 --publish never
 if errorlevel 1 goto :blocked
 
 :done
@@ -79,7 +79,7 @@ echo   ==========================================
 echo      Done! Your installer is ready.
 echo   ==========================================
 echo.
-echo   A folder will open with "CosmoNotes Setup %APPVER%.exe".
+echo   A folder will open with "CosmoNotes-Setup-%APPVER%.exe".
 echo   Double-click it to install. Copy that same file to your
 echo   other devices to install it there too.
 echo.

@@ -6,7 +6,7 @@
   const { V, S, $, $$, SIZES, SIZE_NAMES, sizeNow, ICON, cardsTabNow, sel, load, groupById, sortPrefs, render,
     dropTarget, canMove, moveInto, visibleKeys, clearSel, paintCards, bulkTrash, renderSettings, renderBackups,
     pickBackup, modal, toast, hideCtx, closeFxSheet, closeEdit, emptyBin, NEW_INPUTS, checkNew, savedLock, closePanel,
-    showKeyIfNeeded, clearSettingsSearch } = K;
+    showKeyIfNeeded, clearSettingsSearch, setFold } = K;
   // ================================================================ events
   // Settings is a toggle: clicking it while it's open goes back to Notes or Bin, whichever was open before
   function setTab(v) {
@@ -150,6 +150,14 @@
   }
   $('#sPanic').addEventListener('change', (e) => S.settings.set({ panicOn: e.target.checked }));
   $('#sClickThrough').addEventListener('change', (e) => S.settings.set({ clickThroughOn: e.target.checked })); // 1.3.34
+  $('#sUpdateCheck').addEventListener('change', (e) => S.settings.set({ updateCheck: e.target.checked })); // 1.4.0
+  // 1.4.0: the tray's "Update to …" (and a start Windows refused): Settings, at About's updates
+  S.update.onShow(() => {
+    clearSettingsSearch();
+    if (V.tab !== 'settings') setTab('settings');
+    setFold($('#viewSettings .panel.about'), true);
+    requestAnimationFrame(() => $('#updRow').scrollIntoView({ block: 'center' }));
+  });
   // password or PIN: set / change in an app-styled pop-up
   $('#pwSave').addEventListener('click', async () => {
     const has = !!V.state.settings.hasPassword;

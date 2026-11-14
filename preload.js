@@ -125,4 +125,14 @@ contextBridge.exposeInMainWorld('sticky', {
     remove: (id) => inv('stt:remove', id),
     onChanged: (cb) => ipcRenderer.on('stt:changed', (e, s) => cb(s)),
   },
+  // 1.4.0: Settings → About → updates (main/ipc-update.js)
+  update: {
+    status: () => inv('update:status'),
+    check: () => inv('update:check'),
+    install: () => inv('update:install'),
+    cancel: () => inv('update:cancel'),
+    openPage: () => inv('update:open-page'),
+    onChanged: (cb) => ipcRenderer.on('update:changed', (e, s) => cb(s)),
+    onShow: (cb) => ipcRenderer.on('update:show', () => cb()),
+  },
 });

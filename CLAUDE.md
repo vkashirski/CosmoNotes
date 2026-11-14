@@ -2,13 +2,14 @@
 
 Windows sticky-notes app (Electron 39, plain JavaScript, no framework or bundler). Notes are stored locally only.
 The owner is a programmer: technical detail is fine (texts inside the app stay short and plain). Edit files in this folder in place.
-Keep each file's existing line endings: they are mixed (`main.js`, `main/*.js`, `preload.js`, `src/note.*`, `src/note/*.js`, `src/css/note-*.css`, `build.bat` are CRLF;
+Keep each file's existing line endings (`.gitattributes` holds them for git since 1.4.0: a new CRLF file needs a line there too): they are mixed (`main.js`, `main/*.js`, `preload.js`, `src/note.*`, `src/note/*.js`, `src/css/note-*.css`, `*.bat`, `build/installer.nsh`, `build/afterPack.js`, `.gitignore`, `CLAUDE.md`, `HOW TO INSTALL.txt` are CRLF;
 `store.js`, `src/list.*`, `src/list/*.js`, `src/fx/*.js`, `src/engine/*`, `src/mic-worklet.js`, `src/about.js`, `src/evening.js`, `package.json`, `CHANGELOG.md` and `ai-context/*.md` are LF).
 
 ## Commands
 - `npm test`: all tests, side by side (~30 s), under plain Node (`tests/fake-electron` stands in for Electron); prints only failures and a summary. `npm test -- notes` runs only the files whose name contains "notes". Run the area's file while working and everything once before saying a change is done. The browser tests (`tests/list-ui-*`, `note-ui`) need Playwright: the cloud workspace has it; without it they show as skipped.
 - `npm start` or `test-run.bat`: run the app from this folder (Windows only).
-- `build.bat`: the owner double-clicks it to build `dist/CosmoNotes Setup <version>.exe`. Don't build yourself. There is no linter. No voice model comes with the app since 1.3.4 (it is a download in Settings; `build/fetch-model.js` and `build/models/` are unused).
+- `build.bat`: the owner double-clicks it to build `dist/CosmoNotes-Setup-<version>.exe` on his PC. Don't build yourself.
+- `release.bat` (1.4.0): the owner double-clicks it to send a version to everyone: GitHub Actions tests, builds and publishes it, and the apps update themselves (`ai-context/build-and-release.md` → "Releasing"). Never run it or push a tag yourself. There is no linter. No voice model comes with the app since 1.3.4 (it is a download in Settings; `build/fetch-model.js` and `build/models/` are unused).
 - Only a real Windows PC can confirm the installer, always-on-top, the tray, start with Windows, the microphone, the graphics card (voice to text) and the spellchecker download. Say so; don't claim they work.
 
 ## Golden rules
@@ -48,7 +49,7 @@ Keep each file's existing line endings: they are mixed (`main.js`, `main/*.js`, 
 3. `CHANGELOG.md`: the entry at the top: a one-line summary, then the details. It keeps only the two newest versions: move the oldest one into `CHANGELOG-archive.md` (top of its list).
 4. `ai-context/CONTEXT.md`: the "Last updated" line, plus the one `ai-context/` file whose topic changed (new feature → `feature-map.md`; new field or setting → `data-model.md`; a new rule or trap → the matching file).
 5. `HOW TO INSTALL.txt` and `build.bat`, only if they mention the version or file name (neither hard-codes it since 1.1.5).
-6. `npm test`. The owner then runs `build.bat`.
+6. `npm test`. The owner then runs `build.bat` to try it, and `release.bat` to send it to everyone.
 7. If files go into the owner's folder through the desktop app, verify each one on the device (see Pitfalls). If his build then stops with `EBUSY ... app.asar`, the app is still running (`build-and-release.md`).
 
 ## Saving tokens (these files are big)

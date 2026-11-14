@@ -334,11 +334,21 @@
     <code id="dataPath"></code>
     <div class="btnrow"><button class="pill ghost" id="btnDataFolder">Open notes folder</button></div>
   </div>
-  <div data-find="version update updates help info credits changelog" class="panel about">
+  <div data-find="version update updates upgrade new version download install help info credits changelog github" class="panel about">
     <div class="abouthead">
       <svg class="aboutlogo" viewBox="0 0 32 32"><rect x="5" y="7" width="22" height="21" rx="2.5" fill="#FFE45C" transform="rotate(-6 16 17)"/><path d="M22 26.5l4.4-4.6-4.2.4z" fill="#E6C232" transform="rotate(-6 16 17)"/><circle cx="16" cy="8" r="4" fill="#E5484D"/><circle cx="14.7" cy="6.8" r="1.2" fill="#fff" opacity=".7"/><path d="M27 3.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="#8E7BEF"/></svg>
       <span><h3>About CosmoNotes</h3><small id="aboutLine"></small></span>
     </div>
+    <!-- 1.4.0: updates (painted by paintUpdate in list/settings-menus.js; main/ipc-update.js) -->
+    <div class="row upd" id="updRow">
+      <span><b>Updates</b><small id="updLine"></small></span>
+      <div class="pickbtns" id="updBtns"></div>
+      <div class="sttbar" id="updBar" hidden><i></i></div>
+    </div>
+    <label class="row toggle">
+      <span><b>Check for updates</b><small>When CosmoNotes starts, and once a day.</small></span>
+      <input type="checkbox" id="sUpdateCheck"><i></i>
+    </label>
     <details class="fold" id="foldFeatures">
       <summary>Everything CosmoNotes can do</summary>
       <div id="features"></div>

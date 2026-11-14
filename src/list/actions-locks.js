@@ -483,7 +483,7 @@
     if (r) { toast(on ? 'Encryption is off' : 'Locked notes are encrypted again 🔐'); await load(); }
   });
 
-  Object.assign(K, { trashNote, destroyNote, emptyBin, dissolveGroup, trashGroup, NEW_INPUTS, checkNew, savedLock,
+  Object.assign(K, { setFold, trashNote, destroyNote, emptyBin, dissolveGroup, trashGroup, NEW_INPUTS, checkNew, savedLock,
     ensurePassword, paintLockBar, lockNote, unlockNote, lockGroup, unlockGroup, unlockNoteNow, relockNote, unlockGroupNow,
     relockGroup, openGroupView, openPanel, closePanel,
     paintPanel, showKeyIfNeeded, paintCrypt, clearSettingsSearch });

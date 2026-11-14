@@ -1,0 +1,69 @@
+# 1.4.0: a release, built and published by GitHub. release.bat pushes a tag "v<version>"; this then
+#   1. runs every test (npm test, the browser tests too) on Linux, where they are made to run;
+#   2. builds the installer on Windows, checks that CosmoNotes.exe is Electron's own untouched electron.exe (Smart App
+#      Control, ai-context/build-and-release.md), and only then publishes CosmoNotes-Setup-<version>.exe, its .blockmap
+#      and latest.yml as the release "v<version>" (gh, on the runner), with that version's CHANGELOG.md entry as its notes.
+# The app reads latest.yml from the newest release (main/updater.js). Nothing is published if a step fails.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # to create the release and upload its files
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The tag is the version in package.json
+        run: |
+          v=$(node -p "require('./package.json').version")
+          test "v$v" = "$GITHUB_REF_NAME" || { echo "The tag $GITHUB_REF_NAME is not v$v (package.json)"; exit 1; }
+      # the tests need no npm packages (tests/fake-electron stands in for Electron); the browser tests need Playwright
+      - name: Playwright for the browser tests
+        run: |
+          npm install --global playwright@1.63.0
+          npx --yes playwright@1.63.0 install --with-deps chromium
+      - name: npm test
+        run: |
+          export NODE_PATH="$(npm root --global)"
+          npm test -- -v
+
+  build:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The building kit (the same versions as package-lock.json)
+        run: npm ci --no-audit --no-fund
+      - name: Build (nothing is published yet)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --win nsis --x64 --publish never
+      - name: CosmoNotes.exe is Electron's own electron.exe (Smart App Control)
+        shell: pwsh
+        run: |
+          $a = (Get-FileHash 'dist\win-unpacked\CosmoNotes.exe').Hash
+          $b = (Get-FileHash 'node_modules\electron\dist\electron.exe').Hash
+          if ($a -ne $b) { Write-Error 'CosmoNotes.exe is not Electron''s original file: Smart App Control would block it. Fix the build.'; exit 1 }
+          'Check passed: CosmoNotes.exe is Electron''s original program file.'
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v=$(node -p "require('./package.json').version")
+          node build/release-notes.js
+          test -f "dist/CosmoNotes-Setup-$v.exe" && test -f dist/latest.yml
+          tr -d '\r' < dist/latest.yml | grep -q "^path: CosmoNotes-Setup-$v.exe$"
+          gh release create "v$v" "dist/CosmoNotes-Setup-$v.exe" "dist/CosmoNotes-Setup-$v.exe.blockmap" dist/latest.yml \
+            --title "CosmoNotes $v" --notes-file build/release-notes.md --verify-tag

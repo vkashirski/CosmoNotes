@@ -1,6 +1,6 @@
 'use strict';
-// 1.3.1: voice to text. Downloading the Best model (Settings → Voice to text → Download), the only time CosmoNotes
-// itself goes on the internet (and only main, never a window). Each file comes from Hugging Face at the fixed commit of
+// 1.3.1: voice to text. Downloading the Best model (Settings → Voice to text → Download). Like the update check (1.4.0,
+// main/updater.js), only main goes on the internet, never a window. Each file comes from Hugging Face at the fixed commit of
 // main/stt-models.js and is written as <file>.part, checked (size + sha256) and only then renamed. ready.json, written
 // last, says the model is complete and which set it is (gpu / cpu). Cancel or a failure leaves no .part behind; a file
 // already there with the right hash is kept (Try again goes on from there). The folder is <data>/models/<id>/: not in

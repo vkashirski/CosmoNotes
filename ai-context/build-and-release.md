@@ -1,7 +1,31 @@
 # Building, packaging and releasing
 
-Open this when changing `build.bat` or the `build` section of `package.json`, the Electron or Node version, when a build error
-appears, or when files are saved into the owner's folder. The per-update checklist is in `CLAUDE.md`.
+Open this when changing `build.bat`, `release.bat`, `.github/workflows/release.yml` or the `build` section of `package.json`,
+the Electron or Node version, when a build error appears, or when files are saved into the owner's folder. The per-update
+checklist is in `CLAUDE.md`.
+
+## Releasing (1.4.0)
+
+- **The owner releases with `release.bat`**: it checks git is there, the branch is main, nothing is uncommitted and the tag
+  `v<version>` doesn't exist (here or on GitHub); asks; pushes main, then the tag; opens the Actions page.
+- **`.github/workflows/release.yml`** runs on that tag: job `test` (Linux: the tag must be `v` + package.json's version;
+  `npm test -- -v` with Playwright installed globally and `NODE_PATH`, so the browser tests run too), then job `build`
+  (Windows: `npm ci`, `electron-builder --win nsis --x64 --publish never`, the Smart App Control check (CosmoNotes.exe
+  = node_modules' electron.exe, by hash), then `gh release create v<version>` with the installer, its `.blockmap` and
+  `latest.yml`, notes = that version's CHANGELOG.md entry (`build/release-notes.js` → `build/release-notes.md`,
+  git-ignored)). A failed step publishes nothing; the tag stays, so the next try needs a new version.
+- **The installer's name is `CosmoNotes-Setup-<version>.exe`** (`nsis.artifactName`, 1.4.0). No spaces: GitHub turns
+  spaces in uploaded file names into dots, and `latest.yml` (which the app reads) must name the file as uploaded.
+  `main/updater.js` refuses any other name.
+- **`build.publish`** (provider github, vkashirski/CosmoNotes) makes electron-builder write `latest.yml` (and
+  `resources/app-update.yml`, unused). Nothing uploads from electron-builder: both `build.bat` and the workflow pass
+  `--publish never`; the workflow uploads with `gh`.
+- **Line endings** are in `.gitattributes`. Git keeps the CRLF files as LF inside the repo (as before) and checks them
+  out as CRLF everywhere, so a fresh clone (GitHub's machines too) has the endings `code-structure.test.js` checks.
+  A new CRLF file needs a line there and in CLAUDE.md.
+- **Smart App Control and a downloaded installer**: so far SAC has allowed the installers built on the owner's PC. One
+  built by GitHub is a different (unsigned) file; if SAC refuses it, the app says "Couldn't start the update" and opens
+  again, and the release page offers the file. Known only after the first real update (1.4.0 → 1.4.1).
 
 ## Packaging identity
 
@@ -42,7 +66,7 @@ appears, or when files are saved into the owner's folder. The per-update checkli
   - The exe shows Electron's icon, so `build/installer.nsh` re-points the shortcuts to `resources\icon.ico`.
   - `build.bat` verifies this with `fc /b` after each build. If it ever says the files differ, fix the build.
   Changing the Electron version gives a new electron.exe. That's fine as long as it's an official release
-  (also widely trusted), but check that it starts. The installer (`CosmoNotes Setup.exe`) and the uninstaller are
+  (also widely trusted), but check that it starts. The installer (`CosmoNotes-Setup-<version>.exe`) and the uninstaller are
   NSIS exes; so far SAC has allowed them. If SAC ever blocks the installer, an alternative is copying
   `dist\win-unpacked` into `%LOCALAPPDATA%\Programs\sticky-pins` (the install folder kept its old name).
 

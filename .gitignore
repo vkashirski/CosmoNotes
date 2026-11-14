@@ -3,3 +3,4 @@ dist
 tools
 build/models
 MyPersonalCert.cer
+build/release-notes.md

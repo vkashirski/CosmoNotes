@@ -8,7 +8,7 @@
  * Keep each item short: one or two plain sentences.
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-11-12',
+  LAST_UPDATED: '2026-11-14',
 
   FEATURES: [
     {
@@ -146,6 +146,15 @@ window.COSMO_ABOUT = {
         '“New note” inside an open group puts the note there.',
         'Change the colour or font of every note in a group at once.',
         'New notes can get one colour, or a random one from several.',
+      ],
+    },
+    {
+      title: 'Updates',
+      items: [
+        'CosmoNotes looks for a new version on GitHub when it starts and once a day. Turn it off in Settings → About.',
+        'A new version shows a dot on Settings and a line in the tray menu.',
+        'Install saves your notes, updates, and opens CosmoNotes again with your notes where they were.',
+        'The download is checked before it runs. A wrong or broken file is never started.',
       ],
     },
   ],

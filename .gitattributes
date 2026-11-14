@@ -1,0 +1,17 @@
+# Line endings, the same on every checkout (the owner's PC, GitHub Actions, a fresh clone): CLAUDE.md lists them and
+# tests/code-structure.test.js checks them. Everything is LF unless listed below as CRLF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.nsh text eol=crlf
+.gitignore text eol=crlf
+CLAUDE.md text eol=crlf
+HOW[[:space:]]TO[[:space:]]INSTALL.txt text eol=crlf
+main.js text eol=crlf
+main/*.js text eol=crlf
+preload.js text eol=crlf
+build/afterPack.js text eol=crlf
+src/note.css text eol=crlf
+src/note.html text eol=crlf
+src/note.js text eol=crlf
+src/note/*.js text eol=crlf
+src/css/note-*.css text eol=crlf

@@ -104,6 +104,9 @@ const DEFAULT_SETTINGS = {
   panicClosed: [], // the notes the last panic closed: they come back when CosmoNotes is opened again (main/panic.js reopen)
   // 1.3.34: the click-through button, left of the pin in each note's top bar (note.clickThrough). Off: no note is click-through
   clickThroughOn: false,
+  // 1.4.0: check GitHub for a newer version when CosmoNotes starts and once a day (main/ipc-update.js). The button in
+  // Settings → About works either way
+  updateCheck: true,
 };
 // 1.3.19: a note's own checklist options ({ drag, sink, fixed }: true / false; null = as in Settings)
 const CHECK_OPTS = { drag: 'checkDrag', sink: 'checkSink', fixed: 'checkFixed' };

@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 12 November 2026 · App version 1.3.38**
+**Last updated: 14 November 2026 · App version 1.4.0**
 
 Start with `CLAUDE.md` (rules, commands, pitfalls, release checklist). This file is the map: what the app is,
 how the folder is laid out, and which `ai-context/` file to open for the job in hand. Open only the files your
@@ -34,8 +34,9 @@ for Microsoft Sticky Notes. It was called **Sticky Pins** in 1.0.0.
    (photos, voice, drawing…) live behind **+ Add**.
 
 **The owner** is a programmer (older notes said otherwise; fixed in 1.2.4): technical detail is fine. Texts inside the
-app stay short and plain. They build the installer by double-clicking `build.bat` and install
-`dist/CosmoNotes Setup <version>.exe` on their laptops. The project is a git
+app stay short and plain. Since 1.4.0 they release a version by double-clicking `release.bat` (GitHub Actions builds and
+publishes it; every installed CosmoNotes then offers it in Settings → About and the tray). `build.bat` still builds
+`dist/CosmoNotes-Setup-<version>.exe` on their PC. The project is a git
 repo (public on GitHub: `vkashirski/CosmoNotes`); on the owner's PC it's at `C:\Workspaces\CosmoNotes` (it used
 to be `C:\Users\User\Desktop\Sticky Pins\Sticky Pins`). They want edits made **in that folder, in place**, not
 as new copies. Keep each file's existing line endings (they are mixed: see CLAUDE.md).
@@ -61,7 +62,9 @@ main/              state (S.store, S.listWin, S.quitting, S.listUnlockedAll + wi
                    1.3.27: evening (evening colours: the one clock, a window's background) · panic (the panic button, its
                    global shortcut, reopening what it closed) ·
                    1.3.30: closed-notes (the notes closed by hand, for "Reopen closed note": Ctrl+Shift+T, the tray) ·
-                   ipc (registerIpc calls the eight ipc-* parts)
+                   1.4.0: updater (updates: GitHub's latest.yml, the installer's download + sha512, starting it on quit) ·
+                   ipc-update (update:*, the check at start and once a day, Install, the tray's "Update to …") ·
+                   ipc (registerIpc calls the nine ipc-* parts)
 store.js           All disk storage (notes, groups, settings, attachments, backups). No Electron imports.
 preload.js         Safe bridge: exposes window.sticky.* to both windows (contextIsolation + sandbox)
 src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/note/*.js, 12 parts (1.3.19) loaded in this order, sharing
@@ -110,12 +113,16 @@ src/fx.js          Not used since 1.1.24: only a note saying the code moved to s
 assets/            icon.ico/png (windows), tray.ico/png
 build/             icon.ico/png for the installer/shortcuts; afterPack.js is an unused stub (see build-and-release.md, Smart App Control);
                    fetch-model.js: an unused stub since 1.3.4 (no model comes with the app; can be deleted)
-build.bat          One-click: (private Node if needed) + npm install + electron-builder → dist/CosmoNotes Setup <ver>.exe
+build.bat          One-click: (private Node if needed) + npm install + electron-builder → dist/CosmoNotes-Setup-<ver>.exe (local only)
+release.bat        1.4.0: sends the version in package.json to everyone: pushes main and the tag v<ver> (checks first)
+.github/           1.4.0: workflows/release.yml (a tag v<ver>: tests on Linux, build + Smart App Control check on Windows,
+                   publish to GitHub Releases; its notes: build/release-notes.js, that version's CHANGELOG.md entry)
+.gitattributes     1.4.0: each file's line endings in git (the CRLF ones CLAUDE.md lists; the rest LF)
 HOW TO INSTALL.txt Plain-language guide for the owner (install, data folder, forgot password, tips)
 test-run.bat       Runs CosmoNotes from this folder with Electron's original exe (no build needed)
 build/installer.nsh  Installer addition: shortcuts get the CosmoNotes icon (exe stays untouched, see build-and-release.md)
 CHANGELOG.md       Version history, the two newest versions (the only place it is kept, with the archive)
-CHANGELOG-archive.md  Older versions (1.1.47 back to 1.0.0); the app doesn't read it (release.test.js does)
+CHANGELOG-archive.md  Older versions (1.3.37 back to 1.0.0); the app doesn't read it (release.test.js does)
 tests/             npm test – one *.test.js per area (notes, groups, locks, crypt, effects-…, list-ui-…; testing.md lists
                    them), run side by side; helpers/ (the real main process under fake-electron/, the list and a note in
                    Chromium, the effects in a vm); record/ records a refactor before and after (not run by npm test)
@@ -154,6 +161,8 @@ The Medieval font (1.2.1) is a file in the app: `src/fonts/Augusta.ttf`, loaded 
 - Per-note passwords (the owner said "one password for all notes **for now**").
 - Maybe: drag to reorder notes by hand (currently only sorting), and custom group icons/stickers.
 - Reminders/alarms on notes, a global "new note" shortcut, and export/import to a single file (offered in 1.0.0, not chosen yet).
-- **Not wanted (for now):** a "Check for updates" button (GitHub Releases + electron-updater) was discussed after
-  1.1.5; the owner decided against it. If it comes back: the repo is public, the installer is unsigned (Smart App
-  Control may treat a downloaded copy differently), and checking would be the app's only other network use.
+- Updates (1.4.0) were turned down after 1.1.5 and chosen in 1.4.0, with the owner's picks: a ready installer from
+  GitHub Releases, built by GitHub Actions from a tag that `release.bat` pushes; a quiet check at start and once a day
+  (switch on), a dot and a tray line, no pop-up and no "what's new" in the app; Install saves, updates silently and
+  reopens; a blocked download offers the release page; our own small updater (no electron-updater). Still unknown:
+  whether Smart App Control lets an installer built by GitHub (not on the owner's PC) start: the first real update shows it.

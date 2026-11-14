@@ -6,6 +6,18 @@ file (`tests/release.test.js` checks that every version is in one of the two fil
 Renumbered in 1.1.41: each heading says its old number (the table is at the top of `CHANGELOG.md`). Version numbers inside
 the entries are the old ones.
 
+## 1.3.37 – 12 November 2026
+
+The search rows (Notes, Bin, Settings) stay at the top while you scroll, and are now solid (the owner's report): what
+scrolls under them no longer shows in a thin strip above the search box, at its corners or between its buttons.
+
+- Cause: `.searchrow` (list-base.css) is `position: sticky` with no background, so its 2px top padding, the box's
+  rounded corners and the gaps between the buttons were see-through. Fix: it gets the window's colour and dots
+  (lined up with the view's at the top: `-12px -88px`) and a solid 8px edge below the box (`padding-bottom: 8px`;
+  `margin-bottom` 12px → 4px, and Settings' `-8px` with its 12px gap, so the spacing at the top is unchanged).
+- Once the view scrolls, a soft shadow appears under the row (`searchShade`: a scroll-driven animation,
+  `animation-timeline: scroll(nearest)`, no JS; `--searchShade` is darker in dark themes).
+
 ## 1.3.36 – 12 November 2026
 
 The search in Settings also knows other names for each section (the owner's wish): "dark mode" finds General (the

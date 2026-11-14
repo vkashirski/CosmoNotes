@@ -66,6 +66,7 @@ function registerSettingsIpc() {
     // 1.3.34: the click-through button (off: every click-through note takes the mouse again; each keeps its choice)
     const ctChanged = 'clickThroughOn' in patch;
     if (ctChanged) S.store.settings.clickThroughOn = !!patch.clickThroughOn;
+    if ('updateCheck' in patch) S.store.settings.updateCheck = !!patch.updateCheck; // 1.4.0: main/ipc-update.js
     if (patch.listSort && typeof patch.listSort === 'object') {
       const ls = { ...S.store.settings.listSort };
       if (['updated', 'created'].includes(patch.listSort.by)) ls.by = patch.listSort.by;

@@ -1,17 +1,17 @@
-COSMONOTES - how to build and install
-=====================================
+COSMONOTES - how to install and update
+======================================
 
-1. Build the installer
-   - Double-click  build.bat
-   - Wait until it says "Done!".
-   - A folder opens with the installer, "CosmoNotes Setup X.Y.Z.exe"
-     (X.Y.Z is the version number, shown in the "Done!" message).
-   (This needs Node.js. If the device has none, or an old one, build.bat
-   downloads its own copy into a "tools" folder here the first time.
-   Nothing else on the device is changed.)
+1. Get the installer
+   - Download "CosmoNotes-Setup-X.Y.Z.exe" (X.Y.Z is the version number)
+     from https://github.com/vkashirski/CosmoNotes/releases/latest
+   - Or build it yourself: double-click  build.bat  and wait until it
+     says "Done!". A folder opens with the installer.
+     (This needs Node.js. If the device has none, or an old one, build.bat
+     downloads its own copy into a "tools" folder here the first time.
+     Nothing else on the device is changed.)
 
 2. Install
-   - Double-click "CosmoNotes Setup X.Y.Z.exe".
+   - Double-click "CosmoNotes-Setup-X.Y.Z.exe".
    - If Windows shows "Windows protected your PC": click "More info",
      then "Run anyway".
    - It replaces the old "Sticky Pins" app automatically. Your notes come
@@ -19,8 +19,23 @@ COSMONOTES - how to build and install
      the old Sticky Pins folder (the old folder is left untouched as a
      safety copy).
 
-Other devices
-   Copy "CosmoNotes Setup X.Y.Z.exe" over and run it. Nothing else needed.
+
+UPDATES (since 1.4.0)
+   CosmoNotes looks for a new version when it starts and once a day.
+   When there is one, Settings shows a dot and the tray menu says
+   "Update to X.Y.Z...". Open Settings > About and press Install: your
+   notes are saved, CosmoNotes updates and opens again.
+   - Turn the daily check off in Settings > About ("Check for updates").
+     The "Check for updates" button there works either way.
+   - If the update can't download or start (a work PC may block it),
+     press "Open the download page" and install it as in step 2.
+   - Versions before 1.4.0 can't update themselves: install 1.4.0 (or
+     newer) once as in steps 1 and 2. Every device updates itself after that.
+
+RELEASING AN UPDATE (for the developer)
+   Commit everything, then double-click  release.bat . GitHub tests,
+   builds and publishes it (about 10 minutes, the page that opens shows
+   how it goes). Every CosmoNotes then offers it.
 
 
 WHERE ARE MY NOTES SAVED?

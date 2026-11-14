@@ -219,6 +219,16 @@
 .panel .muted.sttfoot { margin: 8px 0 0; }
 .panel .muted.sttsub { margin: 0 0 10px; overflow-wrap: anywhere; }
 .sttsub a { color: inherit; text-decoration: underline; cursor: pointer; }
+/* 1.4.0: Settings → About → updates, and the dot that says a newer version is ready (Settings tab, About's heading) */
+.row.upd { flex-wrap: wrap; border-top: 1px solid var(--soft); }
+.upd .pickbtns { flex: none; }
+.upd small.err { color: var(--danger); }
+.tab[data-tab="settings"].hasupd, .abouthead h3.hasupd { position: relative; }
+.tab[data-tab="settings"].hasupd::after, .abouthead h3.hasupd::after {
+  content: ''; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #3DAA5C; box-shadow: 0 0 0 2px var(--bg);
+}
+.tab[data-tab="settings"].hasupd::after { top: 3px; right: 5px; }
+.abouthead h3.hasupd::after { top: 2px; right: -12px; }
 .toggle { cursor: pointer; }
 /* 1.1.20: a switch sits right after its text (it used to be pushed to the far right). Switches one after another
    are grouped (.switches, made by list.js groupSwitches) so they still line up under each other */

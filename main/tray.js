@@ -8,9 +8,12 @@ const { bringToFront, createNote, reopenClosed } = require('./note-window');
 const { hasClosed, onClosedChange } = require('./closed-notes');
 const { showList } = require('./list-window');
 const { onPanicChange, panicNow, reopenPanicked } = require('./panic');
+const updater = require('./updater');
+const { showUpdate } = require('./ipc-update');
 const { S } = require('./state');
 
 let tray = null;
+let updateShown = ''; // 1.4.0: what the tray's update line says now (rebuilt only when that changes, not on every %)
 function setFxPaused(on) {
   S.store.settings.fxPaused = !!on;
   S.store.saveSettings();
@@ -47,8 +50,10 @@ function buildTray() {
     tray.on('click', comeBack);
     onPanicChange(buildTray); // 1.3.27: "Reopen notes" comes and goes
     onClosedChange(buildTray); // 1.3.30: "Reopen closed note" is grey with nothing to reopen
+    updater.onChange(() => { if (updateLine() !== updateShown) buildTray(); }); // 1.4.0
   }
   const s = S.store.settings;
+  updateShown = updateLine();
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'New note', click: () => createNote() },
     { label: 'All notes', click: showList },
@@ -61,7 +66,17 @@ function buildTray() {
     { label: 'Pause effects', type: 'checkbox', checked: !!S.store.settings.fxPaused, click: (mi) => setFxPaused(mi.checked) }, // 1.1.16
     { label: 'Start with Windows', type: 'checkbox', checked: !!S.store.settings.startWithWindows, click: (mi) => setStartup(mi.checked) },
     { type: 'separator' },
+    // 1.4.0: a newer version (main/updater.js): opens Settings → About, where Install is
+    ...(updateShown ? [{ label: updateShown, enabled: !/^Downloading|^Installing/.test(updateShown), click: showUpdate }, { type: 'separator' }] : []),
     { label: `Quit ${APP_NAME}`, click: () => { S.quitting = true; app.quit(); } },
   ]));
+}
+// 1.4.0: the tray's update line ('' = none)
+function updateLine() {
+  const u = updater.status();
+  if (u.state === 'available' || u.state === 'failed') return `Update to ${u.latest}…`;
+  if (u.state === 'downloading') return 'Downloading the update…';
+  if (u.state === 'installing') return 'Installing the update…';
+  return '';
 }
 module.exports = { buildTray, comeBack, setStartup, syncLoginItem };

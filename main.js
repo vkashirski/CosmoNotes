@@ -12,6 +12,7 @@ const { buildTray, comeBack, syncLoginItem } = require('./main/tray');
 const { reopenPanicked, stopShortcut, syncShortcut } = require('./main/panic');
 const { startEveningClock } = require('./main/evening');
 const { registerIpc } = require('./main/ipc');
+const { finishUpdate, startUpdates } = require('./main/ipc-update');
 const { S } = require('./main/state');
 const { attachmentBytes, clearOpenCopies, install: installCrypt, mimeOf } = require('./main/crypt');
 const recordings = require('./main/recordings');
@@ -68,6 +69,7 @@ function start() {
   buildTray();
   syncShortcut(); // 1.3.27: the panic button's shortcut (main/panic.js)
   startEveningClock(); // 1.3.27: evening colours (main/evening.js)
+  startUpdates(); // 1.4.0: the update check (main/ipc-update.js)
 
   const atLogin = process.argv.includes('--startup');
   const toOpen = S.store.all().filter((n) => n.open && !n.deletedAt);
@@ -99,9 +101,10 @@ if (!app.requestSingleInstanceLock()) {
       try { S.store.settings.listBounds = S.listWin.getBounds(); S.store.saveSettings(); } catch { /* ignore */ }
     }
   });
-  app.on('will-quit', () => {
+  app.on('will-quit', (e) => {
     stopShortcut(); // 1.3.27: Windows gets the panic shortcut back
     if (S.store) { recordings.finishAll(); S.store.flush(); } // 1.2.4: a recording still running is kept
     clearOpenCopies(); // 1.1.31: no plain photo copies left in temp
+    finishUpdate(e); // 1.4.0: Install was pressed: the installer starts now, after everything is saved (main/updater.js)
   });
 }

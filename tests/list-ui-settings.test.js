@@ -8,6 +8,7 @@
 // 1.3.27: Evening colours (switch, times, the shades), the panic button and its shortcut (press keys: a letter alone is
 // refused; quick picks; another app has it; none), "Use on all notes" under a setting and "Reset notes…" (General).
 // 1.3.34: the click-through switch, and right-click → Turn off click-through on a card.
+// 1.4.0: About → updates: Check, the dot, Install asks first, the switch, the tray's line opens it.
 const assert = require('assert');
 
 (async () => {
@@ -210,6 +211,40 @@ const assert = require('assert');
   assert.ok(/^Version [\d.]+ · Last updated /.test(line), `About says the version and the date (${line})`);
   assert.equal(await ui.count('#foldVersions'), 0, 'no Version history fold');
   assert.ok(await ui.count('#features .fgroup') >= 8, 'the feature list is there');
+  // ---- 1.4.0: About → updates, against a local server playing GitHub Releases (main's side: updates.test.js)
+  const U = require('../main/updater');
+  const exe = require('crypto').randomBytes(1100000);
+  const sha = require('crypto').createHash('sha512').update(exe).digest('base64');
+  const yml = `version: 9.9.9\nfiles:\n  - url: CosmoNotes-Setup-9.9.9.exe\n    sha512: ${sha}\n    size: ${exe.length}\npath: CosmoNotes-Setup-9.9.9.exe\nsha512: ${sha}\n`;
+  const server = require('http').createServer((req, res) => { res.writeHead(200); res.end(req.url.endsWith('.yml') ? yml : exe); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  U.setPlace({ base: `http://127.0.0.1:${server.address().port}`, dir: require('path').join(require('os').tmpdir(), `cosmo-upd-${process.pid}`) });
+  assert.equal(await ui.text('#updBtns'), 'Check for updates', 'nothing known yet: a Check button');
+  assert.equal(await ui.count('.tab.hasupd'), 0, 'no dot');
+  assert.ok(await page.isChecked('#sUpdateCheck'), 'Check for updates (by itself): on');
+  await ui.check('#sUpdateCheck');
+  assert.equal((await settings()).updateCheck, false, 'the switch turns it off');
+  await ui.check('#sUpdateCheck');
+  await ui.click('#updBtns button');
+  await ui.settle(200);
+  assert.equal(await ui.text('#updLine'), 'Version 9.9.9 is ready.');
+  assert.equal(await ui.text('#updBtns'), 'Install');
+  assert.equal(await ui.count('.tab[data-tab="settings"].hasupd'), 1, 'a dot on the Settings tab');
+  assert.equal(await ui.count('.abouthead h3.hasupd'), 1, 'and on About');
+  await ui.click('#updBtns button');
+  assert.equal(await ui.modalTitle(), 'Install the update?', 'Install asks first');
+  await ui.modalCancel();
+  assert.equal(await ui.text('#updLine'), 'Version 9.9.9 is ready.', 'Cancel: nothing happens');
+  await ui.click('#updBtns button'); await ui.modalOk();
+  assert.match(await ui.text('#toast'), /installed app/, 'npm start: it says updates are for the installed app');
+  // the tray's "Update to …": the list goes to Settings, at the updates
+  if (await ui.count('#viewSettings .panel.about.open')) await ui.click('#viewSettings .panel.about .phead');
+  await ui.tab('notes');
+  require('../main/ipc-update').showUpdate();
+  await ui.settle(100);
+  assert.ok(await ui.visible('#updRow'), 'Settings is open at About’s updates');
+  assert.equal(await ui.count('#viewSettings .panel.about.open'), 1, 'About is unfolded');
+  server.close();
   await ui.tab('notes');
 
   // ---- 1.3.27: Evening colours

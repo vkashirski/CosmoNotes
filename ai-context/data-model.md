@@ -86,6 +86,7 @@ eveOn (1.3.27, false: evening colours for notes that follow Settings), eveFrom /
 is put back at load), panicOn (1.3.27, false: the panic button), panicKey ('' = no shortcut; an Electron accelerator such as 'Alt+Z' or 'F8', checked by
 `validKey` in main/panic.js), panicClosed (ids of the notes the last panic closed; they reopen when CosmoNotes is opened again, then it is emptied),
 clickThroughOn (1.3.34, false: the click-through button in each note; off = no note is click-through, each keeps note.clickThrough),
+updateCheck (1.4.0, true: the installed app checks GitHub for a newer version 30 s after it starts and once a day; the button in Settings → About works either way),
 sttWhen (1.3.5: Settings → Voice to text → "Words appear": 'live' = while you talk, 'stop' = when you stop; missing =
 by the PC: graphics card live, processor stop), sttWebgpu (1.3.1: whether the engine found WebGPU last time; decides which set of the model is downloaded; sttModel and
 sttTests, 1.3.1–1.3.3, are deleted at start since 1.3.4),

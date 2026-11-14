@@ -17,7 +17,8 @@ no loose `store` / `listWin` / `quitting` / `listUnlockedAll` is left.
   `win.noteId`, `win.revealed` (true after the password was typed in *that* window).
 - **List window**: a single window (`listWin`) with a hidden title bar plus overlay window buttons.
 - **Tray icon**: New note, All notes, Bring notes to front (also unrolls rolled-up notes), Start with Windows,
-  Quit (1.3.27: and "Panic: hide all notes" while the panic button is on, "Reopen notes" while the panic closed some).
+  Quit (1.3.27: and "Panic: hide all notes" while the panic button is on, "Reopen notes" while the panic closed some;
+  1.4.0: "Update to X…" while a newer version is known, "Downloading / Installing the update…" while it runs).
   Closing every window keeps the app running in the tray. Single instance: launching again brings the
   notes up (without unrolling) and shows the list. Clicking the tray icon and launching again also reopen what the
   panic button closed (`comeBack`, main/tray.js).
@@ -37,12 +38,14 @@ no loose `store` / `listWin` / `quitting` / `listUnlockedAll` is left.
     `groups:make-from`, `groups:dissolve`, `groups:rename`, `groups:update` (name/style/color), `groups:apply` (mass edit
     colour/font), `groups:trash`, `groups:set-locked`, `groups:reveal`, `groups:hide`, `settings:set`,
     `backups:list`, `backups:now`, `backups:restore`, `backups:open-folder`, `data:open-folder`, `stt:status`, `stt:use`,
-    `stt:download`, `stt:download-cancel`, `stt:remove`, `stt:test` (1.3.1, Settings → Voice to text)
+    `stt:download`, `stt:download-cancel`, `stt:remove`, `stt:test` (1.3.1, Settings → Voice to text), `update:status`,
+    `update:check`, `update:install`, `update:cancel`, `update:open-page` (1.4.0, Settings → About, below)
   - main → windows: `notes:changed` (list reloads), `settings:changed` (`{spellCheck, hasPassword, lockKind,
     lockLen}`), `note:look` (a note's colour/font/lock/rolled changed from outside), `note:lock-now` (note became
     locked from the list: the window saves, then calls `note:relock` and hides), `note:win-state` (`{maximized}`), `list:nav` (mouse back/forward
     buttons sent as Windows app-commands), `stt:event` (a voice-to-text job's draft / final / status / progress / ready /
-    error, to its note window only), `stt:changed` (Settings → Voice to text, to the list)
+    error, to its note window only), `stt:changed` (Settings → Voice to text, to the list), `update:changed` (the
+    update's status, to the list), `update:show` (go to Settings → About's updates: the tray's line)
   - the voice-to-text engine window (1.3.1) talks only `engine:msg`, both ways (`src/engine/preload.js`)
   - **No native message boxes.** The list window asks every question with its own app-styled `modal()`
     (list.js) and only then calls main (`list:destroy`, `list:empty-bin`, `backups:restore` don't ask
@@ -190,9 +193,35 @@ Settings), `main/stt-models.js` (the list), `main/stt-download.js` (the download
 - **Only main goes online**, and only on Download (from huggingface.co at the fixed commit). The engine window can't.
   Nothing comes with the installer (1.3.4).
 
+## Updates (1.4.0)
+
+- **`main/updater.js`** (the feed, the download, starting the installer) and **`main/ipc-update.js`** (IPC, when to
+  check, Install, `showUpdate`). The tray (`updateLine`) and the list (`paintUpdate`) only show `updater.status()`:
+  `state` = idle | checking | none | checkfailed | available | downloading | installing | failed (`failure`: 'download'
+  or 'start'), `latest`, `pct`, `page` (the release's page).
+- **The feed**: `https://github.com/vkashirski/CosmoNotes/releases/latest/download/latest.yml` (electron-builder's,
+  published by `.github/workflows/release.yml`; drafts and pre-releases are never "latest"). `parseLatest` reads it
+  without a YAML library and refuses anything but `CosmoNotes-Setup-<version>.exe` with a size and a sha512. The
+  installer comes from `…/releases/download/v<version>/<file>`. A test points both at a local server (`setPlace`).
+- **When**: the installed app only (`app.isPackaged`) and while `settings.updateCheck` is on: 30 s after start, then an
+  hourly tick that checks once a day. These checks are quiet: a failure keeps what was shown. The button's check says
+  "Couldn't check". `npm start` can check, but Install says it is for the installed app.
+- **Install** (asked first in the list): refused while a recording or voice to text runs (`busy`: `isRecording`,
+  `sttBusy`). Download to `%TEMP%\CosmoNotes-update\<file>.part`, size + sha512, rename; a file already there that
+  matches is used again. Then `quitWhenFree` (waits for a recording that started meanwhile) → `S.quitting`, `app.quit()`:
+  windows save on unload, will-quit finishes recordings and flushes the store, then `finishUpdate(e)` (last in
+  will-quit) stops the default quit, starts the installer detached with `--updated /S --force-run` and `app.exit(0)`s
+  once Windows says it started. If Windows refuses it (`error`: Smart App Control, antivirus): `app.relaunch` with
+  `--update-failed=<version>`, and that start shows Settings → About ("Couldn't start the update", the page). No answer
+  in 15 s: it leaves anyway. Never run the installer before the store is flushed.
+- **At start** `cleanup` deletes `CosmoNotes-Setup-*.exe(.part)` from the temp folder (one still running stays).
+- **Network**: like the model download, only main goes online, only to github.com (and the download host it redirects
+  to). Nothing about notes or the PC is sent: two plain GETs.
+
 ## Spellcheck
 
 - `app.commandLine.appendSwitch('disable-features','WinUseBrowserSpellChecker')` forces Chromium's Hunspell
   spellchecker so that with only `en-US` loaded, Cyrillic words are skipped. When spelling is first turned
-  on, Electron downloads the dictionary once from Google's CDN. That and the voice-to-text model's download (1.3.1, only
-  when you press Download) are the only network uses, and both are optional.
+  on, Electron downloads the dictionary once from Google's CDN. That, the voice-to-text model's download (1.3.1, only
+  when you press Download) and the update check (1.4.0, GitHub; Settings → About can turn the daily one off) are the
+  only network uses.

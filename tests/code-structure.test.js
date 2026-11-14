@@ -6,7 +6,8 @@
 //   every name a part takes, calls or hands on through the shared kit (K, K.V) fits; all parts load together in a vm;
 // - src/fx/ (1.1.24): both windows load the same parts in the same order; each part only adds the shared kit;
 // - src/css/ (1.1.26): both windows load their parts in order, after the fonts; every cut is clean (whole rules only);
-// - line endings are kept (CLAUDE.md lists which files are CRLF), the old single files are only a note, all is packaged.
+// - line endings are kept (CLAUDE.md lists which files are CRLF; 1.4.0: every text file as .gitattributes says), the old single
+//   files are only a note, all is packaged.
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -208,6 +209,38 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
   assert.deepEqual(Object.keys(L).sort(), [...sends].sort(), 'every ipcMain.on channel is one preload.js sends, and the other way round');
   const mainSrc = src.main();
   for (const ch of ons) assert.ok(mainSrc.includes(`send('${ch}'`), `main sends ${ch}, which the windows listen for`);
+
+  // ---- 1.4.0: every text file has the line endings .gitattributes gives it (CRLF where listed, LF otherwise), so a fresh
+  // clone (GitHub's machines) and the owner's folder are the same, and a new file can't slip in with the wrong ones
+  const rules = fs.readFileSync(path.join(ROOT, '.gitattributes'), 'utf8').split(/\r?\n/).map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#')).map((l) => {
+      const m = l.match(/^(\S+)\s.*\beol=(crlf|lf)\b/);
+      assert.ok(m, `.gitattributes: ${l}`);
+      const glob = m[1].replace(/\[\[:space:\]\]/g, '\u0000').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*').replace(/\u0000/g, ' ');
+      return { re: new RegExp(m[1].includes('/') ? `^${glob}$` : `(^|/)${glob}$`), eol: m[2] };
+    });
+  const eolOf = (f) => rules.reduce((e, r) => (r.re.test(f) ? r.eol : e), 'lf');
+  const SKIP = new Set(['.git', 'node_modules', 'dist', 'tools', 'models']);
+  const walk = (d, out = []) => {
+    for (const e of fs.readdirSync(path.join(ROOT, d), { withFileTypes: true })) {
+      const f = d ? `${d}/${e.name}` : e.name;
+      if (e.isDirectory()) { if (!SKIP.has(e.name)) walk(f, out); } else if (e.isFile()) out.push(f);
+    }
+    return out;
+  };
+  let seen = 0;
+  for (const f of walk('')) {
+    const b = fs.readFileSync(path.join(ROOT, f));
+    if (b.includes(0) || /\.(wasm|ttf|ico|png|cer|exe)$/.test(f)) continue; // binary
+    const t = b.toString('latin1');
+    if (!t.includes('\n')) continue;
+    seen++;
+    if (eolOf(f) === 'crlf') assert.ok(isCRLF(t), `${f}: CRLF (.gitattributes)`);
+    else assert.ok(isLF(t), `${f}: LF (.gitattributes)`);
+  }
+  assert.ok(seen > 150, 'every text file was looked at');
+  for (const f of ['main.js', 'main/updater.js', 'src/note/base.js', 'src/css/note-base.css', 'HOW TO INSTALL.txt', 'release.bat']) assert.equal(eolOf(f), 'crlf', `${f} is a CRLF file`);
+  for (const f of ['store.js', 'src/list/base.js', 'src/css/list-base.css', 'package.json', '.github/workflows/release.yml']) assert.equal(eolOf(f), 'lf', `${f} is an LF file`);
   console.log('ok');
   await app.quit();
 })();

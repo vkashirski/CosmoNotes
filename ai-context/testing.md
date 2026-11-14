@@ -40,6 +40,7 @@ code (regex) is for rules a test can't easily click through (each such line says
 | `effects-rules.test.js` | effect lists and order (src/fx/ = store.js), removed ones, resolve, cleaning, the Layer, paper tint, speed rules |
 | `effects-draw.test.js` | every background and follower drawn in many sizes / papers / pointer moves: no NaN, colours exist, followers go quiet |
 | `effects-backgrounds.test.js` / `effects-followers.test.js` | how each one behaves, as the owner picked it |
+| `updates.test.js` | updates (1.4.0), main's side against a local server playing GitHub: latest.yml's rules, newer, the check at start and its switch, quiet failures, the tray line, Install (not from npm start, not while recording, size + sha512, Cancel, saved before the installer starts, Windows refusing it, Try again) |
 | `code-structure.test.js` | the split into main/, src/note/, src/list/, src/fx/, src/css/: loading order, the shared kit, no circles, line endings, every IPC channel answered |
 | `editor-code.test.js` | rules in the note window's code that no browser test clicks yet (checklists, Backspace, photos, find, focus) |
 | `release.test.js` | package.json version = newest CHANGELOG heading; its date = about.js `LAST_UPDATED` = CONTEXT.md; every version once |
