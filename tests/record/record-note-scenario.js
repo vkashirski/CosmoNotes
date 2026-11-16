@@ -54,7 +54,7 @@ exports.full = async ({ page, step, H, advance }) => {
   for (const c of ['bold', 'italic', 'underline', 'strikeThrough']) await step(`format ${c}`, () => click(`[data-cmd="${c}"]`));
   await step('text panel open', () => click('#btnText'));
   await step('font round', () => click('#fontSeg [data-font="round"]'));
-  await step('font size', () => click('#fsizeSeg button >> nth=2'));
+  await step('font size', () => click('#fsizeSeg [data-fsize="5"]'));
   await step('colour red', () => click('[data-fore="#D93B3B"]'));
   await step('highlight', () => click('[data-hilite="#FFE74C"]'));
   await step('caret only (what you type next)', () => select('words', { collapse: true }));

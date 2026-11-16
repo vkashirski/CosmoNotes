@@ -8,6 +8,7 @@ const { registerSettingsIpc } = require('./ipc-settings');
 const { registerCryptIpc } = require('./ipc-crypt');
 const { registerSttIpc } = require('./ipc-stt');
 const { registerUpdateIpc } = require('./ipc-update');
+const { registerRemindIpc } = require('./reminders');
 
 function registerIpc() {
   registerNoteIpc();
@@ -19,6 +20,7 @@ function registerIpc() {
   registerCryptIpc();
   registerSttIpc(); // 1.3.1: voice to text
   registerUpdateIpc(); // 1.4.0: updates
+  registerRemindIpc(); // 1.4.1: reminders
 }
 
 module.exports = { registerIpc };

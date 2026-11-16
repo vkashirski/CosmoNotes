@@ -11,7 +11,8 @@
     unlockNote = K.later('unlockNote'), lockGroup = K.later('lockGroup'), unlockGroup = K.later('unlockGroup'),
     unlockNoteNow = K.later('unlockNoteNow'), relockNote = K.later('relockNote'), unlockGroupNow = K.later('unlockGroupNow'),
     relockGroup = K.later('relockGroup'),
-    openGroupView = K.later('openGroupView'), openPanel = K.later('openPanel'), paintCrypt = K.later('paintCrypt');
+    openGroupView = K.later('openGroupView'), openPanel = K.later('openPanel'), paintCrypt = K.later('paintCrypt'),
+    openRemindSheet = K.later('openRemindSheet');
   // ---- Settings → For new notes → Colour (1.1.15): pick one or more colours; each new note gets one of them at random
   const newColors = () => {
     const s = V.state.settings || {};
@@ -109,10 +110,27 @@
     paintPanic();
     $('#sClickThrough').checked = !!s.clickThroughOn; // 1.3.34
     $('#sUpdateCheck').checked = s.updateCheck !== false; // 1.4.0
+    paintRemindSettings(); // 1.4.1
     paintReapply();
     paintVoice(await S.stt.status());
-    paintUpdate(await S.update.status());
+    paintUpdate(await S.updates.status());
     renderBackups(await S.backups.list());
+  }
+
+  // ---- 1.4.1: Settings → Reminders: the sound (src/reminders.js SOUNDS, or none), how loud, hidden notes shown or not
+  function paintRemindSettings() {
+    const s = V.state.settings;
+    const R = window.COSMO_REMIND;
+    const pick = $('#sRemSound');
+    if (R && !pick.options.length) {
+      for (const x of R.SOUNDS) pick.append(h('option', { value: x.id }, x.name));
+      pick.append(h('option', { value: 'none' }, 'No sound'));
+    }
+    pick.value = s.remindSound || (R ? R.DEFAULT_SOUND : 'drops');
+    const vol = Math.round((s.remindVolume ?? 0.6) * 100);
+    if (document.activeElement !== $('#sRemVol')) $('#sRemVol').value = vol; // not while it's being dragged
+    $('#sRemVolVal').textContent = `${$('#sRemVol').value}%`;
+    $('#sRemShow').checked = !!s.remindShowHidden;
   }
 
   // ---- 1.3.27: "Use on all notes". Settings a note can change for itself (store.js OVERRIDES says what each puts back):
@@ -329,10 +347,10 @@
     const box = $('#updBtns');
     box.innerHTML = '';
     if (u.state === 'available') box.append(btn('Install', installUpdate));
-    else if (u.state === 'downloading') box.append(btn('Cancel', async () => paintUpdate(await S.update.cancel()), true));
-    else if (u.state === 'failed') box.append(btn('Open the download page', () => S.update.openPage(), true), btn('Try again', installUpdate));
+    else if (u.state === 'downloading') box.append(btn('Cancel', async () => paintUpdate(await S.updates.cancel()), true));
+    else if (u.state === 'failed') box.append(btn('Open the download page', () => S.updates.openPage(), true), btn('Try again', installUpdate));
     else if (u.state !== 'installing') {
-      const b = btn(u.state === 'checkfailed' ? 'Try again' : 'Check for updates', async () => paintUpdate(await S.update.check()), true);
+      const b = btn(u.state === 'checkfailed' ? 'Try again' : 'Check for updates', async () => paintUpdate(await S.updates.check()), true);
       b.disabled = u.state === 'checking';
       box.append(b);
     }
@@ -340,13 +358,13 @@
   async function installUpdate() {
     const ok = await modal({ title: 'Install the update?', text: 'CosmoNotes saves your notes, closes and opens again.', okLabel: 'Install' });
     if (!ok) return;
-    const u = await S.update.install();
+    const u = await S.updates.install();
     if (u && u.error === 'busy') toast('Wait for the voice recording or voice to text to finish.');
     else if (u && u.error === 'notinstalled') toast('Updates work in the installed app.');
     paintUpdate(u);
   }
-  S.update.onChanged(paintUpdate);
-  (async () => paintUpdate(await S.update.status()))(); // the dot, as soon as the list opens
+  S.updates.onChanged(paintUpdate);
+  (async () => paintUpdate(await S.updates.status()))(); // the dot, as soon as the list opens
 
   // Backups aren't listed in Settings any more: just the newest one, and a button that opens a
   // pop-up to pick the day to restore.
@@ -549,6 +567,7 @@
         ? { label: 'Remove from favourites', icon: ICON.star, run: () => setFav([`n:${n.id}`], false) }
         : { label: 'Add to favourites', icon: ICON.star, run: () => setFav([`n:${n.id}`], true) },
       { label: 'Edit design…', icon: ICON.edit, run: () => openEdit(n) },
+      { label: 'Reminders…', icon: ICON.clock, run: () => openRemindSheet(n) }, // 1.4.1
       n.open ? { label: 'Close note', icon: ICON.hide, run: () => S.list.closeNote(n.id) } : null,
       // 1.3.34: the one way back besides the note's own button (only while Settings → Click-through is on: else it's off anyway)
       n.clickThrough && V.state.settings.clickThroughOn ? { label: 'Turn off click-through', icon: ICON.through, run: () => S.list.clickThroughOff(n.id) } : null,

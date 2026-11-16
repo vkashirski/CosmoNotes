@@ -129,6 +129,11 @@ The same way as list.js, with `tools/split/plan-note.json` (`node split-page.js 
    1.3.1 added an eleventh, `speech` (voice to text), after menus-voice-ink: a new part goes where the names it takes are
    already given (here `rec`, `voiceChip`, `keepClip`), and every later part's "part N of 11" header moves up.
    1.3.19 added a twelfth, `checklists`, after editing (it takes `decorate`, `textUndo` / `textRedo`, `setProp`).
+   1.4.1 added a thirteenth, `remind` (reminders), and 1.4.5 a fourteenth, `pin-apps` (the pin's list), both **before**
+   eraser-start, not after it: **eraser-start must stay last.**
+   Its start-up (`init`) awaits `api.getNote()`, and the browser runs that promise's continuation between two `<script>`s,
+   so a part loaded after eraser-start isn't there yet when `init` goes on (the first try put `remind` last: "K[n] is not a
+   function"). A part init uses goes before it, and init takes its names in its `const {…} = K;` line.
 2. **Shared `let`s → `V.x`:** 9 (`note`, `hidden`, `settings`, `dirty`, `saveTimer`, `savedRange`, `plainPaste`, `resizing`,
    `askResolve`). Later values read as `K.x`: `CB_VARS`, `inkState`, `textOut`, `textMove`, `inkOut` (all `const`s, read only
    inside functions). Two later-part functions are wired up while the window loads: `relock` and `toggleLock` are passed to

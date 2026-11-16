@@ -35,6 +35,8 @@ const app = require('./helpers/app');
   // ---- locking: the window gets nothing of the note
   let n = await H['note:set-locked'](ev(w), true);
   assert.equal(n.hidden, true); assert.equal(n.html, ''); assert.equal(n.text, ''); assert.equal(n.ink, null, 'no drawing');
+  // nor read its pictures (Copy image, 1.4.3)
+  assert.equal(await H['att:image'](ev(w), await H['att:save'](ev(w), new Uint8Array([1, 2]), 'png')), null, 'no picture to a hidden window');
   // a hidden window can't wipe the note (an empty save from it is dropped)
   await H['note:update'](ev(w), { html: '', text: '', ink: null });
   L['note:update-sync'](ev(w), { html: '', text: '', ink: null });

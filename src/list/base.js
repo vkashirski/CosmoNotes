@@ -70,6 +70,7 @@
     star: '<svg viewBox="0 0 24 24"><path d="M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9L3.4 9.4l6-.7z"/></svg>',
     check: '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
     // 1.3.34: click-through (the note's top-bar button has the same arrow)
+    clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M5 3 2 6M19 3l3 3"/></svg>', // 1.4.1: reminders
     through: '<svg viewBox="0 0 24 24"><path d="M4.04 4.69a.5.5 0 0 1 .65-.65l16 6.5a.5.5 0 0 1-.06.95l-6.13 1.58a2 2 0 0 0-1.43 1.43l-1.58 6.13a.5.5 0 0 1-.95.06z"/></svg>',
     x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
     warn: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
@@ -233,7 +234,11 @@
   }
   S.list.onChanged(load);
 
-  const live = () => V.state.notes.filter((n) => !n.deletedAt);
+  // 1.4.1: a note one of its reminders hides is left out (counts, groups, search, tabs) unless Settings → Reminders shows
+  // them, or the reminders filter is on (main/reminders.js; remHidden comes from main)
+  V.remOnly = false;
+  const remShown = (n) => !n.remHidden || V.remOnly || !!V.state.settings.remindShowHidden;
+  const live = () => V.state.notes.filter((n) => !n.deletedAt && remShown(n));
   // 1.2.3 (speed): a note by its id without searching the whole list for every card. The index is made again whenever
   // V.state.notes is a new list (each load); nothing adds to or removes from that list in place.
   let idxOf = null; let idx = new Map();

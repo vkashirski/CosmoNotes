@@ -1,10 +1,10 @@
 'use strict';
-// CosmoNotes note window, part 5 of 12: editing helpers (checklists, strike-through…), Ctrl+F find, the keyboard
+// CosmoNotes note window, part 5 of 14: editing helpers (checklists, strike-through…), Ctrl+F find, the keyboard
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
   const { V, api, $, editor, body, changed, saveNow, anchor, closestIn, runCmd, closePops,
-    undoText, redoText, openLinkForm, autoLink, moveCell } = K;
+    undoText, redoText, openLinkForm, autoLink, moveCell, newNote } = K;
   // defined in a later part:
   const hideCtx = K.later('hideCtx'), stopRecording = K.later('stopRecording'), closeDraw = K.later('closeDraw'),
     drawUndo = K.later('drawUndo'), zoomNow = K.later('zoomNow'), setZoom = K.later('setZoom'),
@@ -351,7 +351,7 @@
       closePops();
       hideCtx();
     }
-    if (mod && e.key.toLowerCase() === 'n') { e.preventDefault(); saveNow(); api.newNote(); }
+    if (mod && e.key.toLowerCase() === 'n') { e.preventDefault(); newNote(); }
     // 1.1.23: Ctrl+S just reassures (everything already saves by itself)
     if (mod && !e.shiftKey && e.key.toLowerCase() === 's') { e.preventDefault(); saveNow(); toast('Already saved. Notes save as you type.'); return; }
     if (mod && e.key === '0') { e.preventDefault(); setZoom(1); }

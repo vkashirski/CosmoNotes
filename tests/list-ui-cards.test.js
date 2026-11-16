@@ -1,6 +1,6 @@
 'use strict';
 // The notes list in a real browser (tests/helpers/list-ui.js): the tabs and their counts, what a card shows (and what a locked
-// note's card never shows; a title in its own font, 1.3.3), a card's menu, search (title, text, picture descriptions), sorting and card sizes, opening a note.
+// note's card never shows; a title in its own font, 1.3.3), a card's menu, search (title, text, picture descriptions), sorting and card sizes, opening a note, reminders on cards (1.4.1), "Over …" on a note pinned over some apps (1.4.5).
 const assert = require('assert');
 
 (async () => {
@@ -149,6 +149,54 @@ const assert = require('assert');
   await ui.H['settings:set']({}, { fxEffect: 'none' }); await ui.settle(200);
   assert.equal(await ui.count('#cards canvas.fxc'), 0, 'an effect setting changed: every card is looked at again');
   await ui.H['list:close-note']({}, B); await ui.settle();
+  // ---- 1.4.1: reminders (main's side: reminders.test.js). A card with a reminder has a clock (what it is on hover); a note a
+  // reminder hides is left out, unless the reminders filter is on (faded there) or Settings shows them; the filter shows only
+  // notes with reminders, the soonest first; right-click → Reminders… opens them with their messages (not on a locked card)
+  {
+    const now = Date.now();
+    const had = new Set((await ui.get()).notes.map((n) => n.id));
+    await ui.H['list:new']({}, null);
+    const X = (await ui.get()).notes.map((n) => n.id).find((x) => !had.has(x));
+    await ui.H['list:remind-set']({}, A, [{ id: 'shop1', start: now + 3600e3 }], { shop1: 'Before 6' });
+    await ui.H['list:remind-set']({}, X, [{ id: 'hid01', start: now + 86400e3, hide: true }], {});
+    await ui.settle();
+    assert.ok(await ui.visible(`${ui.noteKey(A)} .rem`), 'a card with a reminder has a clock');
+    assert.match(await page.getAttribute(`${ui.noteKey(A)} .rem`, 'title'), /^(Today|Tomorrow) \d\d:\d\d/, 'its time on hover');
+    assert.ok(!(await shown()).includes(X), 'a note a reminder hides is not in the list');
+    await ui.click('#btnRem');
+    assert.deepEqual(await shown(), [A, X], 'the filter: notes with reminders only, the soonest first, hidden ones too');
+    assert.ok(await page.$eval(ui.noteKey(X), (c) => c.classList.contains('remhid')), 'a hidden one is faded');
+    await ui.click('#btnRem');
+    await ui.H['settings:set']({}, { remindShowHidden: true }); await ui.settle();
+    assert.ok((await shown()).includes(X), 'Settings → Show hidden notes');
+    await ui.H['settings:set']({}, { remindShowHidden: false }); await ui.settle();
+    await ui.menu(ui.noteKey(A), 'Reminders…');
+    assert.ok(await ui.visible('#remSheet'), 'right-click → Reminders…');
+    assert.match(await ui.text('#remSheet .rm-item small'), /Before 6/, 'with its message');
+    await ui.click('#remSheet .rm-add');
+    await ui.click('#remSheet .rm-chip[data-p="h1"]');
+    await ui.click('#remSheet .rm-save');
+    assert.equal((await ui.get()).notes.find((n) => n.id === A).reminders.length, 2, 'one more, saved');
+    assert.equal(await ui.count('#remSheet .rm-item'), 2);
+    await ui.key('Escape');
+    assert.ok(!(await ui.visible('#remSheet')), 'Esc closes it');
+    await ui.rclick(ui.noteKey(C));
+    assert.ok(!(await ui.menuLabels()).includes('Reminders…'), 'not on a locked card');
+    await ui.down('.searchrow');
+  }
+  // 1.4.5: pinned over some apps only (main/app-pin.js): the card says over which (the apps on hover)
+  {
+    await ui.H['list:open-note']({}, A);
+    const wA = ui.E.__all.find((x) => x.noteId === A && !x.destroyed);
+    await ui.H['note:update']({ sender: wA.webContents }, { pinApps: [{ app: 'Excel', part: null }, { app: 'Visual Studio Code', part: 'ShopWebsite' }] });
+    await ui.settle();
+    assert.equal(await ui.text(`${ui.noteKey(A)} .over`), 'Over Excel +1', 'the card says “Over …”');
+    assert.match(await page.getAttribute(`${ui.noteKey(A)} .over`, 'title'), /Excel\nVisual Studio Code: ShopWebsite/);
+    assert.equal(await page.getAttribute(`${ui.noteKey(A)} .pin`, 'title'), 'Pinned over some apps');
+    await ui.H['note:update']({ sender: wA.webContents }, { pinned: false });
+    await ui.settle();
+    assert.equal(await ui.count(`${ui.noteKey(A)} .over`), 0, 'unpinned: gone');
+  }
   // Ctrl+N makes a new note
   const before = (await ui.get()).notes.length;
   await ui.key('Control+n');

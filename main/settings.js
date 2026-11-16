@@ -16,7 +16,11 @@ function spellLanguages() {
 
 function noteSettings() {
   // appTheme (1.1.16): the notes list's colours; a note's pop-ups and toolbars use them too
-  return { spellCheck: !!S.store.settings.spellCheck, hasPassword: !!S.store.settings.lock, ...lockInfo(), ...fxSettings(), ...checkSettings(), ...eveningAndPanic(), appTheme: S.store.settings.listTheme || 'cream' };
+  return { spellCheck: !!S.store.settings.spellCheck, hasPassword: !!S.store.settings.lock, ...lockInfo(), ...fxSettings(), ...checkSettings(), ...eveningAndPanic(), ...remindSettings(), appTheme: S.store.settings.listTheme || 'cream' };
+}
+// 1.4.1: the sound a reminder plays (unless it has its own) and how loud: the note window plays it (src/note/remind.js)
+function remindSettings() {
+  return { remindSound: S.store.settings.remindSound, remindVolume: S.store.settings.remindVolume };
 }
 // 1.3.27: evening colours (on for notes that follow Settings, and how far into the evening it is now) and the panic button
 // (1.3.34: and the click-through button)

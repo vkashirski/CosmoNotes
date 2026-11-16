@@ -359,6 +359,30 @@
   window.addEventListener('mousedown', (e) => { if (e.button === 3 || e.button === 4) e.preventDefault(); });
   if (S.list.onNav) S.list.onNav((dir) => navigate(dir === 'forward' ? 'forward' : 'back'));
 
+  // ================================================================ reminders (1.4.1)
+  // a note's reminders in a pop-up (right-click → Reminders…, the card's clock): src/remind-ui.js, saved by main as they
+  // change (main/reminders.js). A note its lock hides can't have them changed (main says no): unlock it first.
+  async function openRemindSheet(n) {
+    const UI = window.COSMO_REMIND_UI;
+    if (!UI) return;
+    const data = await S.list.remindGet(n.id);
+    if (!data) { toast('Unlock the note first'); return; }
+    const ed = UI.editor({
+      reminders: data.reminders,
+      msgs: data.msgs,
+      locked: data.locked,
+      settings: V.state.settings,
+      save: (list, msgs) => S.list.remindSet(n.id, list, msgs),
+    });
+    $('#remTitle').textContent = n.title && n.title.trim() ? `Reminders: ${n.title.trim().slice(0, 40)}` : 'Reminders';
+    $('#remHere').innerHTML = '';
+    $('#remHere').append(ed.el);
+    $('#remSheet').hidden = false;
+  }
+  function closeRemindSheet() { $('#remSheet').hidden = true; $('#remHere').innerHTML = ''; }
+  $('#remClose').addEventListener('click', closeRemindSheet);
+  $('#remSheet').addEventListener('mousedown', (e) => { if (e.target.id === 'remSheet') closeRemindSheet(); });
+
   // ================================================================ encryption of locked notes (1.1.30)
   // main/crypt.js does the work. The list shows the recovery key (once), and Settings → Locked notes has the buttons.
   const cryptNow = () => (V.state.settings && V.state.settings.crypt) || {};
@@ -486,5 +510,5 @@
   Object.assign(K, { setFold, trashNote, destroyNote, emptyBin, dissolveGroup, trashGroup, NEW_INPUTS, checkNew, savedLock,
     ensurePassword, paintLockBar, lockNote, unlockNote, lockGroup, unlockGroup, unlockNoteNow, relockNote, unlockGroupNow,
     relockGroup, openGroupView, openPanel, closePanel,
-    paintPanel, showKeyIfNeeded, paintCrypt, clearSettingsSearch });
+    paintPanel, showKeyIfNeeded, paintCrypt, clearSettingsSearch, openRemindSheet, closeRemindSheet });
 })();

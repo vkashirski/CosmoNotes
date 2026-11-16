@@ -2,7 +2,8 @@
 // Note windows, in the main process: the welcome note of a first start, what a window shows (see-through, solid while
 // the mouse is over it, pinned on top, paper colour, rolled up), where a new note opens and that a moved note is
 // remembered, click-through (1.3.34), minimise / maximise, the window title, "Bring notes to front" and a second start,
-// the mouse's back button in the list, closing (X) vs quitting (notes reopen where they were), and reopening a closed note (1.3.30).
+// the mouse's back button in the list, closing (X) vs quitting (notes reopen where they were), reopening a closed note (1.3.30),
+// and quick clicks on + while slow windows load (1.4.6).
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -96,6 +97,20 @@ const app = require('./helpers/app');
   assert.equal((await H['note:get'](ev(w2))).rolled, false, 'a rolled-up note unrolls before maximising');
   await H['note:maximize'](ev(w2));
 
+  // ---- 1.4.2: pinned notes over each other: the one pinned or clicked last stays on top (enforcePinned, every 2.5 s,
+  // calls setAlwaysOnTop oldest first: Windows puts each call above the others, so the last call is on top)
+  const { enforcePinned } = require('../main/note-window');
+  const stack = () => { E.__onTopCalls.length = 0; enforcePinned(); return E.__onTopCalls.filter((x) => x === w || x === w2).map((x) => (x === w ? 'w' : 'w2')); };
+  assert.deepEqual(stack(), ['w', 'w2'], 'w2 was pinned last: it ends on top');
+  w.emit('focus');
+  assert.deepEqual(stack(), ['w2', 'w'], 'clicked: w comes up, and stays up');
+  await H['note:update'](ev(w2), { pinned: false }); await H['note:update'](ev(w2), { pinned: true });
+  assert.deepEqual(stack(), ['w', 'w2'], 'pinned again: on top again');
+  E.__onTopCalls.length = 0;
+  await H['note:update'](ev(w), { color: 'pink', opacity: 0.9 }); await H['note:update'](ev(w), { pinned: true });
+  assert.equal(E.__onTopCalls.length, 0, 'a new colour, or pinning a pinned note, does not bring it up');
+  await H['note:update'](ev(w), { color: 'mint', opacity: 0.5 });
+
   // ---- "Bring notes to front" unrolls rolled-up notes; starting CosmoNotes again only brings them up
   await H['note:update'](ev(w), { rolled: true });
   E.app.emit('second-instance');
@@ -153,6 +168,31 @@ const app = require('./helpers/app');
   assert.equal(await H['list:reopen-closed'](), null, 'a note in the Bin stays there');
   await H['list:restore'](null, other);
   // quitting, Windows shutting down and the panic button don't count (panic.test.js: it has "Reopen notes")
+
+  // ---- 1.4.6: a new note's window can take seconds to show (slow PC): every click still makes a note (the owner's wish),
+  // and each click's answer waits until its note has shown (the + spins until then)
+  {
+    const load0 = E.BrowserWindow.prototype.loadFile;
+    const showNow = [];
+    E.BrowserWindow.prototype.loadFile = function (f) { this.file = f; showNow.push(() => this.emit('ready-to-show')); };
+    const from = app.winOf(firstId);
+    const before = app.noteWins().length;
+    const asks = [H['note:new'](ev(from)), H['note:new'](ev(from)), H['list:new'](null, null), H['note:new'](ev(from))];
+    await tick(30);
+    assert.equal(app.noteWins().length, before + 4, 'four quick clicks: four notes');
+    let done = 0; asks.forEach((p) => p.then(() => { done++; }));
+    await tick(30); assert.equal(done, 0, 'none answered while their windows load');
+    showNow.shift()(); await tick(10);
+    assert.equal(done, 1, 'a click is answered once its own note shows');
+    // a window that closes before it ever shows still answers
+    app.noteWins().find((x) => !x.isVisible()).close(); await tick(10);
+    assert.equal(done, 2);
+    showNow.splice(0).forEach((f) => f());
+    const ids = await Promise.all(asks);
+    assert.equal(new Set(ids).size, 4, 'each click gets its own note');
+    E.BrowserWindow.prototype.loadFile = load0;
+    for (const id of ids) await H['list:close-note'](null, id);
+  }
 
   // ---- the last save when a window goes away, then quitting: open notes stay open for next time
   const e3 = ev(app.winOf(firstId)); L['note:update-sync'](e3, { html: 'final words', text: 'final words' }); assert.equal(e3.returnValue, true);

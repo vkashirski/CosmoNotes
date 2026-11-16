@@ -23,13 +23,18 @@ save 350ms after typing stops, on blur, and synchronously on unload. Main flushe
 `id, title, html, text (plain text for list/search), firstImage, color (yellow|pink|green|blue|purple|
 orange|mint|charcoal, and since 1.1.15 the list themes' colours cream|rose|sage|mist|lavender|night|midnight|forest|plum;
 dark ones = `DARK_COLORS`: charcoal, night, midnight, forest, plum), font (hand|round|medieval; `FONTS` in store.js, unknown → hand), titleFont (1.3.3: the top-bar title's own font, hand|round|medieval, null/unknown = the note's font; not secret), size (s|m|l), ink (draw-over, see below), wrapWidth (px or null:
-locked text layout), nowrap / wrapFixed (which kind of word wrap off, see below), opacity (0.25–1), solidOnHover, pinned, clickThrough (1.3.34: only with pinned, see feature-map; not copied by Duplicate), open
+locked text layout), nowrap / wrapFixed (which kind of word wrap off, see below), opacity (0.25–1), solidOnHover, pinned, clickThrough (1.3.34: only with pinned, see feature-map; not copied by Duplicate), pinApps (1.4.5: `[{ app, part }]`, the apps it is on top over, part null = any window of that app; empty = on top of everything; only while pinned (unpinning forgets them), a whole app drops its parts, at most 40: store.js `cleanPinApps`; not an edit; a hidden locked note may change it), open
 (window open → reopens at start), rolled, zoom (0.5–3, Ctrl + wheel in the note; not an edit), locked, favorite (starred in the list; not an edit), spell (null = follow Settings | true | false), checklist (1.3.19: { drag, sink, fixed }, each
 true / false or null = as in Settings: checkDrag / checkSink / checkFixed; `cleanChecklist`; not an edit; copied by Duplicate),
 groupId, bounds {x,y,width,height} (unrolled height), createdAt, updatedAt, deletedAt (null or in Bin),
 restoredFrom, sizes (1.3.18: 2 = its sizes read the new way: `store.js` `dropDeadSizes` took off the old sizes that showed nothing, once; null = still sealed, done when opened), coverTitle (1.1.30: "Title while locked", shown instead of the title while locked; not secret), enc / encAtt (1.1.30: a locked note's sealed title/html/text/firstImage/ink and the names of its sealed attachment files; main/crypt.js), fx ({ e, f, ea, fa, eo, fo }: the note's own effect / mouse follower, null = same as all notes, 'none' = nothing; ea /
 fa = how much, low | mid | high or null; eo / fo = opacity 0.1–1 in 5 % steps or null (1.1.17, `cleanFxOpacity`); mi = the mouse plays with the background, true / false / null (1.1.21); not an edit; 1.1.16), fxPaused (effects paused on this note; not an edit), evening (1.3.27: evening colours on / off for this note, null = as in
-Settings; not an edit; copied by Duplicate), panic (1.3.27: false = the panic button leaves this note open, null = it closes it; not an edit; copied by Duplicate)`.
+Settings; not an edit; copied by Duplicate), panic (1.3.27: false = the panic button leaves this note open, null = it closes it; not an edit; copied by Duplicate),
+reminders (1.4.1: up to 30 `{ id, start, at, repeat, sound, hide, unlock, target, firing, firedAt, late, snooze, count }`;
+`src/reminders.js` says what each holds and `cleanAll` is the schema; not secret: main needs the times before the PIN; not an
+edit; not copied by Duplicate, nor by a backup's restored copy), remindMsg (1.4.1: `{ reminderId: message }`, at most 500
+letters each; **secret**: in `SECRET` and crypt.js `SECRET_FIELDS`, sealed with a locked note, `{}` while it is sealed, `null`
+in a hidden window, never on a card)`.
 Which of these a note can have its own value of, and what Settings → "Use on all notes" puts back, is one table: `OVERRIDES` in store.js.
 
 **Draw-over ink** (`note.ink`): `{ s: [ { t: pen|hl|line|arrow|rect|ellipse, c: '#rrggbb', w: 1–40, l: 'a'|'b',
@@ -87,6 +92,8 @@ is put back at load), panicOn (1.3.27, false: the panic button), panicKey ('' = 
 `validKey` in main/panic.js), panicClosed (ids of the notes the last panic closed; they reopen when CosmoNotes is opened again, then it is emptied),
 clickThroughOn (1.3.34, false: the click-through button in each note; off = no note is click-through, each keeps note.clickThrough),
 updateCheck (1.4.0, true: the installed app checks GitHub for a newer version 30 s after it starts and once a day; the button in Settings → About works either way),
+remindSound (1.4.1, 'drops': the sound of a reminder that has none of its own, an id of src/reminders.js SOUNDS or 'none'), remindVolume (0 – 1 in
+steps of 0.05, 0.6; both sent to note windows: `noteSettings`), remindShowHidden (false: notes a reminder hides still show in the list, faded),
 sttWhen (1.3.5: Settings → Voice to text → "Words appear": 'live' = while you talk, 'stop' = when you stop; missing =
 by the PC: graphics card live, processor stop), sttWebgpu (1.3.1: whether the engine found WebGPU last time; decides which set of the model is downloaded; sttModel and
 sttTests, 1.3.1–1.3.3, are deleted at start since 1.3.4),

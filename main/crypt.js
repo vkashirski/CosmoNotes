@@ -22,6 +22,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { promisify } = require('util');
+const REMIND = require('../src/reminders');
 const { S } = require('./state');
 
 const scrypt = promisify(crypto.scrypt);
@@ -39,7 +40,9 @@ const SPKI = Buffer.from('302a300506032b656e032100', 'hex'); // X25519 public ke
 const PKCS8 = Buffer.from('302e020100300506032b656e04220420', 'hex'); // X25519 private key in DER
 const CODE_ABC = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // 32 letters and digits, no I, L, O, U
 const ATT_REF = /stickyfile:\/\/att\/([A-Za-z0-9_.-]+)/g;
-const SECRET_FIELDS = ['title', 'html', 'text', 'firstImage', 'ink'];
+const SECRET_FIELDS = ['title', 'html', 'text', 'firstImage', 'ink', 'remindMsg']; // 1.4.1: the reminders' messages too
+// what a sealed note keeps of them in plain text: nothing (one place, for the store's writes and the backups)
+const blank = () => ({ title: '', html: '', text: '', firstImage: null, ink: null, remindMsg: {} });
 const MARKER = 'encrypted';
 
 let priv = null; // the private key, once the PIN or the recovery key was typed this session
@@ -222,7 +225,7 @@ function sealer(n) {
     return n.encAtt ? { ...n, encAtt: null } : n;
   }
   for (const name of refs) if (attStatus(name) === 'plain' && !usedByPlainNote(name, n.id)) sealFile(name);
-  return { ...n, title: '', html: '', text: '', firstImage: null, ink: null, enc: sealNote(n), encAtt: refs.length ? refs : null };
+  return { ...n, ...blank(), enc: sealNote(n), encAtt: refs.length ? refs : null };
 }
 // A note from a backup, opened if it was sealed and the PIN was typed (null = can't be opened now).
 function opener(b) {
@@ -241,6 +244,7 @@ function openAll() {
     n.title = typeof n.title === 'string' ? n.title : '';
     n.html = typeof n.html === 'string' ? n.html : '';
     n.text = typeof n.text === 'string' ? n.text : '';
+    n.remindMsg = REMIND.cleanMsgs(n.remindMsg, n.reminders); // 1.4.1 (sealed before 1.4.1: none)
     n.enc = null;
     n.encAtt = null;
     S.store.openedSizes(n); // 1.3.18: old sizes that showed nothing come off (store.js dropDeadSizes)
@@ -308,7 +312,7 @@ function sealBackups(onlyIds = null) {
       if (!lockedInBackup(b, groups) && !(now && (now.enc || lockedNow(now)))) continue;
       const refs = attRefs(b);
       for (const name of refs) if (attStatus(name) === 'plain' && !usedByPlainNote(name, null)) sealFile(name);
-      const sealed = { ...b, title: '', html: '', text: '', firstImage: null, ink: null, enc: sealNote(b), encAtt: refs.length ? refs : null };
+      const sealed = { ...b, ...blank(), enc: sealNote(b), encAtt: refs.length ? refs : null };
       // with the key open this session: check it opens again before the plain copy is replaced
       if (priv) { const o = openNote(sealed.enc); if (!o || o.html !== b.html || o.title !== b.title) continue; }
       try { writeAtomic(p, Buffer.from(JSON.stringify(sealed), 'utf8')); count++; } catch (e) { console.error('could not encrypt a backup copy', p, e); }

@@ -1,20 +1,20 @@
 'use strict';
 const { ipcMain } = require('electron');
-const { barKind, cleanInkSize, snapInk } = require('./ink-geometry');
+const { barKind, cleanInkSize, fromNote, nearNote, snapInk } = require('./ink-geometry');
 const { placeInk, showInk } = require('./ink-window');
 const { senderNote } = require('./ipc-common');
 
 function registerInkIpc() {
   // 1.1.15: the drawing toolbar in its own window (see "drawing toolbar outside the note")
   // (1.1.16: also the text toolbar, with `bar: 'text'`)
-  // put it at a remembered place ({ mode: 'dock', side, off } or { mode: 'free', x, y }) and show it
+  // put it at a remembered place ({ mode: 'dock', side, off } or { mode: 'free', dx, dy }: from the note, 1.4.2) and show it
   ipcMain.on('ink:show', (e, s) => {
     const { win, note } = senderNote(e);
     if (!note || !s || typeof s !== 'object') return;
     const k = barKind(s.bar);
     const st = cleanInkSize(s);
     if (s.mode === 'dock' && ['left', 'right', 'top', 'bottom'].includes(s.side)) Object.assign(st, { mode: 'dock', side: s.side, off: Number(s.off) || 0 });
-    else Object.assign(st, { mode: 'free', x: Number(s.x) || 0, y: Number(s.y) || 0 });
+    else Object.assign(st, { mode: 'free', ...nearNote(win, st, Number(s.dx) || 0, Number(s.dy) || 0) });
     win[`${k}State`] = st;
     win[`${k}Out`] = true;
     placeInk(win, k);
@@ -51,7 +51,7 @@ function registerInkIpc() {
     }
     const st = win[`${k}State`];
     if (!st) return null;
-    return { inside: false, state: st.mode === 'dock' ? { mode: 'dock', side: st.side, off: st.off } : { mode: 'free', x: st.x, y: st.y } };
+    return { inside: false, state: st.mode === 'dock' ? { mode: 'dock', side: st.side, off: st.off } : { mode: 'free', ...fromNote(win, st) } };
   });
   ipcMain.on('ink:hide', (e, bar) => {
     const { win, note } = senderNote(e);

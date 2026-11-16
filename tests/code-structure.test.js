@@ -122,7 +122,7 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
   Intl, Date, Math, JSON, Object, Array, Set, Map, WeakMap, String, Number, Boolean, Promise, RegExp, Error, parseFloat, parseInt, isFinite, Uint8Array, encodeURIComponent };
 {
   const sticky = fake('sticky'); sticky.getNote = () => Promise.resolve(null); // the window then stops before it shows a note
-  const { K, parts } = checkKit('note', 'note', ['base', 'fx-format', 'panels', 'content', 'editing', 'checklists', 'menus-voice-ink', 'speech', 'lock-zoom', 'draw-over', 'ink-out', 'eraser-start'], 'COSMO_NOTE_KIT', true,
+  const { K, parts } = checkKit('note', 'note', ['base', 'fx-format', 'panels', 'content', 'editing', 'checklists', 'menus-voice-ink', 'speech', 'lock-zoom', 'draw-over', 'ink-out', 'remind', 'pin-apps', 'eraser-start'], 'COSMO_NOTE_KIT', true,
     { ...base, document: doc(), window: { sticky, COSMO_FX: fake('COSMO_FX'), addEventListener() {}, matchMedia: () => ({ matches: true }) }, getSelection: () => fake('selection'), innerWidth: 400, innerHeight: 400, devicePixelRatio: 1,
       localStorage: { getItem: () => null, setItem() {}, removeItem() {} }, navigator: fake('navigator'), CSS: fake('CSS'), Highlight: class {},
       Node: { TEXT_NODE: 3, ELEMENT_NODE: 1 }, NodeFilter: { SHOW_TEXT: 4, SHOW_ELEMENT: 1, FILTER_ACCEPT: 1, FILTER_REJECT: 2 } },
@@ -143,8 +143,9 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
 {
   const ORDER = ['kit', 'effects-classic', 'effects-lab', 'effects-magic', 'followers-classic', 'followers-lab', 'followers-magic', 'engine'];
   const want = ORDER.map((n) => `fx/${n}.js`);
-  assert.deepEqual(tagsIn('note'), [...want, 'evening.js', ...src.files.note], 'note.html: the effects, the evening colours (1.3.27), then its own code');
-  assert.deepEqual(tagsIn('list'), ['about.js', ...want, 'evening.js', ...src.files.list], 'list.html: about.js, the effects, the evening colours, then its own code');
+  const SHARED = ['evening.js', 'reminders.js', 'remind-ui.js']; // 1.3.27 evening colours; 1.4.1 reminders (rules, then the panel)
+  assert.deepEqual(tagsIn('note'), [...want, ...SHARED, ...src.files.note], 'note.html: the effects, the evening colours, the reminders, then its own code');
+  assert.deepEqual(tagsIn('list'), ['about.js', ...want, ...SHARED, ...src.files.list], 'list.html: about.js, the effects, the evening colours, the reminders, then its own code');
   // 1.3.27: src/evening.js is shared by both windows and main: strict, LF, only window.COSMO_EVENING in a window, module.exports in Node
   const eve = read('src/evening.js');
   assert.ok(eve.startsWith("'use strict';") && isLF(eve), 'src/evening.js: strict, LF');
@@ -152,6 +153,17 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
   vm.runInContext(eve, box, { filename: 'src/evening.js' });
   assert.deepEqual(Object.keys(box.window).filter((k) => k !== 'window'), ['COSMO_EVENING'], 'src/evening.js: only COSMO_EVENING on window');
   assert.equal(typeof require('../src/evening').phase, 'function', 'src/evening.js: main and store.js require it');
+  // 1.4.1: src/reminders.js the same way (window.COSMO_REMIND; main and store.js require it); src/remind-ui.js only in a
+  // window, after it (window.COSMO_REMIND_UI)
+  const rem = read('src/reminders.js');
+  const remUi = read('src/remind-ui.js');
+  assert.ok(rem.startsWith("'use strict';") && isLF(rem) && remUi.startsWith("'use strict';") && isLF(remUi), 'src/reminders.js and src/remind-ui.js: strict, LF');
+  const rbox = { window: {} }; rbox.window.window = rbox.window; vm.createContext(rbox);
+  vm.runInContext(rem, rbox, { filename: 'src/reminders.js' });
+  rbox.window.document = { head: null }; rbox.document = rbox.window.document;
+  vm.runInContext(remUi, rbox, { filename: 'src/remind-ui.js' });
+  assert.deepEqual(Object.keys(rbox.window).filter((k) => !['window', 'document'].includes(k)), ['COSMO_REMIND', 'COSMO_REMIND_UI'], 'only COSMO_REMIND and COSMO_REMIND_UI on window');
+  assert.equal(typeof require('../src/reminders').ring, 'function', 'src/reminders.js: main and store.js require it');
   assert.deepEqual(src.files.fx, want, 'the tests load what the windows load');
   assert.deepEqual(fs.readdirSync(path.join(SRC, 'fx')).sort(), want.map((f) => f.slice(3)).sort(), 'every file in src/fx/ is loaded');
   const sandbox = { window: {}, document: { hidden: false, createElement: () => ({ width: 0, height: 0, getContext: () => fake('ctx') }) }, performance: { now: () => 0 },
@@ -205,6 +217,22 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
   const sends = new Set([...pre.matchAll(/ipcRenderer\.send(?:Sync)?\('([^']+)'/g)].map((m) => m[1]));
   const ons = new Set([...pre.matchAll(/ipcRenderer\.on\('([^']+)'/g)].map((m) => m[1]));
   assert.ok(inv.size > 40 && sends.size >= 6 && ons.size >= 5, 'preload.js read');
+  // 1.4.1: no name twice in one object of window.sticky: the second one silently replaces the first (1.4.0's `update`
+  // for the updates replaced the note window's save, `update(patch)`)
+  {
+    const lines = read('preload.js').split(/\r?\n/);
+    const seen = [new Map()];
+    lines.forEach((l, i) => {
+      const m = /^( +)([A-Za-z_$][\w$]*):/.exec(l);
+      if (!m) return;
+      const depth = m[1].length / 2;
+      seen.length = depth; // a key at this depth: deeper objects before it are closed
+      const at = seen[depth - 1] || (seen[depth - 1] = new Map());
+      assert.ok(!at.has(m[2]), `preload.js: "${m[2]}" twice in the same object (lines ${at.get(m[2])} and ${i + 1})`);
+      at.set(m[2], i + 1);
+      seen[depth] = new Map();
+    });
+  }
   assert.deepEqual(Object.keys(H).sort(), [...inv].sort(), 'every ipcMain.handle channel is one preload.js asks, and the other way round');
   assert.deepEqual(Object.keys(L).sort(), [...sends].sort(), 'every ipcMain.on channel is one preload.js sends, and the other way round');
   const mainSrc = src.main();
@@ -216,7 +244,9 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
     .filter((l) => l && !l.startsWith('#')).map((l) => {
       const m = l.match(/^(\S+)\s.*\beol=(crlf|lf)\b/);
       assert.ok(m, `.gitattributes: ${l}`);
-      const glob = m[1].replace(/\[\[:space:\]\]/g, '\u0000').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*').replace(/\u0000/g, ' ');
+      // a leading / is the top folder only (git's rule, 1.4.1: /preload.js is not src/engine/preload.js)
+      const pat = m[1].replace(/^\//, '');
+      const glob = pat.replace(/\[\[:space:\]\]/g, '\u0000').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*').replace(/\u0000/g, ' ');
       return { re: new RegExp(m[1].includes('/') ? `^${glob}$` : `(^|/)${glob}$`), eol: m[2] };
     });
   const eolOf = (f) => rules.reduce((e, r) => (r.re.test(f) ? r.eol : e), 'lf');
@@ -240,7 +270,8 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
   }
   assert.ok(seen > 150, 'every text file was looked at');
   for (const f of ['main.js', 'main/updater.js', 'src/note/base.js', 'src/css/note-base.css', 'HOW TO INSTALL.txt', 'release.bat']) assert.equal(eolOf(f), 'crlf', `${f} is a CRLF file`);
-  for (const f of ['store.js', 'src/list/base.js', 'src/css/list-base.css', 'package.json', '.github/workflows/release.yml']) assert.equal(eolOf(f), 'lf', `${f} is an LF file`);
+  for (const f of ['store.js', 'src/list/base.js', 'src/css/list-base.css', 'package.json', '.github/workflows/release.yml', 'src/engine/preload.js', 'src/reminders.js']) assert.equal(eolOf(f), 'lf', `${f} is an LF file`);
+  assert.equal(eolOf('preload.js'), 'crlf', 'preload.js is a CRLF file');
   console.log('ok');
   await app.quit();
 })();

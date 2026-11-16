@@ -7,27 +7,39 @@ class BrowserWindow extends EventEmitter {
   constructor(o){ super(); this.o=o; this.id=nextId++; this.bounds={x:o.x??100,y:o.y??100,width:o.width,height:o.height}; this.webContents=new WebContents(this); this.destroyed=false; this.visible=false; this.top=false; this.opacity=1; all.push(this); }
   loadFile(f){ this.file=f; setImmediate(()=>{ if(!this.destroyed) this.emit('ready-to-show'); }); }
   loadURL(u){ this.url=u; module.exports.__loaded.push(this); }
-  show(){this.visible=true} showInactive(){this.visible=true} hide(){this.visible=false} focus(){} isFocused(){return false} setParentWindow(p){this.parent=p} destroy(){this.close()}
+  show(){this.visible=true} showInactive(){this.visible=true} hide(){this.visible=false} focus(){} isFocused(){return !!this.focused} setParentWindow(p){this.parent=p} destroy(){this.close()}
   close(){ if(this.destroyed) return; this.destroyed=true; this.emit('closed'); }
   isDestroyed(){return this.destroyed} isMinimized(){return !!this.minimized} isMaximized(){return !!this.maximized} minimize(){this.minimized=true;this.emit('minimize')} maximize(){this.maximized=true;this.emit('maximize')} unmaximize(){this.maximized=false;this.emit('unmaximize')} setMinimizable(v){this.minimizable=v} setMaximizable(){} isVisible(){return this.visible} restore(){ if(this.minimized){this.minimized=false;this.emit('restore')} }
   getBounds(){return {...this.bounds}} setBounds(b){Object.assign(this.bounds,b)} setPosition(x,y){this.bounds.x=x;this.bounds.y=y;this.emit('move')} setSize(w,h){this.bounds.width=w;this.bounds.height=h;this.emit('resize')}
-  setMinimumSize(){} setMaximumSize(){} setOpacity(v){this.opacity=v} setIgnoreMouseEvents(v,o){this.ignoreMouse=v?{forward:!!(o&&o.forward)}:false} setAlwaysOnTop(v){this.top=v} setBackgroundColor(c){this.bg=c} setTitle(t){this.title=t} moveTop(){}
+  setMinimumSize(){} setMaximumSize(){} setOpacity(v){this.opacity=v} setIgnoreMouseEvents(v,o){this.ignoreMouse=v?{forward:!!(o&&o.forward)}:false} setAlwaysOnTop(v){this.top=!!v; if(v) module.exports.__onTopCalls.push(this)} isAlwaysOnTop(){return !!this.top} setBackgroundColor(c){this.bg=c} setTitle(t){this.title=t} moveTop(){} flashFrame(v){this.flashing=!!v}
+  moveAbove(id){ this.above = id } // 1.4.5: app pins put a note just above its app's window
+  getNativeWindowHandle(){ const b=Buffer.alloc(8); b.writeBigUInt64LE(BigInt(5000+this.id)); return b } // 1.4.5: HWND = 5000 + id
   static fromWebContents(wc){ return wc.win } static getAllWindows(){ return all.filter(w=>!w.destroyed) }
 }
 const display = { workArea: { x: 0, y: 0, width: 1920, height: 1040 } };
+// 1.4.1: a test can add monitors (E.__displays) and move the mouse (E.__cursor): getDisplayNearestPoint finds its monitor
+const shows = () => module.exports.__displays || [display];
+const near = (p) => shows().find(({ workArea: a }) => p.x >= a.x && p.x < a.x + a.width && p.y >= a.y && p.y < a.y + a.height) || shows()[0];
 module.exports = {
   __handlers: handlers, __listeners: listeners, __all: all, __loaded: [], __partitions: {},
+  __onTopCalls: [], // 1.4.2: every setAlwaysOnTop(true), in order: Windows puts each one above the others
+
   app: Object.assign(new EventEmitter(), { commandLine: { appendSwitch(){} }, setAppUserModelId(){}, requestSingleInstanceLock:()=>true, whenReady:()=>Promise.resolve(), getPath:(k)=> k==='appData' ? process.env.FAKE_APPDATA : process.env.FAKE_DATA, isPackaged:false, getVersion:()=>'1.0.0', quit(){ module.exports.app.emit('before-quit'); module.exports.app.emit('will-quit'); }, setLoginItemSettings(){} }),
   BrowserWindow,
   ipcMain: { handle:(c,f)=>handlers[c]=f, on:(c,f)=>listeners[c]=f },
-  screen: Object.assign(new EventEmitter(), { getAllDisplays:()=>[display], getPrimaryDisplay:()=>display, getDisplayMatching:()=>display, getDisplayNearestPoint:()=>display }),
+  screen: Object.assign(new EventEmitter(), { getAllDisplays:()=>shows(), getPrimaryDisplay:()=>display, getDisplayMatching:(r)=>near({ x: r.x + r.width / 2, y: r.y + r.height / 2 }), getDisplayNearestPoint:(p)=>near(p), getCursorScreenPoint:()=>module.exports.__cursor || { x: 100, y: 100 } }),
+  powerMonitor: new EventEmitter(), // 1.4.1: 'resume' after the PC slept
   Tray: class extends EventEmitter { constructor(){ super(); module.exports.__tray = this; } setToolTip(){} setContextMenu(m){ this.menu=m } },
   Menu: { buildFromTemplate:(t)=>({ t, popup(){} }), setApplicationMenu(){} },
-  nativeImage: { createFromPath:()=>({}) },
+  nativeImage: { createFromPath:()=>({}), createFromBuffer:(b)=>({ bytes: [...b], isEmpty:()=>!(b.length > 4 && b[0] === 0x89 && b[1] === 0x50) }) }, // 1.4.3: only a PNG decodes
+  clipboard: { writeImage(i){ module.exports.__clip = i } }, // 1.4.3: Copy image
   shell: { openExternal(u){ module.exports.__opened = u }, openPath(){} },
   // 1.3.27: the panic button's shortcut. reg = what is registered (accelerator -> function); a test puts an accelerator in
   // `taken` to play another app that already has it
   globalShortcut: { reg: {}, taken: new Set(), register(a, f){ if (this.taken.has(a)) return false; this.reg[a] = f; return true }, unregister(a){ delete this.reg[a] }, unregisterAll(){ this.reg = {} }, isRegistered(a){ return !!this.reg[a] } },
+  // 1.4.5: app pins (main/app-pin.js): the open windows, front first: a test sets __sources ([{ id: 'window:<hwnd>:0', name }];
+  // a note window's hwnd is 5000 + its id), or __sourcesFail to make the list fail
+  desktopCapturer: { calls: 0, async getSources(){ this.calls++; const E = module.exports; if (E.__sourcesFail) throw new Error('no list'); return (E.__sources || []).map((x) => ({ ...x })); } },
   dialog: { showMessageBox: async()=>({response:0}), showOpenDialog: async()=>({canceled:true}) },
   protocol: { registerSchemesAsPrivileged(){}, handle(s,f){ module.exports.__proto = f } },
   net: { fetch: async (u)=>({ url:u }) },

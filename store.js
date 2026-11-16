@@ -17,6 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const EVENING = require('./src/evening'); // 1.3.27: the evening colours' times (the same file the windows load)
+const REMIND = require('./src/reminders'); // 1.4.1: reminders (the same rules as main and the windows)
 
 // Paper colours. 1.1.15 added the colours of the list themes (cream, rose, sage = the Mint theme, mist = Sky,
 // lavender = Lilac, and the dark night, midnight, forest, plum). In this order everywhere colours are shown:
@@ -107,7 +108,18 @@ const DEFAULT_SETTINGS = {
   // 1.4.0: check GitHub for a newer version when CosmoNotes starts and once a day (main/ipc-update.js). The button in
   // Settings → About works either way
   updateCheck: true,
+  // 1.4.1: reminders (main/reminders.js): the sound a reminder plays unless it has its own (src/reminders.js SOUNDS, or
+  // 'none'), how loud (0 – 1), and whether notes a reminder hides still show in the notes list
+  remindSound: REMIND.DEFAULT_SOUND,
+  remindVolume: 0.6,
+  remindShowHidden: false,
 };
+// 1.4.1: the reminders' sound in Settings (an id of src/reminders.js SOUNDS or 'none') and how loud (0 – 1, steps of 0.05)
+const cleanRemindSound = (v) => (v === 'none' || REMIND.SOUND_IDS.includes(v) ? v : REMIND.DEFAULT_SOUND);
+function cleanVolume(v) {
+  const x = Number(v);
+  return v === null || v === '' || !Number.isFinite(x) ? 0.6 : Math.min(1, Math.max(0, Math.round(x * 20) / 20));
+}
 // 1.3.19: a note's own checklist options ({ drag, sink, fixed }: true / false; null = as in Settings)
 const CHECK_OPTS = { drag: 'checkDrag', sink: 'checkSink', fixed: 'checkFixed' };
 function cleanChecklist(c) {
@@ -115,6 +127,24 @@ function cleanChecklist(c) {
   const out = {};
   for (const k of Object.keys(CHECK_OPTS)) out[k] = typeof o[k] === 'boolean' ? o[k] : null;
   return out;
+}
+// 1.4.5: the apps a note is pinned over (main/app-pin.js): [{ app, part }], part null = any window of the app, else only
+// one whose title has that workspace / file. A rule for a whole app covers its parts (they are dropped); at most 40
+function cleanPinApps(list) {
+  const str = (v, max) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '');
+  const rules = [];
+  const seen = new Set();
+  for (const r of Array.isArray(list) ? list : []) {
+    const app = str(r && r.app, 80);
+    if (!app) continue;
+    const part = str(r.part, 120) || null;
+    const k = `${app.toLowerCase()}\n${(part || '').toLowerCase()}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    rules.push({ app, part });
+  }
+  const whole = new Set(rules.filter((r) => !r.part).map((r) => r.app.toLowerCase()));
+  return rules.filter((r) => !r.part || !whole.has(r.app.toLowerCase())).slice(0, 40);
 }
 
 // 1.3.27: the settings a note can have its own value of, and how Settings → "Use on all notes" puts Settings back on it.
@@ -526,6 +556,9 @@ function normalize(n) {
     // 1.3.34: click-through (main/note-state.js applyClickThrough): the mouse goes through it to the window under it. Only a
     // pinned note: turning it on pins the note (ipc-common.js applyPatch), unpinning turns it off. Not copied by Duplicate.
     clickThrough: !!n.clickThrough && !!n.pinned,
+    // 1.4.5: pinned only over these apps (empty = on top of everything); unpinning forgets them. Not an edit, not copied by
+    // Duplicate (it isn't pinned)
+    pinApps: n.pinned ? cleanPinApps(n.pinApps) : [],
     open: !!n.open,
     rolled: !!n.rolled,
     locked: !!n.locked,
@@ -547,6 +580,10 @@ function normalize(n) {
     checklist: cleanChecklist(n.checklist), // 1.3.19: this note's own checklist options (null each = as in Settings); not an edit
     evening: typeof n.evening === 'boolean' ? n.evening : null, // 1.3.27: evening colours on / off for this note (null = as in Settings); not an edit
     panic: n.panic === false ? false : null, // 1.3.27: false = the panic button leaves this note open (null = it closes it); not an edit
+    // 1.4.1: reminders (src/reminders.js says what each holds; main/reminders.js keeps the clock); not an edit. Their
+    // messages are secret, like the note's words: sealed with a locked note (main/crypt.js), empty while it is sealed
+    reminders: REMIND.cleanAll(n.reminders),
+    remindMsg: REMIND.cleanMsgs(n.remindMsg, REMIND.cleanAll(n.reminders)),
     groupId: typeof n.groupId === 'string' && n.groupId ? n.groupId : null,
     bounds: normalizeBounds(n.bounds),
     createdAt: Number(n.createdAt) || now,
@@ -596,6 +633,9 @@ class Store {
     this.settings.eveTo = EVENING.cleanTime(this.settings.eveTo, EVENING.DEFAULT_TO);
     this.settings.panicKey = typeof this.settings.panicKey === 'string' ? this.settings.panicKey.slice(0, 60) : '';
     this.settings.panicClosed = Array.isArray(this.settings.panicClosed) ? this.settings.panicClosed.filter((x) => typeof x === 'string').slice(0, 2000) : [];
+    // 1.4.1: reminders' sound and volume, cleaned
+    this.settings.remindSound = cleanRemindSound(this.settings.remindSound);
+    this.settings.remindVolume = cleanVolume(this.settings.remindVolume);
     this.groups = new Map();
     const g = readJson(this.groupsFile) || readJson(this.groupsFile + '.bak') || {};
     for (const x of Array.isArray(g.groups) ? g.groups : []) {
@@ -1038,7 +1078,8 @@ class Store {
       }
       if (b.deletedAt) continue;
       // a note that was locked when backed up stays locked (its group's lock doesn't come along into "Restored Notes")
-      const copy = normalize({ ...b, id: crypto.randomUUID(), open: false, restoredFrom: name, deletedAt: null, ...(raw.enc ? { locked: true } : {}) });
+      // 1.4.1: without its reminders (the note itself still has them: they would go off twice)
+      const copy = normalize({ ...b, id: crypto.randomUUID(), open: false, restoredFrom: name, deletedAt: null, reminders: [], ...(raw.enc ? { locked: true } : {}) });
       if (copy.groupId && !this.groups.has(copy.groupId)) copy.groupId = null;
       this.notes.set(copy.id, copy);
       this.writeNow(copy.id);
@@ -1063,4 +1104,4 @@ function backupDayName(name) {
   return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-module.exports = { FONTS, CHECK_OPTS, OVERRIDE_KEYS, overrideCounts, resetPatch, cleanChecklist, checklistMarks, cardRuns, CARD_TAGS, CARD_RUN_KEYS, CARD_FACE_SIZE, CARD_SIZE, dropDeadSizes, pictureWords, picturePlace, lineCount, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };
+module.exports = { cleanPinApps, cleanRemindSound, cleanVolume, FONTS, CHECK_OPTS, OVERRIDE_KEYS, overrideCounts, resetPatch, cleanChecklist, checklistMarks, cardRuns, CARD_TAGS, CARD_RUN_KEYS, CARD_FACE_SIZE, CARD_SIZE, dropDeadSizes, pictureWords, picturePlace, lineCount, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };

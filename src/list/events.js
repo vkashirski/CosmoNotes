@@ -6,7 +6,7 @@
   const { V, S, $, $$, SIZES, SIZE_NAMES, sizeNow, ICON, cardsTabNow, sel, load, groupById, sortPrefs, render,
     dropTarget, canMove, moveInto, visibleKeys, clearSel, paintCards, bulkTrash, renderSettings, renderBackups,
     pickBackup, modal, toast, hideCtx, closeFxSheet, closeEdit, emptyBin, NEW_INPUTS, checkNew, savedLock, closePanel,
-    showKeyIfNeeded, clearSettingsSearch, setFold } = K;
+    showKeyIfNeeded, clearSettingsSearch, setFold, closeRemindSheet } = K;
   // ================================================================ events
   // Settings is a toggle: clicking it while it's open goes back to Notes or Bin, whichever was open before
   function setTab(v) {
@@ -16,8 +16,13 @@
     render(true);
   }
   $$('.tab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
-  // inside a group, a new note is made right there
-  const newNote = () => S.list.newNote(V.tab === 'notes' ? V.openGroup || null : null);
+  // inside a group, a new note is made right there. 1.4.6: every click makes a note; the + spins until they have shown
+  let coming = 0;
+  const newNote = () => {
+    coming++;
+    $('#btnNew').classList.add('busy');
+    S.list.newNote(V.tab === 'notes' ? V.openGroup || null : null).finally(() => { if (--coming === 0) $('#btnNew').classList.remove('busy'); });
+  };
   $('#btnNew').addEventListener('click', newNote);
   $('#btnFront').addEventListener('click', () => S.list.bringToFront());
   $('#q').addEventListener('input', (e) => { V.query = e.target.value; render(); });
@@ -151,8 +156,20 @@
   $('#sPanic').addEventListener('change', (e) => S.settings.set({ panicOn: e.target.checked }));
   $('#sClickThrough').addEventListener('change', (e) => S.settings.set({ clickThroughOn: e.target.checked })); // 1.3.34
   $('#sUpdateCheck').addEventListener('change', (e) => S.settings.set({ updateCheck: e.target.checked })); // 1.4.0
+  // 1.4.1: Settings → Reminders (the volume is saved when let go), and the reminders filter next to the search
+  $('#sRemSound').addEventListener('change', (e) => { V.state.settings.remindSound = e.target.value; S.settings.set({ remindSound: e.target.value }); });
+  $('#sRemPlay').addEventListener('click', () => { if (window.COSMO_REMIND_UI) window.COSMO_REMIND_UI.play($('#sRemSound').value, Number($('#sRemVol').value) / 100); });
+  $('#sRemVol').addEventListener('input', (e) => { $('#sRemVolVal').textContent = `${e.target.value}%`; });
+  $('#sRemVol').addEventListener('change', (e) => { V.state.settings.remindVolume = Number(e.target.value) / 100; S.settings.set({ remindVolume: Number(e.target.value) / 100 }); });
+  $('#sRemShow').addEventListener('change', (e) => S.settings.set({ remindShowHidden: e.target.checked }));
+  $('#btnRem').addEventListener('click', () => {
+    V.remOnly = !V.remOnly;
+    $('#btnRem').classList.toggle('on', V.remOnly);
+    $('#btnRem').setAttribute('aria-pressed', String(V.remOnly));
+    render(true);
+  });
   // 1.4.0: the tray's "Update to …" (and a start Windows refused): Settings, at About's updates
-  S.update.onShow(() => {
+  S.updates.onShow(() => {
     clearSettingsSearch();
     if (V.tab !== 'settings') setTab('settings');
     setFold($('#viewSettings .panel.about'), true);
@@ -198,6 +215,7 @@
     if (!$('#modal').hidden) { if (e.key === 'Escape' && V.modalDone) V.modalDone(null); return; }
     if (!$('#editSheet').hidden) { if (e.key === 'Escape') { e.preventDefault(); closeEdit(); } return; }
     if (!$('#fxSheet').hidden) { if (e.key === 'Escape') { e.preventDefault(); closeFxSheet(); } return; }
+    if (!$('#remSheet').hidden) { if (e.key === 'Escape') { e.preventDefault(); closeRemindSheet(); } return; } // 1.4.1
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); newNote(); }
     // 1.3.30: the note closed last opens again, like a browser's closed tabs (also the tray's "Reopen closed note")
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 't') { e.preventDefault(); S.list.reopenClosed(); }

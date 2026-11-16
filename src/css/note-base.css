@@ -97,9 +97,29 @@ svg .fill { fill: currentColor; stroke: none; }
 }
 .hb:hover { opacity: 1; background: rgba(0,0,0,.08); }
 body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .hb:hover { background: rgba(255,255,255,.1); }
+/* 1.4.6: new notes on their way (panels.js newNote): a ring spins around + (only transform: cheap on a slow PC) */
+#btnNew { position: relative; }
+#btnNew.busy { opacity: 1; cursor: progress; }
+#btnNew.busy::after {
+  content: ''; position: absolute; inset: 0; margin: auto; width: 24px; height: 24px; box-sizing: border-box;
+  border-radius: 50%; pointer-events: none;
+  border: 2px solid transparent; border-top-color: currentColor; border-right-color: currentColor;
+  animation: newSpin .7s linear infinite;
+}
+@keyframes newSpin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) { #btnNew.busy::after { animation-duration: 2s; } }
 .hb svg { width: 16px; height: 16px; }
 #btnPin[aria-pressed="true"] { opacity: 1; }
 #btnPin[aria-pressed="true"] svg { fill: currentColor; transform: rotate(-25deg); }
+/* 1.4.5 / 1.4.8: pinned over some apps only (src/note/pin-apps.js): a little window behind the pin, at its lower right, the
+   pin stuck into it (the owner's pick). The window is an svg of its own (it doesn't tilt with the pin), under the pin's;
+   the pin gets an edge in the top bar's colour, so the two don't run together at 16 px */
+#btnPin { position: relative; }
+#btnPin .pinwin { display: none; position: absolute; left: 50%; top: 50%; overflow: visible; }
+#btnPin .pinwin, #btnPin[aria-pressed="true"] .pinwin { transform: translate(-50%, -50%); fill: none; }
+#btnPin.app .pinwin { display: block; }
+#btnPin.app > svg:not(.pinwin) { position: relative; z-index: 1;
+  filter: drop-shadow(1px 0 0 var(--bar)) drop-shadow(-1px 0 0 var(--bar)) drop-shadow(0 1px 0 var(--bar)) drop-shadow(0 -1px 0 var(--bar)); }
 /* 1.3.34: click-through (main/note-state.js): the window lets clicks through, and nothing in it reacts to the mouse but
    its button (no hover, no drag; the top bar can't be dragged meanwhile either). The other buttons fade so it reads. */
 #btnCt[aria-pressed="true"] { opacity: 1; }

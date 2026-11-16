@@ -32,7 +32,7 @@
   <!-- 1.3.34: click-through (Settings → Click-through; main/note-state.js): the mouse goes through the note to the window
        under it. While it is on, this is the one button that works (note-base.css body.ct) -->
   <button class="hb" id="btnCt" title="Click-through: the mouse goes through this note" aria-pressed="false" hidden><svg viewBox="0 0 24 24"><path d="M4.04 4.69a.5.5 0 0 1 .65-.65l16 6.5a.5.5 0 0 1-.06.95l-6.13 1.58a2 2 0 0 0-1.43 1.43l-1.58 6.13a.5.5 0 0 1-.95.06z"/></svg></button>
-  <button class="hb" id="btnPin" title="Pin on top of other windows" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
+  <button class="hb" id="btnPin" title="Pin on top of other windows" aria-pressed="false"><svg class="pinwin" viewBox="0 0 24 24" aria-hidden="true"><rect x="14" y="13" width="14" height="11.5" rx="2.4"/><path d="M14 16.4h14" stroke-width="3"/></svg><svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
   <button class="hb" id="btnRoll" title="Roll up to just the top bar"><svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></button>
   <!-- 1.1.20: menus no longer close each other; this closes every open one at once (shows when two or more are open) -->
   <button class="hb" id="btnCloseAll" title="Close all open menus (Esc)" hidden><svg viewBox="0 0 24 24"><rect x="8" y="3" width="13" height="13" rx="2.5"/><path d="M5 8H4.5A1.5 1.5 0 0 0 3 9.5v10A1.5 1.5 0 0 0 4.5 21h10a1.5 1.5 0 0 0 1.5-1.5V19"/><path d="m12 7 5 5M17 7l-5 5"/></svg></button>
@@ -42,6 +42,15 @@
   <button class="hb" id="btnMax" title="Maximise (or double-click the top bar)"><svg class="i-max" viewBox="0 0 24 24"><rect x="5.5" y="5.5" width="13" height="13" rx="2"/></svg><svg class="i-restore" viewBox="0 0 24 24"><rect x="4.5" y="8.5" width="11" height="11" rx="2"/><path d="M8.5 5.5h8a2.5 2.5 0 0 1 2.5 2.5v8"/></svg></button>
   <button class="hb" id="btnClose" title="Close note (it stays in your notes list)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
 </header>
+
+<!-- 1.4.1: a reminder that went off (src/note/remind.js): its message, Snooze 10 min (the arrow: other times) and Done -->
+<div id="remBar" role="alert" hidden>
+  <span class="rbic"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M5 3 2 6M19 3l3 3"/></svg></span>
+  <span class="rbtxt"><b id="remWhen">Reminder</b><span id="remMsg" hidden></span><small id="remLockHint" hidden>Unlock to dismiss</small></span>
+  <small id="remMore"></small>
+  <span class="rbbtns"><button type="button" class="rbb" id="remSnooze">Snooze 10 min</button><button type="button" class="rbb more" id="remSnoozeMore" title="Snooze for…"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button><button type="button" class="rbb done" id="remDone">Done</button></span>
+  <div id="remMenu" hidden><button type="button" data-m="5">5 min</button><button type="button" data-m="30">30 min</button><button type="button" data-m="60">1 hour</button><button type="button" data-m="tomorrow">Tomorrow 09:00</button></div>
+</div>
 
 <main id="scroller">
   <div id="sheet">
@@ -205,6 +214,7 @@
     <button class="tile" data-act="table"><span class="ic" style="--tc:#E8DDFF"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></span>Table</button>
     <button class="tile" data-act="numbers"><span class="ic" style="--tc:#CDF3E8"><svg viewBox="0 0 24 24"><path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></span>Numbers</button>
     <button class="tile" data-act="divider"><span class="ic" style="--tc:#FFF4A3"><svg viewBox="0 0 24 24"><path d="M3 12h3M10 12h4M18 12h3"/></svg></span>Divider</button>
+    <button class="tile" data-act="remind"><span class="ic" style="--tc:#DDEBFF"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M5 3 2 6M19 3l3 3"/></svg></span>Reminder</button>
     <button class="tile" data-act="date"><span class="ic" style="--tc:#FFE1DC"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></span>Today’s date</button>
   </div>
 </div>
@@ -250,11 +260,13 @@
     </div>
   </div>
   <div class="irow">
-    <div class="seg" id="fsizeSeg" title="Size of the selected text">
-      <button data-fsize="2">Small</button>
-      <button data-fsize="3">Normal</button>
-      <button data-fsize="5">Big</button>
-      <button data-fsize="6">Huge</button>
+    <div class="seg" id="fsizeSeg" title="Text size, times the note's size">
+      <button data-fsize="1">0.7</button>
+      <button data-fsize="2">0.8</button>
+      <button data-fsize="3">1.0</button>
+      <button data-fsize="4">1.2</button>
+      <button data-fsize="5">1.5</button>
+      <button data-fsize="6">1.9</button>
     </div>
     <button class="iact" id="miClearFmt" title="Clear formatting of the selected text"><svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/><path d="m16 16 5 5M21 16l-5 5"/></svg></button>
   </div>
@@ -355,6 +367,20 @@
   </div>
 </div>
 
+<!-- 1.4.5: the pin's right-click list (src/note/pin-apps.js): on top only while one of the ticked apps is in front -->
+<div class="pop" id="pinPop" hidden>
+  <button class="ix" id="pinX" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  <h4>Pin over</h4>
+  <div id="pinList"></div>
+</div>
+
+<!-- 1.4.1: this note's reminders (src/remind-ui.js fills it; src/note/remind.js) -->
+<div class="pop" id="remPop" hidden>
+  <button class="ix" id="remX" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  <h4>Reminders</h4>
+  <div id="remHere"></div>
+</div>
+
 <!-- small "are you sure?" pop-up in the app's style -->
 <div class="pop" id="askPop" hidden>
   <h4 id="askTitle"></h4>
@@ -376,6 +402,8 @@
 <script src="fx/followers-magic.js"></script>
 <script src="fx/engine.js"></script>
 <script src="evening.js"></script>
+<script src="reminders.js"></script>
+<script src="remind-ui.js"></script>
 <!-- this window's own code (1.1.44: note.js split into src/note/, in this order; see ai-context/splitting-code.md) -->
 <script src="note/base.js"></script>
 <script src="note/fx-format.js"></script>
@@ -388,6 +416,8 @@
 <script src="note/lock-zoom.js"></script>
 <script src="note/draw-over.js"></script>
 <script src="note/ink-out.js"></script>
+<script src="note/remind.js"></script>
+<script src="note/pin-apps.js"></script>
 <script src="note/eraser-start.js"></script>
 </body>
 </html>

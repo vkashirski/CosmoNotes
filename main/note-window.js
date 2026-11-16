@@ -8,9 +8,10 @@ const { fitBounds, visibleOnSomeDisplay } = require('./display');
 const { hardenContents } = require('./web');
 const { watchInkBar } = require('./ink-window');
 const { notifyList } = require('./list-notify');
-const { applyState, setRolled, titleOf } = require('./note-state');
+const { applyState, raised, setRolled, titleOf } = require('./note-state');
 const { groupOpenInList, openForNow } = require('./list-visibility');
 const { closedChanged, noteClosed, takeClosed } = require('./closed-notes');
+const appPin = require('./app-pin');
 const { S, wins } = require('./state');
 
 function openNoteWindow(n, { focus = false } = {}) {
@@ -59,15 +60,23 @@ function openNoteWindow(n, { focus = false } = {}) {
   win.revealed = !isLocked(n) || openForNow(n);
   wins.set(n.id, win);
   closedChanged(); // 1.3.30: opened again some other way: the tray may have nothing left to reopen
+  appPin.changed(); // 1.4.5: pinned over apps: the watch starts
   hardenContents(win.webContents, { inkBarFor: win });
   watchInkBar(win);
 
+  // 1.4.6: settles once the window has shown (or closed first): the + that made it spins until then (createNote)
+  let settle;
+  win.ready = new Promise((res) => { settle = res; });
   let shown = false;
   const showIt = () => {
     if (shown || win.isDestroyed()) return;
     shown = true;
+    settle();
+    win.loaded = true; // 1.4.5: from now on app pins may show it (main/app-pin.js)
     applyState(win, S.store.get(n.id) || n);
+    if (!appPin.mayShow(win)) return; // pinned over apps and none of them is in front: it shows when one is
     if (focus) { win.show(); win.focus(); } else win.showInactive();
+    appPin.shown(win); // its app open behind another: just above that app
   };
   win.once('ready-to-show', showIt);
   setTimeout(showIt, 4000);
@@ -81,13 +90,18 @@ function openNoteWindow(n, { focus = false } = {}) {
       if (!cur) return;
       // a maximised or minimised note keeps its normal size and place for next time
       if (win.isMaximized() || win.isMinimized()) return;
+      if (win.appAnim) return; // 1.4.5: app pins' animation moves it for a moment; it ends where it started
       const r = win.getBounds();
-      cur.bounds = { x: r.x, y: r.y, width: r.width, height: cur.rolled ? (cur.bounds?.height || DEFAULT_H) : r.height };
+      const next = { x: r.x, y: r.y, width: r.width, height: cur.rolled ? (cur.bounds?.height || DEFAULT_H) : r.height };
+      const was = cur.bounds || {};
+      if (next.x === was.x && next.y === was.y && next.width === was.width && next.height === was.height) return; // nothing moved
+      cur.bounds = next;
       S.store.save(cur.id, 300);
     }, 350);
   };
   win.on('move', rememberBounds);
   win.on('resize', rememberBounds);
+  win.on('focus', () => raised(win)); // 1.4.2: clicked: on top of the other pinned notes (enforcePinned)
 
   // A pinned note never minimises by itself (e.g. "Show desktop"), only with its own minimise button (win.userMin).
   win.on('minimize', () => {
@@ -120,8 +134,10 @@ function openNoteWindow(n, { focus = false } = {}) {
   win.on('session-end', () => { S.quitting = true; S.store.flush(); });
 
   win.on('closed', () => {
+    settle();
     const id = win.noteId;
     if (wins.get(id) === win) wins.delete(id);
+    appPin.changed(); // 1.4.5: the last note pinned over apps closed: the watch stops
     const cur = S.store.get(id);
     // 1.3.30: closed by the owner (its X, the list's Close): Ctrl+Shift+T / the tray can bring it back. Remembered only
     // once the window is gone, so the tray's item counts it (Electron closes a window a moment after close()).
@@ -142,6 +158,8 @@ function openNoteWindow(n, { focus = false } = {}) {
   return win;
 }
 
+// Every call makes a note, however fast they come (the owner's wish, 1.4.6: spamming + is allowed). Returns a promise of
+// the note's id, settled once its window has shown (or closed first): the + button spins until then (a slow PC takes seconds).
 function createNote({ near, groupId = null } = {}) {
   let bounds = null;
   if (near && !near.isDestroyed()) {
@@ -158,7 +176,7 @@ function createNote({ near, groupId = null } = {}) {
   // made inside a locked group that is open in the list: no need to type the password again
   if (isLocked(n) && !n.locked && groupOpenInList(n.groupId)) win.revealed = true;
   notifyList();
-  return n;
+  return win.ready.then(() => n.id);
 }
 
 // Duplicate a note: the copy opens next to the original (or where new notes go), in the same
@@ -204,7 +222,8 @@ function reopenClosed() {
   if (!n) return null;
   n.open = true;
   S.store.save(n.id);
-  openNoteWindow(n, { focus: true });
+  const win = openNoteWindow(n, { focus: true });
+  if (appPin.appPinned(n)) appPin.peek(win); // 1.4.5: pinned over apps: it shows now, until another app comes in front
   notifyList();
   return n.id;
 }
@@ -221,22 +240,30 @@ function bringToFront({ unroll = false } = {}) {
   for (const [id, win] of wins) {
     if (win.isDestroyed()) continue;
     if (win.isMinimized()) win.restore();
-    const n = unroll && S.store.get(id);
-    if (n && n.rolled) unrollWin(win, n);
+    const n = S.store.get(id);
+    if (unroll && n && n.rolled) unrollWin(win, n);
+    if (appPin.appPinned(n)) appPin.peek(win); // 1.4.5: pinned over apps: up now too, until another app comes in front
     win.showInactive();
     win.moveTop();
+    raised(win);
   }
 }
 
+// every 2.5 s: pinned notes come back up (also above other apps' on-top windows). 1.4.2: one after the other, the one
+// pinned or clicked longest ago first, so the newest stays on top of the others (it used to be the order they opened in).
 function enforcePinned() {
+  const up = [];
   for (const [id, win] of wins) {
     if (win.isDestroyed()) continue;
     const n = S.store.get(id);
     if (!n || !n.pinned || win.userMin) continue; // minimised with its own button: leave it
+    if (win.appHidden || win.appBehind) continue; // 1.4.5: pinned over apps: its app is closed, or open behind another (main/app-pin.js)
     if (win.isMinimized()) win.restore();
     if (!win.isVisible()) win.showInactive();
-    if (!win.isFocused()) win.setAlwaysOnTop(true, 'screen-saver');
+    up.push(win);
   }
+  up.sort((a, b) => (a.raisedAt || 0) - (b.raisedAt || 0));
+  for (const win of up) win.setAlwaysOnTop(true, 'screen-saver');
 }
 
 function refitAll() {

@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 9 of 12: locking, password or PIN, the "are you sure?" pop-up, word wrap, zoom
+// CosmoNotes note window, part 9 of 14: locking, password or PIN, the "are you sure?" pop-up, word wrap, zoom
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -7,7 +7,7 @@
     closePops, openPop, closeText, paintUndo, decorate, stopPlay, rec, stopRecording, stopRecordingNow, closeDraw, handle, placeHandle, sttHide, dropEmptyLines, joinLists } = K;
   // defined in a later part:
   const renderInk = K.later('renderInk'), inkBounds = K.later('inkBounds'), exitInk = K.later('exitInk'),
-    toast = K.later('toast');
+    toast = K.later('toast'), paintRemind = K.later('paintRemind');
   // ================================================================ locking
   // "Snap shut" (1.1.14, replaced 1.1.13's stardust): locking blurs the note's writing away while the padlock drops in,
   // bounces, and its shackle snaps shut; unlocking pops the shackle open and the padlock floats up as the note fades
@@ -70,6 +70,7 @@
     paintUndo();
     if (fly) { body.append(fly); setTimeout(() => fly.remove(), 800); }
     playLockAnim('unlock');
+    paintRemind(); // 1.4.1: a reminder's message shows now
   }
   function hideContent() {
     const ghost = V.hidden ? null : lockGhost();
@@ -94,6 +95,8 @@
     V.note.html = '';
     paintUndo();
     V.note.title = ''; // 1.1.30: the title is hidden (and encrypted) while locked too
+    V.note.remindMsg = null; // 1.4.1: and the reminders' messages
+    paintRemind();
     if (document.activeElement !== $('#titleInput')) $('#titleInput').value = '';
     observer.observe(editor, { childList: true, subtree: true, characterData: true });
     $('#unlockPw').value = '';
@@ -116,8 +119,8 @@
   api.onLook((v) => {
     if (!V.note || !v) return;
     // 1.3.27: and what Settings → "Use on all notes" puts back (solid on hover, spelling, checklists, evening, panic)
-    for (const k of ['color', 'font', 'titleFont', 'size', 'title', 'coverTitle', 'locked', 'lockedBy', 'pinned', 'clickThrough', 'opacity', 'rolled', 'fx', 'fxPaused', 'fxPlay',
-      'solidOnHover', 'spell', 'checklist', 'evening', 'panic']) if (k in v) V.note[k] = v[k];
+    for (const k of ['color', 'font', 'titleFont', 'size', 'title', 'coverTitle', 'locked', 'lockedBy', 'pinned', 'pinApps', 'clickThrough', 'opacity', 'rolled', 'fx', 'fxPaused', 'fxPlay',
+      'solidOnHover', 'spell', 'checklist', 'evening', 'panic', 'reminders', 'remindMsg']) if (k in v) V.note[k] = v[k]; // 1.4.1: reminders
     if (v.hidden && !V.hidden) { hideContent(); return; }
     // the lock was removed from the notes list while this window still asked for the password/PIN:
     // show the note straight away (1.1.47: or it was unlocked there until CosmoNotes restarts; its lock stays)
@@ -129,6 +132,7 @@
       return;
     }
     applyLook();
+    paintRemind();
   });
   async function toggleLock() {
     closePops();

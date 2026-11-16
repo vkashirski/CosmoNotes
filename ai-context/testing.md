@@ -7,7 +7,7 @@ Open this when writing or running tests, or checking the UI.
   a time (slow ones first). It prints only failures and one summary line. `npm test -- locks groups` runs only the files
   whose name contains one of the words; `npm test -- -v` lists every file with its time. ~30 s for all on 2 cores.
 - While working, run only the area's file (`npm test -- notes`), then everything once before saying a change is done.
-- The browser tests (`list-ui-*`, `note-ui`) need Playwright (the cloud workspace has it). Without it they exit with 77
+- The browser tests (`list-ui-*`, `note-ui*`) need Playwright (the cloud workspace has it). Without it they exit with 77
   and show as skipped.
 
 ## Where a check goes
@@ -21,9 +21,11 @@ code (regex) is for rules a test can't easily click through (each such line says
 | `store.test.js` | store.js alone: saving, .bak recovery, backups (daily, restore, prune), attachments, normalize / normalizeInk / checklistMarks / pictureWords / picturePlace |
 | `upgrade.test.js` | Sticky Pins → CosmoNotes: copied data, notes reopen, dates and old settings kept |
 | `windows.test.js` | note windows: welcome note, see-through / hover / pinned / colour / rolled, placement, moved = remembered, min / max, title, Bring to front, second start, mouse back button, X vs Alt+F4 vs quit, reopen closed note (1.3.30) |
+| `app-pins.test.js` | app pins (1.4.5, `main/app-pin.js`): window titles → app + workspace (browsers: none), store.js `cleanPinApps`, the watch (only while such a note is open; own windows skipped), mirroring its app: on top / just above its app (`moveAbove`, not on top) / hidden (stays open), the animation, `enforcePinned` leaves it hidden, a whole app / two apps, focused / ringing / a list that fails = shows, peeks (list, Bring to front, a second start), unpinning forgets the apps, `pin:apps`, a hidden locked note. `check()` is called by hand; the fake's `desktopCapturer` takes `E.__sources` (a note's hwnd = 5000 + its id) |
 | `safety.test.js` | attachments (images only, no path tricks), links (web only), permissions (microphone only), which child windows may open |
 | `toolbars.test.js` | drawing / text toolbars outside the note: 12 px sticking, following, screen edges, rolled, pinned, back inside |
 | `stt.test.js` | voice to text (1.3.1), main's side with a stub engine: jobs and the queue, close / lock / engine crash, one model (not downloaded = nothing starts, fails to start = error), live (graphics card) or after Stop (processor), old settings cleaned, `cosmomodel://` (fixed list, COOP/COEP, CSP), the engine's session, the download against a local server; the live session logic (`engine-core.mjs`) under Node |
+| `reminders.test.js` | reminders (1.4.1): the rules of `src/reminders.js` under Node (cleaning, repeats and their clock time, weekdays / month end / DST, missed ones ring once, Snooze, Done, hiding, quick picks), then main's side: saving (not an edit, messages only through `list:remind-get`), going off (on top, flashing, `remind:ring`, the sound queued for a window still loading), Snooze / Done, missed, hiding (window closes, list leaves it out, pops up on the mouse's monitor or its corner), Settings → Reminders, a locked note (messages sealed, no changes while hidden, Snooze / Done only without `unlock`), the Bin. `main/reminders.js` `check(now)` is called with a time, so nothing waits |
 | `recordings.test.js` | voice recordings on disk while made (1.2.4): Save, the X, close / page crash / lock / quit mid-recording, a real crash and the next start, a deleted note, a sealed note (chip after the PIN), the sweep |
 | `notes.test.js` | editing a note: title and what is an edit, drawing (cleaned, kept exactly while typing), dashes, zoom, word wrap off, favourites, Edit… title, the Bin |
 | `colours.test.js` | paper colours, several notes / Edit… colour, new notes' colours (picked list, no repeat, old settings) |
@@ -48,6 +50,7 @@ code (regex) is for rules a test can't easily click through (each such line says
 | `list-logic.test.js` | the list's rules without a browser (tests/helpers/list-kit.js) |
 | `list-ui-cards` / `-pictures` / `-groups` / `-picking` / `-locks-bin` / `-unlock` / `-crypt` / `-settings` | the notes list in Chromium against the real main process |
 | `note-ui.test.js` | a note window in Chromium: text toolbar keeps the selection, word wrap off, the voice recorder (fake microphone), Speak to text and Transcribe (1.3.1, a stand-in main and engine), copy / cut / paste of checklist lines and formatting (1.3.2), checklist box sizes and empty lines (1.3.15), checklist options (1.3.19: click, drag, ticked to the bottom, one box size, the ⋯ menu switches, Undo) |
+| `note-ui-pins.test.js` | app pins in a note window (1.4.5, `src/note/pin-apps.js`): right-click the pin → "Pin over", A to Z with workspaces, what each tick saves, a ticked app greys its parts, "not open", Every app = the normal pin, nothing ticked = unpinned, the pin's look and tooltip, a click unpins and forgets the apps, "No apps open" / "Couldn’t list your apps" |
 
 ## Helpers (`tests/helpers/`)
 - `app.js`: the real main process in the test's process, under `tests/fake-electron`. `const app = require('./helpers/app')`

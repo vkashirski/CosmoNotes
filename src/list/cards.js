@@ -14,7 +14,8 @@
     groupMenu = K.later('groupMenu'), paintFxPause = K.later('paintFxPause'), trashNote = K.later('trashNote'),
     paintLockBar = K.later('paintLockBar'), openGroupView = K.later('openGroupView'),
     closePanel = K.later('closePanel'), paintPanel = K.later('paintPanel'), newNote = K.later('newNote'),
-    clearSearch = K.later('clearSearch');
+    clearSearch = K.later('clearSearch'), openRemindSheet = K.later('openRemindSheet');
+  const R = window.COSMO_REMIND;
   // 1.3.27: evening colours (src/evening.js): each light paper's evening shade for the cards. --evp on the body says how far
   // into the evening it is (main's clock); a card whose note has them on (.eve) mixes in by it (list-cards.css)
   const EVE = window.COSMO_EVENING;
@@ -279,10 +280,12 @@
       h('span', { class: 'when', title: `Created ${full(n.createdAt)}\nLast edited ${full(n.updatedAt)}` },
         h('span', { class: 'cal', html: ICON.cal }), when(n.createdAt)),
       n.open ? h('span', { class: 'badge', title: 'Open on your desktop' }, h('i'), 'open') : null,
+      overTag(n),
       n.forNow || n.openUnlocked ? h('span', { class: 'ulk', title: n.forNow ? 'Unlocked until CosmoNotes restarts' : 'Unlocked for now. It locks again when you close the note', html: ICON.unlock }) : null,
+      remIcon(n, shut),
       acts);
     const card = h('div', {
-      class: 'card' + (n.eve ? ' eve' : ''), // 1.3.27: evening colours
+      class: 'card' + (n.eve ? ' eve' : '') + (n.remHidden ? ' remhid' : ''), // 1.3.27: evening colours; 1.4.1: hidden by a reminder
       'data-color': n.color,
       'data-font': n.font,
       'data-key': key,
@@ -291,7 +294,7 @@
       title: n.open ? 'Click to bring to front · Ctrl+click to select · right-click for more' : 'Click to open · Ctrl+click to select · right-click for more',
       onclick: (e) => { if (pickCard(e, key)) return; S.list.openNote(n.id); },
       oncontextmenu: (e) => { e.preventDefault(); if (bulkMenu(e, key)) return; noteMenu(n, e); },
-    }, h('div', { class: 'strip' }), n.pinned ? h('span', { class: 'pin', title: 'Pinned on top' }) : null, cardBody(n), foot, lockBtn('note', n), starBtn(key));
+    }, h('div', { class: 'strip' }), n.pinned ? h('span', { class: 'pin', title: n.appPinned ? 'Pinned over some apps' : 'Pinned on top' }) : null, cardBody(n), foot, lockBtn('note', n), starBtn(key));
     card.addEventListener('dragstart', (e) => startDrag(e, { id: n.id, kind: 'note' }, card));
     card.addEventListener('dragend', endDrag);
     dropTarget(card,
@@ -309,6 +312,25 @@
     return card;
   }
 
+  // 1.4.5: pinned over some apps only (main/app-pin.js): "Over Excel", "Over Excel +2"; the apps on hover. A note its lock
+  // hides gets no names from main, only that it has some
+  function overTag(n) {
+    if (!n.appPinned) return null;
+    const list = n.pinApps || [];
+    const tip = list.length ? `On top only over:\n${list.map((r) => (r.part ? `${r.app}: ${r.part}` : r.app)).join('\n')}` : 'On top only over some apps';
+    const text = list.length ? `Over ${list[0].app}${list.length > 1 ? ` +${list.length - 1}` : ''}` : 'Over apps';
+    return h('span', { class: 'over', title: tip }, text);
+  }
+  // 1.4.1: the card's clock: what its reminders are (on hover), red while one rings; a click opens them (not on a shut card)
+  function remIcon(n, shut) {
+    if (!R || !n.reminders || !n.reminders.length) return null;
+    const now = Date.now();
+    const ring = n.reminders.some((r) => r.firing);
+    const tip = [...n.reminders.map((r) => R.line(r, now)), n.remHidden ? 'Hidden until it goes off' : ''].filter(Boolean).join('\n');
+    const cls = 'rem' + (ring ? ' ring' : '') + (n.remHidden ? ' hid' : '');
+    if (shut) return h('span', { class: cls, title: tip, html: ICON.clock });
+    return h('button', { class: cls, title: `${tip}\nClick to change`, html: ICON.clock, onclick: (e) => { e.stopPropagation(); openRemindSheet(n); } });
+  }
   // the little picture of a group, in its chosen look
   function groupArt(g, notes) {
     const sorted = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
@@ -496,6 +518,18 @@
       sortItems(items).forEach((it, i) => els.push(it.kind === 'group' ? groupEl(it.group, it.notes, i, used) : noteEl(it.note, i, !!it.note.groupId, used)));
       done();
       if (f.hidden) $('#tip').textContent = f.hidden === 1 ? '1 more is in a locked group. Unlock all to see it.' : `${f.hidden} more are in a locked group. Unlock all to see them.`;
+      if ($('#viewNotes').scrollTop !== scroll) $('#viewNotes').scrollTop = scroll;
+      return;
+    }
+
+    // 1.4.1: the reminders filter: every note with a reminder (and the search), the ones ringing first, then the soonest
+    if (V.remOnly) {
+      const due = (n) => (n.reminders.some((r) => r.firing) ? -1 : (R && R.nextOf(n.reminders)) ?? Infinity);
+      const found = liveNotes.filter((n) => n.reminders && n.reminders.length && (!q || `${n.title || ''}\n${n.text || ''}\n${n.pics || ''}`.toLowerCase().includes(q)));
+      found.sort((a, b) => due(a) - due(b));
+      if (!found.length) els.push(q ? emptyState('Nothing found', `No note with a reminder contains “${V.query.trim()}”.`) : emptyState('No reminders', 'Add one in a note (Add → Reminder), or right-click a note here.'));
+      found.forEach((n, i) => els.push(noteEl(n, i, !!n.groupId, used)));
+      done();
       if ($('#viewNotes').scrollTop !== scroll) $('#viewNotes').scrollTop = scroll;
       return;
     }

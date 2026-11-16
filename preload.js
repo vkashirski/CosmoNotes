@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('sticky', {
   onWinState: (cb) => ipcRenderer.on('note:win-state', (e, s) => cb(s)),
   hover: (over) => ipcRenderer.send('note:hover', !!over),
   ctAwake: (on) => ipcRenderer.send('note:ct-awake', !!on), // 1.3.34: the mouse is on the click-through button
+  pinApps: () => inv('pin:apps'), // 1.4.5: the pin's right-click list: the apps open now (main/app-pin.js)
   saveAttachment: (bytes, ext) => inv('att:save', bytes, ext),
   // 1.2.4: a voice recording is written to disk while it is made
   recStart: () => inv('rec:start'),
@@ -42,8 +43,14 @@ contextBridge.exposeInMainWorld('sticky', {
   onStt: (cb) => ipcRenderer.on('stt:event', (e, m) => cb(m)),
   pickImages: () => inv('att:pick-images'),
   openAttachment: (url) => inv('att:open', url),
+  photoBytes: (url) => inv('att:image', url), // 1.4.3: Copy image (main/ipc-files.js)
+  copyImage: (png) => inv('clip:image', png),
   openExternal: (url) => inv('open-external', url),
   showList: () => inv('list:show'),
+  // 1.4.1: reminders (main/reminders.js): save this note's, Snooze / Done one that rings, and hear when one goes off
+  remindSet: (list, msgs) => inv('remind:set', list, msgs),
+  remindAct: (id, what, mins) => inv('remind:act', id, what, mins),
+  onRemindRing: (cb) => ipcRenderer.on('remind:ring', (e, ids) => cb(ids)),
   // 1.1.15: the drawing toolbar in its own little window, outside the note
   ink: {
     show: (s) => ipcRenderer.send('ink:show', s),
@@ -78,6 +85,8 @@ contextBridge.exposeInMainWorld('sticky', {
     lockAll: () => inv('list:lock-all'),
     unlockNow: (id, pw) => inv('list:unlock-now', id, pw), // 1.1.47: right-click → Unlock (until CosmoNotes quits)
     relock: (id) => inv('list:relock', id), // ... and Lock again
+    remindGet: (id) => inv('list:remind-get', id), // 1.4.1: a note's reminders, with their messages
+    remindSet: (id, list, msgs) => inv('list:remind-set', id, list, msgs),
   },
   groups: {
     make: (dragId, targetId) => inv('groups:make', dragId, targetId),
@@ -125,8 +134,9 @@ contextBridge.exposeInMainWorld('sticky', {
     remove: (id) => inv('stt:remove', id),
     onChanged: (cb) => ipcRenderer.on('stt:changed', (e, s) => cb(s)),
   },
-  // 1.4.0: Settings → About → updates (main/ipc-update.js)
-  update: {
+  // 1.4.0: Settings → About → updates (main/ipc-update.js). 1.4.1: `updates`, not `update`: that name is the note
+  // window's save (above), and the second one in this object replaced it
+  updates: {
     status: () => inv('update:status'),
     check: () => inv('update:check'),
     install: () => inv('update:install'),

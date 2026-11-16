@@ -97,6 +97,18 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
   white-space: nowrap;
 }
 .newbtn:hover { transform: translateY(-1px); }
+/* 1.4.6: new notes on their way (events.js newNote): the + turns into a spinning ring */
+.newbtn { position: relative; }
+.newbtn.busy { cursor: progress; }
+.newbtn.busy svg { visibility: hidden; }
+.newbtn.busy::after {
+  content: ''; position: absolute; left: 10px; top: 50%; width: 14px; height: 14px; margin-top: -7px;
+  box-sizing: border-box; border-radius: 50%; pointer-events: none;
+  border: 2px solid transparent; border-top-color: currentColor; border-right-color: currentColor;
+  animation: newSpin .7s linear infinite;
+}
+@keyframes newSpin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) { .newbtn.busy::after { animation-duration: 2s; } }
 .newbtn svg { stroke-width: 2.6; width: 14px; height: 14px; }
 
 /* ---------- tabs ---------- */

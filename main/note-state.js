@@ -1,4 +1,5 @@
 'use strict';
+const REMIND = require('../src/reminders');
 const { APP_NAME, BIG, DEFAULT_H, MIN_H, MIN_W, ROLLED_H } = require('./constants');
 const { paperOf } = require('./evening');
 const { isLocked } = require('./locks');
@@ -19,11 +20,26 @@ const titleOf = (n, revealed = false) => {
 };
 
 // ------------------------------------------------------------------ note windows
+// 1.4.1: a note whose reminder is ringing stays on top of other windows until Snooze or Done (main/reminders.js)
+// 1.4.5: a note pinned over apps whose app is open but not in front sits just above that app instead (win.appBehind,
+// main/app-pin.js)
+const onTop = (n, win) => (!!n.pinned && !(win && win.appBehind)) || REMIND.ringing(n.reminders).length > 0;
+// 1.4.2: pinned notes over each other: the one pinned or clicked last is on top. Windows puts a window above all the
+// other on-top windows each time setAlwaysOnTop(true) is called on it, so it is called here only when a note's on-top
+// really changes, and enforcePinned (note-window.js) puts the pinned ones back in order: win.raisedAt, stamped when a
+// note goes on top, is clicked ('focus') or is brought up (bringToFront, a reminder).
+let raises = 0;
+const raised = (win) => { win.raisedAt = ++raises; };
+function setOnTop(w, on) {
+  if (w && !w.isDestroyed() && w.isAlwaysOnTop() !== on) w.setAlwaysOnTop(on, 'screen-saver');
+}
 function applyState(win, n) {
   if (win.isDestroyed()) return;
   win.setOpacity(n.opacity);
-  win.setAlwaysOnTop(n.pinned, 'screen-saver');
-  for (const k of BAR_KINDS) if (win[`${k}Win`] && !win[`${k}Win`].isDestroyed()) win[`${k}Win`].setAlwaysOnTop(n.pinned, 'screen-saver');
+  const top = onTop(n, win);
+  if (top && !win.isAlwaysOnTop()) raised(win);
+  setOnTop(win, top);
+  for (const k of BAR_KINDS) setOnTop(win[`${k}Win`], top);
   win.setBackgroundColor(paperOf(n)); // 1.3.27: its evening colour in the evening
   applyClickThrough(win, n);
   setWinTitle(win, n);
@@ -73,4 +89,4 @@ function setRolled(win, n) {
     win.setSize(b.width, n.bounds?.height || DEFAULT_H);
   }
 }
-module.exports = { applyClickThrough, applyClickThroughAll, applyState, clickThroughNow, setRolled, setWinTitle, titleOf };
+module.exports = { applyClickThrough, applyClickThroughAll, applyState, clickThroughNow, raised, setRolled, setWinTitle, titleOf };

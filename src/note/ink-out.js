@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 11 of 12: the toolbars outside the note (their own little windows), the eraser for whole strokes
+// CosmoNotes note window, part 11 of 14: the toolbars outside the note (their own little windows), the eraser for whole strokes
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -14,7 +14,9 @@
   // close to one of the note's sides it sticks to it and follows the note around; further away it stays put.
   // Dropped back on the note, it comes back inside. The window is made (hidden) when drawing starts, so
   // dragging out is instant, and closed when drawing ends. Where it was is remembered (localStorage
-  // inkBarOut: { mode: 'dock', side, off } or { mode: 'free', x, y }), so next time it opens there again.
+  // inkBarOut: { mode: 'dock', side, off } or { mode: 'free', dx, dy }), so next time it opens there again. 1.4.2: a loose
+  // one is kept as dx, dy from the note (main/ink-geometry.js fromNote), so it opens next to whichever note opens it; an
+  // older { mode: 'free', x, y } was a spot on the screen (maybe on another monitor): it is dropped, and opens inside.
   // 1.1.16: the text toolbar can go outside too, the same way (its own window, 'cosmoTextBar'): barOut() makes
   // one of these for each toolbar. `kind` goes with every message to main.js ('ink' or 'text').
   function barOut({ el, kind, frame, title, key, mover, onEsc = null }) {
@@ -25,7 +27,7 @@
     let saved = null;
     let sizeObs = null;
     let ready = Promise.resolve(); // the styles in its window have loaded
-    try { const v = JSON.parse(localStorage.getItem(key) || 'null'); if (v && (v.mode === 'dock' || v.mode === 'free')) saved = v; } catch { /* fine */ }
+    try { const v = JSON.parse(localStorage.getItem(key) || 'null'); if (v && (v.mode === 'dock' || (v.mode === 'free' && Number.isFinite(v.dx) && Number.isFinite(v.dy)))) saved = v; } catch { /* fine */ }
     const remember = (v) => {
       saved = v;
       try { if (v) localStorage.setItem(key, JSON.stringify(v)); else localStorage.removeItem(key); } catch { /* fine */ }

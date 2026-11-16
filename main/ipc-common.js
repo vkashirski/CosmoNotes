@@ -4,6 +4,7 @@ const { EDITABLE, WHILE_HIDDEN } = require('./constants');
 const { isLocked, viewOf } = require('./locks');
 const { notifyList } = require('./list-notify');
 const { applyState, setRolled, setWinTitle } = require('./note-state');
+const appPin = require('./app-pin');
 const { S } = require('./state');
 
 // ------------------------------------------------------------------ IPC
@@ -22,6 +23,8 @@ function applyPatch(e, patch) {
   const clean = {};
   for (const k of keys) if (k in patch) clean[k] = patch[k];
   if (clean.clickThrough) clean.pinned = true; // 1.3.34: a click-through note is pinned (store.js normalize: unpinning ends it)
+  // 1.4.5: pinned over apps is a kind of pin (store.js normalize: unpinning forgets the apps)
+  if (Array.isArray(clean.pinApps) && clean.pinApps.length) clean.pinned = true;
   const contentChanged = ('html' in clean && clean.html !== note.html) || ('title' in clean && (clean.title || '') !== note.title)
     || ('ink' in clean && JSON.stringify(clean.ink || null) !== JSON.stringify(note.ink || null));
   const rolledChanged = 'rolled' in clean && !!clean.rolled !== note.rolled;
@@ -33,6 +36,7 @@ function applyPatch(e, patch) {
   else if ('text' in clean || 'title' in clean) setWinTitle(win, n);
   if (rolledChanged && n.rolled && win.isMaximized()) win.unmaximize(); // rolling up a maximised note
   if (rolledChanged) setRolled(win, n);
+  if ('pinned' in clean || 'pinApps' in clean) appPin.changed(); // 1.4.5: shown or hidden by the app in front
   notifyList();
   return viewOf(n, win);
 }

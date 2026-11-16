@@ -1,6 +1,6 @@
 'use strict';
 // What a window may and may not do (main process): saving attachments (images only) and reading them back through
-// stickyfile:// (no path tricks), opening links (web pages only), permissions (the microphone only), and which extra
+// stickyfile:// (no path tricks) and for Copy image, opening links (web pages only), permissions (the microphone only), and which extra
 // windows a note may open (its toolbars and pop-ups; the list none).
 const assert = require('assert');
 const app = require('./helpers/app');
@@ -16,6 +16,21 @@ const app = require('./helpers/app');
   assert.ok(resp.url && resp.url.startsWith('file://'), 'attachment served');
   assert.equal((await E.__proto({ url: 'stickyfile://att/..%2F..%2Fsettings.json' })).status, 404, 'no path tricks');
   await assert.rejects(async () => H['att:save'](ev(w), new Uint8Array([1]), 'exe'), 'only pictures and sound can be saved');
+  // Copy image (1.4.3): main reads the note's picture for it (the note's file:// page can't) and writes the clipboard
+  assert.deepEqual([...await H['att:image'](ev(w), url)], [1, 2, 3], 'a saved photo is read for Copy image');
+  assert.equal(await H['att:image'](ev(w), 'stickyfile://att/..%2F..%2Fsettings.json'), null, 'no path tricks there either');
+  const clip = await H['att:save'](ev(w), new Uint8Array([4]), 'webm');
+  assert.equal(await H['att:image'](ev(w), clip), null, 'only pictures');
+  assert.equal(await H['att:image'](ev(w), 'file:///C:/Windows/win.ini'), null, 'no other files');
+  assert.equal(await H['att:image']({ sender: {} }, url), null, 'only for a note window');
+  const fetchWas = E.net.fetch;
+  E.net.fetch = async (u) => ({ ok: true, arrayBuffer: async () => new Uint8Array([9, u.length]).buffer });
+  assert.deepEqual([...await H['att:image'](ev(w), 'https://example.com/a.png')], [9, 25], 'a picture from a web page: main fetches it');
+  E.net.fetch = fetchWas;
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 13, 10]);
+  assert.equal(await H['clip:image'](ev(w), png), true); assert.deepEqual(E.__clip.bytes, [...png], 'the PNG is on the clipboard');
+  assert.equal(await H['clip:image'](ev(w), new Uint8Array([1, 2, 3, 4, 5])), false, 'not a picture: nothing copied');
+  assert.equal(await H['clip:image'](ev(w), 'x'), false);
 
   // ---- links
   await H['open-external'](ev(w), 'javascript:alert(1)'); assert.equal(E.__opened, undefined, 'no javascript: links');

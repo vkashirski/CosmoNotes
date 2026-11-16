@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 4 of 12: links, picture descriptions, tables, photos (paste / drop), clicks inside the note
+// CosmoNotes note window, part 4 of 14: links, picture descriptions, tables, photos (paste / drop), clicks inside the note
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -341,6 +341,41 @@
     return c.font && c.font !== V.note.font && FACE[c.font] ? sanitize(withFace(html, FACE[c.font]), true) : html;
   }
 
+  // 1.4.4: another app's HTML pasted into a list line (a checklist too): each of its lines becomes a line of that list, at
+  // that level. Pasted as it came, a list with a paragraph or a wrapper around it (a chat, a web page) went inside the line
+  // as a list of its own: boxes inside a box. Its own nesting and numbering go (the lines join the list you paste into);
+  // one line pastes into the line itself. A copy from a note (CLIP) keeps its lists as they were.
+  const LINE_BLOCK = /^(P|DIV|LI|UL|OL|H[1-4]|BLOCKQUOTE|PRE)$/;
+  function inListLine() {
+    const s = getSelection();
+    const n = s.rangeCount ? s.getRangeAt(0).startContainer : null;
+    const el = n && (n.nodeType === 1 ? n : n.parentElement);
+    const li = el && el.closest('li');
+    return !!li && editor.contains(li) && !el.closest('td,th');
+  }
+  function asListLines(html) {
+    const box = document.createElement('div');
+    box.innerHTML = html;
+    const lines = [];
+    let cur = null;
+    const walk = (node) => {
+      for (const ch of [...node.childNodes]) {
+        if (ch.nodeType === 1 && LINE_BLOCK.test(ch.nodeName)) { cur = null; walk(ch); cur = null; continue; }
+        if (!cur) { cur = document.createElement('li'); lines.push(cur); }
+        cur.append(ch);
+      }
+    };
+    walk(box);
+    const real = lines.filter((li) => /[^\s​]/.test(li.textContent) || li.querySelector('br,img,hr,table'));
+    for (const li of real) { // spaces left at either end by the blocks it came out of
+      if (li.firstChild && li.firstChild.nodeType === 3) li.firstChild.data = li.firstChild.data.replace(/^\s+/, '');
+      if (li.lastChild && li.lastChild.nodeType === 3) li.lastChild.data = li.lastChild.data.replace(/\s+$/, '');
+    }
+    if (!real.length) return html;
+    if (real.length === 1) return real[0].innerHTML;
+    return '<ul>' + real.map((li) => li.outerHTML).join('') + '</ul>';
+  }
+
   V.plainPaste = false;
   editor.addEventListener('paste', (e) => {
     const cd = e.clipboardData;
@@ -358,7 +393,7 @@
       const href = t.toLowerCase().startsWith('www.') ? 'https://' + t : t;
       document.execCommand('insertHTML', false, `<a href="${esc(href)}">${esc(t)}</a>&nbsp;`);
     } else if (html && !V.plainPaste) {
-      document.execCommand('insertHTML', false, sanitize(html));
+      document.execCommand('insertHTML', false, inListLine() ? asListLines(sanitize(html)) : sanitize(html));
     } else if (text) {
       document.execCommand('insertText', false, text);
     }
@@ -424,15 +459,21 @@
     else openPhoto(img);
   });
   // 1.1.22 (sixth round): right-click a photo → Copy image (as a PNG, so it pastes anywhere: chats, Paint, Word…)
+  // 1.4.3: this page may not read a saved or web photo itself (another origin: fetch() fails, the canvas is locked), so
+  // main reads it and puts the PNG on the clipboard (main/ipc-files.js att:image, clip:image).
   async function copyPhoto(img) {
     const src = img.getAttribute('src') || '';
     try {
-      // a saved photo is read straight from its file (drawing the <img> itself onto a canvas isn't allowed for it)
-      const pic = src.startsWith('stickyfile:') ? await createImageBitmap(await (await fetch(src)).blob()) : (await img.decode().catch(() => {}), img);
+      let pic = img; // a data: picture is this page's own
+      if (!/^data:image\//i.test(src)) {
+        const bytes = await api.photoBytes(src);
+        if (!bytes) throw new Error('no picture');
+        pic = await createImageBitmap(new Blob([bytes]));
+      } else await img.decode();
       const c = document.createElement('canvas'); c.width = pic.naturalWidth || pic.width; c.height = pic.naturalHeight || pic.height;
       c.getContext('2d').drawImage(pic, 0, 0);
       const blob = await new Promise((ok, no) => c.toBlob((b) => (b ? ok(b) : no(new Error('no image'))), 'image/png'));
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      if (!(await api.copyImage(new Uint8Array(await blob.arrayBuffer())))) throw new Error('not copied');
       toast('Picture copied');
     } catch { toast('Couldn’t copy this picture'); }
   }

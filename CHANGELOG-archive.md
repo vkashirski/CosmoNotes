@@ -6,6 +6,186 @@ file (`tests/release.test.js` checks that every version is in one of the two fil
 Renumbered in 1.1.41: each heading says its old number (the table is at the top of `CHANGELOG.md`). Version numbers inside
 the entries are the old ones.
 
+## 1.4.6 – 16 November 2026
+
+A ring spins around + while a new note is on its way, so a slow PC shows that the click landed.
+
+- **Why:** on a slow PC a new note's window takes a few seconds to show. Nothing showed that the click had landed, so
+  the owner clicked again and got several notes at once.
+- **The ring:** the + button in the note (and Ctrl+N there) and the list's New note button spin a ring until every note
+  they asked for has shown (`.busy`, `newSpin`: only `transform` animates, so it stays cheap on a slow PC). Every click
+  still makes a note: spamming + is allowed (the owner's wish).
+- `createNote` (`main/note-window.js`) returns a promise of the note's id, settled when its window shows or closes first
+  (`win.ready`); `note:new` and `list:new` return it.
+- Tests: `windows.test.js` (quick clicks while windows load: one note each, each answered when its own note shows),
+  `note-ui.test.js` (the ring spins until all have shown).
+
+## 1.4.5 – 15 November 2026
+
+Notes that stick to an app: right-click the pin and tick the apps a note belongs to. The note mirrors its app: on top
+while it is in front, behind the other apps while it is open behind them, gone while it is minimised or closed.
+
+- **App pins** (`main/app-pin.js`, `src/note/pin-apps.js`). Right-click a note's pin: "Pin over" lists Every app (the
+  normal pin) and the apps open now, A to Z, each with its workspaces or files under it (a VS Code folder, an Excel
+  file). Tick one or more. A ticked app covers its workspaces. An app the note is pinned over that isn't open stays in
+  the list, ticked, with "not open". Nothing ticked = not pinned. A click on the pin still unpins, and forgets the apps.
+  The pin gets a tile with the app's first letter (V for VS Code, + for several apps; the owner's pick of six designs)
+  and lists the apps in its tooltip. The list's card says "Over Excel +1".
+- **How main knows the app in front:** `desktopCapturer.getSources({ types: ['window'] })` lists the windows with their
+  titles, front to back. Our own windows are skipped by their handle, and the first one left is the app in front. Its
+  title gives the app (the last part: "… - Visual Studio Code") and the workspace (the part before it). Browsers get no
+  workspaces (their title changes with each page). Nothing native, nothing for Smart App Control to block. The check runs
+  every 0.5 s, only while an open note is pinned over apps. If the list can't be read, every note shows.
+- **It drops in** (the owner's pick of three): coming, the note fades in while it drops 10 px into its place (0.18 s);
+  going, it fades out rising (0.13 s), then hides and is put back. Only its opacity and place change for a moment
+  (`animate`); its saved place never does (`rememberBounds` now also skips an unchanged place: no disk write per switch).
+- **Mirrors its app** (the owner's wish): one of its apps in front = on top, like any pinned note. Its app open but another
+  app in front = the note stays on screen, not on top but just above its app's window (`win.appBehind`: no always-on-top,
+  `moveAbove` the app's window), so whatever covers the app covers the note. Its app minimised or closed (not in the list)
+  = hidden, and back when the app (or that workspace) opens again.
+- **Hidden, not closed:** the window hides (`win.appHidden`) and stays open, so nothing is lost. `enforcePinned` leaves a
+  hidden one hidden and one behind its app behind. It shows anyway while its own window has the focus, while a reminder rings, and after you open it from the list,
+  Bring notes to front, or Reopen closed note (until another window comes in front). A note that opens pinned over apps
+  waits for the first check, so it doesn't flash.
+- **Data:** `note.pinApps` (`[{ app, part }]`, part null = any window of the app), only while pinned (store.js
+  `cleanPinApps`). Not an edit. A hidden locked note may change it (`WHILE_HIDDEN`, a kind of pin); its card gets no
+  names. New IPC `pin:apps` (the open apps, for the list).
+- Not confirmed on a real PC yet: that Windows gives the windows front to back, that minimised windows are left out of
+  the list (WebRTC skips them; if not, a minimised app would count as open behind), and the check's cost. Also: an app whose
+  title doesn't end with its name groups by the wrong part, and another app's always-on-top window counts as "in front".
+
+## 1.4.4 – 15 November 2026
+
+A list pasted from another app into a checklist line becomes lines of the checklist, not boxes inside a box.
+
+- **Fix:** a list copied from a chat or a web page comes with a paragraph or wrappers around it. Chromium's
+  `insertHTML` only merges a pasted list into the list you paste into when the piece starts with the list itself;
+  otherwise the whole piece went inside the line, a list of its own, and in a checklist every one of its lines got a box
+  inside the line's box. Now other apps' HTML pasted into a list line (`inListLine`) is turned into one flat list first
+  (`asListLines` in `src/note/content.js`): every paragraph, heading and list line is a line, the list's own nesting and
+  numbers go, and the lines join the list you paste into, at that level. One line pastes into the line itself. A copy
+  from a note keeps its lists as they were. One Undo takes the paste back.
+
+## 1.4.3 – 15 November 2026
+
+Right-click a photo → Copy image works again: the picture pastes into chats, Paint, Word and other apps.
+
+- **Fix:** Copy image always said "Couldn’t copy this picture". The note window is a `file://` page and read the photo
+  with `fetch('stickyfile://…')`; that is another origin and the scheme has no CORS, so the fetch failed (and drawing
+  the `<img>` itself on a canvas is refused for the same reason; a picture pasted from a web page, with its `https://`
+  address, failed that way). Now main reads the picture (`att:image` in `main/ipc-files.js`: a saved photo, sealed ones
+  only after the PIN, or a web picture through `net.fetch`; nothing for a hidden locked note's window), the note turns
+  it into a PNG at full size (any format: PNG, JPEG, GIF, WebP, BMP), and main writes it with Electron's `clipboard`
+  (`clip:image`), which needs no focus or clipboard permission.
+
+## 1.4.2 – 15 November 2026
+
+Pinned notes stack the way you'd expect, Note settings opens next to its note, and text sizes are numbers.
+
+- **Pinned notes over each other:** the one you pinned or clicked last stays on top. Every 2.5 s `enforcePinned` called
+  `setAlwaysOnTop(true)` on each pinned note (but not the one with the keyboard), and Windows puts a window above the
+  other on-top windows at each call, so the notes ended up in the order their windows were opened, and a note you were
+  typing in went under the others. Now main stamps `win.raisedAt` when a note goes on top, is clicked (`focus`) or is
+  brought up (Bring notes to front, a reminder), and `enforcePinned` calls them oldest first. `applyState` calls
+  `setAlwaysOnTop` only when on-top really changes (a new colour or see-through no longer brings a note up).
+- **Note settings (and every pop-up or toolbar outside a note) opens next to its note.** A loose one's place was kept
+  as a spot on the screen, in `localStorage`, which every note shares: Note settings opened at the same spot for any
+  note, even on another monitor. Now it is kept from the note (`{ mode: 'free', dx, dy }`) and opens on that note's
+  monitor (`nearNote`); places saved by older versions are dropped once (it opens inside the note). One stuck to a side
+  stays on its note's monitor at the monitor's edge (it went onto the next monitor). Dragged, it can still go anywhere.
+- **Text sizes in the A toolbar are numbers:** 0.7, 0.8, 1.0, 1.2, 1.5, 1.9 (times the note's text; they were Small,
+  Normal, Big and Huge, font sizes 2, 3, 5, 6; now 1–6). The size at the cursor or the selection's start is lit; a size
+  picked for what you type next stays lit until the cursor moves. Sizes themselves didn't change (0.82, 1.45 and 1.85
+  show rounded).
+
+## 1.4.1 – 14 November 2026
+
+Reminders: a note can pop up when you need it. At its time it opens on the monitor you're using, stays on top, glows,
+wobbles once and plays a calm sound, with Snooze and Done. Also a fix for 1.4.0: notes didn't save while you typed.
+
+- **Fix (1.4.0):** `preload.js` had two `update` keys in `window.sticky`. The second (1.4.0's updates, for Settings →
+  About) replaced the first, the note window's save (`api.update(patch)`), so typing, the title, colour and every other
+  change in a note threw instead of saving; only closing the note (its unload's `updateSync`) saved. The updates are
+  `window.sticky.updates` now, and `code-structure.test.js` fails on a name used twice in one object of `preload.js`.
+- **Adding** (`src/remind-ui.js`, the same panel in both windows): Add → Reminder in a note, or right-click a note in
+  All notes → Reminders…, or a card's clock. Quick picks (In 20 min, In 1 hour, Today 15:00 while it's ahead, Tomorrow
+  09:00, Next Monday 09:00) or Custom (date + time); repeat: every day, weekdays, every week (pick days), every month, or
+  every N minutes (5 or more) / hours / days / weeks, ending never, on a date or after N times; an optional message; a
+  sound (10 calm nature sounds, made with Web Audio, no files; ▶ plays it); "Hide until it goes off"; on a locked note
+  "Unlock to dismiss". A note can have several (up to 30); each change saves at once.
+- **Going off** (`main/reminders.js`, `src/note/remind.js`): one timer in main for the next reminder (at most a minute
+  ahead; waking the PC checks at once). The note's window opens (or comes up where it is, unrolled) without taking the
+  keyboard, on top of other windows while it rings, and its taskbar button flashes. A window that wasn't open appears
+  where it was if that's on the monitor with the mouse, else in that monitor's top-right corner. A strip under the top
+  bar shows the message (or "Missed at 14:00"), Snooze 10 min (the arrow: 5 min, 30 min, 1 hour, tomorrow 09:00) and
+  Done. The sound plays when it goes off and again after each snooze. Done ends a one-off; a repeat goes on to its next
+  time. A snooze moves only that time.
+- **Missed**: over a minute late (the PC was off or asleep, CosmoNotes closed) = "Missed at …"; a repeat that missed
+  several times rings once, for the latest. One still ringing when CosmoNotes quit comes back at start, quietly.
+- **Hiding**: while one of its reminders has "hide" on and none rings, the note's window is closed and All notes leaves
+  it out (also from the counts, groups and search), unless Settings → Reminders → Show hidden notes is on or the new
+  reminders button next to the search is. That button shows only notes with reminders, ringing ones first, then the
+  soonest; hidden ones are faded. Every card with a reminder has a small clock (what they are on hover, red while one rings).
+- **Locked notes**: the messages are secret like the note's words (`note.remindMsg`, in `SECRET` and crypt.js
+  `SECRET_FIELDS`: sealed with the note, blank in a hidden window and never on a card); the times stay readable, so a
+  reminder goes off before the PIN is typed. A hidden locked note can't have its reminders changed (1.3.28), except
+  Snooze and Done when the reminder doesn't ask for the PIN.
+- **Settings → Reminders**: the sound (each reminder can pick its own), the volume, and Show hidden notes
+  (`remindSound`, `remindVolume`, `remindShowHidden`). Panic: notes the panic button closed stay closed while it keeps
+  them; their reminder rings when they're opened again. A restored backup copy and a duplicate don't take the reminders.
+- **Line endings**: `.gitattributes` gives `/preload.js` (the top folder's only) CRLF; the old `preload.js` rule also
+  caught `src/engine/preload.js`, which is LF (CLAUDE.md). `tests/fake-electron/index.js` is LF again.
+- The rules are one file, `src/reminders.js` (like `src/evening.js`: both windows, main and store.js). The note window
+  has 13 parts (`src/note/remind.js` comes before `eraser-start.js`, whose start-up uses it).
+- Tests: `reminders.test.js` (the rules, and main's side), the strip and the panel in `note-ui.test.js`, cards, the
+  filter and the pop-up in `list-ui-cards.test.js`.
+
+## 1.4.0 – 14 November 2026
+
+Updates without building: CosmoNotes finds a newer version on GitHub and installs it with one click (Settings → About,
+or the tray). Releases are built and published by GitHub Actions; `release.bat` sends one.
+
+- **In the app** (`main/updater.js`, `main/ipc-update.js`): Settings → About has Updates (Check for updates; Version X
+  is ready + Install; the download's progress and Cancel; Couldn't download / Couldn't start + Open the download page
+  and Try again) and a "Check for updates" switch (`settings.updateCheck`, on): the installed app checks 30 s after it
+  starts and once a day (an hourly tick, so a PC that slept still checks). A quiet check that fails shows nothing. A
+  newer version puts a dot on the Settings tab and About's heading, and "Update to X…" in the tray menu (it opens
+  Settings → About).
+- **The feed**: `latest.yml` from the newest GitHub release (electron-builder writes it). Only main goes online, only to
+  `github.com/vkashirski/CosmoNotes/releases`. The file name must be `CosmoNotes-Setup-<version>.exe`, with a size and
+  a sha512.
+- **Install** asks first, then downloads to `%TEMP%\CosmoNotes-update` as `.part`, checks size + sha512 (a wrong file
+  is deleted, never started), and quits like Quit: every window saves on unload, will-quit finishes recordings and
+  flushes the store, and only then the installer starts (`--updated /S --force-run`: silent, and it opens CosmoNotes
+  again with the notes where they were). Not during a voice recording or voice to text ("busy"); one that starts
+  during the download is waited for. If Windows refuses the installer (Smart App Control, antivirus), CosmoNotes opens
+  again by itself (`--update-failed=<version>`) at Settings → About: "Couldn't start the update." Installers from
+  earlier updates are deleted at start. `npm start` can check but not install.
+- **Releases** (`.github/workflows/release.yml`): a pushed tag `v<version>` runs `npm test` with the browser tests on
+  Linux, then builds on Windows (`npm ci`, `--publish never`), checks that `CosmoNotes.exe` is Electron's own
+  `electron.exe`, and only then publishes the installer, its blockmap and `latest.yml` (`gh release create`) with this
+  CHANGELOG entry as the notes (`build/release-notes.js`). `release.bat` checks you're on main with everything
+  committed and the version not released yet, asks, pushes main and the tag, and opens the Actions page.
+- **The installer is now `CosmoNotes-Setup-<version>.exe`** (dashes: GitHub renames spaces, which broke the name in
+  `latest.yml`). `package.json` names the GitHub repo (`build.publish`); `build.bat` builds with `--publish never` and
+  stays for local builds.
+- **Line endings are fixed in git** (`.gitattributes`): a fresh clone, or GitHub's Windows machine, gets the CRLF / LF
+  files CLAUDE.md lists. Before, git stored them all as LF and only the owner's working copy had the CRLF ones, so a
+  fresh clone failed `code-structure.test.js`.
+- Tests: `updates.test.js` (main's side, against a local server playing GitHub), About → updates in
+  `list-ui-settings.test.js`, `release.test.js` for the 1.4 series (1.3 ends at 1.3.38).
+
+## 1.3.38 – 12 November 2026
+
+Only a checklist box itself ticks its line (the owner's wish): a click under the box, beside a long line's other rows,
+or in the gap between the box and the words now just puts the caret there.
+
+- Cause: `boxAt` (checklists.js) took any press left of the words (the line's whole `padding-left` strip, all the way
+  down a wrapped line) as a press on the box. Now it hit-tests the box's own rectangle: the line's `::before` as
+  `alignChecks` placed and sized it (`getComputedStyle(li, '::before')` left / top / width / height, in the note's px:
+  `zoomOf`). The old check for lines nested in it is gone: their space is never inside the box.
+- Dragging a box to move its line starts the same way, so it also needs a press on the box itself.
+
 ## 1.3.37 – 12 November 2026
 
 The search rows (Notes, Bin, Settings) stay at the top while you scroll, and are now solid (the owner's report): what

@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 3 of 12: pop-overs, the header, the ⋯ menu, the Add and text panels, Undo / Redo
+// CosmoNotes note window, part 3 of 14: pop-overs, the header, the ⋯ menu, the Add and text panels, Undo / Redo
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -10,7 +10,7 @@
     startRecording = K.later('startRecording'), openDraw = K.later('openDraw'), relock = K.later('relock'),
     toggleLock = K.later('toggleLock'), saveInk = K.later('saveInk'), inkUndo = K.later('inkUndo'),
     inkRedo = K.later('inkRedo'), finishStroke = K.later('finishStroke'), toast = K.later('toast'),
-    speakToText = K.later('speakToText');
+    speakToText = K.later('speakToText'), openRemind = K.later('openRemind');
   // ================================================================ popovers
   // 1.1.16: the ⋯ menu and the Effects pop-up can be dragged (by their grip) and out of the note, like the
   // toolbars: id → { out: barOut(…), move: movable(…) } (filled in further down, next to the toolbars)
@@ -19,7 +19,7 @@
   // the others open, the newest on top (clicking one brings it to the front). Each closes with its own button (or X),
   // and the "close all" button in the top bar (shown when two or more are open, text toolbar included) or Esc
   // closes them all. The small dialogs (password, link, questions) still replace each other.
-  const EDIT_POPS = ['#menu', '#fxPop', '#ckPop', '#insert']; // 1.3.21: #ckPop, this note's checklists
+  const EDIT_POPS = ['#menu', '#fxPop', '#ckPop', '#insert', '#remPop', '#pinPop']; // 1.3.21: #ckPop, this note's checklists; 1.4.1: #remPop, its reminders; 1.4.5: #pinPop, the apps it is pinned over
   const DIALOGS = ['#pwPop', '#linkPop', '#askPop', '#descPop'];
   function closePop(id) {
     const p = $(id);
@@ -74,7 +74,8 @@
     // the text panel stays open while you click around the note; the A button (or Esc) closes it
     // 1.3.22: not for "close all" either: this closed the menus inside the note first, the button then hid (fewer than
     // two left) and its click never came, so a menu dragged out of the note stayed open
-    if (!e.target.closest('.pop, #btnMenu, #btnInsert, #btnText, #btnCloseAll')) closePops(true);
+    // (1.4.8: nor a right-click on the pin: it opens and closes the pin's list itself, src/note/pin-apps.js)
+    if (!e.target.closest('.pop, #btnMenu, #btnInsert, #btnText, #btnCloseAll') && !(e.button === 2 && e.target.closest('#btnPin'))) closePops(true);
     if (!e.target.closest('.ctx')) hideCtx();
   });
   // 1.1.20: switches one after another are grouped, so each sits right after its text and they still line up
@@ -101,9 +102,18 @@
   $('#btnCloseAll').addEventListener('click', closeAllPops);
 
   // ---------- header
-  $('#btnNew').addEventListener('click', () => { saveNow(); api.newNote(); });
+  // 1.4.6: every click makes a note; a ring spins around + until all the notes asked for have shown (seconds on a slow PC)
+  let coming = 0;
+  const newNote = () => {
+    saveNow();
+    coming++;
+    $('#btnNew').classList.add('busy');
+    api.newNote().finally(() => { if (--coming === 0) $('#btnNew').classList.remove('busy'); });
+  };
+  $('#btnNew').addEventListener('click', newNote);
   $('#btnClose').addEventListener('click', () => { saveNow(); api.close(); });
-  $('#btnPin').addEventListener('click', () => setProp(V.note.pinned ? { pinned: false, clickThrough: false } : { pinned: true }));
+  // (1.4.5: unpinning forgets the apps it was pinned over; right-click = the list of apps, src/note/pin-apps.js)
+  $('#btnPin').addEventListener('click', () => setProp(V.note.pinned ? { pinned: false, clickThrough: false, pinApps: [] } : { pinned: true }));
   // 1.3.34: click-through (base.js applyClickThrough, main/note-state.js). Turning it on pins the note. While it is on, the
   // window ignores clicks, but Windows still sends the mouse's moves: on this button they wake the window (ctAwake) until
   // the mouse leaves it, so this button can be clicked and nothing else can.
@@ -340,6 +350,27 @@
       f = v.includes('caveat') ? 'hand' : v.includes('nunito') ? 'round' : v.includes('augusta') ? 'medieval' : V.note.font;
     }
     $$('#fontSeg button').forEach((b) => b.classList.toggle('on', b.dataset.font === f));
+    const sz = sizeHere();
+    $$('#fsizeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.fsize === sz));
+  }
+  // 1.4.2: the size buttons (0.7 … 1.9 × the note's text, note-text.css font[size]) light the size of the words at the
+  // cursor or the selection's start: their nearest <font size>, none = 3 (1.0). A size picked with nothing selected is for
+  // what you type next: it isn't in the text yet, so it stays lit while the cursor stays put (nextSize).
+  let nextSize = null;
+  function selStart() {
+    const s = getSelection();
+    const r = s.rangeCount && editor.contains(s.getRangeAt(0).startContainer) ? s.getRangeAt(0) : V.savedRange;
+    if (!r || !editor.contains(r.startContainer)) return null;
+    return { r, node: r.startContainer, off: r.startOffset };
+  }
+  function sizeHere() {
+    const at = selStart();
+    if (!at) return '3';
+    if (nextSize && at.r.collapsed && at.node === nextSize.node && at.off === nextSize.off) return nextSize.s;
+    let el = at.node.nodeType === 1 ? (at.node.childNodes[at.off] || at.node) : at.node.parentElement;
+    if (el && el.nodeType !== 1) el = el.parentElement;
+    for (; el && el !== editor; el = el.parentElement) if (el.tagName === 'FONT' && el.hasAttribute('size')) return el.getAttribute('size');
+    return '3';
   }
   // the cursor is exactly where it was saved (then it's left alone: putting it back would forget the typing style)
   function caretIsSaved() {
@@ -404,9 +435,14 @@
     document.execCommand('foreColor', false, b.dataset.fore === 'inherit' ? RESET_COLOR : b.dataset.fore); // back to the note's normal ink colour, keeping bold/italic etc.
   })));
   $$('#textPop [data-hilite]').forEach((b) => b.addEventListener('click', () => onText(() => document.execCommand('hiliteColor', false, b.dataset.hilite))));
-  $$('#fsizeSeg button').forEach((b) => b.addEventListener('click', () => onText(() => document.execCommand('fontSize', false, b.dataset.fsize))));
+  $$('#fsizeSeg button').forEach((b) => b.addEventListener('click', () => onText((sel) => {
+    document.execCommand('fontSize', false, b.dataset.fsize);
+    const at = !sel && selStart();
+    nextSize = at ? { s: b.dataset.fsize, node: at.node, off: at.off } : null;
+  })));
   // clear formatting: the selected text; with nothing selected, what you type next is plain again
   $('#miClearFmt').addEventListener('click', () => onText((sel) => {
+    nextSize = null;
     if (sel) { document.execCommand('removeFormat'); return; }
     for (const c of ['bold', 'italic', 'underline', 'strikeThrough']) if (document.queryCommandState(c)) document.execCommand(c);
     document.execCommand('foreColor', false, RESET_COLOR);
@@ -484,6 +520,7 @@
       }
       case 'voice': startRecording(); break;
       case 'speak': speakToText(); break; // 1.3.1 (src/note/speech.js)
+      case 'remind': openRemind(); break; // 1.4.1 (src/note/remind.js)
       case 'drawing': openDraw(null); break;
       case 'link': openLinkForm(); break;
       case 'table': insertTable(3, 2); toast('Tip: right-click a cell to add rows or columns'); break;
@@ -501,5 +538,5 @@
   }
 
   Object.assign(K, { popOuts, closePop, closePops, openPop, closeText, ownStep, domStep, domRecord, paintTextPanel, undoText,
-    redoText, paintUndo, FACE });
+    redoText, paintUndo, FACE, newNote });
 })();

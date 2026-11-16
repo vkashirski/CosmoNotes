@@ -15,6 +15,10 @@ no loose `store` / `listWin` / `quitting` / `listUnlockedAll` is left.
 - **Main process (`main.js`)** owns all state through one `Store` instance. Windows never touch the disk.
 - **Note windows**: one frameless `BrowserWindow` per open note (`wins: Map<noteId, BrowserWindow>`),
   `win.noteId`, `win.revealed` (true after the password was typed in *that* window).
+- **New notes (1.4.6):** `createNote` (main/note-window.js) returns a promise of the note's id, settled by the
+  window's `win.ready` when it shows (or closes first). `note:new` / `list:new` return it, so the + button spins a ring
+  (`.busy`) until every note it asked for has shown (seconds on a slow PC). Every click makes a note (the owner's wish:
+  spamming + is allowed); don't add a guard that drops clicks.
 - **List window**: a single window (`listWin`) with a hidden title bar plus overlay window buttons.
 - **Tray icon**: New note, All notes, Bring notes to front (also unrolls rolled-up notes), Start with Windows,
   Quit (1.3.27: and "Panic: hide all notes" while the panic button is on, "Reopen notes" while the panic closed some;
@@ -30,7 +34,7 @@ no loose `store` / `listWin` / `quitting` / `listUnlockedAll` is left.
     a hidden locked window can't start one),
     `att:pick-images`, `att:open`, `open-external`, `list:show`, `ink:show`, `ink:drag`, `ink:size`, `ink:drop`, `ink:hide`
     (1.1.15: the drawing toolbar's own window, see §6), `stt:start`, `stt:audio` (send), `stt:stop`, `stt:cancel`,
-    `stt:transcribe` (1.3.1, voice to text, below)
+    `stt:transcribe` (1.3.1, voice to text, below), `remind:set`, `remind:act` (1.4.1, reminders, below)
   - list window: `list:get`, `list:new`, `list:duplicate`, `list:open-note`, `list:close-note`, `list:trash`,
     `list:restore`, `list:destroy`, `list:empty-bin`, `list:bring-front`, `list:set-locked`, `list:favorite`, `list:apply`,
     `list:edit` (1.1.15, the Edit sheet: title + colour; 1.1.20 "Edit design": also `opacity` and `fx`, neither an edit; 1.2.2: `fxKeys` changes only those effect settings), `list:unlock-all` / `list:lock-all` (1.1.15, the Locked tab),
@@ -39,13 +43,15 @@ no loose `store` / `listWin` / `quitting` / `listUnlockedAll` is left.
     colour/font), `groups:trash`, `groups:set-locked`, `groups:reveal`, `groups:hide`, `settings:set`,
     `backups:list`, `backups:now`, `backups:restore`, `backups:open-folder`, `data:open-folder`, `stt:status`, `stt:use`,
     `stt:download`, `stt:download-cancel`, `stt:remove`, `stt:test` (1.3.1, Settings → Voice to text), `update:status`,
-    `update:check`, `update:install`, `update:cancel`, `update:open-page` (1.4.0, Settings → About, below)
+    `update:check`, `update:install`, `update:cancel`, `update:open-page` (1.4.0, Settings → About, below),
+    `list:remind-get`, `list:remind-set` (1.4.1, a note's reminders, below)
   - main → windows: `notes:changed` (list reloads), `settings:changed` (`{spellCheck, hasPassword, lockKind,
     lockLen}`), `note:look` (a note's colour/font/lock/rolled changed from outside), `note:lock-now` (note became
     locked from the list: the window saves, then calls `note:relock` and hides), `note:win-state` (`{maximized}`), `list:nav` (mouse back/forward
     buttons sent as Windows app-commands), `stt:event` (a voice-to-text job's draft / final / status / progress / ready /
     error, to its note window only), `stt:changed` (Settings → Voice to text, to the list), `update:changed` (the
-    update's status, to the list), `update:show` (go to Settings → About's updates: the tray's line)
+    update's status, to the list), `update:show` (go to Settings → About's updates: the tray's line), `remind:ring` (1.4.1:
+    reminders that just went off, to their note window: it plays the sound)
   - the voice-to-text engine window (1.3.1) talks only `engine:msg`, both ways (`src/engine/preload.js`)
   - **No native message boxes.** The list window asks every question with its own app-styled `modal()`
     (list.js) and only then calls main (`list:destroy`, `list:empty-bin`, `backups:restore` don't ask
@@ -132,7 +138,8 @@ no loose `store` / `listWin` / `quitting` / `listUnlockedAll` is left.
   `groupShut` (locked and not open in the list, or inside one; a shut group can't be filled either). The windows only hide
   what would be refused: the list's `isShut` (list/base.js: menu = Select + lock options, no card buttons, no dragging, star
   shown only, `bulkParts(all)`, no Edit design), the note's ⋯ menu and effects button (note-text.css). A new action on a
-  note or group needs the same check in main.
+  note or group needs the same check in main. The one exception (1.4.1, the owner's pick): Snooze and Done on a reminder that
+  rings, when that reminder doesn't ask for the PIN (`unlock` off; `remind:act`).
 
 ## Evening colours and the panic button (1.3.27)
 
@@ -217,6 +224,69 @@ Settings), `main/stt-models.js` (the list), `main/stt-download.js` (the download
 - **At start** `cleanup` deletes `CosmoNotes-Setup-*.exe(.part)` from the temp folder (one still running stays).
 - **Network**: like the model download, only main goes online, only to github.com (and the download host it redirects
   to). Nothing about notes or the PC is sent: two plain GETs.
+
+## Reminders (1.4.1)
+
+- **The rules are `src/reminders.js`** (times, repeats at the local clock time of `start`, `ring` / `done` / `snooze`,
+  `hiddenNow`, the words); store.js cleans with it, main and both windows use it. **`main/reminders.js`** keeps the one
+  clock: one `setTimeout` for the next reminder of any note, at most 60 s ahead (so a PC that slept catches up), and
+  `powerMonitor` `resume` / `unlock-screen` check at once. `check(now)` rings everything due (tests call it with a time).
+- **Going off** (`popUp`): the window opens (`openNoteWindow`, not focused) or comes up (restored, unrolled, `moveTop`), with
+  no move; a window that wasn't open first gets `placeForRing` (its place if its top bar is on the monitor with the mouse,
+  else that monitor's top-right corner). `applyState` keeps it on top while a reminder rings (`onTop`), `flashFrame`. The
+  sound is the window's: `remind:ring` to a loaded window, or `win.ringIds`, handed over once by `note:get` (`ring`) to one
+  still loading (`win.ringLoaded`). What rings is in the note's data, so the strip is right after a restart; ones still
+  ringing at start come back quietly (`startReminders`). The panic button's notes (`settings.panicClosed`) don't open.
+- **Hiding** (`settle`): `hiddenNow` closes the window (`closeNoteWindow`: the window saves on unload); start-up doesn't open
+  such a note; the list leaves it out (`remHidden`, list `live`) unless the filter or `remindShowHidden` shows it. Opening it
+  from the list still works.
+- **Changes**: windows send only what the panel sets (`setReminders` takes time, repeat, sound, hide, unlock); a reminder
+  whose `start` and repeat are unchanged keeps its state, a new time starts again (`firstAt`); one for a time that has passed
+  rings at once. Not an edit (`updatedAt` stays).
+- **Secrets**: `note.remindMsg` is in `SECRET` and crypt.js `SECRET_FIELDS` (one `blank()` for the store's writes and the
+  backups): sealed with a locked note, `{}` while sealed, `null` in a hidden window, never in `list:get` (only `list:remind-get`,
+  which refuses a note `hiddenInList`). `note.reminders` stays plain: main needs the times before the PIN.
+
+## App pins (1.4.5)
+
+- **What:** right-click a note's pin → "Pin over" (`src/note/pin-apps.js`): tick apps (or one workspace / file of an app).
+  `note.pinApps` = `[{ app, part }]`; a note with some **mirrors its app** (`stateOf`): one of them in front = `'top'` (on top,
+  like any pinned note); open but behind another app = `{ under }` (not always-on-top, `moveAbove('window:<hwnd>:0')` its
+  app's nearest window: `place`, `win.appBehind` / `win.appUnder`; `note-state.js` `onTop(n, win)` reads it, so every
+  `applyState` keeps it behind); none open (closed or minimised: WebRTC's list leaves minimised windows out) = `'hide'`.
+  Every app = the normal pin (`pinApps: []`); unpinning forgets them (store.js keeps them only while `pinned`).
+- **Which app is in front** (`main/app-pin.js`): `desktopCapturer.getSources({ types: ['window'], thumbnailSize: 0×0 })`
+  gives the windows with their titles, front to back (EnumWindows order). Our own windows (`BrowserWindow.getAllWindows()`,
+  by `getNativeWindowHandle()` against the source id `window:<hwnd>:0`) are skipped: the notes are always on top, so they
+  come first. The first one left is the app in front. Nothing native (a `.node` module or koffi would be an unsigned DLL,
+  and PowerShell's `Add-Type` is blocked in Constrained Language Mode, both Smart App Control trouble). Not confirmed on
+  a real PC yet: the order, the cost. Another app's always-on-top window counts as in front.
+- **Titles only** (no program name): `parseTitle` takes the last part after " - " / " – " / " — " as the app and the one
+  before it as its workspace / file (VS Code: `file - folder - app`, Excel: `file - app`); a rule's part matches any part of
+  the title. Browsers (`BROWSERS`) get no parts. An app whose title doesn't end with its name (some games, JetBrains IDEs)
+  is listed under the wrong name; ticking it still works while that title stays.
+- **The watch** is on only while an open note is pinned over apps (`sync`, called by `changed()` from `applyPatch`,
+  `openNoteWindow` and a window's `closed`), and its clock (every `POLL_MS`, 0.5 s) ticks only while the focus is in
+  another app (1.4.7, `focusMoved` on the app's `browser-window-focus` / `-blur`): reading the list made every note's drag
+  hitch twice a second. While one of ours has the focus, ours is the app in front and nothing else can come in front;
+  when the focus leaves, a check runs at once. Turning the watch on always checks once, focus or not (`mayShow` waits for it). One check at a time (`poll`); `check()` waits for the one running
+  and runs again (tests call it). A list that fails or takes over `SLOW_MS` sets `broken`: every note shows.
+- **Hidden, never closed:** `apply` hides with `win.hide()` + `showInk(win, false)` and sets `win.appHidden`; showing uses
+  `showInactive` only once the window has loaded (`win.loaded`, set in `openNoteWindow`'s `showIt`, which asks `mayShow`
+  first: a note opening pinned over apps waits for the first check instead of flashing; `place` sets `appBehind` before
+  it shows and `shown` moves it above its app after). `enforcePinned` skips `appHidden` and `appBehind`; `watchInkBar`'s
+  toolbars aren't on top while `appBehind`.
+  A window minimised with its own button (`userMin`) is left alone.
+- **The animation** (`animate`, the owner's pick "Drop in"): coming = fade in while dropping `ANIM.drop` px into place
+  (`ANIM.in` ms, ease-out); going = fade out rising (`ANIM.out` ms), then `hide()`, then back to its place and opacity.
+  A turn mid-way goes on from where it is (`win.appAnim.p`, `home`). While it runs `rememberBounds` saves nothing, and an
+  unchanged place is never saved, so app switches don't write the note; `placeInk` doesn't bring a toolbar back while
+  `appHidden`. A maximised note only fades. Tests set `ANIM.in = ANIM.out = 0` (at once).
+- **On top anyway** (`stateOf` → `'top'`): its window has the focus (ticking its list), a reminder rings, `broken`, or a **peek**
+  (`peek(win)`: the list's open, Bring notes to front / a second start, Reopen closed note) that lasts until another window
+  comes in front than the one there when it started (`peekFrom`, a window handle).
+- **Locks:** `pinApps` is in `WHILE_HIDDEN` (a kind of pin): a hidden locked note's window may change it and ask `pin:apps`
+  (only window titles). `list:get` sends `appPinned` for every note but the names (`pinApps`) not for one `hiddenInList`.
 
 ## Spellcheck
 

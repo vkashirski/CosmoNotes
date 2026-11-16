@@ -11,6 +11,7 @@ const { notifyList } = require('./list-notify');
 const { applyState } = require('./note-state');
 const { groupOpenInList, groupShut, hiddenInList, hideNewlyLocked, revealedNow, unlockedForNow } = require('./list-visibility');
 const { showList } = require('./list-window');
+const REMIND = require('../src/reminders');
 const { S, wins } = require('./state');
 
 function registerGroupIpc() {
@@ -41,6 +42,9 @@ function registerGroupIpc() {
         titleFont: n.titleFont, // 1.3.3: not secret (only the look of the title)
         pinned: n.pinned,
         clickThrough: n.clickThrough, // 1.3.34: right-click → Turn off click-through
+        // 1.4.5: the apps it is pinned over (the card says "Over …"); not of a note its lock hides (only that it has some)
+        pinApps: hiddenInList(n) ? [] : n.pinApps,
+        appPinned: n.pinApps.length > 0,
         favorite: n.favorite,
         fx: n.fx, // 1.1.16: the card shows the note's effect too
         opacity: n.opacity, // 1.1.20: for the Edit design sheet's see-through slider
@@ -49,6 +53,10 @@ function registerGroupIpc() {
         eve: eveOnFor(n), // 1.3.27: its card takes the evening colours too
         evening: n.evening, // and the note's own choice (null = as in Settings)
         panic: n.panic, // 1.3.27: false = the panic button leaves it open
+        // 1.4.1: its reminders (times only: their messages come with list:remind-get, main/reminders.js), and whether one
+        // hides it from the list (src/list/base.js live)
+        reminders: n.reminders,
+        remHidden: REMIND.hiddenNow(n.reminders),
         groupId: n.groupId,
         open: wins.has(n.id),
         createdAt: n.createdAt,

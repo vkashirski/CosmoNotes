@@ -1,6 +1,6 @@
 'use strict';
 const { ipcMain, shell } = require('electron');
-const { FONTS, CHECK_OPTS, OVERRIDE_KEYS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity, resetPatch } = require('../store');
+const { FONTS, CHECK_OPTS, OVERRIDE_KEYS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity, resetPatch, cleanRemindSound, cleanVolume } = require('../store');
 const EVENING = require('../src/evening');
 const { PAPER } = require('./constants');
 const { broadcastSettings, spellLanguages } = require('./settings');
@@ -67,6 +67,11 @@ function registerSettingsIpc() {
     const ctChanged = 'clickThroughOn' in patch;
     if (ctChanged) S.store.settings.clickThroughOn = !!patch.clickThroughOn;
     if ('updateCheck' in patch) S.store.settings.updateCheck = !!patch.updateCheck; // 1.4.0: main/ipc-update.js
+    // 1.4.1: Settings → Reminders (main/reminders.js): the sound, how loud, and whether hidden notes show in the list
+    const remindChanged = 'remindSound' in patch || 'remindVolume' in patch;
+    if ('remindSound' in patch) S.store.settings.remindSound = cleanRemindSound(patch.remindSound);
+    if ('remindVolume' in patch) S.store.settings.remindVolume = cleanVolume(patch.remindVolume);
+    if ('remindShowHidden' in patch) S.store.settings.remindShowHidden = !!patch.remindShowHidden;
     if (patch.listSort && typeof patch.listSort === 'object') {
       const ls = { ...S.store.settings.listSort };
       if (['updated', 'created'].includes(patch.listSort.by)) ls.by = patch.listSort.by;
@@ -78,7 +83,7 @@ function registerSettingsIpc() {
     if (panicChanged) { syncShortcut(); buildTray(); }
     if (eveChanged) pushEvening(true);
     if (ctChanged) applyClickThroughAll();
-    if ('spellCheck' in patch || 'spellCyrillic' in patch || 'listTheme' in patch || fxChanged || checkKeys.length || eveChanged || panicChanged || ctChanged) broadcastSettings();
+    if ('spellCheck' in patch || 'spellCyrillic' in patch || 'listTheme' in patch || fxChanged || checkKeys.length || eveChanged || panicChanged || ctChanged || remindChanged) broadcastSettings();
     // The list already shows a new sort order itself; telling it again made it redraw twice.
     const onlySort = Object.keys(patch).every((k) => k === 'listSort' || k === 'listSize' || k === 'listTheme');
     if (!onlySort) notifyList();

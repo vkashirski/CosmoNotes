@@ -65,11 +65,28 @@ function inkSpot(win, kind = 'ink') {
     vx = st.x + st.inset.l;
     vy = st.y + st.inset.t;
   }
-  // always on a screen (a note maximised or at the screen's edge: the toolbar comes over the note instead)
-  const a = screen.getDisplayNearestPoint({ x: Math.round(vx + v.w / 2), y: Math.round(vy + v.h / 2) }).workArea;
+  // always on a screen (a note maximised or at the screen's edge: the toolbar comes over the note instead). 1.4.2: stuck to
+  // a side, on its note's screen (at the edge of a monitor it used to go onto the next one); loose, on the one it is dragged to
+  const a = (st.mode === 'dock' ? screen.getDisplayMatching(b) : screen.getDisplayNearestPoint({ x: Math.round(vx + v.w / 2), y: Math.round(vy + v.h / 2) })).workArea;
   vx = clampN(vx, a.x, a.x + a.width - v.w);
   vy = clampN(vy, a.y, a.y + a.height - v.h);
   return { x: Math.round(vx - st.inset.l), y: Math.round(vy - st.inset.t), width: st.w, height: st.h };
+}
+// 1.4.2: a loose toolbar or pop-up is remembered by where it is from its note (dx, dy from the note's top-left corner),
+// not by its place on the screen. The note keeps that for next time, for every note (localStorage), so it used to open
+// at the same spot on the screen for any note, even on another monitor. Now it opens at that spot from its own note,
+// on that note's screen; while it is open it stays where it was dropped, as before.
+function fromNote(win, st) {
+  const b = win.getBounds();
+  return { dx: Math.round(st.x - b.x), dy: Math.round(st.y - b.y) };
+}
+function nearNote(win, st, dx, dy) {
+  const b = win.getBounds();
+  const a = screen.getDisplayMatching(b).workArea;
+  const v = inkBox(0, 0, st);
+  const vx = clampN(b.x + dx + st.inset.l, a.x, a.x + a.width - v.w);
+  const vy = clampN(b.y + dy + st.inset.t, a.y, a.y + a.height - v.h);
+  return { x: Math.round(vx - st.inset.l), y: Math.round(vy - st.inset.t) };
 }
 // while dragging: stick to a side when close to it
 function snapInk(win, p) {
@@ -99,4 +116,4 @@ function snapInk(win, p) {
   if (cands.length) return { ...st, mode: 'dock', side: cands[0].side, off: Math.round(cands[0].off) };
   return { ...st, mode: 'free', x: Math.round(x), y: Math.round(y) };
 }
-module.exports = { BAR_FRAMES, BAR_KINDS, barKind, cleanInkSize, inkBarOptions, inkSpot, snapInk };
+module.exports = { BAR_FRAMES, BAR_KINDS, barKind, cleanInkSize, fromNote, inkBarOptions, inkSpot, nearNote, snapInk };

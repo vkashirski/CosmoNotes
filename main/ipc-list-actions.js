@@ -7,6 +7,7 @@ const { notifyList } = require('./list-notify');
 const { applyState, setWinTitle } = require('./note-state');
 const { coverAll, groupShut, hiddenInList, hideNewlyLocked, listOpenGroups, openForNow, pushLook, unlockedForNow } = require('./list-visibility');
 const { bringToFront, closeNoteWindow, createNote, openNoteWindow, reopenClosed } = require('./note-window');
+const appPin = require('./app-pin');
 const { S, wins } = require('./state');
 
 // 1.1.47: a note just unlocked for now: its open window shows it without the password
@@ -99,7 +100,7 @@ function registerListActionIpc() {
     for (const id of S.store.subtree(groupId)) listOpenGroups.delete(id);
     notifyList();
   });
-  ipcMain.handle('list:new', (e, groupId) => { createNote({ groupId }); });
+  ipcMain.handle('list:new', (e, groupId) => createNote({ groupId })); // 1.4.6: settles once it shows
   // 1.1.15: the Locked tab. "Unlock all" (with the password) uncovers every locked note and group in the list;
   // "Lock again" covers them again, also in open note windows that were unlocked.
   ipcMain.handle('list:unlock-all', async (e, pw) => {
@@ -120,6 +121,8 @@ function registerListActionIpc() {
     S.store.save(n.id);
     const fresh = !wins.has(n.id);
     const win = openNoteWindow(n, { focus: true });
+    // 1.4.5: pinned over apps: it shows over whatever is in front now, until another app comes in front (main/app-pin.js)
+    if (appPin.appPinned(n)) appPin.peek(win);
     // Its locked group was just opened with the password in the list (or everything was, with "Unlock all"),
     // so don't ask again. 1.1.47: also a note unlocked for now (openNoteWindow already shows it; this is for "Unlock all").
     if (fresh && isLocked(n) && (S.listUnlockedAll || openForNow(n))) { win.revealed = true; setWinTitle(win, n); }

@@ -13,6 +13,8 @@ const { reopenPanicked, stopShortcut, syncShortcut } = require('./main/panic');
 const { startEveningClock } = require('./main/evening');
 const { registerIpc } = require('./main/ipc');
 const { finishUpdate, startUpdates } = require('./main/ipc-update');
+const { startReminders } = require('./main/reminders');
+const REMIND = require('./src/reminders');
 const { S } = require('./main/state');
 const { attachmentBytes, clearOpenCopies, install: installCrypt, mimeOf } = require('./main/crypt');
 const recordings = require('./main/recordings');
@@ -72,10 +74,12 @@ function start() {
   startUpdates(); // 1.4.0: the update check (main/ipc-update.js)
 
   const atLogin = process.argv.includes('--startup');
-  const toOpen = S.store.all().filter((n) => n.open && !n.deletedAt);
+  // 1.4.1: not a note one of its reminders hides until it goes off (main/reminders.js)
+  const toOpen = S.store.all().filter((n) => n.open && !n.deletedAt && !REMIND.hiddenNow(n.reminders));
   for (const n of toOpen) openNoteWindow(n, { focus: false });
   const back = reopenPanicked(); // 1.3.27: notes the panic button closed before CosmoNotes quit
   if (!atLogin && toOpen.length === 0 && !back) showList();
+  startReminders(); // 1.4.1: what went off while CosmoNotes was closed (main/reminders.js)
 
   S.store.backupIfNeeded();
   setInterval(() => S.store.backupIfNeeded(), 3 * 3600e3);

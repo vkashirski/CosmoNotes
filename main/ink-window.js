@@ -11,7 +11,7 @@ function watchInkBar(win) {
     hardenContents(child.webContents);
     try { child.setParentWindow(win); } catch { /* fine */ }
     const n = S.store.get(win.noteId);
-    child.setAlwaysOnTop(!!(n && n.pinned), 'screen-saver');
+    child.setAlwaysOnTop(!!(n && n.pinned) && !win.appBehind, 'screen-saver'); // (1.4.5: not while app pins put it behind)
     child.on('closed', () => { if (win[`${k}Win`] === child) { win[`${k}Win`] = null; win[`${k}Out`] = false; } });
     if (win[`${k}Out`]) placeInk(win, k);
     // 1.1.23: making this window could take the focus (and with it the note's text selection) from the note: give it back
@@ -27,7 +27,8 @@ function placeInk(win, kind = 'ink') {
   if (!c || c.isDestroyed() || !win[`${k}State`] || win.isDestroyed()) return;
   c.setBounds(inkSpot(win, k));
   const n = S.store.get(win.noteId);
-  if (win[`${k}Out`] && !(n && n.rolled) && !win.isMinimized() && !c.isVisible()) c.showInactive();
+  // (1.4.5: not while app pins hide the note: its moves while it fades out would bring the toolbar back)
+  if (win[`${k}Out`] && !(n && n.rolled) && !win.isMinimized() && !win.appHidden && !c.isVisible()) c.showInactive();
 }
 // kind left out: both toolbars
 function showInk(win, on, kind = null) {

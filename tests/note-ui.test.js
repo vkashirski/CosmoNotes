@@ -16,10 +16,13 @@
 // - a locked note's titles (1.3.11): read-only in the ⋯ menu while it is locked (hidden); unlocked, they can be changed.
 // - copy / cut / paste (1.3.2): a copied checklist line (even part of one) pastes as a checklist line, ticked or not, with its
 //   font, colour, size, bold and highlight; the note's own font goes along into a note with another font; Ctrl+Shift+V is
-//   still plain text; Cut takes the words away; anything else in the copied HTML is cleaned out. A pasted photo is one
+//   still plain text; Cut takes the words away; anything else in the copied HTML is cleaned out; another app's list pasted
+//   into a checklist line joins it, line by line (1.4.4). A pasted photo is one
 //   Undo step in its place among the typing, and so is a checklist tick (1.3.31); Redo goes back the same way.
 //   Every change the note makes itself (photo menu and size handle, voice note and link menus, tables, a typed web
 //   address becoming a link) is one Undo step with Redo (1.3.32).
+// - reminders (1.4.1): the strip of one that rings (Snooze, Done, a locked note's), Add → Reminder and its panel.
+// - + and Ctrl+N (1.4.6): every press asks for a note; a ring spins around + until they have all shown.
 // - checklist boxes (1.3.15): one size for the same size of words, whatever their font; an empty line's box is the size its
 //   words will be (also after Backspace emptied it); copying a whole line doesn't bring an empty line along, and an empty
 //   line with nothing in it (no height, its box over the next one) is dropped when the note opens.
@@ -456,6 +459,25 @@ const look = (page) => page.evaluate(() => {
   await clip(page, ['li', 0, 0], ['li', 0, 3], null, { html: '<ul class="checklist evil" onclick="x()"><li class="done stt-pending" style="--cb-s: 9px"><font face="Evil" color="red;background:url(x)" size="9" onmouseover="x()">A</font>'
     + '<span style="background-image: url(http://x); color: #123456">B</span><img src="x" onerror="x()"><script>x()</script></li></ul>' });
   assert.ok((await lines(page)).endsWith('<ul class="checklist"><li class="done">A<span style="color: rgb(18, 52, 86)">B</span></li></ul>'), 'cleaned: ' + await lines(page));
+  // another app's list pasted into a checklist line (1.4.4: a chat's list, with a paragraph and wrappers around it, went
+  // inside the line as a list of its own, boxes inside a box): each line joins the checklist, at that level; one Undo
+  const pasteInto = async (html, at) => {
+    const pg = await nu.open({ html: '<ul class="checklist"><li>first</li><li>second</li></ul>' });
+    await pg.evaluate(([h, a]) => {
+      const edi = document.getElementById('editor'); edi.focus();
+      const r = document.createRange(); r.setStart(edi.querySelector('li').firstChild, a); getSelection().removeAllRanges(); getSelection().addRange(r);
+      const dt = new DataTransfer(); dt.setData('text/html', h); dt.setData('text/plain', 'x');
+      edi.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    }, [html, at]);
+    return pg;
+  };
+  const items = (pg) => pg.evaluate(() => document.getElementById('editor').innerHTML.replace(/ style="[^"]*"/g, ''));
+  page = await pasteInto('<meta charset="utf-8"><div class="msg"><p>Ideas:</p>\n<ol class="list-decimal">\n<li><p><strong>Reminders</strong>: soon</p><ul><li>on +Add</li></ul></li>\n<li><p>Apps</p></li></ol></div>', 5);
+  assert.equal(await items(page), '<ul class="checklist"><li>first</li><li>Ideas:</li><li><strong>Reminders</strong>: soon</li><li>on +Add</li><li>Apps</li><li>second</li></ul>', 'lines of the checklist, no list inside a line');
+  await page.evaluate(() => document.execCommand('undo'));
+  assert.equal(await items(page), '<ul class="checklist"><li>first</li><li>second</li></ul>', 'one Undo takes it back');
+  page = await pasteInto('<div><p>just <b>this</b></p></div>', 5);
+  assert.equal(await items(page), '<ul class="checklist"><li>firstjust <b>this</b></li><li>second</li></ul>', 'one line pastes into the line');
   // a pasted photo is one Undo step, in its place among the typing (1.3.31: Ctrl+Z couldn't take it back), and Redo
   // goes back the same way; the text it was put into is one text again after Undo
   page = await nu.open({ html: '<p>abc def</p>' }, 360, 320, () => { const s = window.sticky; window.sticky = new Proxy(s, { get: (t, k) => (k === 'saveAttachment' ? () => Promise.resolve('stickyfile://att/p1.png') : t[k]) }); });
@@ -584,6 +606,23 @@ const look = (page) => page.evaluate(() => {
     assert.ok(Math.abs(got[2] / got[3] - 0.82) < 0.02 && Math.abs(got[5] / got[3] - 1.45) < 0.02, `${font}, ${tag}: Small / Big change the size: ${JSON.stringify(got)}`);
     assert.equal(await page.evaluate(() => getSelection().toString()), 'A whole line', 'the words stay selected');
   }
+  // 1.4.2: the size buttons are numbers (0.7 … 1.9); the one of the words at the cursor is lit, and a size picked for what
+  // you type next stays lit until the cursor moves
+  page = await nu.open({ html: '<p>Hello <font size="5">big</font> world</p>' }, 360, 340);
+  const caretAt = (pg, q, i) => pg.evaluate(([q, i]) => { const t = document.querySelector(q).firstChild; const r = document.createRange(); r.setStart(t, i); r.collapse(true); getSelection().removeAllRanges(); getSelection().addRange(r); document.getElementById('editor').focus(); document.dispatchEvent(new Event('selectionchange')); }, [q, i]);
+  const lit = (pg) => pg.evaluate(() => [...document.querySelectorAll('#fsizeSeg button.on')].map((b) => b.textContent).join());
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('#fsizeSeg button')].map((b) => b.textContent + '=' + b.dataset.fsize).join()), '0.7=1,0.8=2,1.0=3,1.2=4,1.5=5,1.9=6');
+  await caretAt(page, '#editor font', 1); await nu.press(page, '#btnText');
+  assert.equal(await lit(page), '1.5', 'in the big word: 1.5');
+  await caretAt(page, '#editor p', 2);
+  assert.equal(await lit(page), '1.0', 'in plain words: 1.0');
+  await nu.press(page, '#fsizeSeg [data-fsize="2"]');
+  assert.equal(await lit(page), '0.8', 'picked for what you type next: lit');
+  await page.keyboard.type('xy'); await page.waitForTimeout(60);
+  assert.ok(/<font size="2">xy<\/font>/.test(await page.evaluate(() => document.getElementById('editor').innerHTML)), 'and the typing is 0.8');
+  assert.equal(await lit(page), '0.8', 'still lit while typing it');
+  await caretAt(page, '#editor font[size="5"]', 1);
+  assert.equal(await lit(page), '1.5', 'the cursor moved: the size there');
   for (const font of ['hand', 'round', 'medieval']) {
     page = await nu.open({ html: '<ul class="checklist"><li><font size="5">Big words</font></li></ul>', font }, 420, 300);
     const big = await px(page); const box = await page.evaluate(() => getComputedStyle(document.querySelector('#editor li'), '::before').width);
@@ -907,6 +946,119 @@ const look = (page) => page.evaluate(() => {
     const small = await nu.open({ html: '<div>x</div>', settings: S }, 200, 200);
     assert.ok(await small.evaluate(() => { const b = document.querySelector('#bar'); const c = document.querySelector('#btnClose').getBoundingClientRect(); return b.scrollWidth <= b.clientWidth && c.right <= innerWidth; }), 'a 200 px note: every button fits');
     await small.close();
+  }
+  // ---- 1.4.1: reminders (main's side: reminders.test.js). A reminder that rings shows a strip under the top bar with its
+  // message ("Missed at …" when late), Snooze 10 min (the arrow: other times) and Done, and the note glows; a locked note
+  // shows no message and waits for the PIN when the reminder asks for it. Add → Reminder opens the panel; adding one sends it
+  // to main (remindSet) with its message, and the panel shows it.
+  {
+    const catchRemind = () => {
+      const old = window.sticky;
+      window.__rem = [];
+      window.sticky = new Proxy({}, { get: (t, k) => {
+        if (k === 'remindAct') return (...a) => { window.__rem.push(['act', ...a]); return Promise.resolve(true); };
+        if (k === 'remindSet') return (list, msgs) => { window.__rem.push(['set', list, msgs]); return Promise.resolve({ reminders: list.map((r) => ({ ...r, at: r.start, firing: false, count: 0, target: 'note' })), remindMsg: msgs }); };
+        return old[k];
+      } });
+    };
+    const now = Date.now();
+    const late = { id: 'late01', start: now - 2 * 3600e3, at: now - 2 * 3600e3, repeat: null, sound: null, hide: false, unlock: true, target: 'note', firing: true, firedAt: now - 2 * 3600e3, late: true, snooze: null, count: 1 };
+    const S = { appTheme: 'cream', remindSound: 'none', remindVolume: 0.5 };
+    let page = await nu.open({ html: '<div>buy milk</div>', reminders: [late], remindMsg: { late01: 'Call the dentist' }, settings: S }, 380, 360, catchRemind);
+    assert.ok(await page.isVisible('#remBar'), 'the strip shows');
+    assert.match(await page.textContent('#remWhen'), /^Missed /, 'late: "Missed …"');
+    assert.equal(await page.textContent('#remMsg'), 'Call the dentist');
+    assert.ok(await page.evaluate(() => document.body.classList.contains('ringing')), 'the note glows');
+    await page.click('#remSnoozeMore');
+    assert.ok(await page.isVisible('#remMenu'), 'the arrow: other times');
+    await page.click('#remMenu [data-m="30"]');
+    await page.click('#remDone');
+    assert.deepEqual(await page.evaluate(() => window.__rem), [['act', 'late01', 'snooze', 30], ['act', 'late01', 'done', undefined]]);
+    await page.close();
+    // a locked note: no message; this reminder asks for the PIN: the buttons wait
+    page = await nu.open({ html: '', hidden: true, lockedBy: 'note', locked: true, reminders: [late], remindMsg: null, settings: S }, 380, 360, catchRemind);
+    assert.ok(await page.isVisible('#remBar') && !(await page.isVisible('#remMsg')), 'locked: the strip, no message');
+    assert.ok(await page.isDisabled('#remDone') && await page.isVisible('#remLockHint'), 'Unlock to dismiss');
+    await page.close();
+    // Add → Reminder: the panel, Tomorrow 09:00 with a message
+    page = await nu.open({ html: '<div>x</div>', settings: S }, 380, 520, catchRemind);
+    assert.ok(!(await page.isVisible('#remBar')), 'nothing rings: no strip');
+    await nu.press(page, '#btnInsert');
+    await page.click('#insert [data-act="remind"]');
+    await page.waitForTimeout(80);
+    assert.ok(await page.isVisible('#remPop'), 'the panel opens');
+    assert.equal(await page.textContent('#remPop .rm-none'), 'No reminders yet.');
+    await page.click('#remPop .rm-add');
+    await page.click('#remPop .rm-chip[data-p="tom"]');
+    assert.ok(!(await page.isVisible('#remPop .rm-row:has(input[type=date])')), 'a quick pick hides the date fields');
+    await page.fill('#remPop textarea', 'Water the plants');
+    await page.click('#remPop .rm-save');
+    await page.waitForTimeout(80);
+    const sent = await page.evaluate(() => window.__rem.filter((x) => x[0] === 'set').pop());
+    const d = new Date(sent[1][0].start);
+    assert.ok(d.getHours() === 9 && d.getMinutes() === 0 && sent[1][0].start > Date.now(), 'tomorrow 09:00');
+    assert.deepEqual(Object.values(sent[2]), ['Water the plants'], 'with its message');
+    assert.match(await page.textContent('#remPop .rm-item b'), /^Tomorrow 09:00/, 'the panel shows it');
+    await page.close();
+  }
+  // Copy image (1.4.3): the page asks main for the photo (its own fetch() of stickyfile:// fails in the app), makes a PNG
+  // of it and hands that to main for the clipboard; a picture main can't give = "Couldn’t copy this picture"
+  {
+    const copyPage = (bytes) => nu.open({ html: '<p>a<img class="att-img" src="stickyfile://att/p.png">b</p>' }, 360, 320, `(() => {
+      const base = window.sticky; window.__cp = { asked: [], png: null, fetched: 0 };
+      const f = window.fetch; window.fetch = (...a) => { window.__cp.fetched++; return f(...a); };
+      window.sticky = new Proxy(base, { get: (t, k) => k === 'photoBytes' ? async (u) => { window.__cp.asked.push(u);
+        if (!${bytes}) return null;
+        const c = new OffscreenCanvas(3, 2); const g = c.getContext('2d'); g.fillStyle = '#f00'; g.fillRect(0, 0, 3, 2);
+        return new Uint8Array(await (await c.convertToBlob({ type: 'image/webp' })).arrayBuffer()); }
+        : k === 'copyImage' ? async (png) => { window.__cp.png = png; return true; } : t[k] });
+    })()`);
+    let pg = await copyPage(true);
+    const copied = async (p) => {
+      await p.locator('#editor img').dispatchEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 });
+      await p.waitForTimeout(50);
+      await p.evaluate(() => [...document.querySelectorAll('#ctx button')].find((x) => x.textContent.includes('Copy image')).click());
+      await p.waitForFunction(() => /\bcop/i.test(document.getElementById('toast').textContent));
+      return p.evaluate(async () => {
+        const cp = window.__cp; let size = null;
+        if (cp.png) { const b = await createImageBitmap(new Blob([cp.png])); size = [b.width, b.height]; }
+        return { asked: cp.asked, fetched: cp.fetched, png: cp.png && [...cp.png.slice(0, 4)], size, toast: document.getElementById('toast').textContent };
+      });
+    };
+    let r = await copied(pg);
+    assert.deepEqual(r.asked, ['stickyfile://att/p.png'], 'main is asked for the photo');
+    assert.equal(r.fetched, 0, 'the page doesn’t fetch it itself');
+    assert.deepEqual(r.png, [0x89, 0x50, 0x4e, 0x47], 'a PNG goes to the clipboard (made from a WebP here)');
+    assert.deepEqual(r.size, [3, 2], 'at its full size');
+    assert.equal(r.toast, 'Picture copied');
+    await pg.close();
+    pg = await copyPage(false);
+    r = await copied(pg);
+    assert.equal(r.png, null); assert.equal(r.toast, 'Couldn’t copy this picture');
+    await pg.close();
+  }
+  // ---- 1.4.6: + and Ctrl+N: every press asks main for a note; a ring spins around + until all of them have shown
+  {
+    const newInit = () => {
+      const base = window.sticky;
+      const N = window.__new = { asked: 0, answer: [] };
+      const own = { newNote: () => { N.asked++; return new Promise((res) => N.answer.push(res)); } };
+      window.sticky = new Proxy({}, { get: (t, k) => own[k] || base[k] });
+    };
+    const pg = await nu.open({ html: '<p>x</p>' }, 360, 320, `(${newInit})()`);
+    const st = () => pg.evaluate(() => ({ asked: window.__new.asked, busy: document.getElementById('btnNew').classList.contains('busy'),
+      ring: getComputedStyle(document.getElementById('btnNew'), '::after').animationName }));
+    await nu.press(pg, '#btnNew'); await nu.press(pg, '#btnNew');
+    await pg.focus('#editor'); await pg.keyboard.press('Control+n');
+    let r = await st();
+    assert.equal(r.asked, 3, 'each press asks for a note (none are dropped)');
+    assert.ok(r.busy && r.ring === 'newSpin', 'the ring spins around +');
+    await pg.evaluate(() => { window.__new.answer.shift()('n1'); window.__new.answer.shift()('n2'); }); await pg.waitForTimeout(30);
+    assert.ok((await st()).busy, 'still spinning while one is on its way');
+    await pg.evaluate(() => window.__new.answer.shift()(null)); await pg.waitForTimeout(30);
+    r = await st();
+    assert.ok(!r.busy && r.ring === 'none', 'all shown: the ring goes');
+    await pg.close();
   }
   await nu.done(); // (fails on any error in a page)
   console.log('ok');

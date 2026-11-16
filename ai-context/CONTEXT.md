@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 14 November 2026 · App version 1.4.0**
+**Last updated: 16 November 2026 · App version 1.4.8**
 
 Start with `CLAUDE.md` (rules, commands, pitfalls, release checklist). This file is the map: what the app is,
 how the folder is laid out, and which `ai-context/` file to open for the job in hand. Open only the files your
@@ -64,10 +64,13 @@ main/              state (S.store, S.listWin, S.quitting, S.listUnlockedAll + wi
                    1.3.30: closed-notes (the notes closed by hand, for "Reopen closed note": Ctrl+Shift+T, the tray) ·
                    1.4.0: updater (updates: GitHub's latest.yml, the installer's download + sha512, starting it on quit) ·
                    ipc-update (update:*, the check at start and once a day, Install, the tray's "Update to …") ·
-                   ipc (registerIpc calls the nine ipc-* parts)
+                   1.4.1: reminders (the reminders' one clock, a note popping up when one goes off, hiding, remind:* and
+                   list:remind-* IPC) · 1.4.5: app-pin (notes pinned over some apps: which app is in front, from the
+                   window titles of desktopCapturer; hides / shows their windows; the open apps for pin:apps) ·
+                   ipc (registerIpc calls the nine ipc-* parts and reminders' registerRemindIpc)
 store.js           All disk storage (notes, groups, settings, attachments, backups). No Electron imports.
 preload.js         Safe bridge: exposes window.sticky.* to both windows (contextIsolation + sandbox)
-src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/note/*.js, 12 parts (1.3.19) loaded in this order, sharing
+src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/note/*.js, 14 parts (1.4.5) loaded in this order, sharing
                    names through window.COSMO_NOTE_KIT (K) and its V (V.note, V.settings, V.hidden, V.dirty, V.savedRange…; see
                    splitting-code.md): base (api, $, colour row, saving: collect/changed/saveNow, dates, applyLook, effects on the
                    note) · fx-format (the Effects pop-up, spelling, selection helpers: saveSel/restoreSel/insertNodes, formatting:
@@ -77,10 +80,12 @@ src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/n
                    keyboard) · checklists (1.3.19: the checklist options checkOn/applyChecks, the box: click to tick, drag to move,
                    ticked lines to the bottom; their Undo steps) · menus-voice-ink
                    (right-click menus, voice notes, drawing sketch, photo resizing) · speech (1.3.1: Speak to text, Transcribe;
-                   part 8 of 12) · lock-zoom (locking, password/PIN, ask(),
+                   part 8 of 13) · lock-zoom (locking, password/PIN, ask(),
                    word wrap, zoom: zoomNow/setZoom, sideways scroll) · draw-over (draw-over: inkState, renderInk, saveInk; floating
                    toolbars: movable) · ink-out (toolbars in their own little windows: barOut, inkOut/textOut; whole-stroke
-                   eraser) · eraser-start (the Partial eraser, toast(), start-up: init).
+                   eraser) · remind (1.4.1: Add → Reminder's panel, the strip of a reminder that rings: Snooze / Done, the glow,
+                   the sound) · pin-apps (1.4.5: the pin's right-click list, "Pin over": the open apps to tick) · eraser-start (the Partial eraser, toast(), start-up: init; it stays last: see splitting-code.md).
+                   Before its own code it loads src/reminders.js and src/remind-ui.js (below).
                    Its styles: src/css/note-*.css, loaded by note.html in this order:
                    note-base (colours, base, top bar) · note-text (locked note, photo handle, writing area) ·
                    note-toolbars (bottom bar, pop-overs) · note-drawing (right-click menu, recording, drawing, toast, 1.1.0–1.1.10 additions) ·
@@ -107,6 +112,9 @@ src/engine/        1.3.1 voice to text: the engine page (engine.mjs, engine-core
 src/mic-worklet.js 1.3.1: the AudioWorklet of Speak to text (16 kHz pieces)
 src/evening.js     1.3.27: evening colours: each light paper's evening shade, the fade (phase), the styles. Loaded by both windows
                    (window.COSMO_EVENING) and required by main and store.js: one list, so they never differ
+src/reminders.js   1.4.1 reminders: the rules (cleaning, repeats and their next time, Snooze, Done, missed, hiding) and their words.
+                   Like evening.js: loaded by both windows (window.COSMO_REMIND) and required by main and store.js
+src/remind-ui.js   1.4.1 the reminders panel (the same in both windows) and the 10 sounds (Web Audio, no files): window.COSMO_REMIND_UI
 src/about.js       In-app feature list (window.COSMO_ABOUT.FEATURES) + LAST_UPDATED date; no version history since 1.1.41
 src/fx/            Note effects + mouse followers (window.COSMO_FX), used by both windows: 8 files loaded in order (see effects.md)
 src/fx.js          Not used since 1.1.24: only a note saying the code moved to src/fx/ (can be deleted)
@@ -122,7 +130,7 @@ HOW TO INSTALL.txt Plain-language guide for the owner (install, data folder, for
 test-run.bat       Runs CosmoNotes from this folder with Electron's original exe (no build needed)
 build/installer.nsh  Installer addition: shortcuts get the CosmoNotes icon (exe stays untouched, see build-and-release.md)
 CHANGELOG.md       Version history, the two newest versions (the only place it is kept, with the archive)
-CHANGELOG-archive.md  Older versions (1.3.37 back to 1.0.0); the app doesn't read it (release.test.js does)
+CHANGELOG-archive.md  Older versions (1.3.38 back to 1.0.0); the app doesn't read it (release.test.js does)
 tests/             npm test – one *.test.js per area (notes, groups, locks, crypt, effects-…, list-ui-…; testing.md lists
                    them), run side by side; helpers/ (the real main process under fake-electron/, the list and a note in
                    Chromium, the effects in a vm); record/ records a refactor before and after (not run by npm test)
@@ -160,7 +168,10 @@ The Medieval font (1.2.1) is a file in the app: `src/fonts/Augusta.ttf`, loaded 
 
 - Per-note passwords (the owner said "one password for all notes **for now**").
 - Maybe: drag to reorder notes by hand (currently only sorting), and custom group icons/stickers.
-- Reminders/alarms on notes, a global "new note" shortcut, and export/import to a single file (offered in 1.0.0, not chosen yet).
+- A global "new note" shortcut, and export/import to a single file (offered in 1.0.0, not chosen yet). (Reminders came in 1.4.1.)
+- Reminders, next (the owner's picks in 1.4.1): a reminder on one checklist line ("buy milk · 18:00"; `target` is ready for
+  it), and maybe an email for a missed reminder (nothing built for it yet). Real nature recordings could replace the
+  made sounds (src/remind-ui.js MAKE): the owner asked for sounds from a free site; this workspace couldn't download them.
 - Updates (1.4.0) were turned down after 1.1.5 and chosen in 1.4.0, with the owner's picks: a ready installer from
   GitHub Releases, built by GitHub Actions from a tag that `release.bat` pushes; a quiet check at start and once a day
   (switch on), a dot and a tray line, no pop-up and no "what's new" in the app; Install saves, updates silently and

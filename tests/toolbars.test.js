@@ -54,7 +54,7 @@ const app = require('./helpers/app');
   L['ink:drag'](ev(w), { x: 1200, y: 600, px: 1300, py: 620, ...size });
   assert.equal(w.inkState.mode, 'free');
   let dropped = await H['ink:drop'](ev(w), { px: 1300, py: 620 });
-  assert.deepEqual(dropped, { inside: false, state: { mode: 'free', x: 1200, y: 600 } });
+  assert.deepEqual(dropped, { inside: false, state: { mode: 'free', dx: 1200 - 100, dy: 600 - 200 } }, '1.4.2: remembered from the note, not as a spot on the screen');
   w.setPosition(150, 220);
   assert.equal(child.bounds.x, 1200, 'a loose toolbar stays put');
   L['ink:drag'](ev(w), { x: 1900, y: 1000, px: 1950, py: 1030, ...size });
@@ -78,6 +78,28 @@ const app = require('./helpers/app');
   assert.equal(dropped.inside, true); assert.equal(child.visible, false);
   child.close();
   assert.equal(w.inkWin, null, 'its window closing forgets it');
+
+  // ---- 1.4.2: two monitors. Opening at a remembered loose spot: that far from this note, on this note's monitor (it used
+  // to be the same spot on the screen for every note, even on another monitor); stuck to a side at a monitor's edge: it
+  // stays on the note's monitor
+  E.__displays = [{ workArea: { x: 0, y: 0, width: 1920, height: 1040 } }, { workArea: { x: 1920, y: 0, width: 1920, height: 1040 } }];
+  const loose = barWin('cosmoInkBar');
+  w.setBounds({ x: 2400, y: 300, width: 340, height: 300 });
+  L['ink:show'](ev(w), { mode: 'free', dx: 360, dy: 20, ...size });
+  assert.deepEqual([loose.bounds.x, loose.bounds.y], [2400 + 360, 300 + 20], 'next to the note on the second monitor');
+  w.setBounds({ x: 200, y: 300, width: 340, height: 300 });
+  L['ink:show'](ev(w), { mode: 'free', dx: 360, dy: 20, ...size });
+  assert.deepEqual([loose.bounds.x, loose.bounds.y], [200 + 360, 300 + 20], 'the same note on the first monitor: there');
+  L['ink:show'](ev(w), { mode: 'free', x: 2500, y: 300, ...size });
+  assert.ok(loose.bounds.x < 1920, 'an old screen spot (x, y) does not take it to the other monitor');
+  w.setBounds({ x: 1920 - 340 - 20, y: 300, width: 340, height: 300 });
+  L['ink:show'](ev(w), { mode: 'free', dx: 360, dy: 20, ...size });
+  assert.ok(loose.bounds.x + 6 + 290 <= 1920, 'room only on the next monitor: it stays on the note\'s');
+  L['ink:show'](ev(w), { mode: 'dock', side: 'right', off: 10, ...size });
+  assert.ok(loose.bounds.x + 6 + 290 <= 1920, 'stuck to the right side at the monitor\'s edge: over the note, not on the next monitor');
+  L['ink:drag'](ev(w), { x: 2600, y: 400, px: 2700, py: 420, ...size });
+  assert.equal(loose.bounds.x, 2600, 'dragged loose, it can still go to the other monitor');
+  L['ink:hide'](ev(w)); loose.close(); delete E.__displays;
 
   // ---- the text toolbar: its own window, the same rules, the drawing toolbar untouched (1.1.16)
   await H['note:update'](ev(w), { pinned: false });

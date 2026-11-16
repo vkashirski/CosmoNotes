@@ -8,13 +8,18 @@ const { applyClickThrough, applyState, clickThroughNow, setWinTitle } = require(
 const { createNote, duplicateNote, unrollWin } = require('./note-window');
 const { applyPatch, senderNote } = require('./ipc-common');
 const { hiddenInList, unlockedForNow } = require('./list-visibility');
+const { openApps } = require('./app-pin');
 const { S } = require('./state');
 
 function registerNoteIpc() {
   ipcMain.handle('note:get', (e) => {
     const { win, note } = senderNote(e);
     if (!note) return null;
-    return { ...viewOf(note, win), focusEditor: !!win.focusOnLoad, settings: noteSettings() };
+    // 1.4.1: reminders that went off while this window was still loading play their sound now (main/reminders.js popUp)
+    const ring = win.ringIds || [];
+    win.ringIds = null;
+    win.ringLoaded = true;
+    return { ...viewOf(note, win), focusEditor: !!win.focusOnLoad, settings: noteSettings(), ring };
   });
   ipcMain.handle('note:unlock', async (e, pw) => {
     const { win, note } = senderNote(e);
@@ -84,7 +89,7 @@ function registerNoteIpc() {
   // 1.3.28: a note its lock hides (in its window, or in the list) can't be copied: unlock it first
   ipcMain.handle('note:duplicate', (e) => { const { win, note } = senderNote(e); return note && (win.revealed || !isLocked(note)) ? duplicateNote(note.id) : null; });
   ipcMain.handle('list:duplicate', (e, id) => { const n = S.store.get(String(id)); return n && !hiddenInList(n) ? duplicateNote(n.id) : null; });
-  ipcMain.handle('note:new', (e) => { createNote({ near: BrowserWindow.fromWebContents(e.sender) }); });
+  ipcMain.handle('note:new', (e) => createNote({ near: BrowserWindow.fromWebContents(e.sender) })); // 1.4.6: settles once it shows
   ipcMain.handle('note:close', (e) => {
     const { win, note } = senderNote(e);
     if (!note) return;
@@ -93,6 +98,9 @@ function registerNoteIpc() {
     win.byHand = true; // 1.3.30: Ctrl+Shift+T / the tray can bring it back (note-window.js 'closed')
     win.close();
   });
+  // 1.4.5: the pin's right-click list: the apps open now, A to Z, with their workspaces / files (main/app-pin.js). Only
+  // window titles, nothing of a note: a hidden locked note may ask too (pinApps is in WHILE_HIDDEN)
+  ipcMain.handle('pin:apps', (e) => (senderNote(e).note ? openApps() : null));
   // 1.1.13: the note's own minimise and maximise buttons
   ipcMain.handle('note:minimize', (e) => {
     const { win } = senderNote(e);

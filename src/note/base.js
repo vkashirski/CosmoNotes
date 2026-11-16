@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 1 of 12: the colour row, saving, dates, look & settings, effects on the note
+// CosmoNotes note window, part 1 of 14: the colour row, saving, dates, look & settings, effects on the note
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   // K: the names the parts share. V: variables more than one part changes (V.note etc.). K.later('f'): a function a later part
@@ -237,7 +237,11 @@
     showDates();
     const pin = $('#btnPin');
     pin.setAttribute('aria-pressed', String(!!V.note.pinned));
-    pin.title = V.note.pinned ? 'Unpin (let other windows cover it)' : 'Pin on top of other windows';
+    // 1.4.5: pinned over some apps only (src/note/pin-apps.js): its own look, and the apps in the tooltip
+    const over = V.note.pinned && Array.isArray(V.note.pinApps) ? V.note.pinApps : [];
+    pin.classList.toggle('app', over.length > 0);
+    pin.title = over.length ? `Pinned over ${over.map((r) => (r.part ? `${r.app}: ${r.part}` : r.app)).join(', ')}. Click to unpin. Right-click to change.`
+      : V.note.pinned ? 'Unpin (let other windows cover it). Right-click: only over some apps.' : 'Pin on top of other windows. Right-click: only over some apps.';
     $('#title').textContent = titleText();
     $$('#colors .sw').forEach((b) => b.classList.toggle('on', b.dataset.color === V.note.color));
     $$('#fontSeg button').forEach((b) => b.classList.toggle('on', b.dataset.font === V.note.font));

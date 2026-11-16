@@ -8,7 +8,7 @@
  * Keep each item short: one or two plain sentences.
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-11-14',
+  LAST_UPDATED: '2026-11-16',
 
   FEATURES: [
     {
@@ -25,8 +25,10 @@ window.COSMO_ABOUT = {
     {
       title: 'Sticky notes on your desktop',
       items: [
-        'Pin a note to keep it above every other window.',
+        'Pin a note to keep it above every other window. The one you pinned or clicked last is on top.',
         'Click-through: read a pinned note over a video or game, and click what’s under it. Turn it on in Settings.',
+        'Right-click the pin to pin a note to some apps. It follows them: on top in front, behind other apps, gone while they’re closed.',
+        'Tick a whole app, or just one folder or file in it. No note can show over a game in exclusive full screen.',
         'Make a note see-through. It can turn solid while your mouse is over it.',
         'Roll a note up to just its top bar.',
         'Minimise and maximise buttons next to the X. Double-click the top bar to maximise.',
@@ -41,6 +43,17 @@ window.COSMO_ABOUT = {
       ],
     },
     {
+      title: 'Reminders',
+      items: [
+        'Add a reminder to a note: Add → Reminder, or right-click it in All notes. A note can have several.',
+        'Pick a quick time or your own. Repeat it every day, on weekdays, on some days of the week, every month, or every few minutes.',
+        'At its time the note pops up on the screen you’re using. It glows, wobbles and plays a calm sound. Snooze or Done.',
+        'Missed one while the PC was off? It shows when CosmoNotes starts.',
+        'A reminder can carry a message, and hide its note until it goes off.',
+        'The clock button in All notes shows only notes with reminders. Pick the sound and volume in Settings.',
+      ],
+    },
+    {
       title: 'Writing',
       items: [
         'Bold, italic, underline, strikethrough, bullet lists and checklists.',
@@ -48,7 +61,7 @@ window.COSMO_ABOUT = {
         'Checkboxes can keep one size. Change these in Settings, or for one note in its ⋯ menu.',
         'Copy and paste keeps checklist boxes, fonts, sizes and colours.',
         'Ctrl+F finds words in a note.',
-        'The A button opens a text toolbar: font, colour, highlight and size. It changes the selected text, or what you type next.',
+        'The A button opens a text toolbar: font, colour, highlight and size (0.7 to 1.9). It changes the selected text, or what you type next.',
         'Spelling check, on or off for each note. Cyrillic words can be skipped.',
         'Word wrap on or off for each note. With it off, a line only ends where you press Enter.',
         'Links become clickable as you type them.',
@@ -85,7 +98,7 @@ window.COSMO_ABOUT = {
       title: 'The Add button',
       items: [
         'Photos: from a file, pasted or dragged in. Drag a corner to resize.',
-        'Right-click a photo to add a description. Search finds the photo by it.',
+        'Right-click a photo to copy it or add a description. Search finds the photo by its description.',
         'Voice recordings you can play inside the note. They save while you talk, so closing the note or a crash keeps them.',
         'Voice to text: talk, and the words appear in your note. It all stays on this device.',
         'Transcribe: right-click a voice note to turn it into text.',
