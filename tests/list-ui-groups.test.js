@@ -139,6 +139,102 @@ const assert = require('assert');
   assert.equal(d.notes.find((n) => n.id === B).groupId, null, 'its notes moved up a level');
   assert.equal(d.groups.find((x) => x.id === KITCHEN).parentId, null, 'its sub-groups too');
   assert.ok(!d.notes.some((n) => n.deletedAt && [A, B].includes(n.id)), 'no note was deleted');
+
+  // ---- 1.4.9: Undo / Redo of moves (Ctrl+Z / Ctrl+Y), the look of several groups, Move out, Cut / Paste
+  await ui.key('Control+z');
+  d = await ui.get();
+  assert.ok(d.groups.some((x) => x.id === HOME), 'Ctrl+Z: the ungrouped group is back');
+  assert.equal(d.notes.find((n) => n.id === B).groupId, HOME); assert.equal(d.groups.find((x) => x.id === KITCHEN).parentId, HOME);
+  assert.ok(/Ungroup undone/.test(await ui.text('#toast')), 'and it says so');
+  await ui.key('Control+y');
+  assert.ok(!(await ui.get()).groups.some((x) => x.id === HOME), 'Ctrl+Y: ungrouped again');
+  // the look of several picked groups at once
+  await ui.click(ui.groupKey(KITCHEN), { ctrlKey: true }); await ui.click(ui.groupKey(pair), { ctrlKey: true });
+  assert.ok(await ui.visible('#bLook'), 'groups picked: a Look button');
+  await ui.click('#bLook');
+  assert.ok(await ui.visible('#lookPop'), 'it opens the looks');
+  await ui.click('#lookStyles button[data-style="notebook"]');
+  await ui.click('#lookColors [data-gc="mint"]');
+  d = await ui.get();
+  for (const id of [KITCHEN, pair]) { const gg = d.groups.find((x) => x.id === id); assert.equal(gg.style, 'notebook', 'both got the look'); assert.equal(gg.color, 'mint', 'and the colour'); }
+  assert.ok(await page.$eval('#lookStyles button[data-style="notebook"]', (b) => b.classList.contains('on')), 'the shared look is lit');
+  await ui.key('Escape');
+  assert.ok(!(await ui.visible('#lookPop')), 'Escape closes the looks');
+  await ui.key('Escape');
+  // Move out: the picked ones leave the open group (which then goes away, being empty); Ctrl+Z brings it all back
+  await ui.click(ui.groupKey(KITCHEN));
+  assert.ok(!(await ui.visible('#bOut')), 'nothing picked: no Move out');
+  await ui.click(ui.noteKey(C), { ctrlKey: true }); await ui.click(ui.noteKey(made.id), { ctrlKey: true });
+  assert.ok(await ui.visible('#bOut'), 'inside a group: Move out');
+  await ui.click('#bOut');
+  d = await ui.get();
+  assert.equal(d.notes.find((n) => n.id === C).groupId, null); assert.equal(d.notes.find((n) => n.id === made.id).groupId, null, 'both moved out');
+  assert.ok(!d.groups.some((x) => x.id === KITCHEN), 'the emptied group went away');
+  await ui.key('Control+z');
+  d = await ui.get();
+  assert.ok(d.groups.some((x) => x.id === KITCHEN && x.style === 'notebook'), 'Ctrl+Z: the group is back, with its look');
+  assert.equal(d.notes.find((n) => n.id === C).groupId, KITCHEN); assert.equal(d.notes.find((n) => n.id === made.id).groupId, KITCHEN, 'both back inside');
+  if (await ui.visible('#groupHead')) await ui.click('#crumbs button.crumb');
+  // Cut and Paste: Ctrl+X, open a group, Ctrl+V; one Ctrl+Z puts both back
+  await ui.click(ui.noteKey(A), { ctrlKey: true }); await ui.click(ui.groupKey(pair), { ctrlKey: true });
+  await ui.key('Control+x');
+  assert.equal(await ui.count('#cards > .card.cut'), 2, 'the cut cards look cut');
+  assert.ok(await ui.visible('#bPaste') && (await ui.text('#bulkCount')) === '2 cut', 'the bar offers Paste here');
+  await ui.click(ui.groupKey(KITCHEN));
+  await ui.key('Control+v');
+  d = await ui.get();
+  assert.equal(d.notes.find((n) => n.id === A).groupId, KITCHEN); assert.equal(d.groups.find((x) => x.id === pair).parentId, KITCHEN, 'pasted into the open group');
+  assert.ok(!(await ui.visible('#bulk')), 'nothing cut any more: the bar goes');
+  await ui.key('Control+z');
+  d = await ui.get();
+  assert.equal(d.notes.find((n) => n.id === A).groupId, null); assert.equal(d.groups.find((x) => x.id === pair).parentId, null, 'one Ctrl+Z: both back');
+  await ui.click('#crumbs button.crumb');
+  // from the right-click menus: Cut on a card, Paste into a group card
+  await ui.menu(ui.noteKey(A), 'Cut (Ctrl+X)');
+  await ui.menu(ui.groupKey(KITCHEN), 'Paste into this group (1)');
+  assert.equal((await ui.get()).notes.find((n) => n.id === A).groupId, KITCHEN, 'Paste into this group');
+  await ui.key('Control+z');
+  // Copy: Ctrl+C, then Ctrl+V puts copies in the open group (and again); the originals stay; Ctrl+Z bins the last copies
+  const notesNow = async () => (await ui.get()).notes.filter((n) => !n.deletedAt).length;
+  const before2 = await notesNow();
+  await ui.click(ui.noteKey(A), { ctrlKey: true });
+  await ui.key('Control+c');
+  assert.equal(await ui.count('#cards > .card.cut'), 0, 'copied cards don’t look cut');
+  assert.equal(await ui.text('#bulkCount'), '1 copied');
+  await ui.click(ui.groupKey(KITCHEN));
+  await ui.key('Control+v');
+  d = await ui.get();
+  const aCopy = d.notes.find((n) => n.groupId === KITCHEN && n.title === 'Milk' && n.id !== A);
+  assert.ok(aCopy, 'a copy of Milk inside Kitchen'); assert.equal(d.notes.find((n) => n.id === A).groupId, null, 'the original stays');
+  assert.ok(/Pasted 1 copy/.test(await ui.text('#toast')));
+  await ui.key('Control+v');
+  assert.equal(await notesNow(), before2 + 2, 'copies can be pasted again');
+  await ui.key('Control+z');
+  assert.equal(await notesNow(), before2 + 1, 'Ctrl+Z: the last copy goes to the Bin');
+  assert.ok(/in the Bin/.test(await ui.text('#toast')));
+  await ui.key('Escape');
+  await ui.click('#crumbs button.crumb');
+  await ui.H['list:trash']({}, aCopy.id); await ui.H['list:destroy']({}, aCopy.id);
+  for (const n of (await ui.get()).notes.filter((x) => x.deletedAt && x.title === 'Milk')) await ui.H['list:destroy']({}, n.id);
+  await ui.settle();
+  // a group can't be pasted inside itself; Escape forgets what was cut
+  await ui.menu(ui.groupKey(KITCHEN), 'Cut (Ctrl+X)');
+  await ui.click(ui.groupKey(KITCHEN));
+  await ui.key('Control+v');
+  assert.ok(/inside itself/.test(await ui.text('#toast')), 'not inside itself');
+  assert.equal((await ui.get()).groups.find((x) => x.id === KITCHEN).parentId, null);
+  await ui.key('Escape');
+  assert.ok(!(await ui.visible('#bulk')), 'Escape forgets the cut');
+  if (await ui.visible('#groupHead')) await ui.click('#crumbs button.crumb');
+  // several cards dragged at once are one Undo step
+  await ui.click(ui.noteKey(A), { ctrlKey: true }); await ui.click(ui.noteKey(B), { ctrlKey: true });
+  await ui.drag(ui.noteKey(A), ui.groupKey(pair));
+  d = await ui.get();
+  assert.ok(d.notes.find((n) => n.id === A).groupId === pair && d.notes.find((n) => n.id === B).groupId === pair, 'both dragged in');
+  await ui.key('Control+z');
+  d = await ui.get();
+  assert.ok(d.notes.find((n) => n.id === A).groupId === null && d.notes.find((n) => n.id === B).groupId === null, 'one Ctrl+Z: both back');
+
   await ui.menu(ui.groupKey(KITCHEN), 'Move its notes to Bin…');
   assert.ok(/Move all 2 notes in “Kitchen” to the Bin\?/.test(await ui.modalTitle()), 'it says how many notes');
   await ui.modalOk();

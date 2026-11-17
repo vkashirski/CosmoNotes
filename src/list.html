@@ -47,6 +47,8 @@
     <button class="iconbtn" id="btnSort" title="Sort"><svg viewBox="0 0 24 24"><path d="M3 6h13M3 12h9M3 18h5"/><path d="M18 8v12M15 17l3 3 3-3"/></svg></button>
     <button class="iconbtn" id="btnSize" title="Card size"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5" opacity=".55"/><rect x="3" y="14" width="5" height="5" rx="1.2" opacity=".55"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg></button>
     <button class="iconbtn" id="btnFront" title="Bring all open notes to the front (and unroll rolled-up ones)"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a2 2 0 0 1 2-2h11"/></svg></button>
+    <!-- 1.4.10: every tag in use: click to filter by it (list/cards.js paintTagRow) -->
+    <div class="tagrow" id="tagRow" hidden></div>
   </div>
   <!-- 1.1.15: the Locked tab's bar: uncover every locked note in this list with the password, and cover them again -->
   <div class="lockbar" id="lockBar" hidden>
@@ -393,6 +395,15 @@
     <div class="mbtns"><button type="button" class="pill ghost" id="mCancel">Cancel</button><button type="submit" class="pill" id="mOk">OK</button></div>
   </form>
 </div>
+<!-- 1.4.10: the tags of a note, a group or the selected ones (src/tags.js editor; list/actions-locks.js openTagSheet) -->
+<div class="modal" id="tagSheet" hidden>
+  <div class="mbox rbox tbox">
+    <h3 id="tagTitle">Tags</h3>
+    <div id="tagHere"></div>
+    <p class="mtip" id="tagTip" hidden></p>
+    <div class="mbtns"><button type="button" class="pill" id="tagClose">Done</button></div>
+  </div>
+</div>
 <!-- 1.4.1: a note's reminders (src/remind-ui.js fills it; list/actions-locks.js openRemindSheet) -->
 <div class="modal" id="remSheet" hidden>
   <div class="mbox rbox">
@@ -488,6 +499,7 @@
 <script src="evening.js"></script>
 <script src="reminders.js"></script>
 <script src="remind-ui.js"></script>
+<script src="tags.js"></script>
 <!-- this window's own code (1.1.28: list.js split into src/list/, in this order; see ai-context/splitting-code.md) -->
 <script src="list/base.js"></script>
 <script src="list/cards.js"></script>

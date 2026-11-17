@@ -3,7 +3,7 @@
 // (src/list.js until 1.1.28; the parts load in order from list.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_LIST_KIT;
-  const { V, S, $, ICON, cardsTabNow, sel, h, when, plural, tilt, groupById,
+  const { V, S, $, $$, ICON, GCOLORS, GNAMES, cardsTabNow, sel, h, when, plural, tilt, groupById,
     notesInTree, isInside, noteIsLocked, groupIsLocked, isShut, LOCKED_NO_DELETE, favourites, cardBody, markMore, emptyState,
     noteById } = K;
   // defined in a later part:
@@ -11,7 +11,7 @@
     paintFx = K.later('paintFx'), destroyNote = K.later('destroyNote'), ensurePassword = K.later('ensurePassword'),
     lockNote = K.later('lockNote'), lockGroup = K.later('lockGroup'), unlockNoteNow = K.later('unlockNoteNow'),
     relockNote = K.later('relockNote'), unlockGroupNow = K.later('unlockGroupNow'), relockGroup = K.later('relockGroup'),
-    openEditMany = K.later('openEditMany');
+    openEditMany = K.later('openEditMany'), openTagSheet = K.later('openTagSheet');
   // ================================================================ favourites, selecting, the lock animation (1.1.13)
   function itemOfKey(k) {
     const id = k.slice(2);
@@ -126,6 +126,7 @@
         b.title = b.disabled ? '' : fav ? 'Remove from favourites' : 'Add to favourites';
       }
       c.classList.toggle('sel', sel.has(k));
+      c.classList.toggle('cut', V.cutMode === 'cut' && V.cut.has(k)); // 1.4.9: cut, waiting for Paste
       const ls = lockStateOf(k);
       seen.set(k, ls);
       const before = V.lockSeen.get(k);
@@ -187,11 +188,27 @@
     bb('bClose', ICON.hide, 'Close', 'Close the selected notes (they stay here)'),
     bb('bFav', ICON.star, 'Favourite', ''),
     bb('bEdit', ICON.edit, 'Edit design', 'Colour, see-through and effects of the selected notes'),
+    bb('bTags', ICON.tag, 'Tags', 'Add or remove tags on the selected notes and groups'), // 1.4.10
     bb('bGroup', ICON.folder, 'Group', 'Put the selected notes and groups together in a new group'),
+    bb('bLook', ICON.palette, 'Look', 'Look and colour of the selected groups'),
+    bb('bOut', ICON.out, 'Move out', 'Move the selected ones out of this group'),
+    bb('bCut', ICON.cut, 'Cut', 'Cut, then paste them in another group (Ctrl+X)'),
+    bb('bCopy', ICON.copy, 'Copy', 'Copy, then paste copies in a group (Ctrl+C)'),
+    bb('bPaste', ICON.paste, 'Paste here', 'Move the cut ones here (Ctrl+V)'),
     bb('bLock', ICON.lock, 'Lock', 'Lock the selected notes and groups'),
     bb('bBin', ICON.trash, 'Bin', 'Move the selected notes to the Bin (Delete key)', 'danger'),
     h('button', { class: 'bb x', id: 'bX', title: 'Clear the selection (Esc)', html: ICON.x }));
   document.body.append(bulk);
+  // 1.4.9: the selected groups' look and colour (the same looks as the group panel's, list.html #gStyles)
+  const lookPop = h('div', { class: 'bulkpop lookpop', id: 'lookPop', hidden: true },
+    h('div', { class: 'styles', id: 'lookStyles', html: $('#gStyles').innerHTML }),
+    h('div', { class: 'swatches small', id: 'lookColors' }));
+  bulk.append(lookPop);
+  for (const [k, v] of Object.entries(GCOLORS)) {
+    $('#lookColors').append(h('button', { class: 'sw', 'data-gc': k, title: GNAMES[k], style: `background:${v}`, onclick: () => setLook({ color: k }) }));
+  }
+  $$('#lookStyles button').forEach((b) => b.addEventListener('click', () => setLook({ style: b.dataset.style })));
+  document.addEventListener('mousedown', (e) => { if (!lookPop.hidden && !e.target.closest('#lookPop, #bLook')) openLook(false); });
   // the picked notes and groups. 1.3.28: shut ones (isShut) only count, and only locking and the Bin (which keeps
   // locked ones) look at them: `all`. Everything else in the bar and its menu works on the others.
   function bulkParts(all = false) {
@@ -208,14 +225,103 @@
     return [...out.values()];
   }
   const bulkEdit = () => openEditMany(designNotes());
+  const bulkTags = () => openTagSheet(bulkParts().items); // 1.4.10
+
+  // ---- 1.4.9: the look of several groups; Move out, Cut / Paste and Undo / Redo of moves (main/move-history.js)
+  const pickedGroups = () => bulkParts().groups;
+  function paintLook() {
+    const gs = pickedGroups();
+    const one = (k, d) => (gs.length && gs.every((g) => (g[k] || d) === (gs[0][k] || d)) ? gs[0][k] || d : null);
+    const style = one('style', 'stack');
+    const color = one('color', 'kraft');
+    $('#lookStyles').style.setProperty('--gc', GCOLORS[color] || GCOLORS.kraft);
+    $$('#lookStyles button').forEach((b) => b.classList.toggle('on', b.dataset.style === style));
+    $$('#lookColors .sw').forEach((b) => b.classList.toggle('on', b.dataset.gc === color));
+  }
+  function openLook(show = lookPop.hidden) {
+    lookPop.hidden = !show || !pickedGroups().length;
+    $('#bLook').classList.toggle('on', !lookPop.hidden);
+    if (!lookPop.hidden) paintLook();
+  }
+  async function setLook(patch) {
+    const gs = pickedGroups();
+    if (!gs.length) return;
+    for (const g of gs) Object.assign(g, patch); // shows at once; the list's refresh confirms it
+    paintLook();
+    await S.groups.updateMany(gs.map((g) => g.id), patch);
+  }
+  // where Move out puts things: the level above the open group
+  const upFromHere = () => (V.openGroup ? groupById(V.openGroup)?.parentId || null : null);
+  const movedToast = (r, what = 'Moved') => {
+    if (!r || !r.moved) { toast(r && r.kept ? 'Those can’t go there' : 'Nothing to move'); return; }
+    toast(`${what} ${plural(r.moved, 'item')}${r.kept ? ` · ${r.kept} stayed` : ''} · Ctrl+Z undoes it`);
+  };
+  async function bulkOut() {
+    const { items } = bulkParts();
+    if (!V.openGroup || V.tab !== 'notes' || !items.length) return;
+    const r = await S.groups.moveMany(items.map((it) => it.id), upFromHere());
+    clearSel();
+    movedToast(r);
+  }
+  // Cut / Copy keep the picked cards (shut ones are left out); Paste moves them, or puts copies of them, into the group
+  // that is open (or the top level). Copies can be pasted again; what was cut is pasted once.
+  function bulkCut(keys = [...sel], mode = 'cut') {
+    const ok = keys.filter((k) => thingOf(k) && !shutKey(k));
+    if (!ok.length) return;
+    V.cut = new Set(ok);
+    V.cutMode = mode;
+    clearSel();
+    toast(`${mode === 'copy' ? 'Copied' : 'Cut'} ${plural(ok.length, 'item')} · open a group and paste (Ctrl+V)`);
+  }
+  const bulkCopy = (keys = [...sel]) => bulkCut(keys, 'copy');
+  function cancelCut() {
+    if (!V.cut.size) return false;
+    V.cut = new Set();
+    paintCards();
+    return true;
+  }
+  async function pasteCut(groupId = V.openGroup || null) {
+    const ids = [...V.cut].filter((k) => thingOf(k)).map((k) => k.slice(2));
+    if (!ids.length) { cancelCut(); return; }
+    if (V.tab !== 'notes' && groupId === (V.openGroup || null)) { toast('Paste in All notes, inside a group'); return; }
+    if (groupId && ids.some((id) => id === groupId || isInside(groupId, id))) { toast('A group can’t go inside itself'); return; }
+    if (V.cutMode === 'copy') {
+      const r = await S.groups.copyMany(ids, groupId);
+      if (!r || !r.copied) { toast('Those can’t be copied'); return; }
+      toast(`Pasted ${r.copied} ${r.copied === 1 ? 'copy' : 'copies'}${r.kept ? ` · ${r.kept} skipped` : ''} · Ctrl+Z undoes it`);
+      return;
+    }
+    V.cut = new Set();
+    const r = await S.groups.moveMany(ids, groupId, 'Paste');
+    paintCards();
+    movedToast(r);
+  }
+  async function undoMove(again = false) {
+    const r = await (again ? S.groups.redo() : S.groups.undo());
+    if (!r) { toast(again ? 'Nothing to redo' : 'Nothing to undo'); return; }
+    const binned = r.label === 'Copy' && !again && r.moved ? ' · the copies are in the Bin' : '';
+    toast(`${r.label} ${again ? 'redone' : 'undone'}${binned}${r.kept ? ` · ${r.kept} couldn’t move` : ''}`);
+  }
   function paintBulk() {
     const every = bulkParts(true);
     const { items, notes } = bulkParts();
-    const show = every.items.length > 0 && cardsTabNow();
+    const pasting = V.cut.size > 0 && V.tab === 'notes'; // 1.4.9: something cut is waiting: the bar offers Paste here
+    const show = (every.items.length > 0 || pasting) && cardsTabNow();
     bulk.hidden = !show;
     document.body.classList.toggle('selecting', show);
-    if (!show) return;
-    $('#bulkCount').textContent = `${every.items.length} selected`;
+    if (!show) { lookPop.hidden = true; return; }
+    bulk.classList.toggle('pasteonly', !every.items.length);
+    $('#bPaste').hidden = !pasting;
+    const pasted = V.cutMode === 'copy' ? 'Put copies of the copied ones' : 'Move the cut ones';
+    $('#bPaste').title = `${pasted} ${V.openGroup ? 'into this group' : 'here, to the top level'} (Ctrl+V)`;
+    $('#bX').title = every.items.length ? 'Clear the selection (Esc)' : `Forget what was ${V.cutMode === 'copy' ? 'copied' : 'cut'} (Esc)`;
+    $('#bLook').hidden = !pickedGroups().length;
+    if (lookPop.hidden === false) { if (!pickedGroups().length) openLook(false); else paintLook(); }
+    $('#bBin').hidden = !every.items.length;
+    $('#bOut').hidden = !(V.tab === 'notes' && V.openGroup && items.length);
+    $('#bCut').hidden = !items.length;
+    $('#bCopy').hidden = !items.length;
+    $('#bulkCount').textContent = every.items.length ? `${every.items.length} selected` : `${V.cut.size} ${V.cutMode === 'copy' ? 'copied' : 'cut'}`;
     $('#bOpen').hidden = !notes.some((n) => !n.open);
     $('#bClose').hidden = !notes.some((n) => n.open);
     const allFav = items.every((it) => (it.note || it.group).favorite);
@@ -224,6 +330,7 @@
     $('#bFav').querySelector('span').textContent = allFav ? 'Unfavourite' : 'Favourite';
     $('#bFav').title = allFav ? 'Remove the selected ones from your favourites' : 'Add the selected ones to your favourites';
     $('#bEdit').hidden = !designNotes().length;
+    $('#bTags').hidden = !items.length;
     $('#bGroup').hidden = items.length < 2;
     $('#bLock').hidden = !every.notes.some((n) => !n.ownLock) && !every.groups.some((g) => !g.locked);
     const canBin = every.notes.some((n) => !noteIsLocked(n)) || every.groups.some((g) => !groupIsLocked(g));
@@ -241,8 +348,13 @@
         notes.some((n) => n.open) ? { label: 'Close notes', icon: ICON.hide, run: bulkClose } : null,
         items.length ? { label: allFav ? 'Remove from favourites' : 'Add to favourites', icon: ICON.star, run: () => setFav([...sel], !allFav) } : null,
         designNotes().length ? { label: 'Edit design…', icon: ICON.edit, run: bulkEdit } : null,
+        items.length ? { label: 'Tags…', icon: ICON.tag, run: bulkTags } : null, // 1.4.10
         '-',
         items.length >= 2 ? { label: 'Put together in a new group', icon: ICON.folder, run: bulkGroup } : null,
+        pickedGroups().length ? { label: 'Group look…', icon: ICON.palette, run: () => openLook(true) } : null,
+        V.tab === 'notes' && V.openGroup && items.length ? { label: 'Move out of this group', icon: ICON.out, run: bulkOut } : null,
+        items.length ? { label: 'Cut (Ctrl+X)', icon: ICON.cut, run: () => bulkCut() } : null,
+        items.length ? { label: 'Copy (Ctrl+C)', icon: ICON.copy, run: () => bulkCopy() } : null,
         every.notes.some((n) => !n.ownLock) || every.groups.some((g) => !g.locked) ? { label: 'Lock', icon: ICON.lock, run: bulkLock } : null,
         '-',
         { label: `Move to Bin (${every.items.length})`, icon: ICON.trash, danger: true, run: () => bulkTrash(false), disabled: $('#bBin').disabled },
@@ -299,10 +411,16 @@
   $('#bClose').addEventListener('click', bulkClose);
   $('#bFav').addEventListener('click', () => setFav([...sel], !$('#bFav').classList.contains('on')));
   $('#bEdit').addEventListener('click', bulkEdit);
+  $('#bTags').addEventListener('click', bulkTags);
   $('#bGroup').addEventListener('click', bulkGroup);
   $('#bLock').addEventListener('click', bulkLock);
   $('#bBin').addEventListener('click', (e) => bulkTrash(e.shiftKey));
-  $('#bX').addEventListener('click', clearSel);
+  $('#bLook').addEventListener('click', () => openLook());
+  $('#bOut').addEventListener('click', bulkOut);
+  $('#bCut').addEventListener('click', () => bulkCut());
+  $('#bCopy').addEventListener('click', () => bulkCopy());
+  $('#bPaste').addEventListener('click', () => pasteCut());
+  $('#bX').addEventListener('click', () => { if (sel.size) clearSel(); else cancelCut(); });
 
 
   function renderBin(binned) {
@@ -340,5 +458,5 @@
   }
 
   Object.assign(K, { selItems, starBtn, lockBtn, unlockedNow, setFav, visibleKeys, pickCard, clearSel, paintCards, paintBulk,
-    bulkMenu, bulkTrash, renderBin });
+    bulkMenu, bulkTrash, renderBin, bulkCut, bulkCopy, cancelCut, pasteCut, undoMove, openLook });
 })();

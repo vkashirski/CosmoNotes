@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 7 of 14: right-click menus, voice notes, drawing, photo resizing
+// CosmoNotes note window, part 7 of 15: right-click menus, voice notes, drawing, photo resizing
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;

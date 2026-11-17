@@ -8,7 +8,7 @@
  * Keep each item short: one or two plain sentences.
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-11-16',
+  LAST_UPDATED: '2026-11-17',
 
   FEATURES: [
     {
@@ -134,6 +134,9 @@ window.COSMO_ABOUT = {
         'A card fades out at the bottom when the note has more.',
         'A card shows the words as the note does: fonts, colours, sizes, bold and more.',
         'Search titles and text. Inside a group, search looks only there. The Bin has its own search.',
+        'Tags for notes and groups: right-click → Tags…, or the note’s ⋯ menu. A group’s tags count for all inside it.',
+        'Click tags under the search to see only what has them. Pick several: All of them or Any. Or type #tag in the search.',
+        'A locked note’s tags stay hidden, like its words, until it is unlocked.',
         'Settings has a search too. Type a word to see only the sections with it. It knows other names too, like “dark mode”.',
         'Five card sizes, also with Ctrl + mouse wheel.',
         'Nine colour themes for this window, light and dark.',
@@ -142,6 +145,9 @@ window.COSMO_ABOUT = {
         'The Locked tab shows every locked note. “Unlock all” lets you read and search them.',
         'Favourites: click the star on a card. The Favourites tab shows them all.',
         'Ctrl+click picks several cards. A bar then opens, stars, groups, locks or bins them at once.',
+        'Picked groups can get a new look and colour at once: Look in the bar.',
+        'Move picked cards out of a group, or cut (Ctrl+X) or copy (Ctrl+C) them and paste in another group (Ctrl+V).',
+        'Ctrl+Z undoes a move or paste in the list. Ctrl+Y does it again.',
         'Edit design in that bar changes the colour, see-through, fonts and effects of them all.',
         'Moving to the Bin asks first. Shift+click skips the question.',
         'Closed a note by mistake? Ctrl+Shift+T here, or the tray’s “Reopen closed note”, opens it again.',

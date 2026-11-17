@@ -11,7 +11,7 @@ backups/YYYY-MM-DD[_HH-MM-SS]/   <uuid>.json…, groups.json, meta.json {created
 models/<id>/           1.3.1: the downloaded voice-to-text model (whisper-small-en, the only one since 1.3.4): its files as in main/stt-models.js, then
                        ready.json { run: 'gpu'|'cpu', at } written last (no ready.json = not complete). Not in backups; the
                        uninstaller leaves it. A .part left by a quit mid-download is removed at the next start.
-groups.json            { groups: [{ id, name, createdAt, parentId, style, color, locked, favorite }] }
+groups.json            { groups: [{ id, name, createdAt, parentId, style, color, locked, favorite, tags }] }
 settings.json          see below
 ```
 
@@ -34,7 +34,10 @@ reminders (1.4.1: up to 30 `{ id, start, at, repeat, sound, hide, unlock, target
 `src/reminders.js` says what each holds and `cleanAll` is the schema; not secret: main needs the times before the PIN; not an
 edit; not copied by Duplicate, nor by a backup's restored copy), remindMsg (1.4.1: `{ reminderId: message }`, at most 500
 letters each; **secret**: in `SECRET` and crypt.js `SECRET_FIELDS`, sealed with a locked note, `{}` while it is sealed, `null`
-in a hidden window, never on a card)`.
+in a hidden window, never on a card), tags (1.4.10: up to 20, `src/tags.js` `cleanAll` (lower case, letters / numbers / - / _,
+30 letters); **secret**: in `SECRET` and crypt.js `SECRET_FIELDS`, sealed with a locked note, `[]` while it is sealed, in a
+hidden window and on its card; changed only by `list:tags` / `note:tags` (add / remove), never by a save; not an edit;
+copied by Duplicate)`.
 Which of these a note can have its own value of, and what Settings → "Use on all notes" puts back, is one table: `OVERRIDES` in store.js.
 
 **Draw-over ink** (`note.ink`): `{ s: [ { t: pen|hl|line|arrow|rect|ellipse, c: '#rrggbb', w: 1–40, l: 'a'|'b',
@@ -99,7 +102,8 @@ by the PC: graphics card live, processor stop), sttWebgpu (1.3.1: whether the en
 sttTests, 1.3.1–1.3.3, are deleted at start since 1.3.4),
 lock ("salt:hash" scrypt, or null; since 1.1.30 the marker 'encrypted' while crypt exists), crypt (1.1.30: { v, pub, byPw, byRec, keyShown, off, backupsSealed (1.1.31) }: the
 encryption keys, see architecture.md; never sent to a window), lockKind ('pin'|'password', null = password from before 1.1.6),
-lockLen (PIN length, so a PIN can open by itself)`.
+lockLen (PIN length, so a PIN can open by itself), tagAny (1.4.10, false: the list's tag filter with several tags picked, All
+of them; true = Any; like listSort it doesn't trigger a reload)`.
 
 **Backups**: made at most once per day (on start and every 3 hours). The newest 30 are kept. Restoring a
 backup **never overwrites**: notes that differ come back as extra closed notes marked `restoredFrom`, all of them
@@ -130,7 +134,8 @@ or a locked group around them) and groups with anything locked inside can't be b
 
 **Groups** form a folder tree: a note has `groupId` (its direct group), and a group has `parentId` (null = top
 level). `style` is one of stack|folder|envelope|notebook, `color` one of
-kraft|sun|rose|coral|lilac|sky|mint|graphite, and `locked` is a boolean. store.js helpers: `chain` (group and its
+kraft|sun|rose|coral|lilac|sky|mint|graphite, and `locked` is a boolean. `tags` (1.4.10, like a note's but not secret, like
+the name) count for everything inside the group: its notes and its groups (the list's `tagsOfNote` / `tagsOfGroup`). store.js helpers: `chain` (group and its
 ancestors), `subtree`, `notesInTree`, `isInside`, `setParent` (refuses loops), `lockedGroupsOf`. A group
 is removed automatically once nothing in its subtree (including notes in the Bin) is left. A group with
 one note stays. **Ungroup** (`dissolveGroup`) moves the notes and sub-groups up one level, never deletes.

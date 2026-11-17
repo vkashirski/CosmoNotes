@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 14 of 14: the "Partial" eraser, the toast, start-up
+// CosmoNotes note window, part 15 of 15: the "Partial" eraser, the toast, start-up
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;

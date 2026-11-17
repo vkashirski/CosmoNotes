@@ -7,8 +7,9 @@ const { notifyList } = require('./list-notify');
 const { applyClickThrough, applyState, clickThroughNow, setWinTitle } = require('./note-state');
 const { createNote, duplicateNote, unrollWin } = require('./note-window');
 const { applyPatch, senderNote } = require('./ipc-common');
-const { hiddenInList, unlockedForNow } = require('./list-visibility');
+const { hiddenInList, knownTags, unlockedForNow } = require('./list-visibility');
 const { openApps } = require('./app-pin');
+const TAGS = require('../src/tags');
 const { S } = require('./state');
 
 function registerNoteIpc() {
@@ -78,6 +79,18 @@ function registerNoteIpc() {
     return { ok: true };
   });
   ipcMain.handle('note:update', (e, patch) => applyPatch(e, patch));
+  // 1.4.10: the ⋯ menu's tags: added and removed one at a time (src/tags.js), like the list's (list:tags). Not from a
+  // window its lock hides (its tags are secret); not an edit
+  ipcMain.handle('note:tags', (e, change = {}) => {
+    const { win, note } = senderNote(e);
+    if (!note || (isLocked(note) && !win.revealed) || !change || typeof change !== 'object') return null;
+    const add = TAGS.cleanAll([].concat(change.add || []));
+    const remove = TAGS.cleanAll([].concat(change.remove || []));
+    S.store.update(note.id, { tags: TAGS.cleanAll([...note.tags.filter((t) => !remove.includes(t)), ...add]) });
+    notifyList();
+    return S.store.get(note.id).tags;
+  });
+  ipcMain.handle('note:tags-known', () => knownTags());
   ipcMain.handle('note:dates', (e) => {
     const { note } = senderNote(e);
     return note ? { createdAt: note.createdAt, updatedAt: note.updatedAt } : null;

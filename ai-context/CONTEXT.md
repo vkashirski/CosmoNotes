@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 16 November 2026 · App version 1.4.8**
+**Last updated: 17 November 2026 · App version 1.4.10**
 
 Start with `CLAUDE.md` (rules, commands, pitfalls, release checklist). This file is the map: what the app is,
 how the folder is laid out, and which `ai-context/` file to open for the job in hand. Open only the files your
@@ -55,7 +55,7 @@ main/              state (S.store, S.listWin, S.quitting, S.listUnlockedAll + wi
                    note-window (openNoteWindow, createNote, duplicateNote, bringToFront, enforcePinned) · list-window (showList, themes) ·
                    tray (buildTray, startup, pause effects) · recordings (1.2.4: voice recordings on disk while made, finished on
                    close / lock / quit, recovered after a crash) · ipc-common (senderNote, applyPatch) · ipc-notes · ipc-ink · ipc-files (+ rec:*) ·
-                   ipc-groups (list:get, groups:*) · ipc-list-actions (list locks, open/close/trash/edit/apply, bin) · ipc-settings
+                   ipc-groups (list:get, groups:*) · move-history (1.4.9: Undo / Redo of moves and pastes in the list: recorded, recordCopy, undoMove, redoMove) · ipc-list-actions (list locks, open/close/trash/edit/apply, bin) · ipc-settings
                    (settings:set, backups) · ipc-crypt (crypt:* from Settings → Locked notes) · 1.3.1 voice to text: stt-models (the
                    model list: files, commits, sha256; where they are) · stt-engine (the hidden engine window, cosmomodel://, its
                    session) · stt-download (the model's download, Remove, .part cleanup) · ipc-stt (stt:* jobs + Settings) ·
@@ -70,7 +70,7 @@ main/              state (S.store, S.listWin, S.quitting, S.listUnlockedAll + wi
                    ipc (registerIpc calls the nine ipc-* parts and reminders' registerRemindIpc)
 store.js           All disk storage (notes, groups, settings, attachments, backups). No Electron imports.
 preload.js         Safe bridge: exposes window.sticky.* to both windows (contextIsolation + sandbox)
-src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/note/*.js, 14 parts (1.4.5) loaded in this order, sharing
+src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/note/*.js, 15 parts (1.4.10) loaded in this order, sharing
                    names through window.COSMO_NOTE_KIT (K) and its V (V.note, V.settings, V.hidden, V.dirty, V.savedRange…; see
                    splitting-code.md): base (api, $, colour row, saving: collect/changed/saveNow, dates, applyLook, effects on the
                    note) · fx-format (the Effects pop-up, spelling, selection helpers: saveSel/restoreSel/insertNodes, formatting:
@@ -84,8 +84,8 @@ src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/n
                    word wrap, zoom: zoomNow/setZoom, sideways scroll) · draw-over (draw-over: inkState, renderInk, saveInk; floating
                    toolbars: movable) · ink-out (toolbars in their own little windows: barOut, inkOut/textOut; whole-stroke
                    eraser) · remind (1.4.1: Add → Reminder's panel, the strip of a reminder that rings: Snooze / Done, the glow,
-                   the sound) · pin-apps (1.4.5: the pin's right-click list, "Pin over": the open apps to tick) · eraser-start (the Partial eraser, toast(), start-up: init; it stays last: see splitting-code.md).
-                   Before its own code it loads src/reminders.js and src/remind-ui.js (below).
+                   the sound) · pin-apps (1.4.5: the pin's right-click list, "Pin over": the open apps to tick) · tags (1.4.10: the ⋯ menu's Tags row) · eraser-start (the Partial eraser, toast(), start-up: init; it stays last: see splitting-code.md).
+                   Before its own code it loads src/reminders.js, src/remind-ui.js and src/tags.js (below).
                    Its styles: src/css/note-*.css, loaded by note.html in this order:
                    note-base (colours, base, top bar) · note-text (locked note, photo handle, writing area) ·
                    note-toolbars (bottom bar, pop-overs) · note-drawing (right-click menu, recording, drawing, toast, 1.1.0–1.1.10 additions) ·
@@ -115,6 +115,8 @@ src/evening.js     1.3.27: evening colours: each light paper's evening shade, th
 src/reminders.js   1.4.1 reminders: the rules (cleaning, repeats and their next time, Snooze, Done, missed, hiding) and their words.
                    Like evening.js: loaded by both windows (window.COSMO_REMIND) and required by main and store.js
 src/remind-ui.js   1.4.1 the reminders panel (the same in both windows) and the 10 sounds (Web Audio, no files): window.COSMO_REMIND_UI
+src/tags.js        1.4.10 tags: the rules (clean, the search box's #tags, All / Any) and the editor (chips + a box), the same in both
+                   windows (window.COSMO_TAGS); main and store.js require it
 src/about.js       In-app feature list (window.COSMO_ABOUT.FEATURES) + LAST_UPDATED date; no version history since 1.1.41
 src/fx/            Note effects + mouse followers (window.COSMO_FX), used by both windows: 8 files loaded in order (see effects.md)
 src/fx.js          Not used since 1.1.24: only a note saying the code moved to src/fx/ (can be deleted)

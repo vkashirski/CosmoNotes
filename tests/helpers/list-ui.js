@@ -52,7 +52,7 @@ module.exports = async function openList(seedFn) {
   const fresh = async (before, now) => [...(await now())].find((x) => !before.has(x));
   const seed = {
     H, E,
-    // a note: { title, html, color, font, titleFont, group, favorite, open }  →  its id
+    // a note: { title, html, color, font, titleFont, group, favorite, tags, open }  →  its id
     async note(o = {}) {
       const before = await ids();
       await H['list:new']({}, o.group || null);
@@ -64,10 +64,11 @@ module.exports = async function openList(seedFn) {
       if (o.font) await H['list:apply']({}, [id], { font: o.font });
       if (o.titleFont) await H['note:update']({ sender: w.webContents }, { titleFont: o.titleFont }); // 1.3.3
       if (o.favorite) await H['list:favorite']({}, [id], true);
+      if (o.tags) await H['list:tags']({}, [id], { add: o.tags }); // 1.4.10
       if (!o.open) await H['list:close-note']({}, id);
       return id;
     },
-    // a group made from notes (and groups): { name, parent, style, color, favorite }  →  its id
+    // a group made from notes (and groups): { name, parent, style, color, favorite, tags }  →  its id
     async group(members, o = {}) {
       const before = await gids();
       await H['groups:make-from']({}, members, o.parent || null);
@@ -75,6 +76,7 @@ module.exports = async function openList(seedFn) {
       if (o.name) await H['groups:rename']({}, id, o.name);
       if (o.style || o.color) await H['groups:update']({}, id, { ...(o.style ? { style: o.style } : {}), ...(o.color ? { color: o.color } : {}) });
       if (o.favorite) await H['list:favorite']({}, [id], true);
+      if (o.tags) await H['list:tags']({}, [id], { add: o.tags }); // 1.4.10
       return id;
     },
     // (1.1.30: the first password sets up encryption and the list would show the recovery key; seeding skips that pop-up)

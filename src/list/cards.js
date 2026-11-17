@@ -5,7 +5,8 @@
   const K = window.COSMO_LIST_KIT;
   const { V, S, $, $$, GCOLORS, THEMES, SIZES, sizeNow, themeNow, ICON, cardsTabNow, navBack, sel, h, when, full,
     plural, tilt, live, groupById, childGroups, chainOf, subtreeIds, notesInTree, isInside, noteIsLocked,
-    groupIsLocked, isShut, noteById, lockedOnes, favourites, sortItems } = K;
+    groupIsLocked, isShut, noteById, lockedOnes, favourites, sortItems, groupShown, finding, noteFits, groupFits,
+    knownTags } = K;
   // defined in a later part:
   const selItems = K.later('selItems'), starBtn = K.later('starBtn'), lockBtn = K.later('lockBtn'),
     pickCard = K.later('pickCard'), clearSel = K.later('clearSel'), paintCards = K.later('paintCards'),
@@ -66,10 +67,52 @@
     $('#qClear').hidden = !V.query;
     $('#bqClear').hidden = !V.binQuery;
     $('#btnNew').title = inGroup ? `New note inside “${inGroup.name || 'this group'}”` : 'New note';
-    if (cardsTabNow()) renderNotes(liveNotes, animate);
+    if (cardsTabNow()) { paintTagRow(); renderNotes(liveNotes, animate); }
     else paintBulk();
     if (V.tab === 'bin') renderBin(binned);
     if (V.tab === 'settings') renderSettings();
+  }
+
+  // ---------- 1.4.10: tags. The row under the search box: every tag in use (the picked ones first, then A–Z); a click
+  // picks or drops one; with two or more picked, All / Any. A card's own tags under its words: a click picks that tag.
+  function setTagPick(list) {
+    V.tagPick = list;
+    render();
+    $('#viewNotes').scrollTop = 0;
+  }
+  const toggleTag = (t) => setTagPick(V.tagPick.includes(t) ? V.tagPick.filter((x) => x !== t) : [...V.tagPick, t]);
+  const pickTag = (t) => { if (!V.tagPick.includes(t)) setTagPick([...V.tagPick, t]); };
+  function paintTagRow() {
+    const row = $('#tagRow');
+    const known = knownTags();
+    const have = new Set(known.map((k) => k.tag));
+    if (V.tagPick.some((t) => !have.has(t))) V.tagPick = V.tagPick.filter((t) => have.has(t)); // its last note went
+    row.hidden = !known.length;
+    if (row.hidden) return;
+    const picked = known.filter((k) => V.tagPick.includes(k.tag));
+    const rest = known.filter((k) => !V.tagPick.includes(k.tag));
+    const chip = ({ tag, count }) => h('button', {
+      class: 'tagchip' + (V.tagPick.includes(tag) ? ' on' : ''),
+      title: V.tagPick.includes(tag) ? 'Click to stop filtering by it' : `Show only what has it (${count})`,
+      onclick: () => toggleTag(tag),
+    }, `#${tag}`, h('small', {}, String(count)));
+    const any = !!V.state.settings.tagAny;
+    const setAny = (v) => { if (v === any) return; V.state.settings.tagAny = v; S.settings.set({ tagAny: v }); render(); };
+    row.replaceChildren(...[
+      h('span', { class: 'tagico', title: 'Tags: click one to filter, or type #tag in the search', html: ICON.tag }),
+      h('div', { class: 'tagchips' }, ...picked.map(chip), ...rest.map(chip)),
+      V.tagPick.length >= 2 ? h('div', { class: 'seg tagmode', title: 'All: has every picked tag · Any: has one of them' },
+        h('button', { class: any ? '' : 'on', onclick: () => setAny(false) }, 'All'),
+        h('button', { class: any ? 'on' : '', onclick: () => setAny(true) }, 'Any')) : null,
+      V.tagPick.length ? h('button', { class: 'qclear tagclear', title: 'Stop filtering by tags', html: ICON.x, onclick: () => setTagPick([]) }) : null,
+    ].filter(Boolean));
+  }
+  function tagPills(tags) {
+    if (!tags || !tags.length) return null;
+    return h('div', { class: 'ctags' }, ...tags.map((t) => h('button', {
+      class: 'ctag', title: `Show only what has #${t}`, draggable: 'false',
+      onclick: (e) => { e.stopPropagation(); pickTag(t); },
+    }, `#${t}`)));
   }
 
   const PICTURE_ONLY = ['\u{1F5BC}\uFE0F Photo', '\u270F\uFE0F Drawing']; // must match collect() in note.js
@@ -263,8 +306,9 @@
     return list.some((x) => canMoveInto(x, gid));
   }
   async function moveInto(d, gid) {
-    for (const x of dragList(d)) if (canMoveInto(x, gid)) await S.groups.moveTo(x.id, gid || null);
-    if (d.many) clearSel();
+    // 1.4.9: several cards move in one go, so one Ctrl+Z puts them all back
+    if (d.many) { await S.groups.moveMany(d.many.filter((x) => canMoveInto(x, gid)).map((x) => x.id), gid || null); clearSel(); return; }
+    if (canMoveInto(d, gid)) await S.groups.moveTo(d.id, gid || null);
   }
 
   function noteCard(n, i, { inGroup = false } = {}) {
@@ -294,7 +338,7 @@
       title: n.open ? 'Click to bring to front · Ctrl+click to select · right-click for more' : 'Click to open · Ctrl+click to select · right-click for more',
       onclick: (e) => { if (pickCard(e, key)) return; S.list.openNote(n.id); },
       oncontextmenu: (e) => { e.preventDefault(); if (bulkMenu(e, key)) return; noteMenu(n, e); },
-    }, h('div', { class: 'strip' }), n.pinned ? h('span', { class: 'pin', title: n.appPinned ? 'Pinned over some apps' : 'Pinned on top' }) : null, cardBody(n), foot, lockBtn('note', n), starBtn(key));
+    }, h('div', { class: 'strip' }), n.pinned ? h('span', { class: 'pin', title: n.appPinned ? 'Pinned over some apps' : 'Pinned on top' }) : null, cardBody(n), tagPills(n.tags), foot, lockBtn('note', n), starBtn(key));
     card.addEventListener('dragstart', (e) => startDrag(e, { id: n.id, kind: 'note' }, card));
     card.addEventListener('dragend', endDrag);
     dropTarget(card,
@@ -393,7 +437,8 @@
         g.locked ? h('span', { class: 'gl', html: g.open ? ICON.unlock : ICON.lock }) : null,
         h('span', { class: 'gname-l' + (g.name ? '' : ' unnamed') }, g.name || 'Group'),
         subs ? h('span', { class: 'gsub', title: plural(subs, 'group') + ' inside', html: ICON.folder + subs }) : null,
-        h('span', { class: 'gcount' }, String(notes.length))));
+        h('span', { class: 'gcount' }, String(notes.length))),
+      tagPills(g.tags));
     card.addEventListener('dragstart', (e) => startDrag(e, { id: g.id, kind: 'group' }, card));
     card.addEventListener('dragend', endDrag);
     dropTarget(card, () => canMove(V.drag, g.id), (d) => (d.many ? moveInto(d, g.id) : S.groups.make(d.id, g.id)), () => 'Put inside');
@@ -468,7 +513,12 @@
         ? [...new Set([...[...fresh].map((el) => el.querySelector(':scope > .body')).filter(Boolean), ...box.querySelectorAll('.card > .body:not([data-m])'), ...document.querySelectorAll('.sheet > .body')])]
         : box.querySelectorAll('.card > .body, .sheet > .body'));
     };
-    const q = V.query.trim().toLowerCase();
+    // 1.4.10: the words typed (q) and the tags: picked under the search box or typed as #tag (fd.on)
+    const fd = finding();
+    const q = fd.text;
+    const asked = [...V.tagPick.map((t) => `#${t}`), V.query.trim()].filter(Boolean).join(' ');
+    const notFound = (what, inner) => emptyState('Nothing found', fd.on ? `${inner || `No ${what}`} matches “${asked}”.` : `${inner || `No ${what}`} contains “${asked}”.`);
+    const fits = (it) => (it.kind === 'group' ? groupFits(it.group, fd) : noteFits(it.note, fd));
     const g = V.tab === 'notes' && V.openGroup ? groupById(V.openGroup) : null;
     $('#groupHead').hidden = !g;
     $('#tip').textContent = '';
@@ -488,10 +538,10 @@
         ...f.groups.map((fg) => ({ kind: 'group', group: fg, notes: notesInTree(fg.id) })),
         ...f.notes.map((n) => ({ kind: 'note', note: n })),
       ];
-      if (q) items = items.filter((it) => (it.kind === 'group' ? (it.group.name || '') : `${it.note.title || ''}\n${it.note.text || ''}\n${it.note.pics || ''}`).toLowerCase().includes(q));
+      if (q || fd.on) items = items.filter(fits);
       if (!items.length) {
-        els.push(q
-          ? emptyState('Nothing found', `No favourite contains “${V.query.trim()}”.`)
+        els.push(q || fd.on
+          ? notFound('favourite')
           : emptyState('No favourites yet', 'Click the star on a note or group to keep it here.'));
       }
       sortItems(items).forEach((it, i) => els.push(it.kind === 'group' ? groupEl(it.group, it.notes, i, used) : noteEl(it.note, i, !!it.note.groupId, used)));
@@ -509,10 +559,10 @@
         ...f.groups.map((fg) => ({ kind: 'group', group: fg, notes: notesInTree(fg.id) })),
         ...f.notes.map((n) => ({ kind: 'note', note: n })),
       ];
-      if (q) items = items.filter((it) => (it.kind === 'group' ? (it.group.name || '') : `${it.note.title || ''}\n${it.note.text || ''}\n${it.note.pics || ''}`).toLowerCase().includes(q));
+      if (q || fd.on) items = items.filter(fits);
       if (!items.length) {
-        els.push(q
-          ? emptyState('Nothing found', V.state.settings.unlockedAll ? `No locked note contains “${V.query.trim()}”.` : `No locked note’s title has “${V.query.trim()}”. Unlock all to search their words too.`)
+        els.push(q || fd.on
+          ? (V.state.settings.unlockedAll ? notFound('locked note') : emptyState('Nothing found', fd.on ? `Nothing locked matches “${asked}”. Unlock all to see their tags and words too.` : `No locked note’s title has “${asked}”. Unlock all to search their words too.`))
           : emptyState('Nothing locked', 'Lock a note or group with the lock on its card, or by right-clicking it.'));
       }
       sortItems(items).forEach((it, i) => els.push(it.kind === 'group' ? groupEl(it.group, it.notes, i, used) : noteEl(it.note, i, !!it.note.groupId, used)));
@@ -525,22 +575,33 @@
     // 1.4.1: the reminders filter: every note with a reminder (and the search), the ones ringing first, then the soonest
     if (V.remOnly) {
       const due = (n) => (n.reminders.some((r) => r.firing) ? -1 : (R && R.nextOf(n.reminders)) ?? Infinity);
-      const found = liveNotes.filter((n) => n.reminders && n.reminders.length && (!q || `${n.title || ''}\n${n.text || ''}\n${n.pics || ''}`.toLowerCase().includes(q)));
+      const found = liveNotes.filter((n) => n.reminders && n.reminders.length && noteFits(n, fd));
       found.sort((a, b) => due(a) - due(b));
-      if (!found.length) els.push(q ? emptyState('Nothing found', `No note with a reminder contains “${V.query.trim()}”.`) : emptyState('No reminders', 'Add one in a note (Add → Reminder), or right-click a note here.'));
+      if (!found.length) els.push(q || fd.on ? notFound('', 'No note with a reminder') : emptyState('No reminders', 'Add one in a note (Add → Reminder), or right-click a note here.'));
       found.forEach((n, i) => els.push(noteEl(n, i, !!n.groupId, used)));
       done();
       if ($('#viewNotes').scrollTop !== scroll) $('#viewNotes').scrollTop = scroll;
       return;
     }
 
-    // search: one flat list of every matching note (only inside the open group, when one is open)
-    if (q) {
+    // search: one flat list of every matching note (only inside the open group, when one is open). 1.4.10: with tags,
+    // the groups that have them too (the outermost: one inside it has them as well, and its notes show anyway)
+    if (q || fd.on) {
       const pool = g ? notesInTree(g.id) : liveNotes;
-      const found = pool.filter((n) => `${n.title || ''}\n${n.text || ''}\n${n.pics || ''}`.toLowerCase().includes(q));
-      const items = sortItems(found.map((n) => ({ kind: 'note', note: n })));
-      if (!items.length) els.push(emptyState('Nothing found', `No note${g ? ' in this group' : ''} contains “${V.query.trim()}”.`));
-      items.forEach((it, i) => els.push(noteEl(it.note, i, !!it.note.groupId, used)));
+      const found = pool.filter((n) => noteFits(n, fd)).map((n) => ({ kind: 'note', note: n }));
+      if (fd.on) {
+        const inside = g ? subtreeIds(g.id) : null;
+        for (const x of V.state.groups) {
+          if ((inside && (!inside.has(x.id) || x.id === g.id)) || !groupShown(x) || !groupFits(x, fd)) continue;
+          const up = x.parentId ? groupById(x.parentId) : null;
+          if (up && (!g || up.id !== g.id) && groupFits(up, fd)) continue;
+          const ns = notesInTree(x.id);
+          if (ns.length) found.push({ kind: 'group', group: x, notes: ns });
+        }
+      }
+      const items = sortItems(found);
+      if (!items.length) els.push(notFound('', `No note${g ? ' in this group' : ''}`));
+      items.forEach((it, i) => els.push(it.kind === 'group' ? groupEl(it.group, it.notes, i, used) : noteEl(it.note, i, !!it.note.groupId, used)));
       done();
       return;
     }

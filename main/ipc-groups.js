@@ -11,6 +11,7 @@ const { notifyList } = require('./list-notify');
 const { applyState } = require('./note-state');
 const { groupOpenInList, groupShut, hiddenInList, hideNewlyLocked, revealedNow, unlockedForNow } = require('./list-visibility');
 const { showList } = require('./list-window');
+const { recorded, recordCopy, undoMove, redoMove, moveHistory } = require('./move-history');
 const REMIND = require('../src/reminders');
 const { S, wins } = require('./state');
 
@@ -46,6 +47,7 @@ function registerGroupIpc() {
         pinApps: hiddenInList(n) ? [] : n.pinApps,
         appPinned: n.pinApps.length > 0,
         favorite: n.favorite,
+        tags: hiddenInList(n) ? [] : n.tags, // 1.4.10: secret like its words (src/tags.js)
         fx: n.fx, // 1.1.16: the card shows the note's effect too
         opacity: n.opacity, // 1.1.20: for the Edit design sheet's see-through slider
         fxPaused: n.fxPaused,
@@ -68,7 +70,9 @@ function registerGroupIpc() {
       settings: { ...settings, ...lockInfo(), hasPassword: !!lock, dataPath: S.store.root, version: app.getVersion(), unlockedAll: S.listUnlockedAll, crypt: crypt.status(),
         // 1.3.27: how far into the evening it is; how many notes have their own value of each setting (Use on all notes);
         // what went wrong with the panic shortcut ('taken' by another app | 'bad' | null)
-        evePhase: evePhase(), overrides: overrideCounts(S.store.all(), S.store.settings), panicKeyError: shortcutError() },
+        evePhase: evePhase(), overrides: overrideCounts(S.store.all(), S.store.settings), panicKeyError: shortcutError(),
+        // 1.4.9: what Undo / Redo of a move would do now (main/move-history.js)
+        moves: moveHistory() },
     };
   });
 
@@ -76,7 +80,8 @@ function registerGroupIpc() {
   // 1.3.28 (the owner's wish): nothing here changes a note or group its lock hides in the list (`hiddenInList`, `groupShut`),
   // nor puts anything into such a group: unlock it first
   const shut = (id) => (S.store.groups.has(id) ? groupShut(id) : !!S.store.get(id) && hiddenInList(S.store.get(id)));
-  ipcMain.handle('groups:make', (e, dragId, targetId) => {
+  // 1.4.9: every change of where things sit goes through `recorded` (main/move-history.js), so Ctrl+Z in the list undoes it
+  ipcMain.handle('groups:make', (e, dragId, targetId) => recorded('Move', () => {
     if (!dragId || dragId === targetId || shut(dragId) || shut(targetId)) return null;
     const dragGroup = S.store.groups.get(dragId);
     const target = S.store.get(targetId);
@@ -98,7 +103,7 @@ function registerGroupIpc() {
     notifyList();
     // where the dragged note/group ended up
     return dragGroup ? S.store.groups.get(dragId)?.parentId || null : S.store.get(dragId)?.groupId || null;
-  });
+  }));
   // one level up: a note leaves its group, a group leaves its parent
   const moveUp = (id) => {
     if (shut(id)) return;
@@ -111,20 +116,82 @@ function registerGroupIpc() {
     S.store.cleanupGroups();
     notifyList();
   };
-  ipcMain.handle('groups:move-up', (e, id) => moveUp(id));
+  ipcMain.handle('groups:move-up', (e, id) => recorded('Move', () => moveUp(id)));
+  // put one note or group straight into a group (or the top level with null); false = it can't go there
+  const putIn = (id, groupId) => {
+    if (shut(id)) return false;
+    if (S.store.groups.has(id)) return S.store.setParent(id, groupId);
+    if (!S.store.get(id)) return false;
+    S.store.setGroup(id, groupId);
+    return true;
+  };
   // move a note or group straight into a group (or to the top level with null)
-  ipcMain.handle('groups:move-to', (e, id, groupId) => {
+  ipcMain.handle('groups:move-to', (e, id, groupId) => recorded('Move', () => {
     groupId = groupId && S.store.groups.has(groupId) ? groupId : null;
-    if (shut(id) || groupShut(groupId)) return false;
-    if (S.store.groups.has(id)) { if (!S.store.setParent(id, groupId)) return false; } else if (S.store.get(id)) S.store.setGroup(id, groupId);
-    else return false;
+    if (groupShut(groupId) || !putIn(id, groupId)) return false;
     S.store.cleanupGroups();
     hideNewlyLocked();
     notifyList();
     return true;
+  }));
+  // 1.4.9: several picked notes and groups into one group (or the top level) at once: one Undo step. Used by dragging
+  // several cards, Move out and Paste (`how` names the step: 'Move' | 'Paste'). Returns how many moved and how many
+  // couldn't (locked, or a group into itself).
+  ipcMain.handle('groups:move-many', (e, ids = [], groupId = null, how = 'Move') => recorded(how === 'Paste' ? 'Paste' : 'Move', () => {
+    groupId = groupId && S.store.groups.has(groupId) ? groupId : null;
+    const list = [...new Set([].concat(ids))].filter((id) => S.store.groups.has(id) || S.store.get(id));
+    if (groupShut(groupId)) return { moved: 0, kept: list.length };
+    let moved = 0;
+    let kept = 0;
+    for (const id of list) {
+      const was = S.store.groups.has(id) ? S.store.groups.get(id).parentId || null : S.store.get(id).groupId || null;
+      if (was === groupId) continue; // already there
+      if (putIn(id, groupId)) moved++; else kept++;
+    }
+    S.store.cleanupGroups();
+    hideNewlyLocked();
+    notifyList();
+    return { moved, kept };
+  }));
+  // 1.4.9: Copy / Paste: copies of the picked notes and groups (with everything inside) in a group or the top level. A
+  // copy keeps its title (it is somewhere else), look, words, pictures and lock; not its reminders, pin or window
+  // place (store.js `duplicate`). A copied group gets the name, look, colour and lock of the original. Nothing a lock
+  // hides is copied, and a group is never copied into itself. One Undo step (main/move-history.js recordCopy).
+  ipcMain.handle('groups:copy-many', (e, ids = [], groupId = null) => {
+    groupId = groupId && S.store.groups.has(groupId) ? groupId : null;
+    const list = [...new Set([].concat(ids))].filter((id) => S.store.groups.has(id) || S.store.get(id));
+    if (groupShut(groupId)) return { copied: 0, kept: list.length };
+    const made = [];
+    const copyNote = (id, gid) => {
+      const n = S.store.get(id);
+      if (!n || n.deletedAt || hiddenInList(n)) return false;
+      const c = S.store.duplicate(id, { groupId: gid, open: false, ...(n.enc ? {} : { title: n.title }) });
+      if (c) made.push(c.id);
+      return !!c;
+    };
+    const copyGroup = (gid, parent) => {
+      if (groupShut(gid) || (parent && (parent === gid || S.store.isInside(parent, gid)))) return false;
+      const g = S.store.groups.get(gid);
+      const notes = S.store.all().filter((n) => n.groupId === gid && !n.deletedAt); // what it holds now, before the copy
+      const kids = [...S.store.groups.values()].filter((c) => c.parentId === gid);
+      const copy = S.store.createGroup([], { name: g.name, parentId: parent });
+      S.store.updateGroup(copy.id, { style: g.style, color: g.color, locked: g.locked });
+      for (const n of notes) copyNote(n.id, copy.id);
+      for (const c of kids) copyGroup(c.id, copy.id);
+      return true;
+    };
+    let copied = 0;
+    for (const id of list) if (S.store.groups.has(id) ? copyGroup(id, groupId) : copyNote(id, groupId)) copied++;
+    S.store.cleanupGroups(); // a copied group with nothing in it goes, like any empty group
+    hideNewlyLocked();
+    notifyList();
+    recordCopy('Copy', made);
+    return { copied, kept: list.length - copied };
   });
-  ipcMain.handle('groups:ungroup', (e, noteId) => moveUp(noteId));
-  ipcMain.handle('groups:dissolve', (e, groupId) => { if (groupShut(groupId)) return; S.store.dissolveGroup(groupId); notifyList(); });
+  ipcMain.handle('groups:undo', () => undoMove());
+  ipcMain.handle('groups:redo', () => redoMove());
+  ipcMain.handle('groups:ungroup', (e, noteId) => recorded('Move', () => moveUp(noteId)));
+  ipcMain.handle('groups:dissolve', (e, groupId) => recorded('Ungroup', () => { if (groupShut(groupId)) return; S.store.dissolveGroup(groupId); notifyList(); }));
   ipcMain.handle('groups:rename', (e, groupId, name) => { if (groupShut(groupId)) return; S.store.renameGroup(groupId, name); notifyList(); });
   ipcMain.handle('groups:update', (e, groupId, patch = {}) => {
     if (groupShut(groupId)) return;
@@ -132,6 +199,19 @@ function registerGroupIpc() {
     for (const k of ['name', 'style', 'color']) if (k in patch) clean[k] = patch[k];
     S.store.updateGroup(groupId, clean);
     notifyList();
+  });
+  // 1.4.9: the look (stack / folder / envelope / notebook) and colour of several picked groups at once
+  ipcMain.handle('groups:update-many', (e, ids = [], patch = {}) => {
+    const clean = {};
+    for (const k of ['style', 'color']) if (k in patch) clean[k] = patch[k];
+    let count = 0;
+    for (const id of [].concat(ids)) {
+      if (!S.store.groups.has(id) || groupShut(id)) continue;
+      S.store.updateGroup(id, clean);
+      count++;
+    }
+    if (count) notifyList();
+    return count;
   });
   // change colour / font of every note in a group (and the groups inside it)
   ipcMain.handle('groups:apply', (e, groupId, patch = {}, includeInner = true) => {

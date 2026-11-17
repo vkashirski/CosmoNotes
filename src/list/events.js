@@ -5,8 +5,9 @@
   const K = window.COSMO_LIST_KIT;
   const { V, S, $, $$, SIZES, SIZE_NAMES, sizeNow, ICON, cardsTabNow, sel, load, groupById, sortPrefs, render,
     dropTarget, canMove, moveInto, visibleKeys, clearSel, paintCards, bulkTrash, renderSettings, renderBackups,
+    bulkCut, bulkCopy, cancelCut, pasteCut, undoMove, openLook,
     pickBackup, modal, toast, hideCtx, closeFxSheet, closeEdit, emptyBin, NEW_INPUTS, checkNew, savedLock, closePanel,
-    showKeyIfNeeded, clearSettingsSearch, setFold, closeRemindSheet } = K;
+    showKeyIfNeeded, clearSettingsSearch, setFold, closeRemindSheet, closeTagSheet } = K;
   // ================================================================ events
   // Settings is a toggle: clicking it while it's open goes back to Notes or Bin, whichever was open before
   function setTab(v) {
@@ -26,8 +27,10 @@
   $('#btnNew').addEventListener('click', newNote);
   $('#btnFront').addEventListener('click', () => S.list.bringToFront());
   $('#q').addEventListener('input', (e) => { V.query = e.target.value; render(); });
-  const clearSearch = () => { V.query = ''; $('#q').value = ''; };
-  $('#qClear').addEventListener('click', () => { clearSearch(); render(); $('#q').focus(); });
+  // the words typed (the X in the box); going to another group forgets the picked tags too (1.4.10)
+  const clearText = () => { V.query = ''; $('#q').value = ''; };
+  const clearSearch = () => { clearText(); V.tagPick = []; };
+  $('#qClear').addEventListener('click', () => { clearText(); render(); $('#q').focus(); });
   // the Bin has its own search, working the same way
   $('#bq').addEventListener('input', (e) => { V.binQuery = e.target.value; render(); });
   const clearBinSearch = () => { V.binQuery = ''; $('#bq').value = ''; };
@@ -216,6 +219,7 @@
     if (!$('#editSheet').hidden) { if (e.key === 'Escape') { e.preventDefault(); closeEdit(); } return; }
     if (!$('#fxSheet').hidden) { if (e.key === 'Escape') { e.preventDefault(); closeFxSheet(); } return; }
     if (!$('#remSheet').hidden) { if (e.key === 'Escape') { e.preventDefault(); closeRemindSheet(); } return; } // 1.4.1
+    if (!$('#tagSheet').hidden) { if (e.key === 'Escape') { e.preventDefault(); closeTagSheet(); } return; } // 1.4.10
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); newNote(); }
     // 1.3.30: the note closed last opens again, like a browser's closed tabs (also the tray's "Reopen closed note")
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 't') { e.preventDefault(); S.list.reopenClosed(); }
@@ -234,13 +238,27 @@
       paintCards();
     }
     if (e.key === 'Delete' && sel.size && cardsTab && !typing) { e.preventDefault(); bulkTrash(e.shiftKey); }
+    // 1.4.9: Ctrl+X / Ctrl+C then Ctrl+V move the picked cards, or put copies of them, in another group; Ctrl+Z / Ctrl+Y
+    // (Ctrl+Shift+Z) undo and redo moves and pastes
+    const ctrl = (e.ctrlKey || e.metaKey) && !e.altKey;
+    const key = e.key.toLowerCase();
+    if (ctrl && cardsTab && !typing && !e.repeat) {
+      if (key === 'x' && sel.size) { e.preventDefault(); bulkCut(); }
+      else if (key === 'c' && sel.size) { e.preventDefault(); bulkCopy(); }
+      else if (key === 'v' && V.cut.size) { e.preventDefault(); pasteCut(); }
+      else if (key === 'z' && !e.shiftKey) { e.preventDefault(); undoMove(false); }
+      else if (key === 'y' || (key === 'z' && e.shiftKey)) { e.preventDefault(); undoMove(true); }
+    }
     if (e.key === 'Escape') {
       if (!$('#ctx').hidden) hideCtx();
+      else if (!$('#lookPop').hidden) openLook(false);
       else if (sel.size && cardsTab) clearSel();
+      else if (V.cut.size && cardsTab) cancelCut();
       else if (!$('#sortPop').hidden) { $('#sortPop').hidden = true; $('#btnSort').classList.remove('on'); }
       else if (!$('#sizePop').hidden) { $('#sizePop').hidden = true; $('#btnSize').classList.remove('on'); }
       else if (V.tab === 'bin' && V.binQuery) { clearBinSearch(); render(); }
-      else if (cardsTab && V.query) { clearSearch(); render(); }
+      else if (cardsTab && V.query) { clearText(); render(); }
+      else if (cardsTab && V.tagPick.length) { V.tagPick = []; render(); } // 1.4.10
       else if (V.tab === 'settings' && $('#sq').value) clearSettingsSearch();
       else if (!$('#groupPanel').hidden) closePanel();
       else if (V.tab === 'notes' && V.openGroup && document.activeElement !== $('#groupName')) { V.openGroup = upLevel(); render(true); }

@@ -122,7 +122,7 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
   Intl, Date, Math, JSON, Object, Array, Set, Map, WeakMap, String, Number, Boolean, Promise, RegExp, Error, parseFloat, parseInt, isFinite, Uint8Array, encodeURIComponent };
 {
   const sticky = fake('sticky'); sticky.getNote = () => Promise.resolve(null); // the window then stops before it shows a note
-  const { K, parts } = checkKit('note', 'note', ['base', 'fx-format', 'panels', 'content', 'editing', 'checklists', 'menus-voice-ink', 'speech', 'lock-zoom', 'draw-over', 'ink-out', 'remind', 'pin-apps', 'eraser-start'], 'COSMO_NOTE_KIT', true,
+  const { K, parts } = checkKit('note', 'note', ['base', 'fx-format', 'panels', 'content', 'editing', 'checklists', 'menus-voice-ink', 'speech', 'lock-zoom', 'draw-over', 'ink-out', 'remind', 'pin-apps', 'tags', 'eraser-start'], 'COSMO_NOTE_KIT', true,
     { ...base, document: doc(), window: { sticky, COSMO_FX: fake('COSMO_FX'), addEventListener() {}, matchMedia: () => ({ matches: true }) }, getSelection: () => fake('selection'), innerWidth: 400, innerHeight: 400, devicePixelRatio: 1,
       localStorage: { getItem: () => null, setItem() {}, removeItem() {} }, navigator: fake('navigator'), CSS: fake('CSS'), Highlight: class {},
       Node: { TEXT_NODE: 3, ELEMENT_NODE: 1 }, NodeFilter: { SHOW_TEXT: 4, SHOW_ELEMENT: 1, FILTER_ACCEPT: 1, FILTER_REJECT: 2 } },
@@ -143,7 +143,7 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
 {
   const ORDER = ['kit', 'effects-classic', 'effects-lab', 'effects-magic', 'followers-classic', 'followers-lab', 'followers-magic', 'engine'];
   const want = ORDER.map((n) => `fx/${n}.js`);
-  const SHARED = ['evening.js', 'reminders.js', 'remind-ui.js']; // 1.3.27 evening colours; 1.4.1 reminders (rules, then the panel)
+  const SHARED = ['evening.js', 'reminders.js', 'remind-ui.js', 'tags.js']; // 1.3.27 evening colours; 1.4.1 reminders (rules, then the panel); 1.4.10 tags
   assert.deepEqual(tagsIn('note'), [...want, ...SHARED, ...src.files.note], 'note.html: the effects, the evening colours, the reminders, then its own code');
   assert.deepEqual(tagsIn('list'), ['about.js', ...want, ...SHARED, ...src.files.list], 'list.html: about.js, the effects, the evening colours, the reminders, then its own code');
   // 1.3.27: src/evening.js is shared by both windows and main: strict, LF, only window.COSMO_EVENING in a window, module.exports in Node
@@ -164,6 +164,13 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
   vm.runInContext(remUi, rbox, { filename: 'src/remind-ui.js' });
   assert.deepEqual(Object.keys(rbox.window).filter((k) => !['window', 'document'].includes(k)), ['COSMO_REMIND', 'COSMO_REMIND_UI'], 'only COSMO_REMIND and COSMO_REMIND_UI on window');
   assert.equal(typeof require('../src/reminders').ring, 'function', 'src/reminders.js: main and store.js require it');
+  // 1.4.10: src/tags.js the same way (window.COSMO_TAGS; main and store.js require it)
+  const tg = read('src/tags.js');
+  assert.ok(tg.startsWith("'use strict';") && isLF(tg), 'src/tags.js: strict, LF');
+  const tbox = { window: {} }; tbox.window.window = tbox.window; vm.createContext(tbox);
+  vm.runInContext(tg, tbox, { filename: 'src/tags.js' });
+  assert.deepEqual(Object.keys(tbox.window).filter((k) => k !== 'window'), ['COSMO_TAGS'], 'src/tags.js: only COSMO_TAGS on window');
+  assert.equal(typeof require('../src/tags').cleanAll, 'function', 'src/tags.js: main and store.js require it');
   assert.deepEqual(src.files.fx, want, 'the tests load what the windows load');
   assert.deepEqual(fs.readdirSync(path.join(SRC, 'fx')).sort(), want.map((f) => f.slice(3)).sort(), 'every file in src/fx/ is loaded');
   const sandbox = { window: {}, document: { hidden: false, createElement: () => ({ width: 0, height: 0, getContext: () => fake('ctx') }) }, performance: { now: () => 0 },

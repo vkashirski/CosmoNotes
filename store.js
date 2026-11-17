@@ -18,6 +18,7 @@ const path = require('path');
 const crypto = require('crypto');
 const EVENING = require('./src/evening'); // 1.3.27: the evening colours' times (the same file the windows load)
 const REMIND = require('./src/reminders'); // 1.4.1: reminders (the same rules as main and the windows)
+const TAGS = require('./src/tags'); // 1.4.10: tags on notes and groups (the same rules as main and the windows)
 
 // Paper colours. 1.1.15 added the colours of the list themes (cream, rose, sage = the Mint theme, mist = Sky,
 // lavender = Lilac, and the dark night, midnight, forest, plum). In this order everywhere colours are shown:
@@ -113,6 +114,8 @@ const DEFAULT_SETTINGS = {
   remindSound: REMIND.DEFAULT_SOUND,
   remindVolume: 0.6,
   remindShowHidden: false,
+  // 1.4.10: the notes list's tag filter with several tags picked: false = notes with all of them, true = with any of them
+  tagAny: false,
 };
 // 1.4.1: the reminders' sound in Settings (an id of src/reminders.js SOUNDS or 'none') and how loud (0 – 1, steps of 0.05)
 const cleanRemindSound = (v) => (v === 'none' || REMIND.SOUND_IDS.includes(v) ? v : REMIND.DEFAULT_SOUND);
@@ -299,6 +302,7 @@ function normalizeGroup(x) {
     color: GROUP_COLORS.includes(x.color) ? x.color : 'kraft',
     locked: !!x.locked,
     favorite: !!x.favorite, // starred in the notes list (1.1.13)
+    tags: TAGS.cleanAll(x.tags), // 1.4.10: its tags count for everything inside it (src/tags.js); not secret, like its name
   };
 }
 
@@ -584,6 +588,9 @@ function normalize(n) {
     // messages are secret, like the note's words: sealed with a locked note (main/crypt.js), empty while it is sealed
     reminders: REMIND.cleanAll(n.reminders),
     remindMsg: REMIND.cleanMsgs(n.remindMsg, REMIND.cleanAll(n.reminders)),
+    // 1.4.10: its tags (src/tags.js); not an edit; copied by Duplicate. Secret, like its words: sealed with a locked note
+    // (main/crypt.js), [] while it is sealed, and never sent to a window or the list while its lock hides it
+    tags: TAGS.cleanAll(n.tags),
     groupId: typeof n.groupId === 'string' && n.groupId ? n.groupId : null,
     bounds: normalizeBounds(n.bounds),
     createdAt: Number(n.createdAt) || now,
@@ -767,7 +774,7 @@ class Store {
   duplicate(id, extra = {}) {
     const src = this.notes.get(id);
     if (!src || src.deletedAt) return null;
-    const keys = ['html', 'text', 'firstImage', 'ink', 'wrapWidth', 'nowrap', 'wrapFixed', 'color', 'font', 'titleFont', 'size', 'opacity', 'solidOnHover', 'spell', 'checklist', 'evening', 'panic', 'locked', 'groupId', 'fx', 'coverTitle'];
+    const keys = ['html', 'text', 'firstImage', 'ink', 'wrapWidth', 'nowrap', 'wrapFixed', 'color', 'font', 'titleFont', 'size', 'opacity', 'solidOnHover', 'spell', 'checklist', 'evening', 'panic', 'locked', 'groupId', 'fx', 'coverTitle', 'tags'];
     const copy = {};
     for (const k of keys) copy[k] = src[k] && typeof src[k] === 'object' ? JSON.parse(JSON.stringify(src[k])) : src[k];
     copy.title = src.title ? `${src.title} (copy)` : '';
@@ -918,6 +925,17 @@ class Store {
     this.groups.delete(id);
     this.saveGroups();
     this.cleanupGroups();
+  }
+
+  // 1.4.9: a group a move took away (emptied: cleanupGroups, or Ungroup) comes back as it was, with its own id, so Undo
+  // can put things back into it (main/move-history.js). Its parent must still exist, or it goes to the top level.
+  restoreGroup(copy) {
+    if (!copy || !copy.id || this.groups.has(String(copy.id))) return this.groups.get(String(copy.id)) || null;
+    const g = normalizeGroup(copy);
+    if (g.parentId && !this.groups.has(g.parentId)) g.parentId = null;
+    this.groups.set(g.id, g);
+    this.saveGroups();
+    return g;
   }
 
   // A group disappears once nothing inside it (not even a note in the bin) is left.

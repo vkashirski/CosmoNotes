@@ -72,6 +72,7 @@ function registerSettingsIpc() {
     if ('remindSound' in patch) S.store.settings.remindSound = cleanRemindSound(patch.remindSound);
     if ('remindVolume' in patch) S.store.settings.remindVolume = cleanVolume(patch.remindVolume);
     if ('remindShowHidden' in patch) S.store.settings.remindShowHidden = !!patch.remindShowHidden;
+    if ('tagAny' in patch) S.store.settings.tagAny = !!patch.tagAny; // 1.4.10: the list's tag filter, All / Any
     if (patch.listSort && typeof patch.listSort === 'object') {
       const ls = { ...S.store.settings.listSort };
       if (['updated', 'created'].includes(patch.listSort.by)) ls.by = patch.listSort.by;
@@ -85,7 +86,7 @@ function registerSettingsIpc() {
     if (ctChanged) applyClickThroughAll();
     if ('spellCheck' in patch || 'spellCyrillic' in patch || 'listTheme' in patch || fxChanged || checkKeys.length || eveChanged || panicChanged || ctChanged || remindChanged) broadcastSettings();
     // The list already shows a new sort order itself; telling it again made it redraw twice.
-    const onlySort = Object.keys(patch).every((k) => k === 'listSort' || k === 'listSize' || k === 'listTheme');
+    const onlySort = Object.keys(patch).every((k) => k === 'listSort' || k === 'listSize' || k === 'listTheme' || k === 'tagAny');
     if (!onlySort) notifyList();
     return true;
   });

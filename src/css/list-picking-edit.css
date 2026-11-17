@@ -29,18 +29,24 @@
 .bb.danger { color: #FFB4AE; }
 .bb.danger:not(:disabled):hover { background: rgba(229,72,77,.28); }
 .bb.x { width: 32px; padding: 0; justify-content: center; }
-@media (max-width: 700px) { .bb:not(.x) span { display: none; } .bb { padding: 0 9px; } }
+@media (max-width: 860px) { .bb:not(.x) span { display: none; } .bb { padding: 0 9px; } } /* 1.4.9: 700 → 860 px, the bar has more buttons */
 .bulkpop {
   position: absolute; left: 50%; bottom: calc(100% + 8px);
   transform: translateX(-50%);
   display: flex; flex-direction: column; gap: 8px;
   padding: 10px;
   border-radius: 14px;
-  background: #FFFDF7; color: #3B3226;
+  background: var(--card2); color: var(--ink);
   box-shadow: 0 10px 26px rgba(40,30,10,.3);
 }
 .bulkpop[hidden] { display: none; }
 .bulkpop .sws { display: flex; gap: 6px; }
+/* 1.4.9: the selected groups' look (picking.js openLook), Cut / Paste here */
+.lookpop { width: 290px; }
+.lookpop .swatches { justify-content: center; }
+.bb.on { background: rgba(255,255,255,.18); }
+.card.cut { opacity: .45; outline: 2px dashed var(--mute); outline-offset: 3px; }
+.card.cut.sel { opacity: .7; }
 
 /* ---------- 1.1.15: rows of colour circles that scroll sideways (swatchStrip in list.js) ----------
    Same circle sizes as before; the row is as wide as the old one (Settings: 9 circles, group panel and the
@@ -143,6 +149,7 @@
 .bfonts button.med { font: 400 16px var(--med); }
 .bfonts button:hover { background: #E8DCC0; }
 body.selecting #viewNotes { padding-bottom: 76px; }
+body.selecting .toast { bottom: 64px; } /* 1.4.9: above the bar, which stays while something cut waits for Paste */
 
 /* "Stardust": locking shrinks the writing into little stars and the lock glows in; unlocking reverses it */
 .stardust { position: absolute; left: 50%; top: 50%; z-index: 7; width: 0; height: 0; pointer-events: none; }

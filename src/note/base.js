@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 1 of 14: the colour row, saving, dates, look & settings, effects on the note
+// CosmoNotes note window, part 1 of 15: the colour row, saving, dates, look & settings, effects on the note
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   // K: the names the parts share. V: variables more than one part changes (V.note etc.). K.later('f'): a function a later part

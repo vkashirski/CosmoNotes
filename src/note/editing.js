@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 5 of 14: editing helpers (checklists, strike-through…), Ctrl+F find, the keyboard
+// CosmoNotes note window, part 5 of 15: editing helpers (checklists, strike-through…), Ctrl+F find, the keyboard
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;

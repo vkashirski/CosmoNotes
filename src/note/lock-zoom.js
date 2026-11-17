@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 9 of 14: locking, password or PIN, the "are you sure?" pop-up, word wrap, zoom
+// CosmoNotes note window, part 9 of 15: locking, password or PIN, the "are you sure?" pop-up, word wrap, zoom
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -120,7 +120,7 @@
     if (!V.note || !v) return;
     // 1.3.27: and what Settings → "Use on all notes" puts back (solid on hover, spelling, checklists, evening, panic)
     for (const k of ['color', 'font', 'titleFont', 'size', 'title', 'coverTitle', 'locked', 'lockedBy', 'pinned', 'pinApps', 'clickThrough', 'opacity', 'rolled', 'fx', 'fxPaused', 'fxPlay',
-      'solidOnHover', 'spell', 'checklist', 'evening', 'panic', 'reminders', 'remindMsg']) if (k in v) V.note[k] = v[k]; // 1.4.1: reminders
+      'solidOnHover', 'spell', 'checklist', 'evening', 'panic', 'reminders', 'remindMsg', 'tags']) if (k in v) V.note[k] = v[k]; // 1.4.1: reminders; 1.4.10: tags
     if (v.hidden && !V.hidden) { hideContent(); return; }
     // the lock was removed from the notes list while this window still asked for the password/PIN:
     // show the note straight away (1.1.47: or it was unlocked there until CosmoNotes restarts; its lock stays)

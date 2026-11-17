@@ -23,6 +23,7 @@ const os = require('os');
 const path = require('path');
 const { promisify } = require('util');
 const REMIND = require('../src/reminders');
+const TAGS = require('../src/tags');
 const { S } = require('./state');
 
 const scrypt = promisify(crypto.scrypt);
@@ -40,9 +41,9 @@ const SPKI = Buffer.from('302a300506032b656e032100', 'hex'); // X25519 public ke
 const PKCS8 = Buffer.from('302e020100300506032b656e04220420', 'hex'); // X25519 private key in DER
 const CODE_ABC = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // 32 letters and digits, no I, L, O, U
 const ATT_REF = /stickyfile:\/\/att\/([A-Za-z0-9_.-]+)/g;
-const SECRET_FIELDS = ['title', 'html', 'text', 'firstImage', 'ink', 'remindMsg']; // 1.4.1: the reminders' messages too
+const SECRET_FIELDS = ['title', 'html', 'text', 'firstImage', 'ink', 'remindMsg', 'tags']; // 1.4.1: the reminders' messages too; 1.4.10: the tags
 // what a sealed note keeps of them in plain text: nothing (one place, for the store's writes and the backups)
-const blank = () => ({ title: '', html: '', text: '', firstImage: null, ink: null, remindMsg: {} });
+const blank = () => ({ title: '', html: '', text: '', firstImage: null, ink: null, remindMsg: {}, tags: [] });
 const MARKER = 'encrypted';
 
 let priv = null; // the private key, once the PIN or the recovery key was typed this session
@@ -245,6 +246,7 @@ function openAll() {
     n.html = typeof n.html === 'string' ? n.html : '';
     n.text = typeof n.text === 'string' ? n.text : '';
     n.remindMsg = REMIND.cleanMsgs(n.remindMsg, n.reminders); // 1.4.1 (sealed before 1.4.1: none)
+    n.tags = TAGS.cleanAll(n.tags); // 1.4.10 (sealed before 1.4.10: none)
     n.enc = null;
     n.encAtt = null;
     S.store.openedSizes(n); // 1.3.18: old sizes that showed nothing come off (store.js dropDeadSizes)

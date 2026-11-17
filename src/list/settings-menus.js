@@ -4,7 +4,7 @@
 (() => {
   const K = window.COSMO_LIST_KIT;
   const { V, S, $, $$, COLORS, DARK_COLORS, COLOR_NAMES, SWATCH, THEMES, themeNow, ICON, sel, h, plural, noteIsLocked,
-    groupIsLocked, isShut, render, setFav, paintCards, unlockedNow } = K;
+    groupIsLocked, isShut, render, setFav, paintCards, unlockedNow, bulkCut, bulkCopy, pasteCut } = K;
   // defined in a later part:
   const fxSummary = K.later('fxSummary'), openEdit = K.later('openEdit'), trashNote = K.later('trashNote'),
     dissolveGroup = K.later('dissolveGroup'), trashGroup = K.later('trashGroup'), lockNote = K.later('lockNote'),
@@ -12,7 +12,7 @@
     unlockNoteNow = K.later('unlockNoteNow'), relockNote = K.later('relockNote'), unlockGroupNow = K.later('unlockGroupNow'),
     relockGroup = K.later('relockGroup'),
     openGroupView = K.later('openGroupView'), openPanel = K.later('openPanel'), paintCrypt = K.later('paintCrypt'),
-    openRemindSheet = K.later('openRemindSheet');
+    openRemindSheet = K.later('openRemindSheet'), openTagSheet = K.later('openTagSheet');
   // ---- Settings → For new notes → Colour (1.1.15): pick one or more colours; each new note gets one of them at random
   const newColors = () => {
     const s = V.state.settings || {};
@@ -568,6 +568,7 @@
         : { label: 'Add to favourites', icon: ICON.star, run: () => setFav([`n:${n.id}`], true) },
       { label: 'Edit design…', icon: ICON.edit, run: () => openEdit(n) },
       { label: 'Reminders…', icon: ICON.clock, run: () => openRemindSheet(n) }, // 1.4.1
+      { label: 'Tags…', icon: ICON.tag, run: () => openTagSheet([{ kind: 'note', note: n }]) }, // 1.4.10
       n.open ? { label: 'Close note', icon: ICON.hide, run: () => S.list.closeNote(n.id) } : null,
       // 1.3.34: the one way back besides the note's own button (only while Settings → Click-through is on: else it's off anyway)
       n.clickThrough && V.state.settings.clickThroughOn ? { label: 'Turn off click-through', icon: ICON.through, run: () => S.list.clickThroughOff(n.id) } : null,
@@ -576,6 +577,8 @@
       '-',
       ...locks,
       n.groupId ? { label: 'Take out of group', icon: ICON.out, run: () => S.groups.moveUp(n.id) } : null,
+      { label: 'Cut (Ctrl+X)', icon: ICON.cut, run: () => bulkCut([`n:${n.id}`]) }, // 1.4.9
+      { label: 'Copy (Ctrl+C)', icon: ICON.copy, run: () => bulkCopy([`n:${n.id}`]) },
       '-',
       noteIsLocked(n)
         ? { label: 'Locked: can’t be deleted', icon: ICON.trash, disabled: true, run: () => {} }
@@ -593,6 +596,7 @@
     showCtx(e, [
       { label: 'Open group', icon: ICON.folder, run: () => openGroupView(g) },
       { label: 'Group settings…', icon: ICON.palette, run: async () => { await openGroupView(g); openPanel(); } },
+      { label: 'Tags…', icon: ICON.tag, run: () => openTagSheet([{ kind: 'group', group: g }]) }, // 1.4.10
       g.favorite
         ? { label: 'Remove from favourites', icon: ICON.star, run: () => setFav([`g:${g.id}`], false) }
         : { label: 'Add to favourites', icon: ICON.star, run: () => setFav([`g:${g.id}`], true) },
@@ -600,6 +604,10 @@
       '-',
       ...locks,
       g.parentId ? { label: 'Move up one level', icon: ICON.out, run: () => S.groups.moveUp(g.id) } : null,
+      // 1.4.9: cut it, or paste what was cut into it
+      { label: 'Cut (Ctrl+X)', icon: ICON.cut, run: () => bulkCut([`g:${g.id}`]) },
+      { label: 'Copy (Ctrl+C)', icon: ICON.copy, run: () => bulkCopy([`g:${g.id}`]) },
+      V.cut.size && !V.cut.has(`g:${g.id}`) ? { label: `Paste into this group (${V.cut.size})`, icon: ICON.paste, run: () => pasteCut(g.id) } : null,
       { label: 'Ungroup…', icon: ICON.ungroup, run: () => dissolveGroup(g) },
       '-',
       groupIsLocked(g)

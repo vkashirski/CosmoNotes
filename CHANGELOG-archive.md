@@ -6,6 +6,30 @@ file (`tests/release.test.js` checks that every version is in one of the two fil
 Renumbered in 1.1.41: each heading says its old number (the table is at the top of `CHANGELOG.md`). Version numbers inside
 the entries are the old ones.
 
+## 1.4.8 – 16 November 2026
+
+The app pin's icon is a little window with the pin stuck into it, and a second right-click on the pin closes its list.
+
+- **Icon** (the owner's pick): the "App letter" tile of 1.4.5 is gone. A note pinned over some apps shows the earlier
+  little window again, now behind the pin (the pin on top, stuck into it): `.pinwin` in `src/note.html`, an svg of its
+  own under the pin's (it doesn't tilt with the pin); the pin gets an edge in the top bar's colour (`note-base.css`).
+- **Fix:** right-clicking the pin while "Pin over" was open opened it again. The note's mousedown closed it first
+  (`panels.js`), then the right-click opened it. Now that mousedown leaves a right-click on the pin alone, and the pin's
+  right-click opens the list or closes it (`src/note/pin-apps.js`).
+- Tests: `note-ui-pins.test.js` (the window behind the pin; right-click opens, the next closes, the next opens).
+
+## 1.4.7 – 16 November 2026
+
+Moving a note no longer hitches twice a second while a note is pinned over an app.
+
+- **Why:** the app pins' check (1.4.5, `main/app-pin.js`) reads every open window's title every 0.5 s. That read is costly
+  enough that dragging any note stuttered on each check (the owner's PC).
+- **The fix:** the check only runs while the focus is in another app. While a CosmoNotes window has the focus (moving a
+  note, typing in it, the list), our app is the one in front and no other app can come in front, so there is nothing to
+  read. When the focus leaves, a check runs at once (`focusMoved`, on the app's `browser-window-focus` / `-blur`), so a note
+  also follows its app sooner than the next tick. Turning the watch on still checks once right away.
+- Tests: `app-pins.test.js` (no clock while one of ours has the focus; a check at once when it leaves).
+
 ## 1.4.6 – 16 November 2026
 
 A ring spins around + while a new note is on its way, so a slow PC shows that the click landed.

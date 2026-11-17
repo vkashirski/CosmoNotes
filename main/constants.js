@@ -22,8 +22,8 @@ const WIN_ICON = path.join(ASSETS, process.platform === 'win32' ? 'icon.ico' : '
 const PRELOAD = path.join(__dirname, '..', 'preload.js');
 const EDITABLE = ['title', 'coverTitle', 'html', 'text', 'firstImage', 'ink', 'wrapWidth', 'nowrap', 'color', 'font', 'titleFont', 'size', 'opacity', 'solidOnHover', 'pinned', 'pinApps', 'clickThrough', 'rolled', 'spell', 'checklist', 'evening', 'panic', 'zoom', 'fx', 'fxPaused', 'fxPlay'];
 // 1.1.30: the title too (a locked note shows its coverTitle instead); these are what main/crypt.js seals
-// 1.4.1: and the reminders' messages (note.remindMsg)
-const SECRET = ['title', 'html', 'text', 'firstImage', 'ink', 'remindMsg'];
+// 1.4.1: and the reminders' messages (note.remindMsg); 1.4.10: and its tags (note.tags, [] while hidden: locks.js viewOf)
+const SECRET = ['title', 'html', 'text', 'firstImage', 'ink', 'remindMsg', 'tags'];
 // 1.3.28 (the owner's wish): all that the window of a hidden locked note may change: where its window sits, not the note
 // (1.3.34: and click-through, its window's mouse: the button stays the one thing that works on it; 1.4.5: and the apps
 // it is pinned over, a kind of pin)

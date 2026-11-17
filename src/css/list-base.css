@@ -147,7 +147,7 @@ body:not(.is-dragging) .view.scrolling > * { pointer-events: none; }
    view's are at the top: 12px in, 88px down), and it reaches 8px below the search box, so nothing shows above it, at
    its corners or between its buttons. Once the view scrolls, a soft shadow under it (scroll-driven, no JS). */
 .searchrow {
-  display: flex; gap: 6px; margin-bottom: 4px; position: sticky; top: 0; z-index: 2; padding: 2px 0 8px;
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; position: sticky; top: 0; z-index: 2; padding: 2px 0 8px;
   background: radial-gradient(var(--dot) 1px, transparent 1.3px) -12px -88px / 18px 18px, var(--bg);
   animation: searchShade linear both; animation-timeline: scroll(nearest); animation-range: 0 24px;
 }
@@ -186,6 +186,25 @@ body.dark { --searchShade: rgba(0,0,0,.7); }
 }
 .iconbtn:hover, .iconbtn.on { color: var(--ink); background: var(--card2); }
 .iconbtn.on { box-shadow: 0 0 0 3px rgba(255,214,60,.45), inset 0 0 0 1.5px #E8C547; }
+/* 1.4.10: the tags under the search box (list/cards.js paintTagRow): one line, scrolls sideways; All / Any and the X stay */
+.tagrow { flex: 1 0 100%; display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: -1px; }
+.tagrow[hidden] { display: none; }
+.tagico { flex: none; display: grid; color: var(--mute); padding-left: 4px; }
+.tagico svg { width: 15px; height: 15px; }
+.tagchips { flex: 1; min-width: 0; display: flex; gap: 5px; overflow-x: auto; scrollbar-width: thin; padding: 2px 1px 3px; }
+.tagchip {
+  flex: none; display: inline-flex; align-items: baseline; gap: 4px;
+  height: 26px; padding: 0 9px; border: 0; border-radius: 999px;
+  background: var(--card); color: var(--ink2); font: 800 12px/26px var(--ui); cursor: pointer;
+  box-shadow: 0 1px 2px rgba(80,60,20,.1), inset 0 0 0 1.5px var(--soft);
+}
+.tagchip small { font-size: 10.5px; color: var(--mute); }
+.tagchip:hover { color: var(--ink); background: var(--card2); }
+.tagchip.on { background: var(--ink); color: var(--bg); box-shadow: none; }
+.tagchip.on small { color: inherit; opacity: .7; }
+.tagmode { flex: none; padding: 2px; border-radius: 10px; }
+.tagmode button { flex: none; padding: 3px 9px; font-size: 11.5px; }
+.tagclear { margin-right: 0; }
 
 /* ---------- sort menu ---------- */
 .view { position: relative; }

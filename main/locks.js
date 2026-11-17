@@ -20,7 +20,7 @@ function viewOf(n, win) {
   const v = { ...n, hidden, lockedBy: lockedBy(n) };
   delete v.enc; // windows never get the sealed contents either
   delete v.encAtt;
-  if (hidden) for (const k of SECRET) v[k] = k === 'html' || k === 'text' || k === 'title' ? '' : null;
+  if (hidden) for (const k of SECRET) v[k] = k === 'html' || k === 'text' || k === 'title' ? '' : k === 'tags' ? [] : null;
   return v;
 }
 

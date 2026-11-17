@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('sticky', {
   onEvening: (cb) => ipcRenderer.on('note:evening', (e, p) => cb(p)), // 1.3.27: how far into the evening it is (0 – 1)
   panic: () => inv('panic:now'), // 1.3.27: the panic button in the top bar
   update: (patch) => inv('note:update', patch),
+  tags: (change) => inv('note:tags', change), // 1.4.10: { add: [...], remove: [...] } from the ⋯ menu
+  tagsKnown: () => inv('note:tags-known'), // every tag in use, for its suggestions
   updateSync: (patch) => ipcRenderer.sendSync('note:update-sync', patch),
   newNote: () => inv('note:new'),
   duplicate: () => inv('note:duplicate'),
@@ -79,6 +81,7 @@ contextBridge.exposeInMainWorld('sticky', {
     onEvening: (cb) => ipcRenderer.on('list:evening', (e, p) => cb(p)), // 1.3.27: evening colours on the cards
     setLocked: (id, locked, pw) => inv('list:set-locked', id, !!locked, pw),
     favorite: (ids, on) => inv('list:favorite', ids, !!on),
+    tags: (ids, change) => inv('list:tags', ids, change), // 1.4.10: { add: [...], remove: [...] } on notes and groups
     apply: (ids, patch) => inv('list:apply', ids, patch),
     edit: (id, patch) => inv('list:edit', id, patch), // 1.1.15: title / colour from the Edit sheet
     unlockAll: (pw) => inv('list:unlock-all', pw), // 1.1.15: the Locked tab
@@ -102,6 +105,12 @@ contextBridge.exposeInMainWorld('sticky', {
     reveal: (groupId, pw) => inv('groups:reveal', groupId, pw),
     hide: (groupId) => inv('groups:hide', groupId),
     makeFrom: (ids, parentId) => inv('groups:make-from', ids, parentId || null),
+    // 1.4.9: several at once (one Undo step), the look of several groups, and Undo / Redo of moves
+    moveMany: (ids, groupId, how) => inv('groups:move-many', ids, groupId || null, how),
+    copyMany: (ids, groupId) => inv('groups:copy-many', ids, groupId || null),
+    updateMany: (ids, patch) => inv('groups:update-many', ids, patch),
+    undo: () => inv('groups:undo'),
+    redo: () => inv('groups:redo'),
   },
   settings: {
     set: (patch) => inv('settings:set', patch),

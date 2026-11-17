@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 13 of 14 (1.4.5): app pins. Right-click the pin: "Pin over" lists the apps open now, A to Z
+// CosmoNotes note window, part 13 of 15 (1.4.5): app pins. Right-click the pin: "Pin over" lists the apps open now, A to Z
 // (main/app-pin.js reads their window titles), each with its workspaces / files under it, to tick. "Every app" is the
 // normal pin (on top of everything). A ticked app covers its workspaces (they grey out); an app the note is pinned over
 // that isn't open stays in the list, ticked, with "not open". Nothing ticked: not pinned. A second right-click closes it.

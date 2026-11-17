@@ -61,4 +61,12 @@ function pushLook(id) {
   applyState(win, n);
   win.webContents.send('note:look', viewOf(n, win));
 }
-module.exports = { coverAll, groupOpenInList, groupShut, hiddenInList, hideNewlyLocked, listOpenGroups, openForNow, pushLook, revealedNow, unlockedForNow };
+// 1.4.10: every tag in use, for a note's ⋯ menu to suggest: the groups' and those of notes not in the Bin whose lock doesn't
+// hide them (a hidden note's tags are secret, src/tags.js)
+function knownTags() {
+  const out = new Set();
+  for (const g of S.store.groups.values()) for (const t of g.tags) out.add(t);
+  for (const n of S.store.all()) if (!n.deletedAt && !hiddenInList(n)) for (const t of n.tags) out.add(t);
+  return [...out].sort((a, b) => a.localeCompare(b));
+}
+module.exports = { coverAll, groupOpenInList, groupShut, hiddenInList, hideNewlyLocked, knownTags, listOpenGroups, openForNow, pushLook, revealedNow, unlockedForNow };

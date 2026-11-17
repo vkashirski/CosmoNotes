@@ -60,6 +60,11 @@
     folder: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
     palette: '<svg viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 3.5-4 3.5h-1.8a1.7 1.7 0 0 0-1.2 2.9c.7.8.3 2.6-1.4 3.4-.5.2-1 .2-1.6.2z"/><circle cx="7.5" cy="10.5" r="1.3"/><circle cx="11" cy="6.5" r="1.3"/><circle cx="16" cy="8" r="1.3"/></svg>',
     ungroup: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><path d="M14 7h3a2 2 0 0 1 2 2v1M10 17H7a2 2 0 0 1-2-2v-1"/></svg>',
+    // 1.4.9: Cut / Paste and Undo / Redo of moves
+    cut: '<svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.1 8.1 20 20M8.1 15.9 20 4"/></svg>',
+    paste: '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11h6M9 15h4"/></svg>',
+    undo: '<svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>',
+    redo: '<svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg>',
     copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2.5"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>',
     restore: '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
     info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
@@ -71,6 +76,7 @@
     check: '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
     // 1.3.34: click-through (the note's top-bar button has the same arrow)
     clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M5 3 2 6M19 3l3 3"/></svg>', // 1.4.1: reminders
+    tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>', // 1.4.10: tags
     through: '<svg viewBox="0 0 24 24"><path d="M4.04 4.69a.5.5 0 0 1 .65-.65l16 6.5a.5.5 0 0 1-.06.95l-6.13 1.58a2 2 0 0 0-1.43 1.43l-1.58 6.13a.5.5 0 0 1-.95.06z"/></svg>',
     x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
     warn: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
@@ -95,6 +101,8 @@
   // and how locked each card looked last time (for the lock / unlock animation)
   const sel = new Set();
   V.selAnchor = null;
+  V.cut = new Set(); // 1.4.9: cards cut (Ctrl+X) or copied (Ctrl+C) in picking.js: they go where Ctrl+V is pressed
+  V.cutMode = 'cut'; // 'cut' = Paste moves them (once) | 'copy' = Paste puts copies there (again and again)
   V.lockSeen = new Map();
 
   // ---------- tiny DOM helper
@@ -297,6 +305,30 @@
     return { notes: sn, groups: sg, hidden: notes.length + groups.length - sn.length - sg.length };
   }
 
+  // ---------- 1.4.10: tags (src/tags.js). A note counts as tagged with its own tags and its groups' (a group's count for
+  // everything inside it, its groups too). The filter: the tags picked under the search box (V.tagPick: all of them, or any
+  // with settings.tagAny) and #tags typed in the search (each the start of a tag), with the words typed
+  const T = window.COSMO_TAGS;
+  V.tagPick = [];
+  const groupTags = (id) => chainOf(id).flatMap((g) => g.tags || []);
+  const tagsOfNote = (n) => [...new Set([...(n.tags || []), ...groupTags(n.groupId)])];
+  const tagsOfGroup = (g) => [...new Set(groupTags(g.id))];
+  function finding() {
+    const p = T ? T.parse(V.query) : { tags: [], text: V.query.trim().toLowerCase() };
+    return { text: p.text, typed: p.tags, picked: V.tagPick, any: !!V.state.settings.tagAny, on: !!(p.tags.length || V.tagPick.length) };
+  }
+  const tagsFit = (have, f) => !T || T.match(have, f.picked, f.typed, f.any);
+  const noteFits = (n, f) => (!f.text || `${n.title || ''}\n${n.text || ''}\n${n.pics || ''}`.toLowerCase().includes(f.text)) && tagsFit(tagsOfNote(n), f);
+  const groupFits = (g, f) => (!f.text || (g.name || '').toLowerCase().includes(f.text)) && tagsFit(tagsOfGroup(g), f);
+  // every tag on a note or group in the list (not in the Bin), and on how many
+  function knownTags() {
+    const count = new Map();
+    const add = (t) => count.set(t, (count.get(t) || 0) + 1);
+    for (const n of live()) for (const t of n.tags || []) add(t);
+    for (const g of V.state.groups) if ((g.tags || []).length && notesInTree(g.id).length) for (const t of g.tags) add(t);
+    return [...count.keys()].sort((a, b) => a.localeCompare(b)).map((tag) => ({ tag, count: count.get(tag) }));
+  }
+
   function sortPrefs() {
     return { by: 'updated', dir: 'desc', groups: 'mixed', ...(V.state.settings.listSort || {}) };
   }
@@ -321,5 +353,6 @@
   Object.assign(K, { S, $, $$, COLORS, DARK_COLORS, COLOR_NAMES, SWATCH, GCOLORS, GNAMES, THEMES, SIZES, SIZE_NAMES,
     sizeNow, themeNow, ICON, cardsTabNow, navBack, sel, h, when, full, plural, tilt, swatchStrip, load, live, noteById,
     groupById, childGroups, chainOf, subtreeIds, notesInTree, isInside, noteIsLocked, groupIsLocked, LOCKED_NO_DELETE,
-    isShut, lockedOnes, favourites, sortPrefs, sortItems });
+    isShut, noteShown, groupShown, lockedOnes, favourites, tagsOfNote, tagsOfGroup, finding, noteFits, groupFits, knownTags,
+    sortPrefs, sortItems });
 })();

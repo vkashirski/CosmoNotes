@@ -87,8 +87,9 @@ no loose `store` / `listWin` / `quitting` / `listUnlockedAll` is left.
     note to disk must go through `diskForm` too, or locked notes leak in plain text.
   - In memory a note is sealed (`n.enc` set, secret fields empty) until the PIN is typed (`openAll`). A sealed note counts as
     locked (`isLocked`, `hiddenInList`), is written back unchanged, and must never be "saved" from its empty fields.
-  - `SECRET` (constants.js) = what is hidden from windows **and** what is sealed: title, html, text, firstImage, ink. A new
-    field with note contents belongs in both `SECRET` and `SECRET_FIELDS` (crypt.js).
+  - `SECRET` (constants.js) = what is hidden from windows **and** what is sealed: title, html, text, firstImage, ink (and
+    remindMsg 1.4.1, tags 1.4.10). A new field with note contents belongs in both `SECRET` and `SECRET_FIELDS` (crypt.js),
+    with its empty value in crypt.js `blank()` and in locks.js `viewOf`.
   - Photos / drawings / voice of a locked note are sealed files; `note.encAtt` lists them so `sweepAttachments` keeps them.
     Read attachment bytes only through `attachmentBytes` / `openableCopy` (a sealed file is useless otherwise).
   - `syncSeals` (start-up and every `notifyList`) seals or opens files whose lock changed; only those are written.

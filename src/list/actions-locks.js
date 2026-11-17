@@ -5,7 +5,7 @@
   const K = window.COSMO_LIST_KIT;
   const { V, S, $, $$, COLORS, COLOR_NAMES, SWATCH, GCOLORS, GNAMES, ICON, navBack, h, plural, swatchStrip, load,
     live, groupById, chainOf, notesInTree, isInside, noteIsLocked, groupIsLocked, LOCKED_NO_DELETE, lockedOnes,
-    render, modal, toast } = K;
+    isShut, knownTags, render, modal, toast } = K;
   // defined in a later part:
   const clearSearch = K.later('clearSearch');
   // ================================================================ actions (with confirmations)
@@ -383,6 +383,41 @@
   $('#remClose').addEventListener('click', closeRemindSheet);
   $('#remSheet').addEventListener('mousedown', (e) => { if (e.target.id === 'remSheet') closeRemindSheet(); });
 
+  // 1.4.10: the tags of a note, a group, or several (right-click → Tags…, the selection bar): the src/tags.js editor. Each
+  // tag added or removed is saved at once (main list:tags); with several, a tag only some have is faded. Shut ones
+  // (isShut) are left out: main refuses them too
+  function openTagSheet(items) {
+    const T = window.COSMO_TAGS;
+    items = items.filter((it) => !isShut(it.kind, it.note || it.group));
+    if (!T || !items.length) return;
+    const ids = items.map((it) => (it.note || it.group).id);
+    const lists = items.map((it) => (it.note || it.group).tags || []);
+    const every = lists[0].filter((t) => lists.every((l) => l.includes(t)));
+    const some = [...new Set(lists.flat())].filter((t) => !every.includes(t));
+    const ed = T.editor({
+      tags: every, some, known: knownTags().map((k) => k.tag),
+      add: (t) => S.list.tags(ids, { add: [t] }),
+      remove: (t) => S.list.tags(ids, { remove: [t] }),
+    });
+    const one = items.length === 1 ? items[0] : null;
+    const name = one ? (one.note ? one.note.title : one.group.name) || '' : '';
+    $('#tagTitle').textContent = !one ? `Tags: ${plural(items.length, 'selected one')}` : name.trim() ? `Tags: ${name.trim().slice(0, 40)}` : one.group ? 'Tags of this group' : 'Tags';
+    const groups = items.some((it) => it.group);
+    $('#tagTip').hidden = !groups && one;
+    $('#tagTip').textContent = groups ? 'Everything inside a group has its tags too.' : 'Faded tags: only some of them have it.';
+    $('#tagHere').replaceChildren(ed.el);
+    $('#tagSheet').hidden = false;
+    ed.focus();
+  }
+  function closeTagSheet() {
+    const box = $('#tagHere input');
+    if (box) box.blur(); // a tag still being typed is kept
+    $('#tagSheet').hidden = true;
+    $('#tagHere').replaceChildren();
+  }
+  $('#tagClose').addEventListener('click', closeTagSheet);
+  $('#tagSheet').addEventListener('mousedown', (e) => { if (e.target.id === 'tagSheet') closeTagSheet(); });
+
   // ================================================================ encryption of locked notes (1.1.30)
   // main/crypt.js does the work. The list shows the recovery key (once), and Settings → Locked notes has the buttons.
   const cryptNow = () => (V.state.settings && V.state.settings.crypt) || {};
@@ -510,5 +545,5 @@
   Object.assign(K, { setFold, trashNote, destroyNote, emptyBin, dissolveGroup, trashGroup, NEW_INPUTS, checkNew, savedLock,
     ensurePassword, paintLockBar, lockNote, unlockNote, lockGroup, unlockGroup, unlockNoteNow, relockNote, unlockGroupNow,
     relockGroup, openGroupView, openPanel, closePanel,
-    paintPanel, showKeyIfNeeded, paintCrypt, clearSettingsSearch, openRemindSheet, closeRemindSheet });
+    paintPanel, showKeyIfNeeded, paintCrypt, clearSettingsSearch, openRemindSheet, closeRemindSheet, openTagSheet, closeTagSheet });
 })();

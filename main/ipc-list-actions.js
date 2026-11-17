@@ -8,6 +8,8 @@ const { applyState, setWinTitle } = require('./note-state');
 const { coverAll, groupShut, hiddenInList, hideNewlyLocked, listOpenGroups, openForNow, pushLook, unlockedForNow } = require('./list-visibility');
 const { bringToFront, closeNoteWindow, createNote, openNoteWindow, reopenClosed } = require('./note-window');
 const appPin = require('./app-pin');
+const TAGS = require('../src/tags');
+const { recorded } = require('./move-history');
 const { S, wins } = require('./state');
 
 // 1.1.47: a note just unlocked for now: its open window shows it without the password
@@ -173,6 +175,31 @@ function registerListActionIpc() {
     notifyList();
     return count;
   });
+  // 1.4.10: tags (src/tags.js) on notes and groups, one or several: add and remove (never the whole list, so two changes
+  // close together can't undo each other). Not an edit. A note or group its lock hides is left alone (1.3.28); an open
+  // note's window gets them at once (its ⋯ menu shows them)
+  ipcMain.handle('list:tags', (e, ids = [], change = {}) => {
+    const add = TAGS.cleanAll([].concat(change && change.add || []));
+    const remove = TAGS.cleanAll([].concat(change && change.remove || []));
+    const next = (list) => TAGS.cleanAll([...list.filter((t) => !remove.includes(t)), ...add]);
+    let count = 0;
+    for (const id of [].concat(ids)) {
+      if (typeof id !== 'string') continue;
+      if (S.store.groups.has(id)) {
+        if (groupShut(id)) continue;
+        S.store.updateGroup(id, { tags: next(S.store.groups.get(id).tags) });
+        count++;
+        continue;
+      }
+      const n = S.store.get(id);
+      if (!n || hiddenInList(n)) continue;
+      S.store.update(id, { tags: next(n.tags) });
+      pushLook(id);
+      count++;
+    }
+    if (count) notifyList();
+    return count;
+  });
   // paper colour / font for several notes
   // 1.1.15: right-click → Edit… in the list: a note's title and colour. An open window of the note gets the
   // change straight away ('note:look'), so both stay the same. A new title counts as an edit; a colour doesn't.
@@ -222,7 +249,7 @@ function registerListActionIpc() {
   });
   // put several notes and groups together in a new group, made inside `parentId` (null = top level).
   // Things hidden by a locked group that isn't open in the list are left where they are.
-  ipcMain.handle('groups:make-from', (e, ids = [], parentId = null) => {
+  ipcMain.handle('groups:make-from', (e, ids = [], parentId = null) => recorded('New group', () => {
     parentId = parentId && S.store.groups.has(parentId) ? parentId : null;
     if (groupShut(parentId)) return null;
     const noteIds = [];
@@ -245,7 +272,7 @@ function registerListActionIpc() {
     hideNewlyLocked();
     notifyList();
     return g.id;
-  });
+  })); // 1.4.9: one Undo step (main/move-history.js)
   // (the list window asks "are you sure?" in its own style before calling these)
   ipcMain.handle('list:destroy', async (e, id) => {
     const n = S.store.get(id);

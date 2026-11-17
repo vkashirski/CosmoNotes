@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 3 of 14: pop-overs, the header, the ⋯ menu, the Add and text panels, Undo / Redo
+// CosmoNotes note window, part 3 of 15: pop-overs, the header, the ⋯ menu, the Add and text panels, Undo / Redo
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -10,7 +10,7 @@
     startRecording = K.later('startRecording'), openDraw = K.later('openDraw'), relock = K.later('relock'),
     toggleLock = K.later('toggleLock'), saveInk = K.later('saveInk'), inkUndo = K.later('inkUndo'),
     inkRedo = K.later('inkRedo'), finishStroke = K.later('finishStroke'), toast = K.later('toast'),
-    speakToText = K.later('speakToText'), openRemind = K.later('openRemind');
+    speakToText = K.later('speakToText'), openRemind = K.later('openRemind'), paintTags = K.later('paintTags');
   // ================================================================ popovers
   // 1.1.16: the ⋯ menu and the Effects pop-up can be dragged (by their grip) and out of the note, like the
   // toolbars: id → { out: barOut(…), move: movable(…) } (filled in further down, next to the toolbars)
@@ -64,7 +64,7 @@
     toFront($(id));
     syncPops();
     if (popOuts[id]) { popOuts[id].out.start(); popOuts[id].move.place(); }
-    if (id === '#menu') colorStrip.reveal($('#colors .sw.on'));
+    if (id === '#menu') { colorStrip.reveal($('#colors .sw.on')); paintTags(); } // 1.4.10: its tags (tags.js)
   }
   function togglePop(id) {
     if (!$(id).hidden) closePop(id);

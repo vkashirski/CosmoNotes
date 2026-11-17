@@ -127,6 +127,101 @@ const app = require('./helpers/app');
   await H['list:trash'](null, e);
   await H['list:destroy'](null, e); await H['list:destroy'](null, made);
   assert.equal(await app.group(T), undefined, 'a group goes once its notes are gone for good');
+  // ---- 1.4.9: several at once, the look of several groups, Undo / Redo of moves (main/move-history.js)
+  const m1 = await app.newNote(); const m2 = await app.newNote(); const m3 = await app.newNote();
+  const A = await H['groups:make-from'](null, [m1, m2], null);
+  const B = await H['groups:make-from'](null, [m3], null);
+  assert.equal((await get()).settings.moves.undo, 'New group', 'the list knows what Undo would do');
+  let mm = await H['groups:move-many'](null, [m1, m2, B], A, 'Paste');
+  assert.deepEqual(mm, { moved: 1, kept: 0 }, 'm1 and m2 are already in A: only B moves');
+  assert.equal(await parentOf(B), A);
+  assert.equal((await get()).settings.moves.undo, 'Paste');
+  mm = await H['groups:move-many'](null, [m1, m2, B], null);
+  assert.deepEqual(mm, { moved: 3, kept: 0 }, 'all out to the top level');
+  assert.equal(await app.group(A), undefined, 'A was emptied, so it went away');
+  let u = await H['groups:undo']();
+  assert.equal(u.label, 'Move'); assert.equal(u.moved, 3);
+  assert.ok(await app.group(A), 'Undo brings A back, with its own id');
+  assert.equal(await noteIn(m1), A); assert.equal(await noteIn(m2), A); assert.equal(await parentOf(B), A);
+  assert.equal((await get()).settings.moves.redo, 'Move');
+  u = await H['groups:redo']();
+  assert.equal(u.moved, 3);
+  assert.equal(await app.group(A), undefined, 'Redo moves them out again');
+  await H['groups:undo'](); await H['groups:undo'](); // back before the paste: B at the top, m1 and m2 in A
+  assert.equal(await parentOf(B), null); assert.equal(await noteIn(m1), A);
+  await H['groups:undo'](); // B's "New group": m3 back at the top, B goes away
+  assert.equal(await noteIn(m3), null); assert.equal(await app.group(B), undefined);
+  await H['groups:redo'](); // and B comes back with m3 in it
+  assert.ok(await app.group(B)); assert.equal(await noteIn(m3), B);
+  // a new move forgets what Redo had
+  await H['groups:undo']();
+  assert.ok((await get()).settings.moves.redo);
+  await H['groups:move-to'](null, m1, null);
+  assert.equal((await get()).settings.moves.redo, null, 'a new move clears Redo');
+  await H['groups:undo']();
+  assert.equal(await noteIn(m1), A, 'single drags undo too');
+  // Ungroup can be undone (the group comes back with its look)
+  await H['groups:update'](null, A, { style: 'envelope', color: 'sky' });
+  await H['groups:dissolve'](null, A);
+  assert.equal(await app.group(A), undefined);
+  u = await H['groups:undo']();
+  assert.equal(u.label, 'Ungroup');
+  assert.equal((await app.group(A)).style, 'envelope', 'its look came back too');
+  assert.equal(await noteIn(m1), A); assert.equal(await noteIn(m2), A);
+  // a group never goes into its own sub-group, also several at once
+  const inner = await H['groups:make-from'](null, [m2], A);
+  mm = await H['groups:move-many'](null, [A, m3], inner);
+  assert.deepEqual(mm, { moved: 1, kept: 1 }, 'm3 moves, A stays');
+  assert.equal(await parentOf(A), null);
+  // the look of several groups at once (unknown keys and looks ignored)
+  const C = await H['groups:make-from'](null, [m3], null);
+  assert.equal(await H['groups:update-many'](null, [A, C, 'nope'], { style: 'notebook', color: 'mint', name: 'x' }), 2);
+  for (const gid of [A, C]) { const gg = await app.group(gid); assert.equal(gg.style, 'notebook'); assert.equal(gg.color, 'mint'); assert.notEqual(gg.name, 'x'); }
+  // things gone for good stay gone: Undo leaves them out
+  await H['groups:move-many'](null, [m3], A);
+  await H['list:trash'](null, m3); await H['list:destroy'](null, m3);
+  u = await H['groups:undo']();
+  assert.equal(u.moved, 0); assert.equal(u.kept, 1, 'the deleted note is skipped');
+  // Copy / Paste: copies keep their title; a copied group comes whole (name, look, sub-groups); one Undo step moves the
+  // copies to the Bin, Redo brings them back; never into itself
+  const k1 = await app.newNote({ html: '<p>kitten</p>' });
+  await H['list:edit'](null, k1, { title: 'Kitten', color: 'pink' });
+  const box = await H['groups:make-from'](null, [k1], null);
+  await H['groups:rename'](null, box, 'Box'); await H['groups:update'](null, box, { style: 'folder' });
+  const sub = await H['groups:make-from'](null, [m2], box);
+  const target = await H['groups:make-from'](null, [m1], null);
+  let cp = await H['groups:copy-many'](null, [k1, box], target);
+  assert.deepEqual(cp, { copied: 2, kept: 0 });
+  let all = await get();
+  const boxCopy = all.groups.find((g) => g.parentId === target && g.id !== box);
+  assert.ok(boxCopy && boxCopy.name === 'Box' && boxCopy.style === 'folder', 'the group copy has its name and look');
+  assert.ok(all.groups.some((g) => g.parentId === boxCopy.id), 'and its sub-group');
+  const k1src = all.notes.find((n) => n.id === k1);
+  assert.equal(k1src.title, 'Kitten');
+  const copies = all.notes.filter((n) => n.id !== k1 && n.text === k1src.text);
+  assert.equal(copies.length, 2, 'the note, and the note inside the copied group');
+  assert.ok(copies.every((n) => n.title === k1src.title && !n.title.includes('(copy)')), 'copies keep their title');
+  assert.ok(copies.some((n) => n.groupId === target) && copies.some((n) => n.groupId === boxCopy.id));
+  assert.equal(await noteIn(k1), box, 'the original stays put');
+  assert.equal((await get()).settings.moves.undo, 'Copy');
+  u = await H['groups:undo']();
+  assert.equal(u.label, 'Copy'); assert.equal(u.moved, 3, 'the three copies');
+  all = await get();
+  assert.ok(all.notes.filter((n) => copies.some((c) => c.id === n.id) || (n.groupId && n.text === k1src.text && n.id !== k1)).every((n) => n.deletedAt), 'Undo: the copies are in the Bin, not deleted');
+  assert.ok(!all.notes.find((n) => n.id === k1).deletedAt, 'the original is not');
+  u = await H['groups:redo']();
+  assert.equal(u.moved, 3);
+  all = await get();
+  assert.ok(copies.every((c) => !all.notes.find((n) => n.id === c.id).deletedAt), 'Redo: back from the Bin');
+  cp = await H['groups:copy-many'](null, [box], sub);
+  assert.deepEqual(cp, { copied: 0, kept: 1 }, 'never into itself');
+  for (const n of (await get()).notes.filter((x) => x.text === k1src.text)) { await H['list:trash'](null, n.id); await H['list:destroy'](null, n.id); }
+  // nothing left to undo: null (and the history is gone after a restart: memory only)
+  while (await H['groups:undo']()) { /* empty it */ }
+  assert.equal(await H['groups:undo'](), null);
+  assert.equal((await get()).settings.moves.undo, null);
+  for (const id of [m1, m2]) { await H['list:trash'](null, id); await H['list:destroy'](null, id); }
+
   // a group with one note stays; dissolving it, and the tip stays off with no groups left
   const one = await H['groups:make-from'](null, [d], null);
   assert.ok(await app.group(one), 'a group with one note stays');

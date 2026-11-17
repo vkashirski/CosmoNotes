@@ -11,6 +11,21 @@ body[data-apptheme="forest"]   { --pop-ink2: #C2D0C5; --pop-hover: rgba(255,255,
 body[data-apptheme="plum"]     { --pop-ink2: #D2C3D5; --pop-hover: rgba(255,255,255,.08); --pop-bg: #2D2432; --pop-card: #45384B; --pop-soft: #362C3B; --pop-soft2: #48394D; --pop-mute: #AE9FB3; --pop-ink: #EEE3F0; --pop-pick: #EEE3F0; --pop-pickfg: #251D29; --pop-danger: #FF8A80; }
 body:is([data-apptheme="night"], [data-apptheme="midnight"], [data-apptheme="forest"], [data-apptheme="plum"]) :is(.pop, #inkBar, .ctx) { box-shadow: 0 12px 32px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.06); }
 
+/* ---------- 1.4.10: the ⋯ menu's tags (src/note/tags.js; the editor is src/tags.js) ---------- */
+.tagedit { display: flex; flex-direction: column; gap: 6px; }
+.tchips { display: flex; flex-wrap: wrap; gap: 4px; }
+.tchips[hidden], .tsugg[hidden] { display: none; }
+.tchip { display: inline-flex; align-items: center; height: 24px; padding: 0 1px 0 9px; border-radius: 999px; background: var(--pop-pick); color: var(--pop-pickfg); font: 800 12px var(--ui); }
+.tchip .tname { border: 0; padding: 0; background: none; color: inherit; font: inherit; }
+.tchip .tx { width: 22px; height: 22px; margin-left: 1px; border: 0; border-radius: 50%; background: transparent; color: inherit; font: 800 14px/1 var(--ui); cursor: pointer; opacity: .7; }
+.tchip .tx:hover { opacity: 1; background: color-mix(in oklab, var(--pop-pickfg) 22%, transparent); }
+.tinput { width: 100%; height: 30px; padding: 0 10px; border: 1.5px solid var(--pop-soft2); border-radius: 10px; background: var(--pop-card); color: var(--pop-ink); font: 700 12.5px var(--ui); outline: none; }
+.tinput::placeholder { color: var(--pop-mute); }
+.tinput:focus { border-color: #D6B13A; box-shadow: 0 0 0 3px rgba(214,177,58,.2); }
+.tsugg { display: flex; flex-wrap: wrap; gap: 4px; }
+.tsg { height: 22px; padding: 0 8px; border: 0; border-radius: 999px; background: var(--pop-soft); color: var(--pop-ink2); font: 800 11px var(--ui); cursor: pointer; }
+.tsg:hover { background: var(--pop-soft2); color: var(--pop-ink); }
+
 /* ---------- 1.1.22 (ninth round): Ctrl+F, find in the note ---------- */
 #find {
   position: fixed; right: 10px; top: 40px; z-index: 25;
