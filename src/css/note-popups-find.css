@@ -107,3 +107,12 @@ body.wobble { animation: rbwobble .8s ease-in-out; }
 #pinList .pa:has(input:disabled):hover { background: transparent; }
 #pinList .pa-sep { height: 1px; margin: 4px 2px; background: var(--pop-soft2); }
 #pinList .pa-none { margin: 6px 4px 2px; }
+/* 1.4.11: Click-through, the menu's first row (clear of its X) */
+#pinCtRow { padding-right: 24px; }
+#pinCtRow[hidden] { display: none; }
+#pinCt { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; color: var(--pop-ink); font: 700 13px var(--ui); text-align: left; }
+#pinCt:hover, #pinCt:focus-visible { background: var(--pop-soft); }
+#pinCt svg { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+#pinCt span { flex: 1; min-width: 0; }
+#pinCt small { display: block; font: 700 11px var(--ui); color: var(--pop-mute); }
+#pinCtRow .pa-sep { height: 1px; margin: 4px 2px; background: var(--pop-soft2); }

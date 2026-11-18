@@ -2,7 +2,7 @@ const EventEmitter = require('events');
 const handlers = {}, listeners = {};
 let nextId = 1;
 const all = [];
-class WebContents extends EventEmitter { constructor(w){ super(); this.win=w; this.sent=[]; this.session={addWordToSpellCheckerDictionary(){}} } send(ch, ...a){ this.sent.push(ch); (this.sentArgs || (this.sentArgs = [])).push([ch, ...a]); } setWindowOpenHandler(f){ this.openHandler=f } replaceMisspelling(){} }
+class WebContents extends EventEmitter { constructor(w){ super(); this.win=w; this.sent=[]; this.session={addWordToSpellCheckerDictionary(){}} } send(ch, ...a){ this.sent.push(ch); (this.sentArgs || (this.sentArgs = [])).push([ch, ...a]); } setWindowOpenHandler(f){ this.openHandler=f } replaceMisspelling(){} isDestroyed(){ return this.win.destroyed } }
 class BrowserWindow extends EventEmitter {
   constructor(o){ super(); this.o=o; this.id=nextId++; this.bounds={x:o.x??100,y:o.y??100,width:o.width,height:o.height}; this.webContents=new WebContents(this); this.destroyed=false; this.visible=false; this.top=false; this.opacity=1; all.push(this); }
   loadFile(f){ this.file=f; setImmediate(()=>{ if(!this.destroyed) this.emit('ready-to-show'); }); }
@@ -22,6 +22,7 @@ const shows = () => module.exports.__displays || [display];
 const near = (p) => shows().find(({ workArea: a }) => p.x >= a.x && p.x < a.x + a.width && p.y >= a.y && p.y < a.y + a.height) || shows()[0];
 module.exports = {
   __handlers: handlers, __listeners: listeners, __all: all, __loaded: [], __partitions: {},
+  __popups: [],
   __onTopCalls: [], // 1.4.2: every setAlwaysOnTop(true), in order: Windows puts each one above the others
 
   app: Object.assign(new EventEmitter(), { commandLine: { appendSwitch(){} }, setAppUserModelId(){}, requestSingleInstanceLock:()=>true, whenReady:()=>Promise.resolve(), getPath:(k)=> k==='appData' ? process.env.FAKE_APPDATA : process.env.FAKE_DATA, isPackaged:false, getVersion:()=>'1.0.0', quit(){ module.exports.app.emit('before-quit'); module.exports.app.emit('will-quit'); }, setLoginItemSettings(){} }),
@@ -30,7 +31,8 @@ module.exports = {
   screen: Object.assign(new EventEmitter(), { getAllDisplays:()=>shows(), getPrimaryDisplay:()=>display, getDisplayMatching:(r)=>near({ x: r.x + r.width / 2, y: r.y + r.height / 2 }), getDisplayNearestPoint:(p)=>near(p), getCursorScreenPoint:()=>module.exports.__cursor || { x: 100, y: 100 } }),
   powerMonitor: new EventEmitter(), // 1.4.1: 'resume' after the PC slept
   Tray: class extends EventEmitter { constructor(){ super(); module.exports.__tray = this; } setToolTip(){} setContextMenu(m){ this.menu=m } },
-  Menu: { buildFromTemplate:(t)=>({ t, popup(){} }), setApplicationMenu(){} },
+  // 1.4.11: every menu shown (popup), with its template and options: __popups (the text's right-click menu, a note's » menu)
+  Menu: { buildFromTemplate:(t)=>({ t, popup(o){ module.exports.__popups.push({ t, o }) } }), setApplicationMenu(){} },
   nativeImage: { createFromPath:()=>({}), createFromBuffer:(b)=>({ bytes: [...b], isEmpty:()=>!(b.length > 4 && b[0] === 0x89 && b[1] === 0x50) }) }, // 1.4.3: only a PNG decodes
   clipboard: { writeImage(i){ module.exports.__clip = i } }, // 1.4.3: Copy image
   shell: { openExternal(u){ module.exports.__opened = u }, openPath(){} },

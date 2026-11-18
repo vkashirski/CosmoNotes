@@ -156,11 +156,10 @@
     h: () => 'font-weight:700',
     a: () => 'color:var(--accent);text-decoration-line:underline',
   };
-  function runSpan(r, noteFont) {
+  function runSpan(r) {
     if (!r || typeof r.t !== 'string') return '';
     const css = [];
     for (const k of Object.keys(runCss)) if (r[k] !== undefined && r[k] !== null) css.push(runCss[k](r[k]));
-    if (r.f === 'hand' && noteFont !== 'hand') css.push('line-height:1.1'); // as note-drawing.css
     // underline and strike together: one text-decoration-line with both
     const deco = ['u', 's', 'a'].filter((k) => r[k]).length > 1 ? `text-decoration-line:${r.s ? 'line-through ' : ''}underline` : '';
     const style = css.filter(Boolean).filter((x) => !deco || !x.startsWith('text-decoration-line')).concat(deco || []).join(';');
@@ -179,7 +178,7 @@
     const lines = (n.text || '').split('\n').map((s) => s.trim()).filter(Boolean);
     // 1.3.11: each line in the look it has in the note (store.js cardRuns; null = plain)
     const runs = Array.isArray(n.runs) && n.runs.length === lines.length ? n.runs : null;
-    const words = (i) => (runs && Array.isArray(runs[i]) ? runs[i].map((r) => runSpan(r, n.font || 'hand')) : [lines[i]]);
+    const words = (i) => (runs && Array.isArray(runs[i]) ? runs[i].map((r) => runSpan(r)) : [lines[i]]);
     // 1.1.22: checklist lines get their box (ticked or not) like in the note; `checks` has one letter per line (main.js)
     const marks = typeof n.checks === 'string' ? n.checks : '';
     // 1.1.46: each line is its own row (`.ln`), so the card can tell how many fit (markMore)
@@ -328,6 +327,9 @@
       n.forNow || n.openUnlocked ? h('span', { class: 'ulk', title: n.forNow ? 'Unlocked until CosmoNotes restarts' : 'Unlocked for now. It locks again when you close the note', html: ICON.unlock }) : null,
       remIcon(n, shut),
       acts);
+    // 1.4.16: a card stays when its note changes (refreshCard moves a new card's parts into it), so the card's own handlers
+    // read the note as it is now, never the one it was built from
+    const now = () => noteById(n.id) || n;
     const card = h('div', {
       class: 'card' + (n.eve ? ' eve' : '') + (n.remHidden ? ' remhid' : ''), // 1.3.27: evening colours; 1.4.1: hidden by a reminder
       'data-color': n.color,
@@ -337,21 +339,22 @@
       style: `--r:${tilt(n.id)}deg; animation-delay:${Math.min(i, 12) * 18}ms`,
       title: n.open ? 'Click to bring to front · Ctrl+click to select · right-click for more' : 'Click to open · Ctrl+click to select · right-click for more',
       onclick: (e) => { if (pickCard(e, key)) return; S.list.openNote(n.id); },
-      oncontextmenu: (e) => { e.preventDefault(); if (bulkMenu(e, key)) return; noteMenu(n, e); },
+      oncontextmenu: (e) => { e.preventDefault(); if (bulkMenu(e, key)) return; noteMenu(now(), e); },
     }, h('div', { class: 'strip' }), n.pinned ? h('span', { class: 'pin', title: n.appPinned ? 'Pinned over some apps' : 'Pinned on top' }) : null, cardBody(n), tagPills(n.tags), foot, lockBtn('note', n), starBtn(key));
     card.addEventListener('dragstart', (e) => startDrag(e, { id: n.id, kind: 'note' }, card));
     card.addEventListener('dragend', endDrag);
     dropTarget(card,
-      () => !shut && (V.drag.many ? !V.drag.many.some((x) => x.id === n.id) : V.drag.kind === 'note' && V.drag.id !== n.id && !shutDrag(V.drag)),
+      () => !isShut('note', now()) && (V.drag.many ? !V.drag.many.some((x) => x.id === n.id) : V.drag.kind === 'note' && V.drag.id !== n.id && !shutDrag(V.drag)),
       async (d) => {
         if (!d.many) return S.groups.make(d.id, n.id);
-        await S.groups.makeFrom([n.id, ...d.many.map((x) => x.id)], n.groupId || null);
+        await S.groups.makeFrom([n.id, ...d.many.map((x) => x.id)], now().groupId || null);
         clearSel();
       },
       () => {
         if (V.drag.many) return 'Make a group';
         const from = V.state.notes.find((x) => x.id === V.drag.id);
-        return n.groupId && from && from.groupId !== n.groupId ? 'Add to its group' : 'Make a group';
+        const gid = now().groupId;
+        return gid && from && from.groupId !== gid ? 'Add to its group' : 'Make a group';
       });
     return card;
   }
@@ -375,7 +378,9 @@
     if (shut) return h('span', { class: cls, title: tip, html: ICON.clock });
     return h('button', { class: cls, title: `${tip}\nClick to change`, html: ICON.clock, onclick: (e) => { e.stopPropagation(); openRemindSheet(n); } });
   }
-  // the little picture of a group, in its chosen look
+  // the little picture of a group, in its chosen look. 1.4.14 (the owner's pick): every look wears the same cream label
+  // in the same spot (name + number of notes), and nothing is under the card. The label is always cream, so its ink is
+  // fixed (never the theme's --ink: that is light on dark themes). The name shows in the group's own font (titleFont).
   function groupArt(g, notes) {
     const sorted = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
     const hiddenG = !g.open;
@@ -383,12 +388,15 @@
     const top = sorted[0];
     const peek = [sorted[0], sorted[1], sorted[2]].filter(Boolean);
     const lockBadge = g.locked ? h('span', { class: 'glock', html: g.open ? ICON.unlock : ICON.lockA }) : null;
+    const label = h('div', { class: 'glabel' },
+      h('b', { class: g.name ? '' : 'unnamed', 'data-font': g.titleFont || 'hand' }, g.name || 'Group'),
+      h('small', {}, plural(notes.length, 'note')));
     const style = g.style || 'stack';
     if (style === 'folder') {
       return h('div', { class: 'art folder' },
         h('div', { class: 'f-back' }),
         ...peek.slice(0, 3).map((n, k) => paper(n, `pk pk${k + 1}`)),
-        h('div', { class: 'f-front' }, h('span', { class: 'f-count' }, plural(notes.length, 'note'))),
+        h('div', { class: 'f-front' }, label), // on the front, so it tips with it
         lockBadge);
     }
     if (style === 'envelope') {
@@ -397,15 +405,13 @@
         ...peek.slice(0, 2).map((n, k) => paper(n, `pk pk${k + 1}`)),
         h('div', { class: 'e-front' }),
         h('span', { class: 'e-seal', html: '<svg viewBox="0 0 24 24"><path d="M12 3l2.4 5.6 6 .5-4.6 4 1.4 5.9L12 16l-5.2 3 1.4-5.9-4.6-4 6-.5z"/></svg>' }),
-        lockBadge);
+        label, lockBadge);
     }
     if (style === 'notebook') {
       return h('div', { class: 'art notebook' },
         h('div', { class: 'nb-pages' }),
-        h('div', { class: 'nb-cover' },
-          h('div', { class: 'nb-label' }, h('b', {}, g.name || 'Notebook'), h('small', {}, plural(notes.length, 'note')))),
+        h('div', { class: 'nb-cover' }, label), // on the cover, so it turns with it
         h('div', { class: 'nb-rings' }, ...Array.from({ length: 6 }, () => h('i'))),
-        h('div', { class: 'nb-band' }),
         lockBadge);
     }
     // stack (the original look)
@@ -417,6 +423,7 @@
       h('div', { class: 'sheet s1', 'data-color': top ? top.color : 'yellow', 'data-font': top ? top.font : 'hand' },
         front || h('div', { class: 'body' }, h('div', { class: 'lockmark', html: ICON.lockA }))),
       h('span', { class: 'clip' }),
+      label,
       g.locked && g.open ? lockBadge : null);
   }
 
@@ -433,11 +440,6 @@
       onclick: (e) => { if (pickCard(e, key)) return; openGroupView(g); },
       oncontextmenu: (e) => { e.preventDefault(); if (bulkMenu(e, key)) return; groupMenu(g, e); },
     }, lockBtn('group', g), starBtn(key), groupArt(g, notes),
-      h('div', { class: 'gfoot' },
-        g.locked ? h('span', { class: 'gl', html: g.open ? ICON.unlock : ICON.lock }) : null,
-        h('span', { class: 'gname-l' + (g.name ? '' : ' unnamed') }, g.name || 'Group'),
-        subs ? h('span', { class: 'gsub', title: plural(subs, 'group') + ' inside', html: ICON.folder + subs }) : null,
-        h('span', { class: 'gcount' }, String(notes.length))),
       tagPills(g.tags));
     card.addEventListener('dragstart', (e) => startDrag(e, { id: g.id, kind: 'group' }, card));
     card.addEventListener('dragend', endDrag);
@@ -468,6 +470,7 @@
     $('#backLabel').textContent = parent ? (parent.name || 'Group') : 'All notes';
     const input = $('#groupName');
     if (document.activeElement !== input) input.value = g.name || '';
+    input.dataset.font = g.titleFont || 'hand';
     $('#gIcon').innerHTML = $(`#gStyles [data-style="${g.style || 'stack'}"] svg`).outerHTML;
     $('#groupHead').style.setProperty('--gc', GCOLORS[g.color] || GCOLORS.kraft);
     $('#btnRelockGroup').hidden = !chain.some((c) => c.locked);
@@ -480,11 +483,86 @@
   let cardCache = new Map(); // key → { sig, el }
   let cacheDay = '';
   let lastLook = ''; // card size, theme and width at the last render (1.2.3)
+  const refreshed = new Set(); // 1.4.16: the cards this render kept but filled again (refreshCard)
   function cached(key, sig, build, used) {
     const hit = cardCache.get(key);
-    const el = hit && hit.sig === sig ? hit.el : build();
+    let el;
+    if (hit && hit.sig === sig) el = hit.el;
+    else if (hit && key.startsWith('n:')) { el = hit.el; refreshCard(el, build()); refreshed.add(el); }
+    else el = build();
     used.set(key, { sig, el });
     return el;
+  }
+  // 1.4.16: a note that changed keeps its card. A new card swapped in made the card blink while the owner typed (a new
+  // element: its effect started again, its picture hid until it had loaded). Now the new card's parts move into the card
+  // on screen (the effect's canvas stays), and only the new letters write themselves in (inkIn).
+  const KEEP_CLASSES = ['sel', 'is-fav', 'cut', 'dragging', 'drop-on', 'lock-anim', 'unlock-anim']; // set by others, not by noteCard
+  function refreshCard(card, fresh) {
+    const before = lineTexts(card);
+    const keep = KEEP_CLASSES.filter((c) => card.classList.contains(c));
+    for (const a of [...card.attributes]) if (!fresh.hasAttribute(a.name) && a.name !== 'data-drop') card.removeAttribute(a.name);
+    for (const a of [...fresh.attributes]) if (card.getAttribute(a.name) !== a.value) card.setAttribute(a.name, a.value);
+    if (keep.length) card.classList.add(...keep);
+    const fx = card.querySelector(':scope > .fxc');
+    card.replaceChildren(...(fx ? [fx] : []), ...fresh.childNodes);
+    inkIn(card, before);
+  }
+  // the words of each line of a card (null for a locked one: unlocking it shows its words without writing them in)
+  const cardLines = (card) => [...card.querySelectorAll(':scope > .body > .txt > .ln')];
+  const lineTexts = (card) => (card.querySelector(':scope > .body > .lockmark') ? null : cardLines(card).map((l) => l.textContent));
+  // Which lines have new letters, and from where: lines that stayed the same (moved or not) don't count; a changed line
+  // counts from the first letter that differs from the line it replaced
+  function newLetters(a, b) {
+    const n = a.length; const m = b.length;
+    const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    const out = []; const loose = []; let i = 0; let j = 0;
+    while (j < m) {
+      if (i < n && a[i] === b[j]) { i++; j++; loose.length = 0; } else if (i < n && L[i + 1][j] >= L[i][j + 1]) loose.push(a[i++]);
+      else {
+        const was = loose.length ? loose.shift() : '';
+        let p = 0; while (p < was.length && p < b[j].length && was[p] === b[j][p]) p++;
+        if (p < b[j].length) out.push({ line: j, from: p });
+        j++;
+      }
+    }
+    return out;
+  }
+  // Ink (the owner's pick): the new letters appear one after the other, as if written (.ink, list-cards.css). At most
+  // INK_MAX letters write themselves in (half a second in all); the rest of a long paste fades in with the last one.
+  const INK_MAX = 160;
+  const INK_STEP = 22; // ms between two letters
+  const graphemes = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
+  const lettersOf = (t) => (graphemes ? [...graphemes.segment(t)].map((x) => x.segment) : [...t]);
+  function inkIn(card, before) {
+    if (!before || matchMedia('(prefers-reduced-motion: reduce)').matches) return; // "Reduce animations" in Windows
+    const lines = cardLines(card);
+    const parts = newLetters(before, lines.map((l) => l.textContent));
+    if (!parts.length) return;
+    // every text bit after the first new letter, in reading order
+    const bits = [];
+    for (const { line, from } of parts) {
+      let skip = from;
+      const walk = document.createTreeWalker(lines[line], NodeFilter.SHOW_TEXT);
+      for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+        if (skip >= t.data.length) { skip -= t.data.length; continue; }
+        bits.push({ t, from: skip }); skip = 0;
+      }
+    }
+    const total = bits.reduce((s, b) => s + lettersOf(b.t.data.slice(b.from)).length, 0);
+    const step = Math.min(INK_STEP, 520 / Math.min(total, INK_MAX));
+    let k = 0;
+    for (const { t, from } of bits) {
+      const keep = t.data.slice(0, from);
+      const spans = [];
+      let rest = '';
+      for (const ch of lettersOf(t.data.slice(from))) {
+        if (k >= INK_MAX) { rest += ch; continue; }
+        spans.push(h('span', { class: 'ink', style: `animation-delay:${Math.round(k * step)}ms` }, ch)); k++;
+      }
+      if (rest) spans.push(h('span', { class: 'ink', style: `animation-delay:${Math.round((INK_MAX - 1) * step)}ms` }, rest));
+      t.replaceWith(...(keep ? [keep] : []), ...spans);
+    }
   }
   function placeCards(box, els) {
     const keep = new Set(els);
@@ -499,14 +577,18 @@
     const used = new Map();
     const els = [];
     const old = new Set([...cardCache.values()].map((x) => x.el));
+    refreshed.clear();
     const done = () => {
       placeCards(box, els);
       cardCache = used;
-      // 1.2.3 (speed): a card kept from last time looks exactly as before, so only the cards built now are measured
+      // 1.4.16: a picture the window already has (this card's, a moment ago) can be shown at once. Its load event only
+      // comes a frame later, and until then it is hidden (.wait): the picture blinked on every refresh
+      for (const img of box.querySelectorAll('img.wait')) if (img.complete && img.naturalWidth) img.dispatchEvent(new Event('load'));
+      // 1.2.3 (speed): a card kept from last time looks exactly as before, so only the cards built (1.4.16: or filled again) now are measured
       // (markMore) and get their effect set up (paintFx). When the card size, the theme or the window's width changed,
       // the kept cards changed too: then all of them, as before.
       const look = `${sizeNow()}|${themeNow()}|${box.clientWidth}`;
-      const fresh = look === lastLook ? new Set(els.filter((el) => !old.has(el))) : null;
+      const fresh = look === lastLook ? new Set(els.filter((el) => !old.has(el) || refreshed.has(el))) : null;
       lastLook = look;
       paintCards(fresh);
       markMore(fresh

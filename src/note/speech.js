@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 8 of 15: voice to text (1.3.1): + Add → Speak to text, and right-click a voice note → Transcribe
+// CosmoNotes note window, part 8 of 16: voice to text (1.3.1): + Add → Speak to text, and right-click a voice note → Transcribe
 // (the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 // The engine runs in main (main/ipc-stt.js, main/stt-engine.js); this window only sends audio and puts the text in.
 // - Speak to text is the voice recorder of part 6 (rec.stt): the recording goes to disk as always (the safety net), and

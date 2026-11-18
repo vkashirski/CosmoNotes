@@ -3,7 +3,7 @@
 // the mouse is over it, pinned on top, paper colour, rolled up), where a new note opens and that a moved note is
 // remembered, click-through (1.3.34), minimise / maximise, the window title, "Bring notes to front" and a second start,
 // the mouse's back button in the list, closing (X) vs quitting (notes reopen where they were), reopening a closed note (1.3.30),
-// and quick clicks on + while slow windows load (1.4.6).
+// quick clicks on + while slow windows load (1.4.6), and the text's right-click Add ▸ and a small note's » menu (1.4.11).
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -69,6 +69,36 @@ const app = require('./helpers/app');
   assert.ok(w.webContents.sentArgs.some(([ch, x]) => ch === 'note:look' && x.clickThrough === false), 'its window is told');
   await H['note:update'](ev(w), { color: 'mint' });
   await H['settings:set'](null, { clickThroughOn: false });
+
+  // ---- 1.4.11: right-click in the text → Add ▸ the note's Add items (only in its text, only while its words show); a small
+  // note's » menu: the lines it sends, a tick for the pin, the line picked goes back to it
+  const menuOf = (e) => { E.__popups.length = 0; w.webContents.emit('context-menu', { preventDefault() {} }, { misspelledWord: '', dictionarySuggestions: [], isEditable: true, formControlType: 'none', selectionText: '', editFlags: { canCut: false, canCopy: false, canPaste: true }, ...e }); return E.__popups.length ? E.__popups[0].t : null; };
+  const addOf = (t) => t && t.find((x) => x.label === 'Add');
+  assert.ok(!addOf(menuOf()), 'no Add before the note has sent its items');
+  L['note:add-items'](ev(w), [{ act: 'photo', label: 'Photo' }, { act: 'date', label: 'Today’s date' }, { act: 'bad act!', label: 'x' }, { act: 'link', label: '' }, null]);
+  let add = addOf(menuOf());
+  assert.deepEqual(add.submenu.map((x) => x.label), ['Photo', 'Today’s date'], 'Add ▸ its items (the odd ones dropped)');
+  assert.ok(menuOf().some((x) => x.role === 'paste'), 'with Cut / Copy / Paste still there');
+  w.webContents.sentArgs.length = 0;
+  add.submenu[1].click();
+  assert.deepEqual(w.webContents.sentArgs.pop(), ['note:add', 'date'], 'picked: the note is told');
+  assert.ok(!addOf(menuOf({ formControlType: 'input-text' })), 'not in a box (the title, a password)');
+  assert.ok(!addOf(menuOf({ isEditable: false, selectionText: 'x' })), 'not on words that can’t be edited');
+  const wasRevealed = w.revealed;
+  ST.store.update(w.noteId, { locked: true }); w.revealed = false; // (as a lock leaves its window)
+  assert.ok(!addOf(menuOf()), 'a hidden locked note: no Add');
+  ST.store.update(w.noteId, { locked: false }); w.revealed = wasRevealed;
+  assert.ok(addOf(menuOf()), 'shown again: Add is back');
+  E.__popups.length = 0;
+  L['note:bar-menu'](ev(w), [{ id: 'btnList', label: 'All notes' }, { id: 'btnPin', label: 'Pin on top', checked: true }, { id: 'x y', label: 'bad' }], 30.4, 32);
+  const bar = E.__popups.pop();
+  assert.deepEqual(bar.t.map((x) => [x.label, x.type || 'normal', !!x.checked]), [['All notes', 'normal', false], ['Pin on top', 'checkbox', true]], '» : its lines, the pin as a tick');
+  assert.ok(bar.o.window === w && bar.o.x === 30 && bar.o.y === 32, 'under the » button, in its window');
+  bar.t[1].click();
+  assert.deepEqual(w.webContents.sentArgs.pop(), ['note:bar-act', 'btnPin'], 'the line picked goes back to the note');
+  E.__popups.length = 0;
+  L['note:bar-menu'](ev(w), 'nothing', 0, 0);
+  assert.equal(E.__popups.length, 0, 'nothing to show: no menu');
 
   let prevented = false;
   w.emit('page-title-updated', { preventDefault() { prevented = true; } }, 'CosmoNotes');

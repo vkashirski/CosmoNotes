@@ -162,7 +162,7 @@ module.exports = async ({ page, step }) => {
   await step('four new notes', async () => { for (let k = 0; k < 4; k++) { await click('#btnNew'); await page.clock.runFor(200); } });
   await step('lock a fresh note (card button)', () => click(`${note(3)} >> .lockb`));
   await step('lock ok', () => modalOk(['pw1234']));
-  for (const lab of ['Add to favourites', 'Remove from favourites', 'Duplicate note', 'Select (Ctrl+click)', 'Close note', 'Edit design…']) await step(`note menu: ${lab}`, async () => { await key('Escape'); await key('Escape'); await menu(note(0), lab); });
+  for (const lab of ['Add to favourites', 'Remove from favourites', 'Duplicate note', 'Select (Ctrl+click)', 'Close note', 'Note design…']) await step(`note menu: ${lab}`, async () => { await key('Escape'); await key('Escape'); await menu(note(0), lab); });
   await step('edit escape', () => key('Escape'));
   await step('note menu: Lock note', () => menu(note(1), 'Lock note'));
   await step('lock ok', () => modalOk(['pw1234']));
@@ -196,10 +196,10 @@ module.exports = async ({ page, step }) => {
   await step('group bin ok', () => modalOk());
 
   // ---- Edit design
-  await step('edit design open', () => menu(note(0), 'Edit design…'));
+  await step('edit design open', () => menu(note(0), 'Note design…'));
   await step('edit title', () => setVal('#editTitle', 'Gifts!'));
   await step('edit title enter', () => press('#editTitle', 'Enter'));
-  await step('edit design again', () => menu(note(0), 'Edit design…'));
+  await step('edit design again', () => menu(note(0), 'Note design…'));
   await step('edit colour', () => click('#editColors button >> nth=5'));
   await step('edit opacity', () => setVal('#editOpacity', '70'));
   for (const t of ['e', 'f', 'look', 'e']) await step(`edit tab ${t}`, () => click(`#editTabs [data-tab="${t}"]`));
@@ -215,8 +215,8 @@ module.exports = async ({ page, step }) => {
   await step('edit open note', () => click('#editOpen'));
   await step('edit done', () => click('#editDone'));
   await step('edit click outside', () => down('#editSheet'));
-  await step('edit design again, x', async () => { await menu(note(1), 'Edit design…'); await click('#editX'); });
-  await step('window resize while editing', async () => { await menu(note(1), 'Edit design…'); await page.setViewportSize({ width: 1000, height: 760 }); await page.setViewportSize({ width: 1100, height: 800 }); await key('Escape'); });
+  await step('edit design again, x', async () => { await menu(note(1), 'Note design…'); await click('#editX'); });
+  await step('window resize while editing', async () => { await menu(note(1), 'Note design…'); await page.setViewportSize({ width: 1000, height: 760 }); await page.setViewportSize({ width: 1100, height: 800 }); await key('Escape'); });
 
   // ---- Settings
   await step('settings', () => tab('settings'));

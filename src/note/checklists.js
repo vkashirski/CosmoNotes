@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 6 of 15: checklists (1.3.19): click a box to tick it, drag a box to move its line,
+// CosmoNotes note window, part 6 of 16: checklists (1.3.19): click a box to tick it, drag a box to move its line,
 // ticked lines to the bottom, boxes of one size. Each option is this note's own choice (⋯ → Checklists…, its own pop-up
 // since 1.3.21) or Settings → Checklists.
 // (the parts load in order from note.html. How they share names: ai-context/splitting-code.md)

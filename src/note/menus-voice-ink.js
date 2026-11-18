@@ -1,10 +1,10 @@
 'use strict';
-// CosmoNotes note window, part 7 of 15: right-click menus, voice notes, drawing, photo resizing
+// CosmoNotes note window, part 7 of 16: right-click menus, voice notes, drawing, photo resizing
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
-  const { V, api, $, $$, editor, body, esc, fmt, changed, saveNow, saveSel, insertNodes, closePops, openLinkForm, openDesc,
-    tableOp, copyPhoto, openPhoto, domStep, domRecord } = K;
+  const { V, api, $, $$, editor, body, esc, fmt, changed, saveNow, saveSel, insertNodes, closePops, openLinkForm, picLink,
+    unlinkPic, openDesc, tableOp, copyPhoto, openPhoto, domStep, domRecord } = K;
   // defined in a later part:
   const zoomNow = K.later('zoomNow'), hasInk = K.later('hasInk'), needsResizeWarning = K.later('needsResizeWarning'),
     resizeWarning = K.later('resizeWarning'), toast = K.later('toast'), textWidth = K.later('textWidth'),
@@ -63,6 +63,14 @@
       };
       // 1.1.23: words you can find the picture by (Ctrl+F and the notes list's search); shown when you point at it
       const desc = { label: img.getAttribute('alt') ? 'Edit description…' : 'Add description…', run: () => openDesc(img) };
+      // 1.4.11: a link on the photo (content.js picLink): a click on it opens the link
+      const link = picLink(img);
+      const links = link ? [
+        { label: 'Open link', run: () => api.openExternal(link.getAttribute('href')) },
+        { label: 'Edit link…', run: () => openLinkForm(null, img) },
+        { label: 'Copy link address', run: () => navigator.clipboard.writeText(link.getAttribute('href')).catch(() => {}) },
+        { label: 'Remove link', run: () => unlinkPic(img) },
+      ] : [{ label: 'Add link…', run: () => openLinkForm(null, img) }];
       items = drawing
         ? [{ label: 'Edit sketch', run: () => openDraw(img) }, desc, '-', keep]
         : [
@@ -70,13 +78,15 @@
           { label: 'Open in photo viewer', run: () => openPhoto(img) }, // was "Open full size"
           desc,
           '-',
+          ...links,
+          '-',
           { label: 'Small', run: guarded(() => setImgWidth(img, textWidth() * 0.4)) },
           { label: 'Medium', run: guarded(() => setImgWidth(img, textWidth() * 0.7)) },
           { label: 'Full width', run: guarded(() => { domStep(() => { img.classList.remove('w-s', 'w-m', 'fixed'); img.removeAttribute('width'); }); changed(); placeHandle(); }) },
           '-',
           keep,
         ];
-      items.push('-', { label: drawing ? 'Remove drawing' : 'Remove photo', danger: true, run: () => { domStep(() => img.remove()); changed(); } });
+      items.push('-', { label: drawing ? 'Remove drawing' : 'Remove photo', danger: true, run: () => { domStep(() => (picLink(img) || img).remove()); changed(); } }); // its link goes with it
     } else if (voice) {
       items = [
         { label: playingChip === voice ? 'Pause' : 'Play', run: () => togglePlay(voice) },
@@ -435,7 +445,7 @@
     redraw();
     const box = contentBox();
     if (!box) {
-      if (target) { target.remove(); changed(); }
+      if (target) { domStep(() => target.remove()); changed(); } // 1.4.17: one Undo step (before, Undo couldn't bring it back)
       closeDraw();
       return;
     }

@@ -176,8 +176,8 @@ const assert = require('assert');
 
   // ---- Edit design
   await ui.tab('notes');
-  await ui.menu(ui.noteKey(A), 'Edit design…');
-  assert.ok(await ui.visible('#editSheet'), 'right-click → Edit design… opens the pop-up');
+  await ui.menu(ui.noteKey(A), 'Note design…');
+  assert.ok(await ui.visible('#editSheet'), 'right-click → Note design… opens the pop-up');
   assert.deepEqual(await page.$$eval('#editTabs [data-tab]', (x) => [...new Set(x.map((b) => b.dataset.tab))]), ['look', 'e', 'f'], 'three tabs: Colour, Background, Mouse (1.1.22)');
   assert.equal(await page.inputValue('#editTitle'), 'Plan');
   assert.ok(!(await ui.visible('#editFontRow')), 'no Font row for one note (1.2.2: only for several)');
@@ -199,11 +199,11 @@ const assert = require('assert');
   assert.ok(await page.isVisible('#editColors [data-color="mint"].on'), 'a colour changed elsewhere shows here');
   await page.locator('#editTitle').dispatchEvent('keydown', { key: 'Enter' }); await ui.settle();
   assert.ok(!(await ui.visible('#editSheet')), 'Enter in the title closes it');
-  await ui.menu(ui.noteKey(A), 'Edit design…'); await ui.key('Escape');
+  await ui.menu(ui.noteKey(A), 'Note design…'); await ui.key('Escape');
   assert.ok(!(await ui.visible('#editSheet')), 'Escape closes it');
-  await ui.menu(ui.noteKey(A), 'Edit design…'); await ui.down('#editSheet');
+  await ui.menu(ui.noteKey(A), 'Note design…'); await ui.down('#editSheet');
   assert.ok(!(await ui.visible('#editSheet')), 'a click outside closes it');
-  await ui.menu(ui.noteKey(A), 'Edit design…'); await ui.click('#editOpen');
+  await ui.menu(ui.noteKey(A), 'Note design…'); await ui.click('#editOpen');
   assert.ok((await note(A)).open && !(await ui.visible('#editSheet')), '“Open note” opens it on the desktop');
   // ---- About: the version and the date, the feature list, no version history (1.1.41)
   await ui.tab('settings');

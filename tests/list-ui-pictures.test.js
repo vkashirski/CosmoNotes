@@ -82,6 +82,24 @@ const assert = require('assert');
   const fade = /\.card \.body\.more \{[^}]*mask-image: linear-gradient\(to bottom, #000 calc\(100% - ([\d.]+)em\)/.exec(require('./helpers/sources').css('list'));
   assert.ok(fade && +fade[1] >= 3, 'the fade starts about two lines up (it was 1.7em: too faint on some papers, 1.1.48)');
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT.replace(/\.png$/, '-xxl.png') });
+
+  // 1.4.16: a note with a picture changes (its words, its colour): the picture shows at once on the card filled again (it
+  // hid until its load event, a frame later, and blinked)
+  for (const [k, cls] of [['mid', 'pic'], ['only', 'thumb']]) {
+    await ui.H['list:open-note']({}, ids[k]); await ui.settle(200);
+    const w = ui.E.__all.find((x) => x.noteId === ids[k] && !x.destroyed);
+    const shownAtOnce = page.evaluate(([sel, c]) => new Promise((res) => {
+      const was = document.querySelector(`${sel} img.${c}`);
+      const mo = new MutationObserver(() => {
+        const img = document.querySelector(`${sel} img.${c}`);
+        if (img && img !== was) { mo.disconnect(); res(!img.classList.contains('wait')); }
+      });
+      mo.observe(document.querySelector('#cards'), { subtree: true, childList: true });
+    }), [card(k), cls]);
+    await ui.H['note:update']({ sender: w.webContents }, k === 'only' ? { color: 'blue' } : { html: `<div>before</div><div><img class="att-img" width="110" src="${small}"></div><div>after, changed</div>`, text: 'before\nafter, changed' });
+    await ui.settle(200); // passes main's message on: the list refreshes
+    assert.ok(await shownAtOnce, `${k}: the picture shows at once`);
+  }
   await ui.done();
   console.log('ok');
   process.exit(0);

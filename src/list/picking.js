@@ -187,10 +187,10 @@
     bb('bOpen', ICON.open, 'Open', 'Open the selected notes on the desktop'),
     bb('bClose', ICON.hide, 'Close', 'Close the selected notes (they stay here)'),
     bb('bFav', ICON.star, 'Favourite', ''),
-    bb('bEdit', ICON.edit, 'Edit design', 'Colour, see-through and effects of the selected notes'),
+    bb('bEdit', ICON.edit, 'Note design', ''), // 1.4.15: was Edit design; the title says which notes (paintBulk)
     bb('bTags', ICON.tag, 'Tags', 'Add or remove tags on the selected notes and groups'), // 1.4.10
     bb('bGroup', ICON.folder, 'Group', 'Put the selected notes and groups together in a new group'),
-    bb('bLook', ICON.palette, 'Look', 'Look and colour of the selected groups'),
+    bb('bLook', ICON.palette, 'Group look', 'The selected groups themselves: look, colour, name font'), // 1.4.15: was Look
     bb('bOut', ICON.out, 'Move out', 'Move the selected ones out of this group'),
     bb('bCut', ICON.cut, 'Cut', 'Cut, then paste them in another group (Ctrl+X)'),
     bb('bCopy', ICON.copy, 'Copy', 'Copy, then paste copies in a group (Ctrl+C)'),
@@ -200,14 +200,21 @@
     h('button', { class: 'bb x', id: 'bX', title: 'Clear the selection (Esc)', html: ICON.x }));
   document.body.append(bulk);
   // 1.4.9: the selected groups' look and colour (the same looks as the group panel's, list.html #gStyles)
+  // 1.4.15: and their name font; headed with what it changes (the groups, not the notes in them: that is Note design)
   const lookPop = h('div', { class: 'bulkpop lookpop', id: 'lookPop', hidden: true },
+    h('p', { class: 'pophead', id: 'lookHead' }),
+    h('h4', {}, 'Look'),
     h('div', { class: 'styles', id: 'lookStyles', html: $('#gStyles').innerHTML }),
-    h('div', { class: 'swatches small', id: 'lookColors' }));
+    h('h4', {}, 'Colour'),
+    h('div', { class: 'swatches small', id: 'lookColors' }),
+    h('h4', {}, 'Name font'),
+    h('div', { class: 'seg', id: 'lookFonts', html: $('#gNameFont').innerHTML }));
   bulk.append(lookPop);
   for (const [k, v] of Object.entries(GCOLORS)) {
     $('#lookColors').append(h('button', { class: 'sw', 'data-gc': k, title: GNAMES[k], style: `background:${v}`, onclick: () => setLook({ color: k }) }));
   }
   $$('#lookStyles button').forEach((b) => b.addEventListener('click', () => setLook({ style: b.dataset.style })));
+  $$('#lookFonts button').forEach((b) => b.addEventListener('click', () => setLook({ titleFont: b.dataset.font })));
   document.addEventListener('mousedown', (e) => { if (!lookPop.hidden && !e.target.closest('#lookPop, #bLook')) openLook(false); });
   // the picked notes and groups. 1.3.28: shut ones (isShut) only count, and only locking and the Bin (which keeps
   // locked ones) look at them: `all`. Everything else in the bar and its menu works on the others.
@@ -234,6 +241,9 @@
     const one = (k, d) => (gs.length && gs.every((g) => (g[k] || d) === (gs[0][k] || d)) ? gs[0][k] || d : null);
     const style = one('style', 'stack');
     const color = one('color', 'kraft');
+    const font = one('titleFont', 'hand');
+    $('#lookHead').textContent = `${plural(gs.length, 'group')} · their cards, not the notes inside`;
+    $$('#lookFonts button').forEach((b) => b.classList.toggle('on', b.dataset.font === font));
     $('#lookStyles').style.setProperty('--gc', GCOLORS[color] || GCOLORS.kraft);
     $$('#lookStyles button').forEach((b) => b.classList.toggle('on', b.dataset.style === style));
     $$('#lookColors .sw').forEach((b) => b.classList.toggle('on', b.dataset.gc === color));
@@ -329,7 +339,9 @@
     $('#bFav').classList.toggle('on', allFav);
     $('#bFav').querySelector('span').textContent = allFav ? 'Unfavourite' : 'Favourite';
     $('#bFav').title = allFav ? 'Remove the selected ones from your favourites' : 'Add the selected ones to your favourites';
-    $('#bEdit').hidden = !designNotes().length;
+    const design = designNotes();
+    $('#bEdit').hidden = !design.length;
+    $('#bEdit').title = `Colour, see-through and effects of ${plural(design.length, 'note')}${pickedGroups().length ? ': the selected ones and the notes inside the selected groups' : ''}`;
     $('#bTags').hidden = !items.length;
     $('#bGroup').hidden = items.length < 2;
     $('#bLock').hidden = !every.notes.some((n) => !n.ownLock) && !every.groups.some((g) => !g.locked);
@@ -347,7 +359,7 @@
         notes.some((n) => !n.open) ? { label: 'Open on desktop', icon: ICON.open, run: bulkOpen } : null,
         notes.some((n) => n.open) ? { label: 'Close notes', icon: ICON.hide, run: bulkClose } : null,
         items.length ? { label: allFav ? 'Remove from favourites' : 'Add to favourites', icon: ICON.star, run: () => setFav([...sel], !allFav) } : null,
-        designNotes().length ? { label: 'Edit design…', icon: ICON.edit, run: bulkEdit } : null,
+        designNotes().length ? { label: 'Note design…', icon: ICON.edit, run: bulkEdit } : null,
         items.length ? { label: 'Tags…', icon: ICON.tag, run: bulkTags } : null, // 1.4.10
         '-',
         items.length >= 2 ? { label: 'Put together in a new group', icon: ICON.folder, run: bulkGroup } : null,

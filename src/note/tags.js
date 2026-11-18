@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 14 of 15 (1.4.10): tags. The ⋯ menu's Tags row: this note's own tags (src/tags.js has the
+// CosmoNotes note window, part 14 of 16 (1.4.10): tags. The ⋯ menu's Tags row: this note's own tags (src/tags.js has the
 // rules and the editor). Each one added or removed is saved at once (main note:tags), never with the note's words; the
 // suggestions are every tag in use (main note:tags-known). The notes list filters by them.
 (() => {

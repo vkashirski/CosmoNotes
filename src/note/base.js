@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 1 of 15: the colour row, saving, dates, look & settings, effects on the note
+// CosmoNotes note window, part 1 of 16: the colour row, saving, dates, look & settings, effects on the note
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   // K: the names the parts share. V: variables more than one part changes (V.note etc.). K.later('f'): a function a later part
@@ -283,14 +283,14 @@
   // ================================================================ click-through (1.3.34)
   // note.clickThrough, only while Settings → Click-through is on; main lets the mouse through the window (note-state.js
   // applyClickThrough). body.ct switches off everything but the button (note-base.css), the mouse follower too; the button
-  // wakes the window while the mouse is on it (panels.js).
+  // wakes the window while the mouse is on it (panels.js). 1.4.11: the button shows only while it is on (it is the way
+  // back); the pin's right-click menu turns it on (pin-apps.js).
   function applyClickThrough() {
-    const shown = !!V.settings.clickThroughOn;
-    const on = shown && !!V.note && !!V.note.clickThrough;
+    const on = !!V.settings.clickThroughOn && !!V.note && !!V.note.clickThrough;
     const b = $('#btnCt');
-    b.hidden = !shown;
+    b.hidden = !on;
     b.setAttribute('aria-pressed', String(on));
-    b.title = on ? 'Click-through is on. Click to use the note again' : 'Click-through: the mouse goes through this note. It pins it.';
+    b.title = 'Click-through is on. Click to use the note again';
     if (on === body.classList.contains('ct')) return;
     body.classList.toggle('ct', on);
     V.ctAwake = false; // main starts every click-through asleep, and forgets it when it ends

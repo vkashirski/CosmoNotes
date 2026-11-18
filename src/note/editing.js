@@ -1,9 +1,9 @@
 'use strict';
-// CosmoNotes note window, part 5 of 15: editing helpers (checklists, strike-through…), Ctrl+F find, the keyboard
+// CosmoNotes note window, part 5 of 16: editing helpers (checklists, strike-through…), Ctrl+F find, the keyboard
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
-  const { V, api, $, editor, body, changed, saveNow, anchor, closestIn, runCmd, closePops,
+  const { V, api, $, editor, body, changed, saveNow, anchor, closestIn, runCmd, closePops, selLines, indentLines, outdentLines,
     undoText, redoText, openLinkForm, autoLink, moveCell, newNote } = K;
   // defined in a later part:
   const hideCtx = K.later('hideCtx'), stopRecording = K.later('stopRecording'), closeDraw = K.later('closeDraw'),
@@ -76,25 +76,39 @@
     return own.some((c) => (c.nodeType === 3 ? seen(c.data) : c.nodeName !== 'BR' && (seen(c.textContent) || (c.nodeType === 1 && c.querySelector && (c.matches('img,.voice') || c.querySelector('img,.voice')))))) ? li : null;
   }
 
-  // Each checklist box is sized and centred on its line's first words (they may be bigger, smaller or in the other
-  // font: the box used to be one size at one height, so it sat too high or low). Measured on screen, kept in
-  // --cb-s / --cb-t / --cb-p on the line (not saved: collect() strips them). And a ticked line's photos get a line
-  // struck through them, like its text (an overlay over the text, #strikes).
-  // 1.3.15: the box goes by the size the words are written at, not by their font. Words in another font are drawn
-  // bigger or smaller to match the note's own letters, so the box takes that back out: their size ÷ their font's
-  // --kf (note-drawing.css, read from the CSS: the numbers live there only). An empty line gets the box its
-  // words will have: measured on its line break inside its own font / size tags; with none (Backspace took them, or a
-  // new line: the browser keeps the look only for typing), the box it had when it last had words, else the line
-  // above's: same size AND same place, as the words may be in another font, which sits higher or lower on the line
-  // (the box moved when the first letter came). BOX = note-text.css: box and indent, in the note's em
-  // (Caveat and Augusta letters are small for their size: their box is smaller, like Rounded words in that note).
+  // Each checklist box is sized by its line's first words (they may be bigger or smaller), kept in --cb-s / --cb-t /
+  // --cb-p on the line (not saved: collect() strips them). And a ticked line's photos get a line struck through them,
+  // like its text (an overlay over the text, #strikes).
+  // 1.4.13 (the owner's wish): the boxes are static. A box goes only by the size its words are written at, never by
+  // their font: nothing is measured from the letters (each font sits a little higher or lower, and its letters'
+  // measure moved and resized the box). Its size = the note's text size (--fs) × the sizes on the way from the words up
+  // to the line (SIZE: font size=, TAG_SIZE: headings, code, sub / sup; both = note-text.css, editor-code.test.js
+  // checks), and it sits in the middle of the line's first line, whose height comes from those sizes too (LINE_H: the
+  // line's 1.45, a font tag's 1.3, note-text.css). An empty line with its own font / size tags: their size. With none
+  // (Backspace took them, or a new line: the browser keeps the look only for typing): the box it had when it last had
+  // words, else the line above's. BOX = note-text.css: box and indent, in em, the same for every font (1.4.12).
   // 1.3.19: "Keep boxes the same size" (checkOn('fixed'), checklists part): every box is the note's own size, still
-  // centred on its words.
+  // in the middle of its line.
   const CB_VARS = ['--cb-s', '--cb-t', '--cb-p'];
-  const BOX = { hand: { k: 0.78, pad: 1.3 }, round: { k: 1, pad: 1.55 }, medieval: { k: 0.84, pad: 1.3 } };
-  function boxSize(el, nf) {
-    const cs = getComputedStyle(el);
-    return Math.max(10, parseFloat(cs.fontSize) / (parseFloat(cs.getPropertyValue('--kf')) || 1) * BOX[nf].k);
+  const BOX = { k: 1, pad: 1.55 };
+  const SIZE = { 1: 0.7, 2: 0.82, 3: 1, 4: 1.2, 5: 1.45, 6: 1.85, 7: 2.3 };
+  const TAG_SIZE = { H1: 1.2, H2: 1.2, H3: 1.2, H4: 1.2, CODE: 0.8, PRE: 0.8, SUB: 1 / 1.2, SUP: 1 / 1.2 };
+  const LINE_H = { line: 1.45, font: 1.3 };
+  // how big `el` is written, times the note's text size (sizes multiply on the way up), and whether a font tag is on
+  // the way (its line height is the font tag's). While typing, the browser may write a size as a span's own font-size
+  // (in px: the size from there up; until the note's next save makes it a size= again).
+  function sizeOf(el, fs) {
+    let k = 1; let inFont = false;
+    for (let x = el; x && x !== editor; x = x.parentElement) {
+      if (x.nodeName === 'FONT') inFont = true;
+      const own = x.style && x.style.fontSize;
+      if (own && own.endsWith('px')) return { k: k * parseFloat(own) / fs, inFont: inFont || !!x.closest('#editor font') };
+      if (own && own.endsWith('em')) k *= parseFloat(own) || 1;
+      else if (own && own.endsWith('%')) k *= (parseFloat(own) || 100) / 100;
+      else if (x.nodeName === 'FONT') k *= SIZE[x.getAttribute('size')] || 1;
+      else k *= TAG_SIZE[x.nodeName] || 1;
+    }
+    return { k, inFont };
   }
   // where a line's own words start (the lines nested in it don't count): { t: the text of its first letters }, or { br: the
   // line break of a line with nothing typed at its start yet (a photo may come after) }, else null (it starts with a photo…)
@@ -106,45 +120,38 @@
     }
     return null;
   }
-  const lastOwn = new WeakMap(); // a line → its box when it was last measured from its own words or tags { sz, top }
+  const lastOwn = new WeakMap(); // a line → its box when it was last worked out from its own words or tags { sz, at }
   function setVar(el, k, v) { if (v === null) { if (el.style.getPropertyValue(k)) el.style.removeProperty(k); } else if (el.style.getPropertyValue(k) !== v) el.style.setProperty(k, v); if (!el.getAttribute('style')) el.removeAttribute('style'); }
   function alignChecks() {
     const lis = editor.querySelectorAll('ul.checklist li');
     if (!lis.length) return;
-    const er = editor.getBoundingClientRect(); const k = er.width ? editor.offsetWidth / er.width : 1; // the note's zoom
-    const nf = BOX[body.dataset.font] ? body.dataset.font : 'hand';
+    const fs = parseFloat(getComputedStyle(body).getPropertyValue('--fs')) || parseFloat(getComputedStyle(editor).fontSize);
     const fixed = checkOn('fixed');
-    // 1.1.23 (speed): measure every line first, then write: writing between two measurements made the browser lay the
-    // whole note out again for each checklist line, on every key press
+    // 1.1.23 (speed): work every line out first, then write (writing between two reads lays the note out again)
     const out = []; const boxes = new Map();
     for (const li of lis) {
       let size = null; let top = null; let pad = null; let sz = null; let at = null; // at: the box's top, from the line's top
-      const lr = li.getBoundingClientRect();
-      const s = lr.height ? lineStart(li) : null;
-      let mid = null; let key = null; // key: the words' font and size
-      const keyOf = (el) => { const cs = getComputedStyle(el); return `${cs.fontFamily}|${cs.fontSize}`; };
-      const prev = li.previousElementSibling;
-      if (s && s.t) {
-        const t = s.t; const i = t.data.search(/[^\s​]/); const r = document.createRange(); r.setStart(t, Math.max(0, i)); r.setEnd(t, Math.max(0, i) + 1);
-        const rr = r.getClientRects()[0];
-        if (rr && rr.height) { sz = boxSize(t.parentElement, nf); mid = (rr.top + rr.bottom) / 2; key = keyOf(t.parentElement); }
-      } else if (s && s.br && s.br.parentElement !== li) { // its own font / size tags: the break has their size and font
-        const p = prev && boxes.get(prev); const kk = keyOf(s.br.parentElement);
-        if (p && p.key === kk) ({ sz, at } = p); // under words of the same look (Enter): their box, exactly
-        else { const br = s.br.getBoundingClientRect(); if (br.height) { sz = boxSize(s.br.parentElement, nf); mid = (br.top + br.bottom) / 2; } }
-      } else if (s && s.br) { // nothing on the line says how its words will look
+      const s = li.offsetParent ? lineStart(li) : null;
+      const liFs = fs * sizeOf(li, fs).k;
+      const words = s && (s.t ? s.t.parentElement : s.br.parentElement !== li ? s.br.parentElement : null);
+      if (words) {
+        const w = sizeOf(words, fs);
+        sz = fs * w.k * BOX.k;
+        const lineH = Math.max(LINE_H.line * liFs, (w.inFont ? LINE_H.font : LINE_H.line) * fs * w.k);
+        at = (lineH - sz) / 2;
+        lastOwn.set(li, { sz, at });
+      } else if (s) { // nothing on the line says how its words will look
+        const prev = li.previousElementSibling;
         const was = lastOwn.get(li) || (prev && boxes.get(prev));
         if (was) ({ sz, at } = was);
-        else { const br = s.br.getBoundingClientRect(); if (br.height) { sz = boxSize(li, nf); mid = (br.top + br.bottom) / 2; } } // the note's own font, then
+        else { sz = liFs * BOX.k; at = (LINE_H.line * liFs - sz) / 2; }
       }
-      if (sz && mid !== null) { at = (mid - lr.top) * k - sz / 2; lastOwn.set(li, { sz, at }); }
-      if (sz && at !== null) {
-        const liFs = parseFloat(getComputedStyle(li).fontSize);
-        const base = liFs * BOX[nf].k; // the box at the note's own size
-        boxes.set(li, { sz, at, key });
+      if (sz) {
+        const base = liFs * BOX.k; // the box at the note's own size
+        boxes.set(li, { sz, at });
         if (fixed) { at += (sz - base) / 2; sz = base; } // same middle, the note's own size
         size = `${sz.toFixed(1)}px`; top = `${at.toFixed(1)}px`;
-        pad = sz > base + 0.5 ? `${(BOX[nf].pad * liFs + (sz - base)).toFixed(1)}px` : null;
+        pad = sz > base + 0.5 ? `${(BOX.pad * liFs + (sz - base)).toFixed(1)}px` : null;
       }
       out.push([li, size, top, pad]);
     }
@@ -299,7 +306,15 @@
       e.preventDefault();
       const cell = closestIn(anchor(), 'td,th');
       if (cell) { moveCell(cell, e.shiftKey ? -1 : 1); return; }
-      if (closestIn(anchor(), 'li')) { document.execCommand(e.shiftKey ? 'outdent' : 'indent'); changed(); return; }
+      // 1.4.17: our own move of the same lines (they keep their ticks; one Undo step), formatting part. A top-level line
+      // with Shift+Tab leaves the list: the editor's outdent.
+      if (closestIn(anchor(), 'li')) {
+        const { lines } = selLines();
+        if (!e.shiftKey) indentLines(lines);
+        else if (!outdentLines(lines)) document.execCommand('outdent');
+        changed();
+        return;
+      }
       if (!e.shiftKey) document.execCommand('insertText', false, ' ');
       return;
     }
@@ -311,8 +326,10 @@
       if (s.rangeCount && s.isCollapsed && editor.contains(s.anchorNode)) {
         // 1.1.22 (sixth round): Backspace at the start of a ticked-box line takes the box away and keeps the text as a
         // normal line. The browser glued the line onto the one above instead (except for a list's first line, which is
-        // why it only worked sometimes).
-        if (e.key === 'Backspace') { const li = checkLineStart(s); if (li) { e.preventDefault(); li.classList.remove('done'); document.execCommand('outdent'); changed(); return; } }
+        // why it only worked sometimes). 1.4.17: a nested line goes one level out (outdentLines: it keeps its tick); a
+        // top-level line leaves the list (the editor's outdent). Its tick is no longer taken off first: that was outside
+        // Undo, so Undo brought the line back unticked.
+        if (e.key === 'Backspace') { const li = checkLineStart(s); if (li) { e.preventDefault(); if (!outdentLines([li])) document.execCommand('outdent'); changed(); return; } }
         // Delete right before a photo / Backspace right after one: the browser did nothing (a photo is its own block,
         // so "the next character" was an empty step); now the photo goes (Ctrl+Z brings it back)
         const r = s.getRangeAt(0);
@@ -335,8 +352,12 @@
   });
   editor.addEventListener('input', (e) => {
     if (e.inputType === 'insertParagraph') {
+      // a new, empty line doesn't take the tick along. Enter at the end of a line: the new line is the cursor's; at the
+      // start (1.4.17), the new line is the one above it. Both are new elements, so the editor's Undo takes them away.
       const li = closestIn(anchor(), 'li');
       if (li && !li.textContent.trim()) li.classList.remove('done');
+      const up = li && li.previousElementSibling;
+      if (up && up.nodeName === 'LI' && up.classList.contains('done') && !up.textContent.trim() && !up.querySelector('img,table,hr,.voice') && checkLineStart(getSelection()) === li) up.classList.remove('done');
     }
   });
   document.addEventListener('keydown', (e) => {

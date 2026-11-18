@@ -30,6 +30,12 @@ contextBridge.exposeInMainWorld('sticky', {
   hover: (over) => ipcRenderer.send('note:hover', !!over),
   ctAwake: (on) => ipcRenderer.send('note:ct-awake', !!on), // 1.3.34: the mouse is on the click-through button
   pinApps: () => inv('pin:apps'), // 1.4.5: the pin's right-click list: the apps open now (main/app-pin.js)
+  // 1.4.11: right-click in the text → Add ▸ (main/web.js): the Add panel's items, once; main sends the one picked
+  addItems: (list) => ipcRenderer.send('note:add-items', list),
+  onAdd: (cb) => ipcRenderer.on('note:add', (e, act) => cb(act)),
+  // 1.4.11: a small note's » button (src/note/top-bar.js): main shows its menu; the line picked comes back
+  barMenu: (items, x, y) => ipcRenderer.send('note:bar-menu', items, x, y),
+  onBarAct: (cb) => ipcRenderer.on('note:bar-act', (e, id) => cb(id)),
   saveAttachment: (bytes, ext) => inv('att:save', bytes, ext),
   // 1.2.4: a voice recording is written to disk while it is made
   recStart: () => inv('rec:start'),

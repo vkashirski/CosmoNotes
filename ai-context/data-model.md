@@ -11,7 +11,8 @@ backups/YYYY-MM-DD[_HH-MM-SS]/   <uuid>.json…, groups.json, meta.json {created
 models/<id>/           1.3.1: the downloaded voice-to-text model (whisper-small-en, the only one since 1.3.4): its files as in main/stt-models.js, then
                        ready.json { run: 'gpu'|'cpu', at } written last (no ready.json = not complete). Not in backups; the
                        uninstaller leaves it. A .part left by a quit mid-download is removed at the next start.
-groups.json            { groups: [{ id, name, createdAt, parentId, style, color, locked, favorite, tags }] }
+groups.json            { groups: [{ id, name, createdAt, parentId, style, color, titleFont, locked, favorite, tags }] }
+                       titleFont (1.4.14): the name's font on the card's label and in the group's bar: hand | round | medieval (default hand)
 settings.json          see below
 ```
 

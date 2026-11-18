@@ -42,8 +42,11 @@
 .bulkpop[hidden] { display: none; }
 .bulkpop .sws { display: flex; gap: 6px; }
 /* 1.4.9: the selected groups' look (picking.js openLook), Cut / Paste here */
-.lookpop { width: 290px; }
+.lookpop { width: 290px; gap: 0; }
 .lookpop .swatches { justify-content: center; }
+/* 1.4.15: what the pop-up changes, and its rows' names (like the group panel's) */
+.lookpop .pophead { margin: 0 2px 2px; font: 800 12.5px var(--ui); color: var(--ink); }
+.lookpop h4 { margin: 10px 2px 6px; font: 800 10.5px var(--ui); letter-spacing: .07em; text-transform: uppercase; color: var(--mute); }
 .bb.on { background: rgba(255,255,255,.18); }
 .card.cut { opacity: .45; outline: 2px dashed var(--mute); outline-offset: 3px; }
 .card.cut.sel { opacity: .7; }

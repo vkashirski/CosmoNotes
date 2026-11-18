@@ -1,12 +1,13 @@
 'use strict';
-// CosmoNotes note window, part 13 of 15 (1.4.5): app pins. Right-click the pin: "Pin over" lists the apps open now, A to Z
+// CosmoNotes note window, part 13 of 16 (1.4.5): app pins. Right-click the pin: "Pin over" lists the apps open now, A to Z
 // (main/app-pin.js reads their window titles), each with its workspaces / files under it, to tick. "Every app" is the
 // normal pin (on top of everything). A ticked app covers its workspaces (they grey out); an app the note is pinned over
 // that isn't open stays in the list, ticked, with "not open". Nothing ticked: not pinned. A second right-click closes it.
 // A click on the pin still pins / unpins (unpinning forgets the apps, panels.js). Main shows and hides the window by the app in front.
+// 1.4.11: the menu's first row turns click-through on (only while Settings → Click-through is on; panels.js setClickThrough).
 (() => {
   const K = window.COSMO_NOTE_KIT;
-  const { V, api, $, setProp, openPop, closePop } = K;
+  const { V, api, $, setProp, openPop, closePop, setClickThrough } = K;
   const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
   const az = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
   let open = []; // what main says is open: [{ app, parts }], null = it couldn't tell
@@ -46,6 +47,7 @@
     return l;
   }
   function paint() {
+    $('#pinCtRow').hidden = !V.settings.clickThroughOn;
     const list = $('#pinList');
     list.textContent = '';
     list.append(row('Every app', !!V.note.pinned && !rules().length, (on) => save(on ? 'all' : [])));
@@ -95,4 +97,5 @@
     else closePop('#pinPop');
   });
   $('#pinX').addEventListener('click', () => closePop('#pinPop'));
+  $('#pinCt').addEventListener('click', () => setClickThrough(true)); // it closes the menus
 })();

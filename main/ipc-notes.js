@@ -1,5 +1,5 @@
 'use strict';
-const { BrowserWindow, ipcMain } = require('electron');
+const { BrowserWindow, Menu, ipcMain } = require('electron');
 const { checkPassword, hashPassword, isLocked, packLock, viewOf, wait } = require('./locks');
 const crypt = require('./crypt');
 const { broadcastSettings, lockInfo, noteSettings } = require('./settings');
@@ -150,6 +150,32 @@ function registerNoteIpc() {
     win.ctAwake = !!awake;
     applyClickThrough(win, note);
   });
+  // 1.4.11: right-click in the text → Add ▸: the note sends its Add panel's items once, kept on its window (main/web.js
+  // shows them, only while the note's words show: noteWindow's addItems)
+  ipcMain.on('note:add-items', (e, list) => {
+    const { win } = senderNote(e);
+    if (win && !win.isDestroyed()) win.addItems = menuItems(list, 'act');
+  });
+  // 1.4.11: a small note's » button (src/note/top-bar.js): the buttons that didn't fit, in a real menu (it shows outside the
+  // window, so it works on the smallest and on a rolled-up note); the line picked goes back and its button does it
+  ipcMain.on('note:bar-menu', (e, items, x, y) => {
+    const { win, note } = senderNote(e);
+    if (!note || win.isDestroyed()) return;
+    const list = menuItems(items, 'id');
+    if (!list.length) return;
+    Menu.buildFromTemplate(list.map((it) => ({
+      label: it.label,
+      ...(typeof it.checked === 'boolean' ? { type: 'checkbox', checked: it.checked } : {}),
+      click: () => { if (!win.isDestroyed()) win.webContents.send('note:bar-act', it.id); },
+    }))).popup({ window: win, x: Math.max(0, Math.round(Number(x) || 0)), y: Math.max(0, Math.round(Number(y) || 0)) });
+  });
+}
+
+// a menu's lines from a window: [{ <key>: a short name, label, checked? }], at most 20
+function menuItems(list, key) {
+  if (!Array.isArray(list)) return [];
+  return list.slice(0, 20).filter((it) => it && /^[A-Za-z]{1,20}$/.test(it[key]) && typeof it.label === 'string' && it.label.trim())
+    .map((it) => ({ [key]: it[key], label: it.label.trim().slice(0, 60), ...(typeof it.checked === 'boolean' ? { checked: it.checked } : {}) }));
 }
 
 module.exports = { registerNoteIpc };

@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 9 of 15: locking, password or PIN, the "are you sure?" pop-up, word wrap, zoom
+// CosmoNotes note window, part 9 of 16: locking, password or PIN, the "are you sure?" pop-up, word wrap, zoom
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;

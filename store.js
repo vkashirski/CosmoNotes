@@ -300,6 +300,7 @@ function normalizeGroup(x) {
     parentId: typeof x.parentId === 'string' && x.parentId ? x.parentId : null,
     style: GROUP_STYLES.includes(x.style) ? x.style : 'stack',
     color: GROUP_COLORS.includes(x.color) ? x.color : 'kraft',
+    titleFont: FONTS.includes(x.titleFont) ? x.titleFont : 'hand', // 1.4.14: the font of its name (card label, group bar)
     locked: !!x.locked,
     favorite: !!x.favorite, // starred in the notes list (1.1.13)
     tags: TAGS.cleanAll(x.tags), // 1.4.10: its tags count for everything inside it (src/tags.js); not secret, like its name
@@ -352,7 +353,8 @@ function checklistMarks(html, text) {
 // trimmed, empty ones left out); px = its width in the note (its width attribute), pct = Small / Medium (45 / 72 % of
 // the text's width), neither = full width (no wider than the picture itself); d = a drawing; fs = the note's text size
 // (px), tw = the text's width (px), so the card can turn px into "this many letters wide".
-const FONT_PX = { hand: { s: 19, m: 23, l: 28 }, round: { s: 13.5, m: 15.5, l: 18.5 }, medieval: { s: 16, m: 18.5, l: 22 } };
+// the note's text size by its size (note-base.css --fs: one for every font since 1.4.12)
+const FONT_PX = { s: 13.5, m: 15.5, l: 18.5 };
 // the note fonts: Handwritten (Caveat), Rounded (Nunito), Medieval (Augusta, src/fonts/, 1.2.1)
 const FONTS = ['hand', 'round', 'medieval'];
 function picturePlace(n) {
@@ -377,7 +379,7 @@ function picturePlace(n) {
   const attrs = m[1];
   const cls = (/\bclass\s*=\s*("([^"]*)"|'([^']*)')/i.exec(attrs) || [])[2] || '';
   const w = Number((/\bwidth\s*=\s*["']?(\d+(?:\.\d+)?)/i.exec(attrs) || [])[1]);
-  const fs = (FONT_PX[n.font] || FONT_PX.hand)[n.size] || FONT_PX.hand.m;
+  const fs = FONT_PX[n.size] || FONT_PX.m;
   const tw = Math.max(80, Number(n.wrapWidth) || ((n.bounds && n.bounds.width) || 340) - 32);
   return {
     at,
@@ -416,12 +418,10 @@ const CARD_TAGS = {
   IMG: { empty: 1 },
 };
 const CARD_RUN_KEYS = ['f', 'c', 'bg', 'k', 'b', 'i', 'u', 's', 'mk', 'sub', 'sup', 'code', 'h', 'a'];
-// 1.3.13: the size of the words, k = times the note's text size, worked out exactly as the note's CSS does it. 1.3.18:
-// k = the size they're written at (`_n`: sizes multiply, nested ones add up: font[size] CARD_SIZE, headings 1.2, code
-// .8, sub / sup the browser's 1/1.2) × the resize of the app font they're in (`_fk`: CARD_FACE_SIZE[note's font][their
-// font], the note's own font 1; the innermost font counts, once: note-drawing.css `font[face]` --kf / --k).
-// store.test.js checks these against the CSS files.
-const CARD_FACE_SIZE = { round: { hand: 1.45, medieval: 1.19 }, hand: { round: 0.68, medieval: 0.8 }, medieval: { hand: 1.24, round: 0.84 } };
+// 1.3.13: the size of the words, k = times the note's text size, worked out exactly as the note's CSS does it: the size
+// they're written at (`_n`: sizes multiply, nested ones add up: font[size] CARD_SIZE, headings 1.2, code .8, sub / sup
+// the browser's 1/1.2). Their font changes no size (1.4.12: the card, like the note, matches the letters with
+// font-size-adjust). store.test.js checks these against the CSS files.
 const CARD_SIZE = { 1: 0.7, 2: 0.82, 3: 1, 4: 1.2, 5: 1.45, 6: 1.85, 7: 2.3 };
 const CARD_TAG_SIZE = { H1: 1.2, H2: 1.2, H3: 1.2, H4: 1.2, CODE: 0.8, PRE: 0.8, SUB: 1 / 1.2, SUP: 1 / 1.2 };
 const attrOf = (attrs, name) => {
@@ -429,19 +429,16 @@ const attrOf = (attrs, name) => {
   return m ? decodeEnt(m[1] ?? m[2] ?? m[3] ?? '').trim() : null;
 };
 // the look a tag adds to the words inside it (on top of `look`, the look around it)
-function cardLook(look, tag, attrs, noteFont) {
+function cardLook(look, tag, attrs) {
   const add = CARD_TAGS[tag];
   const out = { ...look };
   out._n = (look._n || 1) * (CARD_TAG_SIZE[tag] || 1);
   for (const k of CARD_RUN_KEYS) if (add && add[k]) out[k] = 1;
   if (tag === 'FONT') {
     const face = attrOf(attrs, 'face');
-    // the note's CSS matches the face exactly (font[face="Nunito"]), so only an exact name gets resized
-    const exact = face && { Caveat: 'hand', Nunito: 'round', Augusta: 'medieval' }[face];
     if (face) { const f = CARD_FACE[face.split(',')[0].replace(/["']/g, '').trim().toLowerCase()]; if (f) out.f = f; }
     const c = attrOf(attrs, 'color');
     if (c && CARD_RESET.test(c)) delete out.c; else if (c && CARD_COLOR.test(c)) out.c = c;
-    if (exact) out._fk = (CARD_FACE_SIZE[noteFont] || {})[exact] || 1;
     const sz = attrOf(attrs, 'size');
     if (sz && CARD_SIZE[sz]) out._n *= CARD_SIZE[sz];
   }
@@ -455,7 +452,7 @@ function cardLook(look, tag, attrs, noteFont) {
       if (/^transparent$/i.test(v) || CARD_RESET.test(v)) delete out[key]; else if (CARD_COLOR.test(v)) out[key] = v;
     }
   }
-  const k = Math.round(out._n * (out._fk || 1) * 1000) / 1000;
+  const k = Math.round(out._n * 1000) / 1000;
   if (k === 1) delete out.k; else out.k = k;
   return out;
 }
@@ -475,7 +472,7 @@ function dropDeadSizes(html, noteFont) {
   });
 }
 const sameLook = (a, b) => CARD_RUN_KEYS.every((k) => a[k] === b[k]);
-function cardRuns(html, text, noteFont = 'hand') {
+function cardRuns(html, text) {
   if (typeof html !== 'string' || typeof text !== 'string' || !/<(b|strong|i|em|u|s|strike|del|mark|sub|sup|code|pre|a|font|span|h[1-4]|th)\b/i.test(html)) return null;
   const lines = []; let cur = []; let chars = 0;
   const stack = []; let look = {};
@@ -500,7 +497,7 @@ function cardRuns(html, text, noteFont = 'hand') {
       if (at >= 0) { look = stack[at].before; stack.length = at; }
     } else {
       stack.push({ tag, before: look });
-      look = cardLook(look, tag, attrs, noteFont);
+      look = cardLook(look, tag, attrs);
     }
   }
   endLine();
@@ -1122,4 +1119,4 @@ function backupDayName(name) {
   return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-module.exports = { cleanPinApps, cleanRemindSound, cleanVolume, FONTS, CHECK_OPTS, OVERRIDE_KEYS, overrideCounts, resetPatch, cleanChecklist, checklistMarks, cardRuns, CARD_TAGS, CARD_RUN_KEYS, CARD_FACE_SIZE, CARD_SIZE, dropDeadSizes, pictureWords, picturePlace, lineCount, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };
+module.exports = { cleanPinApps, cleanRemindSound, cleanVolume, FONTS, CHECK_OPTS, OVERRIDE_KEYS, overrideCounts, resetPatch, cleanChecklist, checklistMarks, cardRuns, CARD_TAGS, CARD_RUN_KEYS, CARD_SIZE, FONT_PX, dropDeadSizes, pictureWords, picturePlace, lineCount, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };

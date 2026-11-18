@@ -5,13 +5,9 @@ body.rolled #fxCanvas { display: none; }
 #btnFx svg { stroke-width: 1.7; }
 #btnFx.off { opacity: .45; } /* paused */
 #btnFx.off svg { stroke-dasharray: 2 2.2; }
-@media (max-width: 279px) { #btnFx { display: none; } }
 /* 1.3.27: the panic button: like the other top-bar buttons, red when pointed at so it reads as "hide everything" */
 #btnPanic:hover, #btnPanic:focus-visible { opacity: 1; color: #fff; background: #E5484D; }
-/* with it, a narrow note has no room for every button: Maximise goes (double-clicking the top bar still maximises) */
-@media (max-width: 250px) { #bar:has(#btnPanic:not([hidden])) #btnMax, #bar:has(#btnCt:not([hidden])) #btnMax { display: none; } }
-/* 1.3.34: with the click-through button too, the narrowest notes lose Minimise as well */
-@media (max-width: 224px) { #bar:has(#btnPanic:not([hidden])):has(#btnCt:not([hidden])) #btnMin { display: none; } }
+/* (a narrow note's buttons that don't fit go into the » menu: src/note/top-bar.js, 1.4.11) */
 .mi .mival { margin-left: auto; padding-left: 8px; font: 700 11.5px var(--ui); color: var(--pop-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
 #fxPop > .ix { top: 8px; right: 8px; }
 .fxsub { margin: 10px 2px 6px; font: 800 12px var(--ui); color: var(--pop-ink); }
@@ -138,7 +134,6 @@ body.text-fresh #textPop { opacity: 1 !important; }
 #btnMax .i-restore, body.maxed #btnMax .i-max { display: none; }
 body.maxed #btnMax .i-restore { display: block; }
 @media (max-width: 330px) { .hb { width: 24px; } .hsep { margin: 0 2px; } }
-@media (max-width: 250px) { #btnNew { display: none; } }
 /* 1.1.13: the ••• menu sits in the top-right corner, normal size, at least 40% of the note's width
    (and never narrower than 260 px, so nothing in it gets squashed) */
 #menu {

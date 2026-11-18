@@ -222,9 +222,18 @@ body.dark { --searchShade: rgba(0,0,0,.7); }
 .sortpop .seg button { font-size: 12px; padding: 6px 2px; }
 
 /* ---------- inside a group ---------- */
-.groupview { --gc: #D9B77E; margin: 0 2px 12px; }
+/* 1.4.12: the group's parts sit straight in the scrolling view (display: contents), so its bar (.gstick: Back, name,
+   settings) can stick under the search row while the cards scroll. --stickTop = the search row's height, and
+   #viewNotes.gstuck = the bar is stuck (both from events.js): then it gets the window's background and the shade. */
+.groupview { --gc: #D9B77E; display: contents; }
 .groupview[hidden] { display: none; }
-.crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin: 0 2px 6px; font: 800 11.5px var(--ui); color: var(--mute); }
+.crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin: 0 4px 4px; font: 800 11.5px var(--ui); color: var(--mute); }
+.gstick { position: sticky; top: var(--stickTop, 0px); z-index: 2; margin-bottom: 4px; padding: 2px 2px 8px; }
+#viewNotes.gstuck .gstick {
+  background: radial-gradient(var(--dot) 1px, transparent 1.3px) -12px calc(-88px - var(--stickTop, 0px)) / 18px 18px, var(--bg);
+  box-shadow: 0 8px 8px -8px var(--searchShade);
+}
+#viewNotes.gstuck .searchrow { animation: none; box-shadow: none; }
 .crumb { border: 0; background: transparent; padding: 3px 6px; border-radius: 7px; font: inherit; color: var(--mute); cursor: pointer; }
 .crumb:hover { background: var(--soft); color: var(--ink); }
 .crumb.cur { color: var(--ink); cursor: default; }
@@ -244,14 +253,24 @@ body.dark { --searchShade: rgba(0,0,0,.7); }
 
 /* group settings panel */
 .gpanel {
-  margin-top: 8px; padding: 6px 14px 14px;
+  margin: -4px 2px 12px; padding: 6px 14px 14px;
   border-radius: 16px;
   background: var(--card2);
   box-shadow: 0 8px 24px rgba(60,40,10,.14), 0 1px 3px rgba(0,0,0,.08);
   animation: drop .14s ease-out;
 }
 .gpanel[hidden] { display: none; }
-.gpanel h4 { margin: 12px 2px 7px; font: 800 10.5px var(--ui); letter-spacing: .07em; text-transform: uppercase; color: var(--mute); }
+.gpanel h4 { margin: 10px 2px 7px; font: 800 10.5px var(--ui); letter-spacing: .07em; text-transform: uppercase; color: var(--mute); }
+/* 1.4.15: the two parts of the group panel. "This group" is tinted with the group's colour, "Notes inside" with note
+   paper, so it is clear at a glance what each part changes */
+.gsec { margin-top: 8px; padding: 2px 12px 12px; border-radius: 13px; }
+.gsec.gself { background: color-mix(in srgb, var(--gc) 16%, var(--card)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--gc) 40%, var(--card)); }
+.gsec.gnotes { background: color-mix(in srgb, #FFE45C 12%, var(--card)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, #FFE45C 34%, var(--card)); }
+.gsech { display: flex; align-items: baseline; gap: 7px; margin: 10px 2px 2px; font: 800 14px var(--ui); color: var(--ink); }
+.gsech svg { align-self: center; width: 17px; height: 17px; flex: none; }
+.gsech small { font: 700 11.5px var(--ui); color: var(--mute); }
+.gsec .gmore { margin-top: 10px; }
+.gsec.gnotes .gsech { margin-bottom: 9px; }
 .styles { --gc: #D9B77E; display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
 .styles button {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -301,9 +320,12 @@ body.dark { --searchShade: rgba(0,0,0,.7); }
   border: 0; border-bottom: 2px dashed transparent;
   background: transparent;
   color: var(--ink);
-  font: 700 25px var(--hand);
+  font: 700 20px var(--hand); font-size-adjust: .484;
   outline: none;
 }
+/* 1.4.14: the group's own name font (titleFont, Group settings → Name font); one size for every font, like the card label */
+.gname[data-font="round"] { font: 800 20px var(--ui); font-size-adjust: .484; }
+.gname[data-font="medieval"] { font: 400 20px var(--med); font-size-adjust: .484; }
 .gname:hover, .gname:focus { border-bottom-color: var(--soft2); }
 .gname::placeholder { color: var(--mute); }
 .pill.small { height: 28px; padding: 0 11px; font-size: 11.5px; }
@@ -357,9 +379,10 @@ body.is-dragging .backbtn { background: #F1EDFF; color: #5B3AA8; box-shadow: 0 0
 .card.group:hover .s2 { transform: rotate(8deg) translate(9px, 2px); }
 .sheet { transition: transform .18s; }
 .sheet .body { padding: 14px 10px 6px; }
-.sheet[data-font="hand"] .txt { font: 400 17px/1.1 var(--hand); }
-.sheet[data-font="round"] .txt { font: 400 11.5px/1.35 var(--ui); }
-.sheet[data-font="medieval"] .txt { font: 400 13px/1.25 var(--med); }
+/* 1.4.12: one size for every font, the letters matched by font-size-adjust (list-cards.css .card .txt) */
+.sheet[data-font="hand"] .txt { font: 400 11.5px/1.35 var(--hand); font-size-adjust: .484; }
+.sheet[data-font="round"] .txt { font: 400 11.5px/1.35 var(--ui); font-size-adjust: .484; }
+.sheet[data-font="medieval"] .txt { font: 400 11.5px/1.35 var(--med); font-size-adjust: .484; }
 .sheet .thumb { height: 48px; }
 .sheet[data-color="yellow"]   { --paper:#FFF4A3; --cink:#3B3220; }
 .sheet[data-color="pink"]     { --paper:#FFD6E6; --cink:#3D2430; }
@@ -386,9 +409,5 @@ body.is-dragging .backbtn { background: #F1EDFF; color: #5B3AA8; box-shadow: 0 0
   box-shadow: 0 2px 3px rgba(0,0,0,.28);
 }
 .clip::after { content: ""; position: absolute; left: 6px; right: 6px; top: 4px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.45); }
-.gfoot { display: flex; align-items: center; gap: 6px; padding: 18px 6px 2px; }
-.gname-l { flex: 1; min-width: 0; font: 700 20px/1.1 var(--hand); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gname-l.unnamed { color: var(--mute); }
-.gcount { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: #8E7BEF; color: #fff; font: 800 11px/17px var(--ui); text-align: center; }
 .card.group.drop-on { box-shadow: none; outline-offset: 1px; border-radius: 10px; } /* like .card.group.ctxon */
 

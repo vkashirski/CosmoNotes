@@ -1,7 +1,7 @@
 'use strict';
 // Groups, in the main process: groups inside groups (dropping a note on a note, a group on a group; never a group into
 // its own sub-group), moving up / to a group / to the top, making a group from several picked items, ungrouping and
-// dissolving, a group's look and colour, recolouring everything in a group, a new note made inside an open group,
+// dissolving, a group's look, colour and name font, recolouring everything in a group, a new note made inside an open group,
 // groups and the Bin, locking a group (its notes and sub-groups hide), groups.json on disk, and the "make a group" tip.
 const assert = require('assert');
 const app = require('./helpers/app');
@@ -64,6 +64,13 @@ const app = require('./helpers/app');
   const gl = await app.group(G);
   assert.equal(gl.style, 'folder'); assert.equal(gl.color, 'lilac'); assert.equal(gl.bogus, undefined);
   assert.equal((await app.group(S)).style, 'stack', 'unknown look falls back');
+  // its name's font (1.4.14): one of the note fonts, Handwritten until changed (an unknown one falls back, like the look)
+  assert.equal(gl.titleFont, 'hand', 'Handwritten by default');
+  await H['groups:update'](null, G, { titleFont: 'medieval' });
+  await H['groups:update'](null, G, { titleFont: 'comic' });
+  assert.equal((await app.group(G)).titleFont, 'hand', 'an unknown font falls back');
+  await H['groups:update'](null, G, { titleFont: 'round' });
+  assert.equal((await app.group(G)).titleFont, 'round', 'a known one is saved');
   const wa = app.winOf(a);
   let n = await H['groups:apply'](null, G, { color: 'mint', font: 'round' }, true);
   assert.equal(n, 4, 'a, b, c and e (e is in T inside S inside G)');
@@ -175,8 +182,8 @@ const app = require('./helpers/app');
   assert.equal(await parentOf(A), null);
   // the look of several groups at once (unknown keys and looks ignored)
   const C = await H['groups:make-from'](null, [m3], null);
-  assert.equal(await H['groups:update-many'](null, [A, C, 'nope'], { style: 'notebook', color: 'mint', name: 'x' }), 2);
-  for (const gid of [A, C]) { const gg = await app.group(gid); assert.equal(gg.style, 'notebook'); assert.equal(gg.color, 'mint'); assert.notEqual(gg.name, 'x'); }
+  assert.equal(await H['groups:update-many'](null, [A, C, 'nope'], { style: 'notebook', color: 'mint', titleFont: 'medieval', name: 'x' }), 2);
+  for (const gid of [A, C]) { const gg = await app.group(gid); assert.equal(gg.style, 'notebook'); assert.equal(gg.color, 'mint'); assert.equal(gg.titleFont, 'medieval', 'and the name font (1.4.15)'); assert.notEqual(gg.name, 'x'); }
   // things gone for good stay gone: Undo leaves them out
   await H['groups:move-many'](null, [m3], A);
   await H['list:trash'](null, m3); await H['list:destroy'](null, m3);
@@ -187,14 +194,14 @@ const app = require('./helpers/app');
   const k1 = await app.newNote({ html: '<p>kitten</p>' });
   await H['list:edit'](null, k1, { title: 'Kitten', color: 'pink' });
   const box = await H['groups:make-from'](null, [k1], null);
-  await H['groups:rename'](null, box, 'Box'); await H['groups:update'](null, box, { style: 'folder' });
+  await H['groups:rename'](null, box, 'Box'); await H['groups:update'](null, box, { style: 'folder', titleFont: 'medieval' });
   const sub = await H['groups:make-from'](null, [m2], box);
   const target = await H['groups:make-from'](null, [m1], null);
   let cp = await H['groups:copy-many'](null, [k1, box], target);
   assert.deepEqual(cp, { copied: 2, kept: 0 });
   let all = await get();
   const boxCopy = all.groups.find((g) => g.parentId === target && g.id !== box);
-  assert.ok(boxCopy && boxCopy.name === 'Box' && boxCopy.style === 'folder', 'the group copy has its name and look');
+  assert.ok(boxCopy && boxCopy.name === 'Box' && boxCopy.style === 'folder' && boxCopy.titleFont === 'medieval', 'the group copy has its name, look and name font');
   assert.ok(all.groups.some((g) => g.parentId === boxCopy.id), 'and its sub-group');
   const k1src = all.notes.find((n) => n.id === k1);
   assert.equal(k1src.title, 'Kitten');

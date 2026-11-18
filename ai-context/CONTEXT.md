@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 17 November 2026 · App version 1.4.10**
+**Last updated: 18 November 2026 · App version 1.4.17**
 
 Start with `CLAUDE.md` (rules, commands, pitfalls, release checklist). This file is the map: what the app is,
 how the folder is laid out, and which `ai-context/` file to open for the job in hand. Open only the files your
@@ -70,7 +70,7 @@ main/              state (S.store, S.listWin, S.quitting, S.listUnlockedAll + wi
                    ipc (registerIpc calls the nine ipc-* parts and reminders' registerRemindIpc)
 store.js           All disk storage (notes, groups, settings, attachments, backups). No Electron imports.
 preload.js         Safe bridge: exposes window.sticky.* to both windows (contextIsolation + sandbox)
-src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/note/*.js, 15 parts (1.4.10) loaded in this order, sharing
+src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/note/*.js, 16 parts (1.4.11) loaded in this order, sharing
                    names through window.COSMO_NOTE_KIT (K) and its V (V.note, V.settings, V.hidden, V.dirty, V.savedRange…; see
                    splitting-code.md): base (api, $, colour row, saving: collect/changed/saveNow, dates, applyLook, effects on the
                    note) · fx-format (the Effects pop-up, spelling, selection helpers: saveSel/restoreSel/insertNodes, formatting:
@@ -84,7 +84,7 @@ src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/n
                    word wrap, zoom: zoomNow/setZoom, sideways scroll) · draw-over (draw-over: inkState, renderInk, saveInk; floating
                    toolbars: movable) · ink-out (toolbars in their own little windows: barOut, inkOut/textOut; whole-stroke
                    eraser) · remind (1.4.1: Add → Reminder's panel, the strip of a reminder that rings: Snooze / Done, the glow,
-                   the sound) · pin-apps (1.4.5: the pin's right-click list, "Pin over": the open apps to tick) · tags (1.4.10: the ⋯ menu's Tags row) · eraser-start (the Partial eraser, toast(), start-up: init; it stays last: see splitting-code.md).
+                   the sound) · pin-apps (1.4.5: the pin's right-click list, "Pin over": the open apps to tick) · tags (1.4.10: the ⋯ menu's Tags row) · top-bar (1.4.11: a small note's top bar: the buttons the title needs the room of go into » and main's menu) · eraser-start (the Partial eraser, toast(), start-up: init; it stays last: see splitting-code.md).
                    Before its own code it loads src/reminders.js, src/remind-ui.js and src/tags.js (below).
                    Its styles: src/css/note-*.css, loaded by note.html in this order:
                    note-base (colours, base, top bar) · note-text (locked note, photo handle, writing area) ·

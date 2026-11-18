@@ -114,12 +114,15 @@ body:hover #scroller::-webkit-scrollbar-thumb, body:focus-within #scroller::-web
   user-select: text;
   font-family: var(--hand);
   font-size: var(--fs);
-  line-height: 1.28;
+  /* 1.4.12: every font's small letters as tall as Rounded's (Nunito's x-height, .484 of its size): a font change, on the
+     whole note or on some words, keeps the size, the line height and the boxes (all in em) as they were */
+  font-size-adjust: .484;
+  line-height: 1.45;
   overflow-wrap: anywhere;
   caret-color: var(--accent);
 }
-body[data-font="round"] #editor { font-family: var(--ui); line-height: 1.45; }
-body[data-font="medieval"] #editor { font-family: var(--med); line-height: 1.38; }
+body[data-font="round"] #editor { font-family: var(--ui); }
+body[data-font="medieval"] #editor { font-family: var(--med); }
 #editor.empty::before {
   content: attr(data-placeholder);
   position: absolute; left: 0; top: 0;
@@ -134,21 +137,17 @@ body[data-font="medieval"] #editor { font-family: var(--med); line-height: 1.38;
 #editor li::marker { color: var(--accent); }
 #editor ul.checklist, #editor ul.checklist ul { list-style: none; padding-left: .1em; }
 #editor ul.checklist ul { padding-left: 1em; }
-#editor ul.checklist li { position: relative; padding-left: var(--cb-p, 1.3em); }
+#editor ul.checklist li { position: relative; padding-left: var(--cb-p, 1.55em); }
 #editor ul.checklist li::before {
   content: "";
   position: absolute; left: 0; top: var(--cb-t, .3em); /* 1.1.22: --cb-*: measured from the line's first words (note.js alignChecks) */
-  width: var(--cb-s, .78em); height: var(--cb-s, .78em);
+  width: var(--cb-s, 1em); height: var(--cb-s, 1em);
   border: 2px solid var(--accent);
   border-radius: .24em;
   background: rgba(255,255,255,.4) center / 78% no-repeat;
   opacity: .75;
   cursor: pointer;
 }
-body[data-font="round"] #editor ul.checklist li { padding-left: var(--cb-p, 1.55em); }
-body[data-font="round"] #editor ul.checklist li::before { top: var(--cb-t, .3em); width: var(--cb-s, 1em); height: var(--cb-s, 1em); }
-/* 1.3.15: a Medieval note's box is .84em, the size its Rounded words are drawn at (alignChecks BOX), not Caveat's .78em */
-body[data-font="medieval"] #editor ul.checklist li::before { width: var(--cb-s, .84em); height: var(--cb-s, .84em); }
 body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #editor ul.checklist li:not(.done)::before { background-color: transparent; }
 #editor ul.checklist li.done::before {
   opacity: 1;
@@ -175,15 +174,18 @@ body.cb-dragging #editor { user-select: none; }
 #editor hr { border: 0; border-top: 2px dashed var(--line); margin: .5em 0; }
 #editor blockquote { margin: .2em 0; padding-left: .6em; border-left: 3px solid var(--line); }
 #editor code, #editor pre { font-family: Consolas, monospace; font-size: .8em; background: rgba(0,0,0,.06); border-radius: 4px; padding: 0 .2em; }
-/* --sm: the size on a font tag, also when the tag has a font of its own (note-drawing.css `font[face]`, 1.3.18) */
-#editor font { --sm: 1; }
-#editor font[size="1"] { font-size: .7em; --sm: .7; }
-#editor font[size="2"] { font-size: .82em; --sm: .82; }
-#editor font[size="3"] { font-size: 1em; --sm: 1; }
-#editor font[size="4"] { font-size: 1.2em; --sm: 1.2; }
-#editor font[size="5"] { font-size: 1.45em; --sm: 1.45; }
-#editor font[size="6"] { font-size: 1.85em; --sm: 1.85; }
-#editor font[size="7"] { font-size: 2.3em; --sm: 2.3; }
+/* 1.4.12: a font tag's size= is its only size. Its font changes nothing else: the letters are matched by font-size-adjust
+   (#editor), so no font tag may set a font-size of its own (that was the 1.3.15-1.4.11 resize per font). Each font sits
+   a little higher or lower on its line, so a font tag's own line height is smaller than the line's (1.3 < 1.45): words in
+   any font at the normal size fit in the line as it is, and bigger words make it taller by their size only. */
+#editor font { line-height: 1.3; }
+#editor font[size="1"] { font-size: .7em; }
+#editor font[size="2"] { font-size: .82em; }
+#editor font[size="3"] { font-size: 1em; }
+#editor font[size="4"] { font-size: 1.2em; }
+#editor font[size="5"] { font-size: 1.45em; }
+#editor font[size="6"] { font-size: 1.85em; }
+#editor font[size="7"] { font-size: 2.3em; }
 
 #editor img { max-width: 100%; height: auto; }
 #editor img.att-img {
@@ -201,6 +203,10 @@ body.cb-dragging #editor { user-select: none; }
 #editor img.att-drawing { display: block; margin: .25em 0; cursor: pointer; }
 body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #editor img.att-drawing { background: rgba(255,255,255,.88); border-radius: 6px; }
 #editor img.sel-img { outline: 3px solid var(--accent); outline-offset: 2px; }
+/* 1.4.11: a photo with a link (<a href><img></a>, content.js picLink): a little chain in its white strip; a click opens it */
+#editor a[href] > img.att-img:only-child {
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23857555' stroke-width='2.6' stroke-linecap='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7'/%3E%3C/svg%3E") no-repeat right 5px bottom 2px / 10px 10px;
+}
 
 #editor table { border-collapse: collapse; width: 100%; margin: .35em 0; table-layout: fixed; }
 #editor td, #editor th { border: 1.5px solid var(--line); padding: .1em .35em; min-width: 1.5em; vertical-align: top; }

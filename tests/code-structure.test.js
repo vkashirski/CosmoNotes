@@ -116,13 +116,13 @@ function checkKit(page, dir, ORDER, kitName, crlf, sandbox, shared) {
   return { K, parts };
 }
 const i0 = (p, parts) => p === parts[0];
-const doc = () => ({ querySelector: (s) => fake(s), querySelectorAll: () => [], createElement: (t) => fake(t), createElementNS: (n, t) => fake(t), addEventListener() {}, body: fake('body'), documentElement: fake('html'), hidden: false, fonts: { ready: new Promise(() => {}) } });
+const doc = () => ({ querySelector: (s) => fake(s), querySelectorAll: () => [], createElement: (t) => fake(t), createElementNS: (n, t) => fake(t), addEventListener() {}, body: fake('body'), documentElement: fake('html'), hidden: false, fonts: { ready: new Promise(() => {}), addEventListener() {} } });
 const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {}, requestAnimationFrame: () => 0, cancelAnimationFrame() {}, getComputedStyle: () => fake('style'),
   ResizeObserver: class { observe() {} }, MutationObserver: class { observe() {} }, IntersectionObserver: class { observe() {} unobserve() {} },
   Intl, Date, Math, JSON, Object, Array, Set, Map, WeakMap, String, Number, Boolean, Promise, RegExp, Error, parseFloat, parseInt, isFinite, Uint8Array, encodeURIComponent };
 {
   const sticky = fake('sticky'); sticky.getNote = () => Promise.resolve(null); // the window then stops before it shows a note
-  const { K, parts } = checkKit('note', 'note', ['base', 'fx-format', 'panels', 'content', 'editing', 'checklists', 'menus-voice-ink', 'speech', 'lock-zoom', 'draw-over', 'ink-out', 'remind', 'pin-apps', 'tags', 'eraser-start'], 'COSMO_NOTE_KIT', true,
+  const { K, parts } = checkKit('note', 'note', ['base', 'fx-format', 'panels', 'content', 'editing', 'checklists', 'menus-voice-ink', 'speech', 'lock-zoom', 'draw-over', 'ink-out', 'remind', 'pin-apps', 'tags', 'top-bar', 'eraser-start'], 'COSMO_NOTE_KIT', true,
     { ...base, document: doc(), window: { sticky, COSMO_FX: fake('COSMO_FX'), addEventListener() {}, matchMedia: () => ({ matches: true }) }, getSelection: () => fake('selection'), innerWidth: 400, innerHeight: 400, devicePixelRatio: 1,
       localStorage: { getItem: () => null, setItem() {}, removeItem() {} }, navigator: fake('navigator'), CSS: fake('CSS'), Highlight: class {},
       Node: { TEXT_NODE: 3, ELEMENT_NODE: 1 }, NodeFilter: { SHOW_TEXT: 4, SHOW_ELEMENT: 1, FILTER_ACCEPT: 1, FILTER_REJECT: 2 } },

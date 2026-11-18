@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 3 of 15: pop-overs, the header, the ⋯ menu, the Add and text panels, Undo / Redo
+// CosmoNotes note window, part 3 of 16: pop-overs, the header, the ⋯ menu, the Add and text panels, Undo / Redo
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -116,18 +116,21 @@
   $('#btnPin').addEventListener('click', () => setProp(V.note.pinned ? { pinned: false, clickThrough: false, pinApps: [] } : { pinned: true }));
   // 1.3.34: click-through (base.js applyClickThrough, main/note-state.js). Turning it on pins the note. While it is on, the
   // window ignores clicks, but Windows still sends the mouse's moves: on this button they wake the window (ctAwake) until
-  // the mouse leaves it, so this button can be clicked and nothing else can.
+  // the mouse leaves it, so this button can be clicked and nothing else can. 1.4.11: it is turned on from the pin's
+  // right-click menu (pin-apps.js); this button shows only while it is on, and turns it off.
   const wakeCt = (on) => {
     on = on && body.classList.contains('ct');
     if (on === V.ctAwake) return;
     V.ctAwake = on;
     api.ctAwake(on);
   };
-  $('#btnCt').addEventListener('click', () => {
-    const on = !V.note.clickThrough;
+  function setClickThrough(on) {
     if (on) { closePops(); finishStroke(); saveNow(); saveInk(); }
     setProp(on ? { clickThrough: true, pinned: true } : { clickThrough: false });
-    wakeCt(true); // on: the mouse is still on the button (sent after the change, so main wakes it after starting it)
+  }
+  $('#btnCt').addEventListener('click', () => {
+    setClickThrough(!V.note.clickThrough);
+    wakeCt(true); // (sent after the change, so main wakes it after starting it)
   });
   $('#btnCt').addEventListener('pointermove', () => wakeCt(true));
   $('#btnCt').addEventListener('pointerleave', () => wakeCt(false));
@@ -237,6 +240,10 @@
 
   // ---------- Add panel
   $$('#insert [data-act]').forEach((b) => b.addEventListener('click', () => doInsert(b.dataset.act)));
+  // 1.4.11: right-click in the text → Add ▸ the same items (main/web.js puts them in the text's menu, with the spelling).
+  // The list is the panel's own, so a new tile shows there too. Main offers it only while the note's words show.
+  if (api.addItems) api.addItems($$('#insert [data-act]').map((b) => ({ act: b.dataset.act, label: b.textContent.trim() })));
+  if (api.onAdd) api.onAdd((act) => { if (V.note && !V.hidden && $(`#insert [data-act="${act}"]`)) doInsert(act); });
 
   // ---------- text panel (A)
   // Every button changes the selected text. With nothing selected (1.1.16), it changes what you type next, from
@@ -538,5 +545,5 @@
   }
 
   Object.assign(K, { popOuts, closePop, closePops, openPop, closeText, ownStep, domStep, domRecord, paintTextPanel, undoText,
-    redoText, paintUndo, FACE, newNote });
+    redoText, paintUndo, FACE, newNote, setClickThrough });
 })();

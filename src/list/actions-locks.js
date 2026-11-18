@@ -5,7 +5,7 @@
   const K = window.COSMO_LIST_KIT;
   const { V, S, $, $$, COLORS, COLOR_NAMES, SWATCH, GCOLORS, GNAMES, ICON, navBack, h, plural, swatchStrip, load,
     live, groupById, chainOf, notesInTree, isInside, noteIsLocked, groupIsLocked, LOCKED_NO_DELETE, lockedOnes,
-    isShut, knownTags, render, modal, toast } = K;
+    isShut, knownTags, render, modal, toast, openEditMany } = K;
   // defined in a later part:
   const clearSearch = K.later('clearSearch');
   // ================================================================ actions (with confirmations)
@@ -219,7 +219,11 @@
   }
 
   // ================================================================ group settings panel
-  function openPanel() { $('#groupPanel').hidden = false; $('#btnGroupSettings').classList.add('on'); }
+  function openPanel() {
+    $('#groupPanel').hidden = false; $('#btnGroupSettings').classList.add('on');
+    // 1.4.12: the panel opens under the group's bar where it is in the list, at the top: scroll there if the bar is stuck
+    if ($('#viewNotes').classList.contains('gstuck')) $('#viewNotes').scrollTop = 0;
+  }
   function closePanel() { $('#groupPanel').hidden = true; $('#btnGroupSettings').classList.remove('on'); }
   // which paper colour / font the notes in the group share (shown as selected), given the "inside too" box
   function panelScope(g) {
@@ -235,10 +239,13 @@
     const color = shared(scope, 'color');
     $$('#gFont button').forEach((b) => b.classList.toggle('on', b.dataset.font === font));
     $$('#gNoteColors .sw').forEach((b) => b.classList.toggle('on', b.dataset.color === color));
+    $('#gNotesCount').textContent = plural(scope.length, 'note');
+    $('#gNoteDesign').disabled = !scope.some((n) => !isShut('note', n));
     $('#gMixed').textContent = scope.length && (!font || !color) ? 'Notes inside use different ' + [!color && 'colours', !font && 'fonts'].filter(Boolean).join(' and ') + '.' : '';
     $$('#gStyles button').forEach((b) => b.classList.toggle('on', b.dataset.style === (g.style || 'stack')));
     $('#gStyles').style.setProperty('--gc', GCOLORS[g.color] || GCOLORS.kraft);
     $$('#gColors .sw').forEach((b) => b.classList.toggle('on', b.dataset.gc === (g.color || 'kraft')));
+    $$('#gNameFont button').forEach((b) => b.classList.toggle('on', b.dataset.font === (g.titleFont || 'hand')));
     $('#gLock').innerHTML = (g.locked ? ICON.unlock + 'Remove lock…' : ICON.lock + 'Lock group');
   }
   (function buildPanel() {
@@ -255,8 +262,11 @@
     toast(count ? `Changed ${plural(count, 'note')}` : 'No notes to change');
   }
   $$('#gStyles button').forEach((b) => b.addEventListener('click', () => S.groups.update(V.openGroup, { style: b.dataset.style })));
+  $$('#gNameFont button').forEach((b) => b.addEventListener('click', () => S.groups.update(V.openGroup, { titleFont: b.dataset.font })));
   $('#gInner').addEventListener('change', () => { const g = groupById(V.openGroup); if (g) paintPanel(g); });
   $$('#gFont button').forEach((b) => b.addEventListener('click', () => massEdit({ font: b.dataset.font })));
+  // 1.4.15: the rest of the notes' design (see-through, effects…) in the same pop-up as for picked notes
+  $('#gNoteDesign').addEventListener('click', () => { const g = groupById(V.openGroup); if (g) openEditMany(panelScope(g).filter((n) => !isShut('note', n))); });
   $('#gLock').addEventListener('click', () => { const g = groupById(V.openGroup); if (g) (g.locked ? unlockGroup(g) : lockGroup(g)); });
   $('#gUngroup').addEventListener('click', () => { const g = groupById(V.openGroup); if (g) dissolveGroup(g); });
   $('#gTrash').addEventListener('click', () => { const g = groupById(V.openGroup); if (g) trashGroup(g); });

@@ -109,6 +109,27 @@
     }, { passive: true });
   }
 
+  // 1.4.12: inside a group its bar (Back, name, settings) stays in sight while the cards scroll (list-base.css .gstick).
+  // It sticks right under the search row: --stickTop = that row's height (it grows when the tags wrap). The bar is
+  // stuck once the crumbs above it have gone under the search row: #viewNotes.gstuck, watched off the scroll itself.
+  {
+    const view = $('#viewNotes'); const row = view.querySelector('.searchrow'); const crumbs = $('#crumbs');
+    let io = null; let top = -1;
+    const watch = () => {
+      const h = row.offsetHeight;
+      if (h === top) return;
+      top = h;
+      view.style.setProperty('--stickTop', `${h}px`);
+      if (io) io.disconnect();
+      io = new IntersectionObserver(([e]) => {
+        view.classList.toggle('gstuck', e.boundingClientRect.height > 0 && e.boundingClientRect.bottom <= e.rootBounds.top + 0.5);
+      }, { root: view, rootMargin: `-${h}px 0px 0px 0px` });
+      io.observe(crumbs);
+    };
+    new ResizeObserver(watch).observe(row);
+    watch();
+  }
+
   // sort menu
   $('#btnSort').addEventListener('click', (e) => {
     e.stopPropagation();

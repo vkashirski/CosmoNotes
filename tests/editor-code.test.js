@@ -15,28 +15,23 @@ assert.ok(nj.indexOf('function collect()') > 0 && nj.indexOf('function collect()
 assert.ok(nj.indexOf('function alignChecks()') > 0 && nj.indexOf('function alignChecks()') < nj.indexOf('function paintStrikes()'), '(alignChecks() comes before paintStrikes())');
 
 // ---- checklist boxes follow their line's first words; the measured values are never saved; measured all at once
-assert.ok(/top: var\(--cb-t, \.3em\)/.test(nc) && /width: var\(--cb-s, \.78em\)/.test(nc), 'box size / place from --cb-*');
+assert.ok(/top: var\(--cb-t, \.3em\)/.test(nc) && /width: var\(--cb-s, 1em\)/.test(nc), 'box size / place from --cb-*');
 assert.ok(/for \(const v of (K\.)?CB_VARS\) el\.style\.removeProperty\(v\)/.test(nj), 'collect() strips the measured values');
 const al = between('function alignChecks()', 'function paintStrikes()');
 assert.ok(/out\.push\(\[li, size, top, pad\]\)/.test(al) && al.indexOf('setVar(li') > al.indexOf('out.push'), 'checklist boxes: measure all lines, then write (no layout per line per key)');
-// 1.3.18: a word's size and its font multiply once each (note-drawing.css `font[face]`): its own size= (--sm) counts, and
-// the font around it is taken out (--k = that font's --kf, set on the tag's children). The box reads --kf from the CSS.
+// 1.4.12 (the owner's wish): a font changes no size. Every note font has one text size, line height and box; the letters
+// are matched by font-size-adjust; a font tag's size= is its only size; the box = the words' size × BOX (no per-font table).
 {
-  assert.ok(nc.includes('#editor font[face] { --kf: 1; font-size: calc(1em * var(--sm, 1) * var(--kf) / var(--k, 1)); }') && nc.includes('#editor font[face] > * { --k: 1; }'), 'the font tag rule');
-  const kf = [...nc.matchAll(/(body\[data-font="\w+"\] #editor font\[face="\w+"\]) \{ --kf: ([.\d]+); \}/g)];
-  assert.equal(kf.length, 6, 'six font resizes');
-  for (const [, sel, v] of kf) assert.ok(nc.includes(`${sel} > * { --k: ${v}; }`), `${sel}: its children see --k ${v}`);
-  for (const m of nc.matchAll(/#editor font\[size="\d"\] \{ font-size: ([.\d]+)em; --sm: ([.\d]+); \}/g)) assert.equal(m[1], m[2], 'size= also in --sm');
-  assert.ok(!/#editor font\[face[^{]*\{[^}]*font-size: [.\d]+em/.test(nc), 'no font tag sets its own font-size (it would beat size=)');
-  assert.ok(/getPropertyValue\('--kf'\)/.test(nj) && !/FACE_SIZE/.test(nj), 'the box takes the font resize from the CSS, no copy of it');
+  assert.ok(!/data-font="\w+"\]\[data-size/.test(nc) && /body\[data-size="m"\] \{ --fs: 15\.5px; \}/.test(nc), 'one --fs for every note font');
+  assert.ok(/#editor \{[^}]*font-size-adjust: \.484;[^}]*line-height: 1\.45;/.test(nc), 'the editor matches every font\'s letters (font-size-adjust)');
+  assert.ok(!/data-font="\w+"\] #editor[^{]*\{[^}]*(line-height|font-size|width|padding)/.test(nc), 'no note font has its own line height, size or box');
+  assert.ok(!/--kf|--sm\b|--k\b/.test(nc) && !/--kf/.test(nj), 'the per-font resize (--kf, 1.3.15-1.4.11) is gone');
+  assert.ok(!/#editor font[^{]*\{[^}]*font-size: calc/.test(nc) && !/#editor font\[face[^{]*\{[^}]*font-size/.test(nc), 'no font tag sets its own font-size (it would beat size=)');
+  assert.ok(/#editor font \{ line-height: 1\.3; \}/.test(nc), 'a font tag\'s line height is under the line\'s: a font change keeps the line\'s height');
   const box = JSON.parse(/const BOX = (\{.*?\});/.exec(nj)[1].replace(/(\w+):/g, '"$1":').replace(/: \./g, ': 0.'));
   const em = (re) => Number((re.exec(nc) || [])[1]);
-  assert.equal(box.hand.k, em(/#editor ul\.checklist li::before \{[^}]*width: var\(--cb-s, ([.\d]+)em\)/), 'hand box = CSS');
-  assert.equal(box.round.k, em(/body\[data-font="round"\] #editor ul\.checklist li::before \{[^}]*width: var\(--cb-s, ([.\d]+)em\)/), 'round box = CSS');
-  assert.equal(box.medieval.k, em(/body\[data-font="medieval"\] #editor ul\.checklist li::before \{[^}]*width: var\(--cb-s, ([.\d]+)em\)/), 'medieval box = CSS');
-  assert.equal(box.hand.pad, em(/#editor ul\.checklist li \{ position: relative; padding-left: var\(--cb-p, ([.\d]+)em\)/), 'indent = CSS');
-  assert.equal(box.medieval.pad, box.hand.pad, 'medieval indent = CSS');
-  assert.equal(box.round.pad, em(/body\[data-font="round"\] #editor ul\.checklist li \{ padding-left: var\(--cb-p, ([.\d]+)em\)/), 'round indent = CSS');
+  assert.equal(box.k, em(/#editor ul\.checklist li::before \{[^}]*width: var\(--cb-s, ([.\d]+)em\)/), 'box = CSS');
+  assert.equal(box.pad, em(/#editor ul\.checklist li \{ position: relative; padding-left: var\(--cb-p, ([.\d]+)em\)/), 'indent = CSS');
 }
 
 // ---- Backspace / Delete
@@ -63,4 +58,18 @@ assert.ok(/const keep = (V\.)?savedRange && !(V\.)?savedRange\.collapsed/.test(n
 assert.ok(!nh.includes('id="fxColors"') && !nh.includes('id="fxOpacity"') && nh.includes('id="btnCloseAll"'), 'Effects: no colour or see-through (1.1.22), a close-all button');
 assert.ok(/item\(null, 'Same as all'/.test(nj) && /add\(null, 'Same as all'/.test(src.list()), 'the short "Same as all" (note and list)');
 assert.ok(/if \(win\.isFocused\(\)\) setTimeout\(\(\) => \{ if \(!win\.isDestroyed\(\)\) win\.webContents\.focus\(\); \}, 0\);/.test(src.main()), 'a toolbar window never keeps the focus from its note');
+// 1.4.13 (the owner's wish): the checklist boxes are static: worked out from sizes only, never from the letters or a font
+{
+  const ac = nj.slice(nj.indexOf('function alignChecks()'), nj.indexOf('function paintStrikes()'));
+  assert.ok(!/getClientRects|getBoundingClientRect|createRange|fontFamily/.test(ac), 'alignChecks measures no letters and reads no font');
+  const tbl = (name) => new Function(`return ${new RegExp(`const ${name} = (\\{[^;]*\\});`).exec(nj)[1]}`)();
+  const sizes = Object.fromEntries([...nc.matchAll(/#editor font\[size="(\d)"\] \{ font-size: ([.\d]+)em; \}/g)].map((m) => [m[1], Number(m[2])]));
+  assert.deepEqual(tbl('SIZE'), sizes, 'SIZE = note-text.css font[size]');
+  const tags = tbl('TAG_SIZE');
+  assert.ok(/#editor h1, #editor h2, #editor h3, #editor h4 \{ font-size: 1\.2em;/.test(nc) && tags.H1 === 1.2 && tags.H4 === 1.2, 'headings = CSS');
+  assert.ok(/#editor code, #editor pre \{[^}]*font-size: \.8em;/.test(nc) && tags.CODE === 0.8 && tags.PRE === 0.8, 'code = CSS');
+  const lh = tbl('LINE_H');
+  assert.ok(new RegExp(`#editor \\{[^}]*line-height: ${lh.line};`).test(nc) && new RegExp(`#editor font \\{ line-height: ${lh.font}; \\}`).test(nc), 'LINE_H = CSS');
+}
+
 console.log('ok');

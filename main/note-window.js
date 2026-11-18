@@ -61,7 +61,8 @@ function openNoteWindow(n, { focus = false } = {}) {
   wins.set(n.id, win);
   closedChanged(); // 1.3.30: opened again some other way: the tray may have nothing left to reopen
   appPin.changed(); // 1.4.5: pinned over apps: the watch starts
-  hardenContents(win.webContents, { inkBarFor: win });
+  // 1.4.11: right-click → Add ▸, only while the note's words show (not on a hidden locked note's lock screen)
+  hardenContents(win.webContents, { inkBarFor: win, addItems: () => { const m = S.store.get(win.noteId); return m && !(isLocked(m) && !win.revealed) ? win.addItems : null; } });
   watchInkBar(win);
 
   // 1.4.6: settles once the window has shown (or closed first): the + that made it spins until then (createNote)

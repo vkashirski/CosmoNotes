@@ -77,28 +77,39 @@
   </div>
   <div class="groupview" id="groupHead" hidden>
     <nav class="crumbs" id="crumbs"></nav>
-    <div class="grouphead">
+    <!-- 1.4.12: the group's bar stays at the top while the cards scroll (list-base.css .gstick, events.js) -->
+    <div class="gstick" id="gStick"><div class="grouphead">
       <button class="backbtn" id="btnBack" title="Up one level. Drag a note or group here to move it up."><svg viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg><span id="backLabel">All notes</span></button>
       <span class="gicon" id="gIcon"></span>
       <input class="gname" id="groupName" maxlength="120" placeholder="Name this group" autocomplete="off" spellcheck="false">
       <button class="iconbtn sm" id="btnRelockGroup" title="Lock this group again" hidden><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></svg></button>
       <button class="iconbtn sm" id="btnGroupSettings" title="Group settings: look, colour, lock, change all notes"><svg viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 3.5-4 3.5h-1.8a1.7 1.7 0 0 0-1.2 2.9c.7.8.3 2.6-1.4 3.4-.5.2-1 .2-1.6.2z"/><circle cx="7.5" cy="10.5" r="1.3" class="fill"/><circle cx="11" cy="6.5" r="1.3" class="fill"/><circle cx="16" cy="8" r="1.3" class="fill"/></svg></button>
-    </div>
+    </div></div>
     <div class="gpanel" id="groupPanel" hidden>
-      <h4>Look</h4>
-      <div class="styles" id="gStyles">
-        <button data-style="stack"><svg viewBox="0 0 48 40"><rect x="9" y="8" width="26" height="26" rx="2" transform="rotate(-8 22 21)" class="p2"/><rect x="13" y="7" width="26" height="26" rx="2" transform="rotate(6 26 20)" class="p3"/><rect x="11" y="8" width="26" height="26" rx="2" class="p1"/><rect x="19" y="4" width="10" height="7" rx="2" class="gc"/></svg><span>Stack</span></button>
-        <button data-style="folder"><svg viewBox="0 0 48 40"><path d="M4 9a3 3 0 0 1 3-3h11l4 4h19a3 3 0 0 1 3 3v21a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" class="gc dk"/><rect x="10" y="9" width="18" height="16" rx="1.5" class="p1" transform="rotate(-6 19 17)"/><rect x="20" y="8" width="18" height="16" rx="1.5" class="p2" transform="rotate(5 29 16)"/><path d="M4 18a3 3 0 0 1 3-3h34a3 3 0 0 1 3 3v16a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" class="gc"/></svg><span>Folder</span></button>
-        <button data-style="envelope"><svg viewBox="0 0 48 40"><rect x="5" y="12" width="38" height="25" rx="3" class="gc dk"/><rect x="11" y="4" width="17" height="18" rx="1.5" class="p1" transform="rotate(-5 19 13)"/><rect x="21" y="5" width="16" height="17" rx="1.5" class="p2" transform="rotate(6 29 13)"/><path d="M5 16l19 11 19-11v18a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z" class="gc"/><circle cx="24" cy="27" r="3.2" class="seal"/></svg><span>Envelope</span></button>
-        <button data-style="notebook"><svg viewBox="0 0 48 40"><rect x="8" y="5" width="32" height="32" rx="3" class="gc"/><rect x="15" y="15" width="18" height="10" rx="1.5" class="lbl"/><g class="rings"><circle cx="14" cy="5" r="1.8"/><circle cx="20" cy="5" r="1.8"/><circle cx="26" cy="5" r="1.8"/><circle cx="32" cy="5" r="1.8"/></g><rect x="35" y="5" width="2.5" height="32" class="band"/></svg><span>Notebook</span></button>
-      </div>
-      <h4>Group colour</h4>
-      <div class="swatches" id="gColors"></div>
-      <h4>Change every note inside</h4>
-      <div class="row2"><span>Paper</span><div class="swstrip small"><div class="swatches small" id="gNoteColors"></div></div></div>
-      <div class="row2"><span>Font</span><div class="seg" id="gFont"><button data-font="hand" class="hand">Handwritten</button><button data-font="round">Rounded</button><button data-font="medieval" class="med">Medieval</button></div></div>
-      <label class="check"><input type="checkbox" id="gInner" checked> <span>Also the notes in groups inside this one</span></label>
-      <p class="gmixed" id="gMixed"></p>
+      <!-- 1.4.15 (the owner's wish): two parts, so it is clear what changes what. "This group": the group's own picture.
+           "Notes inside": the notes in it (Note design opens the same pop-up as for picked notes). -->
+      <section class="gsec gself">
+        <h3 class="gsech"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>This group<small>its card in the list</small></h3>
+        <h4>Look</h4>
+        <div class="styles" id="gStyles">
+          <button data-style="stack"><svg viewBox="0 0 48 40"><rect x="9" y="8" width="26" height="26" rx="2" transform="rotate(-8 22 21)" class="p2"/><rect x="13" y="7" width="26" height="26" rx="2" transform="rotate(6 26 20)" class="p3"/><rect x="11" y="8" width="26" height="26" rx="2" class="p1"/><rect x="19" y="4" width="10" height="7" rx="2" class="gc"/></svg><span>Stack</span></button>
+          <button data-style="folder"><svg viewBox="0 0 48 40"><path d="M4 9a3 3 0 0 1 3-3h11l4 4h19a3 3 0 0 1 3 3v21a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" class="gc dk"/><rect x="10" y="9" width="18" height="16" rx="1.5" class="p1" transform="rotate(-6 19 17)"/><rect x="20" y="8" width="18" height="16" rx="1.5" class="p2" transform="rotate(5 29 16)"/><path d="M4 18a3 3 0 0 1 3-3h34a3 3 0 0 1 3 3v16a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" class="gc"/></svg><span>Folder</span></button>
+          <button data-style="envelope"><svg viewBox="0 0 48 40"><rect x="5" y="12" width="38" height="25" rx="3" class="gc dk"/><rect x="11" y="4" width="17" height="18" rx="1.5" class="p1" transform="rotate(-5 19 13)"/><rect x="21" y="5" width="16" height="17" rx="1.5" class="p2" transform="rotate(6 29 13)"/><path d="M5 16l19 11 19-11v18a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z" class="gc"/><circle cx="24" cy="27" r="3.2" class="seal"/></svg><span>Envelope</span></button>
+          <button data-style="notebook"><svg viewBox="0 0 48 40"><rect x="8" y="5" width="32" height="32" rx="3" class="gc"/><rect x="15" y="15" width="18" height="10" rx="1.5" class="lbl"/><g class="rings"><circle cx="14" cy="5" r="1.8"/><circle cx="20" cy="5" r="1.8"/><circle cx="26" cy="5" r="1.8"/><circle cx="32" cy="5" r="1.8"/></g><rect x="35" y="5" width="2.5" height="32" class="band"/></svg><span>Notebook</span></button>
+        </div>
+        <h4>Colour</h4>
+        <div class="swatches" id="gColors"></div>
+        <h4>Name font</h4>
+        <div class="seg" id="gNameFont"><button data-font="hand" class="hand">Handwritten</button><button data-font="round">Rounded</button><button data-font="medieval" class="med">Medieval</button></div>
+      </section>
+      <section class="gsec gnotes">
+        <h3 class="gsech"><svg viewBox="0 0 24 24"><path d="M5 3h14v12l-6 6H5z"/><path d="M13 21v-6h6"/></svg>Notes inside<small id="gNotesCount"></small></h3>
+        <div class="row2"><span>Paper</span><div class="swstrip small"><div class="swatches small" id="gNoteColors"></div></div></div>
+        <div class="row2"><span>Font</span><div class="seg" id="gFont"><button data-font="hand" class="hand">Handwritten</button><button data-font="round">Rounded</button><button data-font="medieval" class="med">Medieval</button></div></div>
+        <label class="check"><input type="checkbox" id="gInner" checked> <span>Also the notes in groups inside this one</span></label>
+        <p class="gmixed" id="gMixed"></p>
+        <button class="pill small ghost gmore" id="gNoteDesign" title="See-through, effects and more for these notes">Note design…</button>
+      </section>
       <div class="gpbtns">
         <button class="pill ghost" id="gLock"></button>
         <button class="pill ghost" id="gUngroup">Ungroup…</button>
@@ -311,12 +322,12 @@
     </label>
   </div>
 
-  <!-- 1.3.34: click-through (main/note-state.js) -->
+  <!-- 1.3.34: click-through (main/note-state.js); 1.4.11: in the pin's right-click menu, no longer a top-bar button -->
   <div data-find="ignore mouse pass through transparent overlay game games video watch" class="panel">
     <h3>Click-through</h3>
     <p class="muted">Read a note over a video or a game, and click what’s under it.</p>
     <label class="row toggle">
-      <span><b>Click-through button</b><small>Left of the pin in each note’s top bar. It pins the note. While it’s on, only that button works.</small></span>
+      <span><b>Click-through</b><small>Right-click a note’s pin to turn it on. It pins the note. While it’s on, only its button works.</small></span>
       <input type="checkbox" id="sClickThrough"><i></i>
     </label>
   </div>
@@ -438,9 +449,9 @@
      "completely eclipses the all notes view"), with tabs: Colour, Background, Mouse. The list stays visible and the note
      being edited is outlined. -->
 <div class="modal esheet epop" id="editSheet" hidden>
-  <form class="ebox" id="editBox" autocomplete="off" aria-label="Edit design">
+  <form class="ebox" id="editBox" autocomplete="off" aria-label="Note design">
     <div class="ehead">
-      <h3>Edit design</h3>
+      <h3>Note design</h3>
       <button type="button" class="qclear" id="editX" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div class="epaper" id="editPaper" data-color="yellow"><canvas class="fxc" id="editFxCanvas" aria-hidden="true"></canvas><input class="etitle" id="editTitle" maxlength="120" placeholder="Title (optional)" spellcheck="false" aria-label="Title"></div>

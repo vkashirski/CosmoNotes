@@ -566,7 +566,7 @@
       n.favorite
         ? { label: 'Remove from favourites', icon: ICON.star, run: () => setFav([`n:${n.id}`], false) }
         : { label: 'Add to favourites', icon: ICON.star, run: () => setFav([`n:${n.id}`], true) },
-      { label: 'Edit design…', icon: ICON.edit, run: () => openEdit(n) },
+      { label: 'Note design…', icon: ICON.edit, run: () => openEdit(n) }, // 1.4.15: was Edit design
       { label: 'Reminders…', icon: ICON.clock, run: () => openRemindSheet(n) }, // 1.4.1
       { label: 'Tags…', icon: ICON.tag, run: () => openTagSheet([{ kind: 'note', note: n }]) }, // 1.4.10
       n.open ? { label: 'Close note', icon: ICON.hide, run: () => S.list.closeNote(n.id) } : null,

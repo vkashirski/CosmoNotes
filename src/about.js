@@ -8,7 +8,7 @@
  * Keep each item short: one or two plain sentences.
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-11-17',
+  LAST_UPDATED: '2026-11-18',
 
   FEATURES: [
     {
@@ -26,17 +26,18 @@ window.COSMO_ABOUT = {
       title: 'Sticky notes on your desktop',
       items: [
         'Pin a note to keep it above every other window. The one you pinned or clicked last is on top.',
-        'Click-through: read a pinned note over a video or game, and click what’s under it. Turn it on in Settings.',
+        'Click-through: read a pinned note over a video or game, and click what’s under it. Turn it on in Settings, then right-click the pin.',
         'Right-click the pin to pin a note to some apps. It follows them: on top in front, behind other apps, gone while they’re closed.',
         'Tick a whole app, or just one folder or file in it. No note can show over a game in exclusive full screen.',
         'Make a note see-through. It can turn solid while your mouse is over it.',
         'Roll a note up to just its top bar.',
         'Minimise and maximise buttons next to the X. Double-click the top bar to maximise.',
+        'A small note keeps its title. The buttons that don’t fit go into the » button.',
         'Notes reopen where you left them, also after a restart.',
         'Starts with Windows (you can turn this off).',
         '17 paper colours, light and dark. The colour row in the ⋯ menu scrolls sideways.',
         'Evening colours: light notes turn a softer shade in the evening, so they don’t glare. Pick the times in Settings.',
-        'Three fonts for each note: Handwritten, Rounded or Medieval.',
+        'Three fonts for each note: Handwritten, Rounded or Medieval. A font change keeps the size of the text and the boxes.',
         'An optional title on the top bar, in the note’s font or its own.',
         'Ctrl + mouse wheel zooms a note. Ctrl + 0 goes back to 100%.',
         'Shows when a note was last edited. The ⋯ menu shows when it was made.',
@@ -58,6 +59,7 @@ window.COSMO_ABOUT = {
       items: [
         'Bold, italic, underline, strikethrough, bullet lists and checklists.',
         'Drag a checkbox to move its item. Ticked items can move to the bottom. Turning that on in a note tidies its lists.',
+        'A checkbox goes by the size of its words, never their font.',
         'Checkboxes can keep one size. Change these in Settings, or for one note in its ⋯ menu.',
         'Copy and paste keeps checklist boxes, fonts, sizes and colours.',
         'Ctrl+F finds words in a note.',
@@ -99,6 +101,7 @@ window.COSMO_ABOUT = {
       items: [
         'Photos: from a file, pasted or dragged in. Drag a corner to resize.',
         'Right-click a photo to copy it or add a description. Search finds the photo by its description.',
+        'Put a link on a photo: right-click it → Add link. A click on the photo opens the link.',
         'Voice recordings you can play inside the note. They save while you talk, so closing the note or a crash keeps them.',
         'Voice to text: talk, and the words appear in your note. It all stays on this device.',
         'Transcribe: right-click a voice note to turn it into text.',
@@ -106,6 +109,7 @@ window.COSMO_ABOUT = {
         'Pick in Settings if the words appear while you talk or when you stop.',
         'Sketches: a small drawing pad that becomes a picture.',
         'Links, tables, numbered lists, dividers and today’s date.',
+        'Right-click in the text → Add, for all of these without the button.',
       ],
     },
     {
@@ -133,6 +137,7 @@ window.COSMO_ABOUT = {
         'A card shows a note’s picture where it is in the note, at its size.',
         'A card fades out at the bottom when the note has more.',
         'A card shows the words as the note does: fonts, colours, sizes, bold and more.',
+        'As you type in a note, the new words write themselves onto its card.',
         'Search titles and text. Inside a group, search looks only there. The Bin has its own search.',
         'Tags for notes and groups: right-click → Tags…, or the note’s ⋯ menu. A group’s tags count for all inside it.',
         'Click tags under the search to see only what has them. Pick several: All of them or Any. Or type #tag in the search.',
@@ -141,14 +146,14 @@ window.COSMO_ABOUT = {
         'Five card sizes, also with Ctrl + mouse wheel.',
         'Nine colour themes for this window, light and dark.',
         'Right-click a note or group for quick actions.',
-        'Right-click → Edit design… changes a note’s title, title font, colour and effects right in the list.',
+        'Right-click → Note design… changes a note’s title, title font, colour and effects right in the list.',
         'The Locked tab shows every locked note. “Unlock all” lets you read and search them.',
         'Favourites: click the star on a card. The Favourites tab shows them all.',
         'Ctrl+click picks several cards. A bar then opens, stars, groups, locks or bins them at once.',
-        'Picked groups can get a new look and colour at once: Look in the bar.',
+        'Group look in that bar changes the picked groups themselves: look, colour and name font.',
         'Move picked cards out of a group, or cut (Ctrl+X) or copy (Ctrl+C) them and paste in another group (Ctrl+V).',
         'Ctrl+Z undoes a move or paste in the list. Ctrl+Y does it again.',
-        'Edit design in that bar changes the colour, see-through, fonts and effects of them all.',
+        'Note design in that bar changes the colour, see-through, fonts and effects of them all.',
         'Moving to the Bin asks first. Shift+click skips the question.',
         'Closed a note by mistake? Ctrl+Shift+T here, or the tray’s “Reopen closed note”, opens it again.',
         'Sort by last edited or date made, newest or oldest first.',
@@ -160,10 +165,12 @@ window.COSMO_ABOUT = {
       items: [
         'Drag a note onto another to make a group. The card it goes into is outlined.',
         'Groups can hold groups, like folders. The mouse’s back and forward buttons move between levels.',
+        'Inside a group, its bar with the back button stays at the top while you scroll.',
         'Four looks for a group (paper stack, folder, envelope, notebook) in 8 colours.',
+        'Every group wears a label with its name and how many notes. The name can have its own font.',
         'Name, lock or ungroup a group, or bin all its notes.',
         '“New note” inside an open group puts the note there.',
-        'Change the colour or font of every note in a group at once.',
+        'Group settings has two parts: This group (its card) and Notes inside (every note in it).',
         'New notes can get one colour, or a random one from several.',
       ],
     },

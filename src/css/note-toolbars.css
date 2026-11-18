@@ -266,6 +266,7 @@ input[type="range"] { width: 100%; margin: 2px 0 4px; accent-color: #C9A227; }
 .dot .none { width: 14px; height: 2px; background: #C0392B; transform: rotate(-45deg); border-radius: 2px; }
 
 .fld { display: block; margin: 0 2px 8px; }
+.fld[hidden] { display: none; } /* 1.4.11: the link form's "Text to show", for a picture */
 .fld span { display: block; margin-bottom: 3px; font-size: 11.5px; color: var(--pop-mute); }
 .fld input, .fld textarea {
   width: 100%;

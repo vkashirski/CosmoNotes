@@ -71,10 +71,9 @@
   background: linear-gradient(180deg, color-mix(in srgb, var(--gc) 92%, #fff), var(--gc));
   box-shadow: 0 -2px 6px rgba(0,0,0,.12), 0 6px 14px -6px rgba(80,60,20,.45);
   transform-origin: bottom; transition: transform .2s;
-  display: flex; align-items: flex-end; padding: 0 10px 8px;
+  display: flex; align-items: flex-end; justify-content: center; padding: 0 0 var(--lblB);
 }
 .card.group:hover .folder .f-front { transform: perspective(300px) rotateX(-12deg); }
-.f-count { font: 800 11px var(--ui); color: rgba(0,0,0,.45); }
 
 /* envelope */
 .envelope .e-back { position: absolute; left: 0; right: 0; top: 26%; bottom: 0; border-radius: 8px; background: color-mix(in srgb, var(--gc) 80%, #000); }
@@ -91,13 +90,13 @@
   filter: drop-shadow(0 6px 8px rgba(80,60,20,.3));
 }
 .envelope .e-seal {
-  position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%);
-  width: 26px; height: 26px; border-radius: 50%;
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 20px; height: 20px; border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, #FFE7A3, #E3A82B 62%, #A97510);
   box-shadow: 0 2px 4px rgba(0,0,0,.3);
   display: grid; place-items: center;
 }
-.envelope .e-seal svg { width: 13px; height: 13px; fill: rgba(255,255,255,.85); stroke: none; }
+.envelope .e-seal svg { width: 10px; height: 10px; fill: rgba(255,255,255,.85); stroke: none; }
 
 /* notebook */
 .notebook .nb-pages { position: absolute; left: 8px; right: 2px; top: 10px; bottom: -3px; border-radius: 4px 10px 10px 4px; background: #FBF8F0; box-shadow: 0 1px 2px rgba(0,0,0,.15), 0 6px 14px -6px rgba(80,60,20,.45); }
@@ -109,16 +108,33 @@
   transition: transform .2s; transform-origin: left center;
 }
 .card.group:hover .notebook .nb-cover { transform: perspective(400px) rotateY(-14deg); }
-.nb-label { width: 68%; padding: 6px 8px; border-radius: 4px; background: #FFFDF6; box-shadow: 0 1px 2px rgba(0,0,0,.18); text-align: center; }
-.nb-label b { display: block; font: 700 18px/1.05 var(--hand); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nb-label small { font: 800 10px var(--ui); color: var(--mute); }
 .nb-rings { position: absolute; left: 12px; right: 18px; top: 0; display: flex; justify-content: space-between; }
 .nb-rings i { width: 8px; height: 13px; border-radius: 5px; border: 2px solid #8C8496; background: #fff; }
-/* 1.1.13: the elastic band is drawn on the cover itself, so it tilts with the cover when you point at the notebook
-   (before, it stayed put and stuck out on the right) */
-.nb-band { display: none; }
+/* 1.1.13: the elastic band is drawn on the cover itself, so it tilts with the cover when you point at the notebook */
 .notebook .nb-cover::after { content: ""; position: absolute; right: 12px; top: 0; bottom: 0; width: 6px; background: rgba(0,0,0,.28); border-radius: 2px; }
-.card.group.look-notebook .gname-l { visibility: hidden; }
+
+/* 1.4.14 (the owner's pick): the label. The same cream label in the same spot on every look: the name, and the number
+   of notes under it. Always cream, so its ink is fixed: never the theme's --ink (light on dark themes: the old
+   notebook label's name could hardly be read). The name's font is the group's own (titleFont); like the note fonts
+   (ui-gotchas.md → "Font sizes") a font never changes a size: one size, one fixed line, letters matched by
+   font-size-adjust. Sizes per card size: --lf (name) / --lc (count) / --lblB (gap under the label), list-groups-menus.css. */
+.card.group { --lf: 14.5px; --lc: 10px; --lblB: 12px; }
+.glabel {
+  position: absolute; left: 50%; bottom: var(--lblB); z-index: 2;
+  width: 74%; padding: 4px 8px 4px; border-radius: 4px;
+  background: #FFFDF6; box-shadow: 0 1px 2px rgba(0,0,0,.2), 0 4px 8px -4px rgba(0,0,0,.35);
+  text-align: center;
+  transform: translateX(-50%) rotate(-1.5deg); transition: transform .2s;
+}
+.card.group:hover .glabel { transform: translateX(-50%) rotate(0deg) translateY(-2px); }
+.folder .f-front .glabel, .notebook .nb-cover .glabel { left: 13%; transform: rotate(-1.5deg); }
+.folder .f-front .glabel { position: relative; left: auto; bottom: auto; }
+.card.group:hover .folder .f-front .glabel, .card.group:hover .notebook .nb-cover .glabel { transform: rotate(0deg) translateY(-2px); }
+.glabel b { display: block; height: calc(var(--lf) * 1.5); font: 700 var(--lf)/calc(var(--lf) * 1.5) var(--hand); font-size-adjust: .484; color: #3B3226; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.glabel b[data-font="round"] { font: 800 var(--lf)/calc(var(--lf) * 1.5) var(--ui); font-size-adjust: .484; }
+.glabel b[data-font="medieval"] { font: 400 var(--lf)/calc(var(--lf) * 1.5) var(--med); font-size-adjust: .484; }
+.glabel b.unnamed { color: #9A8B70; }
+.glabel small { display: block; font: 800 var(--lc)/1.3 var(--ui); color: #8A7B62; }
 
 /* locked groups */
 .glock {
@@ -129,13 +145,9 @@
   box-shadow: 0 2px 6px rgba(0,0,0,.25);
 }
 .glock svg { width: 16px; height: 16px; }
-.card.group.locked .art.folder .glock, .card.group.locked .art.envelope .glock, .card.group.locked .art.notebook .glock { left: 50%; right: auto; bottom: 22%; transform: translateX(-50%); width: 38px; height: 38px; }
+.card.group.locked .art.folder .glock, .card.group.locked .art.envelope .glock, .card.group.locked .art.notebook .glock { left: 50%; right: auto; top: 40%; bottom: auto; transform: translate(-50%, -50%); width: 38px; height: 38px; }
 .card.group.locked .art.folder .glock svg, .card.group.locked .art.envelope .glock svg, .card.group.locked .art.notebook .glock svg { width: 20px; height: 20px; }
 .card.group.locked .art.envelope .e-seal { display: none; }
-.gfoot .gl { display: grid; color: var(--mute); }
-.gfoot .gl svg { width: 15px; height: 15px; }
-.gsub { display: inline-flex; align-items: center; gap: 2px; font: 800 11px var(--ui); color: var(--mute); }
-.gsub svg { width: 14px; height: 14px; }
 
 /* ================================================================ right-click menu */
 .ctx {
@@ -233,62 +245,46 @@
 /* three card sizes in the notes list (and the Bin) */
 .cards.size-s { --cw: 124px; --ch: 128px; gap: 10px; }
 .cards.size-s .card .body { padding: 6px 9px 2px; }
-.cards.size-s .card[data-font="hand"] .txt { font-size: 16px; }
-.cards.size-s .card[data-font="round"] .txt { font-size: 11px; }
-.cards.size-s .card[data-font="medieval"] .txt { font-size: 12.5px; }
+.cards.size-s .card .txt { font-size: 11px; }
 .cards.size-s .card .foot { font-size: 10px; padding: 2px 5px 5px 9px; }
 .cards.size-s .card .thumb { height: 48px; }
 .cards.size-s .card .thumb.only { height: 62px; }
 .cards.size-s .card .lockmark svg { width: 28px; height: 28px; }
 .cards.size-s .card.group .art, .cards.size-s .sheets { min-height: 80px; }
-.cards.size-s .gname-l { font-size: 17px; }
-.cards.size-s .gfoot { padding-top: 12px; }
-.cards.size-s .nb-label b { font-size: 14px; }
+.cards.size-s .card.group { --lf: 12px; --lc: 9px; --lblB: 8px; }
 .cards.size-s .acts .act { width: 22px; height: 22px; }
 .cards.size-s .card.binned .pill { font-size: 10px; height: 22px; padding: 0 7px; }
 
 .cards.size-l { --cw: 208px; --ch: 222px; gap: 18px; }
 .cards.size-l .card .body { padding: 10px 14px 6px; }
-.cards.size-l .card[data-font="hand"] .txt { font-size: 23px; }
-.cards.size-l .card[data-font="round"] .txt { font-size: 14px; }
-.cards.size-l .card[data-font="medieval"] .txt { font-size: 16px; }
+.cards.size-l .card .txt { font-size: 14px; }
 .cards.size-l .card .foot { font-size: 12px; }
 .cards.size-l .card .thumb { height: 110px; }
 .cards.size-l .card .thumb.only { height: 140px; }
 .cards.size-l .card.group .art, .cards.size-l .sheets { min-height: 160px; }
-.cards.size-l .sheet[data-font="hand"] .txt { font-size: 20px; }
-.cards.size-l .gname-l { font-size: 23px; }
-.cards.size-l .nb-label b { font-size: 21px; }
+.cards.size-l .card.group { --lf: 16.5px; --lc: 10.5px; --lblB: 14px; }
 
 /* 1.1.7: two bigger sizes */
 .cards.size-xl { --cw: 260px; --ch: 278px; gap: 20px; }
 .cards.size-xl .card .body { padding: 12px 16px 6px; }
-.cards.size-xl .card[data-font="hand"] .txt { font-size: 26px; }
-.cards.size-xl .card[data-font="round"] .txt { font-size: 15.5px; }
-.cards.size-xl .card[data-font="medieval"] .txt { font-size: 17.5px; }
+.cards.size-xl .card .txt { font-size: 15.5px; }
 .cards.size-xl .card .foot { font-size: 12.5px; padding: 4px 8px 8px 16px; }
 .cards.size-xl .card .thumb { height: 150px; }
 .cards.size-xl .card .thumb.only { height: 190px; }
 .cards.size-xl .card .lockmark svg { width: 50px; height: 50px; }
 .cards.size-xl .card.group .art, .cards.size-xl .sheets { min-height: 210px; }
-.cards.size-xl .sheet[data-font="hand"] .txt { font-size: 23px; }
-.cards.size-xl .gname-l { font-size: 25px; }
-.cards.size-xl .nb-label b { font-size: 24px; }
+.cards.size-xl .card.group { --lf: 18.5px; --lc: 11.5px; --lblB: 16px; }
 .cards.size-xl .card .strip { height: 11px; }
 
 .cards.size-xxl { --cw: 320px; --ch: 340px; gap: 22px; }
 .cards.size-xxl .card .body { padding: 14px 18px 8px; }
-.cards.size-xxl .card[data-font="hand"] .txt { font-size: 29px; }
-.cards.size-xxl .card[data-font="round"] .txt { font-size: 17px; }
-.cards.size-xxl .card[data-font="medieval"] .txt { font-size: 19.5px; }
+.cards.size-xxl .card .txt { font-size: 17px; }
 .cards.size-xxl .card .foot { font-size: 13px; padding: 4px 10px 10px 18px; }
 .cards.size-xxl .card .thumb { height: 200px; }
 .cards.size-xxl .card .thumb.only { height: 250px; }
 .cards.size-xxl .card .lockmark svg { width: 60px; height: 60px; }
 .cards.size-xxl .card.group .art, .cards.size-xxl .sheets { min-height: 268px; }
-.cards.size-xxl .sheet[data-font="hand"] .txt { font-size: 26px; }
-.cards.size-xxl .gname-l { font-size: 27px; }
-.cards.size-xxl .nb-label b { font-size: 27px; }
+.cards.size-xxl .card.group { --lf: 21px; --lc: 12.5px; --lblB: 18px; }
 .cards.size-xxl .card .strip { height: 12px; }
 .sz.xl { width: 18px; height: 18px; }
 .sz.xxl { width: 21px; height: 21px; }

@@ -133,11 +133,11 @@ assert.equal(store.checklistMarks(null, 'x'), '');
     + '<div><span class="voice" contenteditable="false" data-src="stickyfile://att/r.webm"><span class="v-play"></span><span class="v-bars"><i class="h1"></i></span><span class="v-time">0:03</span></span>&nbsp;<u>after</u></div>';
   const t1 = 'Rounded bold line\nplain\n\nlit & red\nmilk\nreset colour\n0:03 after';
   assert.deepEqual(R(h1, t1), [
-    [{ t: 'Rounded ', f: 'round', k: 0.68 }, { t: 'bold', f: 'round', b: 1, k: 0.68 }, { t: ' line', f: 'round', k: 0.68 }],
+    [{ t: 'Rounded ', f: 'round' }, { t: 'bold', f: 'round', b: 1 }, { t: ' line', f: 'round' }],
     null,
     [{ t: 'lit', bg: 'rgb(255, 231, 76)' }, { t: ' & ' }, { t: 'red', c: '#D93B3B', k: 1.45 }],
     [{ t: 'milk', i: 1 }],
-    [{ t: 'reset colour', f: 'medieval', k: 0.8 }],
+    [{ t: 'reset colour', f: 'medieval' }],
     [{ t: '0:03 ' }, { t: 'after', u: 1 }],
   ], 'fonts, bold, highlight, colour, size, italic; "Normal" colour = none; a voice note line');
   assert.equal(R('<div>just words</div><div>more</div>', 'just words\nmore'), null, 'no formatting: null (the card shows plain text, as before)');
@@ -157,23 +157,25 @@ assert.equal(store.checklistMarks(null, 'x'), '');
   const cards = src('src/list/cards.js');
   const css = /const runCss = \{([\s\S]*?)\n  \};/.exec(cards)[1];
   for (const k of store.CARD_RUN_KEYS) assert.ok(new RegExp(`\\n\\s*${k}: `).test(css), `the card draws "${k}" (cards.js runCss)`);
-  const sizes = Object.fromEntries([...src('src/css/note-text.css').matchAll(/font\[size="(\d)"\] \{ font-size: ([.\d]+)em; --sm: [.\d]+; \}/g)].map((m) => [m[1], Number(m[2])]));
+  const sizes = Object.fromEntries([...src('src/css/note-text.css').matchAll(/font\[size="(\d)"\] \{ font-size: ([.\d]+)em; \}/g)].map((m) => [m[1], Number(m[2])]));
   assert.deepEqual(Object.fromEntries(Object.entries(store.CARD_SIZE).map(([k, v]) => [k, v])), sizes, 'store.js CARD_SIZE = the note\'s (note-text.css font[size])');
   const face = /const FACE = (\{[^}]*\})/.exec(src('src/note/panels.js'))[1];
-  // 1.3.12: a font on some words is resized to match the note's font, on the card just as in the note
-  const idOf = Object.fromEntries(Object.entries(new Function(`return ${face}`)()).map(([id, name]) => [name, id]));
-  const noteFaceSize = {};
-  for (const m of src('src/css/note-drawing.css').matchAll(/body\[data-font="(\w+)"\] #editor font\[face="(\w+)"\] \{ --kf: ([.\d]+); \}/g)) (noteFaceSize[m[1]] ||= {})[idOf[m[2]]] = Number(m[3]);
-  assert.ok(Object.keys(noteFaceSize).length === 3, 'found the note\'s rules');
-  assert.deepEqual(store.CARD_FACE_SIZE, noteFaceSize, 'store.js CARD_FACE_SIZE = note-drawing.css font[face] sizes');
+  // 1.4.12: a font changes no size, in the note (font-size-adjust) or on its card: the card's text matches the letters too
+  assert.ok(!('CARD_FACE_SIZE' in store), 'no per-font resize on the cards any more');
+  const cardCss = src('src/css/list-cards.css') + src('src/css/list-base.css');
+  for (const f of ['hand', 'round', 'medieval']) {
+    assert.ok(new RegExp(`\\.card\\[data-font="${f}"\\] \\.txt \\{ font: 400 12\\.5px/1\\.4 var\\(--\\w+\\); font-size-adjust: \\.484; \\}`).test(cardCss), `${f} cards: one size, the letters matched`);
+    assert.ok(new RegExp(`\\.sheet\\[data-font="${f}"\\] \\.txt \\{ font: 400 11\\.5px/1\\.35 var\\(--\\w+\\); font-size-adjust: \\.484; \\}`).test(cardCss), `${f} stack sheets: one size, the letters matched`);
+  }
+  assert.ok(!/\.cards\.size-\w+ \.(card|sheet)\[data-font/.test(src('src/css/list-groups-menus.css')), 'card sizes: one text size per card size, every font');
+  assert.deepEqual(store.FONT_PX, Object.fromEntries([...src('src/css/note-base.css').matchAll(/body\[data-size="(\w)"\] \{ --fs: ([.\d]+)px; \}/g)].map((m) => [m[1], Number(m[2])])), 'store.js FONT_PX = note-base.css --fs');
   assert.ok(/#editor h1, #editor h2, #editor h3, #editor h4 \{ font-size: 1\.2em;/.test(src('src/css/note-text.css')) && /#editor code, #editor pre \{[^}]*font-size: \.8em;/.test(src('src/css/note-text.css')), 'headings 1.2, code .8 (store.js CARD_TAG_SIZE)');
-  for (const [id, name] of Object.entries(new Function(`return ${face}`)())) assert.deepEqual(R(`<div><font face="${name}">x</font></div>`, 'x', id), [[{ t: 'x', f: id }]], `the note font ${name} on a card (in a note of that font: no resize)`);
-  // sizes as the note's CSS works them out (1.3.18): sizes multiply; the font the words are in resizes them once
-  assert.deepEqual(R('<div><font face="Nunito"><font face="Nunito">x</font></font></div>', 'x', 'hand'), [[{ t: 'x', f: 'round', k: 0.68 }]], 'a font inside the same font: once');
-  assert.deepEqual(R('<div><font face="Nunito"><font face="Caveat">x</font></font></div>', 'x', 'hand'), [[{ t: 'x', f: 'hand' }]], 'the note\'s own font inside another: the note\'s size');
-  assert.deepEqual(R('<div><font face="Nunito" size="5">x</font></div>', 'x', 'hand'), [[{ t: 'x', f: 'round', k: 0.986 }]], 'size and font on one tag: both count, 1.45 × 0.68');
-  assert.deepEqual(R('<div><font size="4"><font face="Augusta">x</font></font></div>', 'x', 'round'), [[{ t: 'x', f: 'medieval', k: 1.428 }]], 'size 4 around a resized face: 1.2 × 1.19');
-  assert.deepEqual(R('<div><font face="Augusta"><font size="4">x</font></font></div>', 'x', 'round'), [[{ t: 'x', f: 'medieval', k: 1.428 }]], 'and inside it: the same');
+  for (const [id, name] of Object.entries(new Function(`return ${face}`)())) assert.deepEqual(R(`<div><font face="${name}">x</font></div>`, 'x'), [[{ t: 'x', f: id }]], `the note font ${name} on a card: no resize`);
+  // sizes as the note's CSS works them out: sizes multiply, a font changes none (1.4.12)
+  assert.deepEqual(R('<div><font face="Nunito"><font face="Caveat">x</font></font></div>', 'x'), [[{ t: 'x', f: 'hand' }]], 'a font inside another: the innermost, no size');
+  assert.deepEqual(R('<div><font face="Nunito" size="5">x</font></div>', 'x'), [[{ t: 'x', f: 'round', k: 1.45 }]], 'size and font on one tag: the size only');
+  assert.deepEqual(R('<div><font size="4"><font face="Augusta">x</font></font></div>', 'x'), [[{ t: 'x', f: 'medieval', k: 1.2 }]], 'size 4 around a face: 1.2');
+  assert.deepEqual(R('<div><font face="Augusta"><font size="4">x</font></font></div>', 'x'), [[{ t: 'x', f: 'medieval', k: 1.2 }]], 'and inside it: the same');
 }
 
 // ---- 1.3.18: sizes that showed nothing before (on the tag of an app font other than the note's) come off once
@@ -211,7 +213,7 @@ assert.equal(store.pictureWords('<p>none</p>'), ''); assert.equal(store.pictureW
 // ---- picturePlace / lineCount: where a card shows the first picture, and how many lines a note has
 const ph = '<ul class="checklist"><li class="done">one</li><li class="done">two &amp; three</li></ul><div><img class="att-img" width="110" src="stickyfile://att/a.png"></div><div>after</div>';
 assert.deepEqual(store.picturePlace({ html: ph, text: 'one\ntwo & three\n\nafter', font: 'hand', size: 'm', bounds: { width: 400 } }),
-  { at: 2, px: 110, pct: null, d: false, fs: 23, tw: 368 }, 'two lines before it, 110 px wide, big hand text');
+  { at: 2, px: 110, pct: null, d: false, fs: 15.5, tw: 368 }, 'two lines before it, 110 px wide, the text size (one for every font, 1.4.12)');
 assert.equal(store.lineCount('one\ntwo & three\n\nafter'), 3, 'empty lines are not counted');
 assert.equal(store.picturePlace({ html: '<img class="att-img w-s" src=x><div>a</div>', text: 'a' }).pct, 45, 'Small = 45 %');
 assert.equal(store.picturePlace({ html: '<div>a</div><img class="att-drawing" src=x>', text: 'a' }).d, true, 'a drawing');

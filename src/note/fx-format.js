@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 2 of 15: the Effects pop-up, spelling, selection helpers, formatting
+// CosmoNotes note window, part 2 of 16: the Effects pop-up, spelling, selection helpers, formatting
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -213,30 +213,179 @@
     placeHandle();
   });
 
-  // ================================================================ formatting
-  function toggleChecklist() {
-    const ul = closestIn(anchor(), 'ul');
-    if (ul && ul.classList.contains('checklist')) {
-      document.execCommand('insertUnorderedList');
-    } else if (ul) {
-      ul.classList.add('checklist');
-    } else {
-      document.execCommand('insertUnorderedList');
-      const nu = closestIn(anchor(), 'ul');
-      if (nu) nu.classList.add('checklist');
+  // ================================================================ list lines (1.4.17)
+  // Bullets, Checklist, Tab and Shift+Tab change only the lines the cursor is on or that are selected, never a whole
+  // list. They move the very same line elements (a line keeps its tick, its words' look, and the editor's earlier Undo
+  // steps still fit), each as one Undo step (domStep). Before 1.4.17, Bullets in a checklist made the whole list (every
+  // level) bullets and took every tick off, outside Undo, and Checklist then made the whole list a checklist again with
+  // empty boxes (the owner lost 45 ticks that way). Tab / Shift+Tab were the editor's indent / outdent, which build a
+  // new line: a ticked line came back unticked.
+  // A line has a box when any list around it is a ul.checklist (note-text.css `ul.checklist li`), so Bullets works on
+  // the lines of the outermost checklist: a line there and everything nested in it (checkLine).
+  const isListEl = (x) => !!x && x.nodeType === 1 && (x.nodeName === 'UL' || x.nodeName === 'OL');
+  const shows = (t) => /[^\s\u200b]/.test(t);
+  function checkRoot(el) {
+    let top = null;
+    for (let x = el.parentElement; x && x !== editor; x = x.parentElement) if (x.matches('ul.checklist')) top = x;
+    return top;
+  }
+  function checkLine(li) {
+    const root = checkRoot(li);
+    let x = li;
+    while (x.parentElement !== root) x = x.parentElement;
+    return x;
+  }
+  // the part of node n inside range r
+  function partIn(n, r) {
+    const p = document.createRange();
+    p.selectNode(n);
+    if (p.compareBoundaryPoints(Range.START_TO_START, r) < 0) p.setStart(r.startContainer, r.startOffset);
+    if (p.compareBoundaryPoints(Range.END_TO_END, r) > 0) p.setEnd(r.endContainer, r.endOffset);
+    return p;
+  }
+  // the range holds some of the line's own words or pictures (not only of a list nested in it, and not just its edge)
+  function ownIn(li, r) {
+    for (const c of li.childNodes) {
+      if (isListEl(c) || !r.intersectsNode(c)) continue;
+      const f = partIn(c, r).cloneContents();
+      if (shows(f.textContent) || f.querySelector('img,br,hr,table,.voice')) return true;
     }
+    return false;
+  }
+  // the lines the cursor is on / the selection covers, and whether it also covers words outside any list
+  function selLines() {
+    const s = getSelection();
+    if (!s.rangeCount || !editor.contains(s.getRangeAt(0).commonAncestorContainer)) return { lines: [], loose: false };
+    const r = s.getRangeAt(0);
+    const one = closestIn(r.startContainer, 'li');
+    if (r.collapsed) return { lines: one ? [one] : [], loose: !one };
+    let lines = [...editor.querySelectorAll('li')].filter((li) => ownIn(li, r));
+    if (!lines.length && one) lines = [one];
+    let loose = false;
+    const top = r.commonAncestorContainer.nodeType === 1 ? r.commonAncestorContainer : r.commonAncestorContainer.parentNode;
+    const w = document.createTreeWalker(top, NodeFilter.SHOW_TEXT);
+    for (let t = w.nextNode(); t && !loose; t = w.nextNode()) if (r.intersectsNode(t) && !closestIn(t, 'li') && shows(partIn(t, r).toString())) loose = true;
+    return { lines, loose };
+  }
+  // the lines with nothing selected above them (a line takes the lines nested in it along)
+  const outerOnes = (lines) => lines.filter((li) => !lines.some((o) => o !== li && o.contains(li)));
+  // the cursor / selection stays on the same words (the elements moved, so the browser's own range was reset)
+  function keepSel(fn) {
+    const s = getSelection();
+    const r = s.rangeCount ? s.getRangeAt(0) : null;
+    const at = r && [r.startContainer, r.startOffset, r.endContainer, r.endOffset];
+    const out = fn();
+    if (at && editor.contains(at[0]) && editor.contains(at[2])) {
+      try {
+        const n = document.createRange();
+        n.setStart(at[0], at[1]);
+        n.setEnd(at[2], at[3]);
+        s.removeAllRanges();
+        s.addRange(n);
+        V.savedRange = n.cloneRange();
+      } catch { /* the place is gone */ }
+    }
+    return out;
+  }
+  const plainList = (l) => { l.classList.remove('checklist'); if (!l.classList.length) l.removeAttribute('class'); };
+  // `units` (children of `list`) go into lists of their own, changed by make(); the other lines stay in lists as `list`
+  // was. All of them changed: `list` itself is changed.
+  function splitOff(list, units, make) {
+    const runs = [];
+    let cur = null;
+    for (const c of [...list.childNodes]) {
+      const on = units.has(c) || (c.nodeName !== 'LI' && !!cur && cur.on); // spaces and old stray lists go with the line before
+      if (!cur || cur.on !== on) { cur = { on, nodes: [] }; runs.push(cur); }
+      cur.nodes.push(c);
+    }
+    if (runs.every((x) => x.on)) { make(list); return; }
+    const was = list.cloneNode(false);
+    let at = list;
+    runs.forEach((run, i) => {
+      if (i === 0) { if (run.on) make(list); return; }
+      const l = was.cloneNode(false);
+      if (run.on) make(l);
+      at.after(l);
+      l.append(...run.nodes);
+      at = l;
+    });
+  }
+  // the lines (and what is nested in them) become checklist lines (toCheck) or bullets (their ticks go: Undo brings them back)
+  function listStep(lines, toCheck) {
+    keepSel(() => domStep(() => {
+      const byList = new Map();
+      for (const li of lines) {
+        const unit = toCheck ? li : checkLine(li);
+        if (!byList.has(unit.parentElement)) byList.set(unit.parentElement, new Set());
+        byList.get(unit.parentElement).add(unit);
+      }
+      for (const [list, units] of byList) {
+        if (!toCheck) {
+          for (const u of units) {
+            for (const li of [u, ...u.querySelectorAll('li')]) if (li.nodeName === 'LI' && li.classList.contains('done')) { li.classList.remove('done'); if (!li.classList.length) li.removeAttribute('class'); }
+            for (const l of [u, ...u.querySelectorAll('ul.checklist')]) if (l.nodeName === 'UL' && l.classList.contains('checklist')) plainList(l);
+          }
+        }
+        splitOff(list, units, toCheck ? (l) => l.classList.add('checklist') : plainList);
+      }
+    }));
+  }
+  function toggleChecklist() {
+    const { lines, loose } = selLines();
+    const plain = lines.filter((li) => !checkRoot(li));
+    // every line has a box: they leave the list (the editor's own command, so its Undo)
+    if (lines.length && !plain.length && !loose) { document.execCommand('insertUnorderedList'); return; }
+    if (plain.length && !loose && plain.every((li) => li.parentElement.nodeName === 'UL')) { listStep(plain, true); return; }
+    // words outside any list, or numbered lines: the editor makes them bullets first; a list of only these lines then
+    // becomes a checklist within the editor's own step, else (it joined a list next to it) the lines become checklist lines
+    document.execCommand('insertUnorderedList');
+    const now = selLines().lines.filter((li) => !checkRoot(li) && li.parentElement.nodeName === 'UL');
+    const lists = new Set(now.map((li) => li.parentElement));
+    if ([...lists].every((l) => [...l.children].every((c) => c.nodeName !== 'LI' || now.includes(c)))) lists.forEach((l) => l.classList.add('checklist'));
+    else listStep(now, true);
   }
   function toggleBullets() {
-    const ul = closestIn(anchor(), 'ul');
-    if (ul && ul.classList.contains('checklist')) {
-      let top = ul;
-      let p = ul.parentElement;
-      while (p && p !== editor) { if (p.matches('ul.checklist')) top = p; p = p.parentElement; }
-      top.classList.remove('checklist');
-      top.querySelectorAll('ul.checklist, li.done').forEach((el) => el.classList.remove('checklist', 'done'));
-    } else {
-      document.execCommand('insertUnorderedList');
-    }
+    const boxed = selLines().lines.filter((li) => checkRoot(li));
+    if (boxed.length) listStep(boxed, false);
+    else document.execCommand('insertUnorderedList');
+  }
+  // Tab: each line goes one level in, into the list nested in the line above it (a new one if it has none). The first
+  // line of a list has no line above to go into: it stays.
+  function indentLines(lines) {
+    const todo = outerOnes(lines).filter((li) => { const p = li.previousElementSibling; return !!p && (p.nodeName === 'LI' || isListEl(p)); });
+    if (!todo.length) return;
+    keepSel(() => domStep(() => {
+      for (const li of todo) {
+        const prev = li.previousElementSibling;
+        let into = isListEl(prev) ? prev : isListEl(prev.lastElementChild) ? prev.lastElementChild : null;
+        if (!into) { into = document.createElement(li.parentElement.nodeName); prev.append(into); }
+        into.append(li);
+      }
+    }));
+  }
+  const nested = (li) => { const up = li.parentElement.parentElement; return !!up && up !== editor && (up.nodeName === 'LI' || isListEl(up)); };
+  // Shift+Tab: each line goes one level out, right after the line it was nested in; the lines after it at its level
+  // stay below it, now nested in it. → false when a line is at the top level: the caller lets the editor take those out
+  // of the list (outdent), as before.
+  function outdentLines(lines) {
+    const todo = outerOnes(lines);
+    if (!todo.length || !todo.every(nested)) return false;
+    keepSel(() => domStep(() => {
+      for (const li of [...todo].reverse()) { // from the last: the lines after one are already where they go
+        const list = li.parentElement;
+        const after = list.parentElement.nodeName === 'LI' ? list.parentElement : list; // (old notes: a list right in a list)
+        const rest = [];
+        for (let x = li.nextSibling; x; x = x.nextSibling) rest.push(x);
+        if (rest.some((x) => x.nodeType === 1)) {
+          let into = isListEl(li.lastElementChild) && li.lastElementChild.nodeName === list.nodeName ? li.lastElementChild : null;
+          if (!into) { into = list.cloneNode(false); li.append(into); }
+          into.append(...rest);
+        }
+        after.after(li);
+        if (!list.children.length && !shows(list.textContent)) list.remove();
+      }
+    }));
+    return true;
   }
 
   function runCmd(cmd) {
@@ -271,5 +420,5 @@
   });
 
   Object.assign(K, { paintFxPop, setFxPlaying, setProp, applySpell, applyTheme, anchor, closestIn, saveSel,
-    caretAtEnd, restoreSel, insertHTML, insertNodes, runCmd });
+    caretAtEnd, restoreSel, insertHTML, insertNodes, runCmd, selLines, indentLines, outdentLines });
 })();

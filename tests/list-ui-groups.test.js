@@ -31,12 +31,44 @@ const assert = require('assert');
   assert.ok(!(await ui.visible('#groupHead')), 'no group header at the top');
   const home = await page.$eval(ui.groupKey(HOME), (c) => ({ cls: c.className, t: c.title }));
   assert.ok(/look-folder/.test(home.cls) && /Home · 3 notes · 1 group inside/.test(home.t), 'the group card: its look, and what it holds');
+  // the owner's pick (1.4.14): every look wears the same label (name + number of notes) in the same spot, nothing under
+  // the card; its ink is fixed (the label is always cream), whatever the theme
+  for (const id of [HOME, SAFE]) {
+    assert.equal(await ui.count(`${ui.groupKey(id)} .glabel`), 1, 'one label on each look');
+    assert.equal(await ui.text(`${ui.groupKey(id)} .glabel small`), id === HOME ? '3 notes' : '1 note', 'it says how many notes');
+  }
+  assert.equal(await ui.text(`${ui.groupKey(HOME)} .glabel b`), 'Home', 'with the name');
+  assert.equal(await ui.count(`${ui.groupKey(HOME)} .f-front .glabel`), 1, 'the folder’s label rides on its front');
+  assert.equal(await ui.count('#cards .gfoot, #cards .f-count, #cards .nb-label'), 0, 'no name or count anywhere else');
+  const theme = await page.evaluate(() => { const t = document.body.dataset.theme; document.body.dataset.theme = 'night'; return t; });
+  assert.equal(await page.$eval(`${ui.groupKey(HOME)} .glabel b`, (b) => getComputedStyle(b).color), 'rgb(59, 50, 38)', 'dark ink on a dark theme too');
+  await page.evaluate((t) => { document.body.dataset.theme = t; }, theme);
 
   // ---- open a group, then its sub-group; crumbs; back up
   await ui.click(ui.groupKey(HOME));
   assert.ok(await ui.visible('#groupHead'), 'the group header shows');
   assert.equal(await page.inputValue('#groupName'), 'Home');
   assert.deepEqual((await shown()).sort(), [A, B, KITCHEN].sort(), 'inside: its notes and its sub-group');
+  // 1.4.12 (the owner's wish): the group's bar (Back, name, settings) stays in sight under the search row while the cards scroll
+  {
+    const vp = page.viewportSize();
+    await page.setViewportSize({ width: vp.width, height: 300 });
+    await page.evaluate(() => { const v = document.getElementById('viewNotes'); v.scrollTop = v.scrollHeight; });
+    await page.waitForTimeout(60); // the scroll event comes with the next frame
+    await page.waitForFunction(() => !document.getElementById('viewNotes').classList.contains('scrolling')); // no mouse while it scrolls
+    const st = await page.evaluate(() => {
+      const v = document.getElementById('viewNotes'); const b = document.getElementById('btnBack').getBoundingClientRect();
+      const row = v.querySelector('.searchrow').getBoundingClientRect(); const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+      return { scrolled: v.scrollTop > 0, stuck: v.classList.contains('gstuck'), under: Math.abs(document.getElementById('gStick').getBoundingClientRect().top - row.bottom) < 1.5, back: !!(hit && hit.closest('#btnBack')) };
+    });
+    assert.deepEqual(st, { scrolled: true, stuck: true, under: true, back: true }, 'scrolled down: the bar sticks under the search row, Back still clickable: ' + JSON.stringify(st));
+    await ui.click('#btnGroupSettings');
+    assert.ok(await page.evaluate(() => document.getElementById('viewNotes').scrollTop === 0 && !document.getElementById('groupPanel').hidden), 'its settings open where they are: at the top');
+    await ui.click('#btnGroupSettings');
+    await page.waitForTimeout(150);
+    assert.ok(!(await page.evaluate(() => document.getElementById('viewNotes').classList.contains('gstuck'))), 'at the top: not stuck');
+    await page.setViewportSize(vp);
+  }
   await ui.click(ui.groupKey(KITCHEN));
   assert.deepEqual(await crumbs(), ['All notes', 'Home', 'Kitchen'], 'crumbs: the way down');
   assert.deepEqual(await shown(), [C]);
@@ -72,6 +104,19 @@ const assert = require('assert');
   let g = (await ui.get()).groups.find((x) => x.id === HOME);
   assert.equal(g.style, 'envelope', 'its look is saved');
   assert.notEqual(g.color, 'lilac', 'its colour is saved');
+  // 1.4.15: two parts, This group (its card) and Notes inside (with how many)
+  assert.deepEqual(await page.$$eval('#groupPanel .gsech', (x) => x.map((e) => e.firstChild.nextSibling.textContent)), ['This group', 'Notes inside']);
+  assert.ok(await page.$eval('#groupPanel .gself', (x) => !!x.querySelector('#gStyles') && !!x.querySelector('#gColors') && !!x.querySelector('#gNameFont') && !x.querySelector('#gFont')), 'the card’s settings in This group');
+  assert.ok(await page.$eval('#groupPanel .gnotes', (x) => !!x.querySelector('#gNoteColors') && !!x.querySelector('#gFont') && !!x.querySelector('#gNoteDesign')), 'the notes’ in Notes inside');
+  // the name's own font (1.4.14): on the card's label and in the group's bar; one size for every font
+  assert.equal(g.titleFont, 'hand', 'Handwritten until changed');
+  await ui.click('#gNameFont button[data-font="medieval"]');
+  g = (await ui.get()).groups.find((x) => x.id === HOME);
+  assert.equal(g.titleFont, 'medieval', 'the name font is saved');
+  assert.ok(await page.$eval('#gNameFont button[data-font="medieval"]', (b) => b.classList.contains('on')), 'and shown as picked');
+  assert.equal(await page.$eval('#groupName', (i) => i.dataset.font), 'medieval', 'the group’s bar uses it');
+  await ui.click('#gNameFont button[data-font="round"]');
+  assert.equal(await page.$eval('#groupName', (i) => getComputedStyle(i).fontSize), '20px', 'the same size in every font');
   // every note's paper colour: with "notes in its groups too" ticked, the sub-group's notes change as well
   if (!(await page.isChecked('#gInner'))) await ui.check('#gInner');
   await ui.click('#gNoteColors .sw[data-color="pink"]');
@@ -83,7 +128,15 @@ const assert = require('assert');
   d = await ui.get();
   assert.equal(d.notes.find((n) => n.id === C).color, 'pink', 'unticked: the sub-group’s notes keep theirs');
   assert.equal(d.notes.find((n) => n.id === A).color, 'mint');
+  // Notes inside → Note design…: the notes' pop-up, for the notes in this part (the box unticked: this group's own)
+  const inside = d.notes.filter((n) => n.groupId === HOME && !n.deletedAt).length;
+  assert.equal(await ui.text('#gNotesCount'), `${inside} notes`, 'Notes inside says how many');
+  await ui.click('#gNoteDesign');
+  assert.ok(await ui.visible('#editSheet'), 'Note design… opens the notes’ pop-up');
+  assert.equal(await ui.text('#editBox h3'), `Note design · ${inside} notes`);
   await ui.key('Escape');
+  assert.ok(!(await ui.visible('#editSheet')));
+  if (await ui.visible('#groupPanel')) await ui.key('Escape');
   assert.ok(!(await ui.visible('#groupPanel')), 'Escape closes the panel');
   await ui.click('#btnBack');
 
@@ -150,14 +203,21 @@ const assert = require('assert');
   assert.ok(!(await ui.get()).groups.some((x) => x.id === HOME), 'Ctrl+Y: ungrouped again');
   // the look of several picked groups at once
   await ui.click(ui.groupKey(KITCHEN), { ctrlKey: true }); await ui.click(ui.groupKey(pair), { ctrlKey: true });
-  assert.ok(await ui.visible('#bLook'), 'groups picked: a Look button');
+  assert.ok(await ui.visible('#bLook'), 'groups picked: a Group look button');
+  // 1.4.15 (the owner's wish): the two buttons say what they change: Group look = the groups' cards, Note design = notes
+  assert.equal((await ui.text('#bLook')).trim(), 'Group look');
+  assert.equal((await ui.text('#bEdit')).trim(), 'Note design');
+  assert.ok(/notes inside the selected groups/.test(await page.getAttribute('#bEdit', 'title')), 'Note design says it is for the notes inside');
   await ui.click('#bLook');
   assert.ok(await ui.visible('#lookPop'), 'it opens the looks');
+  assert.equal(await ui.text('#lookHead'), '2 groups · their cards, not the notes inside', 'headed with what it changes');
   await ui.click('#lookStyles button[data-style="notebook"]');
   await ui.click('#lookColors [data-gc="mint"]');
+  await ui.click('#lookFonts button[data-font="round"]');
   d = await ui.get();
-  for (const id of [KITCHEN, pair]) { const gg = d.groups.find((x) => x.id === id); assert.equal(gg.style, 'notebook', 'both got the look'); assert.equal(gg.color, 'mint', 'and the colour'); }
+  for (const id of [KITCHEN, pair]) { const gg = d.groups.find((x) => x.id === id); assert.equal(gg.style, 'notebook', 'both got the look'); assert.equal(gg.color, 'mint', 'and the colour'); assert.equal(gg.titleFont, 'round', 'and the name font'); }
   assert.ok(await page.$eval('#lookStyles button[data-style="notebook"]', (b) => b.classList.contains('on')), 'the shared look is lit');
+  assert.ok(await page.$eval('#lookFonts button[data-font="round"]', (b) => b.classList.contains('on')), 'the shared name font is lit');
   await ui.key('Escape');
   assert.ok(!(await ui.visible('#lookPop')), 'Escape closes the looks');
   await ui.key('Escape');

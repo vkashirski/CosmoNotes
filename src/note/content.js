@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 4 of 15: links, picture descriptions, tables, photos (paste / drop), clicks inside the note
+// CosmoNotes note window, part 4 of 16: links, picture descriptions, tables, photos (paste / drop), clicks inside the note
 // (src/note.js until 1.1.44; the parts load in order from note.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_NOTE_KIT;
@@ -10,6 +10,7 @@
     toast = K.later('toast');
   // ================================================================ links
   let editingLink = null;
+  let linkPic = null; // 1.4.11: a picture the link goes on (its <a> holds only it)
   function normUrl(u) {
     u = u.trim();
     if (!u) return '';
@@ -17,26 +18,48 @@
     if (/^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(u)) return 'mailto:' + u;
     return 'https://' + u.replace(/^\/+/, '');
   }
-  function openLinkForm(existing = null) {
-    editingLink = existing;
+  // 1.4.11: a link on a picture: <a href><img></a> (the usual HTML, so it stays a link when copied out). picLink(img) = that
+  // <a>, or null. A link that holds a picture keeps what is in it: the form has no "Text to show" then.
+  const picLink = (img) => { const a = img && img.parentElement; return a && a.matches('a[href]') && a.childNodes.length === 1 ? a : null; };
+  function openLinkForm(existing = null, pic = null) {
+    editingLink = existing || picLink(pic);
+    linkPic = pic;
     saveSel();
     const sel = getSelection().toString();
-    $('#linkTitle').textContent = existing ? 'Edit link' : 'Add a link';
-    $('#linkText').value = existing ? existing.textContent : sel;
-    $('#linkUrl').value = existing ? existing.getAttribute('href') : '';
+    const holdsPic = !!(pic || (existing && existing.querySelector('img')));
+    $('#linkTitle').textContent = pic ? (editingLink ? 'Picture link' : 'Link this picture') : existing ? 'Edit link' : 'Add a link';
+    $('#linkTextRow').hidden = holdsPic;
+    $('#linkText').value = holdsPic ? '' : existing ? existing.textContent : sel;
+    $('#linkUrl').value = editingLink ? editingLink.getAttribute('href') : '';
     openPop('#linkPop');
-    setTimeout(() => ($('#linkText').value ? $('#linkUrl') : $('#linkText')).focus(), 20);
+    setTimeout(() => (holdsPic || $('#linkText').value ? $('#linkUrl') : $('#linkText')).focus(), 20);
   }
-  $('#linkCancel').addEventListener('click', () => { closePop('#linkPop'); restoreSel(); });
+  // right-click a linked picture → Remove link: the picture stays where it was
+  function unlinkPic(img) {
+    const a = picLink(img);
+    if (!a) return;
+    domStep(() => a.replaceWith(img));
+    changed();
+  }
+  $('#linkCancel').addEventListener('click', () => { closePop('#linkPop'); linkPic = null; restoreSel(); });
   $('#linkPop').addEventListener('submit', (e) => {
     e.preventDefault();
     const url = normUrl($('#linkUrl').value);
     if (!url) { $('#linkUrl').focus(); return; }
     const text = $('#linkText').value.trim() || $('#linkUrl').value.trim();
     closePop('#linkPop');
+    const pic = linkPic;
+    linkPic = null;
     if (editingLink && editor.contains(editingLink)) {
-      domStep(() => { editingLink.setAttribute('href', url); editingLink.textContent = text; }); // one Undo step (1.3.32)
+      const a = editingLink;
+      const keep = !!a.querySelector('img'); // its picture stays (1.4.11)
+      domStep(() => { a.setAttribute('href', url); if (!keep) a.textContent = text; }); // one Undo step (1.3.32)
       changed();
+    } else if (pic) {
+      if (editor.contains(pic)) {
+        domStep(() => { const a = document.createElement('a'); a.setAttribute('href', url); pic.replaceWith(a); a.append(pic); });
+        changed();
+      }
     } else {
       restoreSel();
       document.execCommand('insertHTML', false, `<a href="${esc(url)}">${esc(text)}</a>&nbsp;`);
@@ -421,6 +444,7 @@
   const EDGE = 7;
   let edgeDown = false;
   function caretAt(node, after) {
+    node = picLink(node) || node; // beside a linked picture, not inside its link (or the words typed there join the link)
     const r = document.createRange();
     if (after) r.setStartAfter(node); else r.setStartBefore(node);
     r.collapse(true);
@@ -445,6 +469,8 @@
     if (voice) { e.preventDefault(); togglePlay(voice); return; }
     const img = e.target.closest('img');
     if (img && edgeDown) return; // clicked the photo's left edge: the caret is already in front of it
+    // 1.4.11: a linked picture opens its link, like a linked word (once for a double-click); Shift+click picks it
+    if (img && picLink(img) && !e.shiftKey) { e.preventDefault(); if (e.detail < 2) api.openExternal(picLink(img).getAttribute('href')); return; }
     if (img) { selectImage(img); return; }
     const a = e.target.closest('a[href]');
     if (a && getSelection().isCollapsed && !e.shiftKey) {
@@ -454,7 +480,7 @@
   });
   editor.addEventListener('dblclick', (e) => {
     const img = e.target.closest('img');
-    if (!img || edgeDown) return;
+    if (!img || edgeDown || (picLink(img) && !e.shiftKey)) return; // a linked picture: the click opened its link
     if (img.classList.contains('att-drawing')) openDraw(img);
     else openPhoto(img);
   });
@@ -541,5 +567,5 @@
     editor.querySelectorAll('img.caret-near').forEach((i) => { if (overImg(i)) i.classList.remove('caret-near'); });
   });
 
-  Object.assign(K, { openLinkForm, openDesc, autoLink, insertTable, tableOp, moveCell, copyPhoto, openPhoto, dropEmptyLines, joinLists, listGroup });
+  Object.assign(K, { openLinkForm, picLink, unlinkPic, openDesc, autoLink, insertTable, tableOp, moveCell, copyPhoto, openPhoto, dropEmptyLines, joinLists, listGroup });
 })();

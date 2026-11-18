@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes note window, part 12 of 15 (1.4.1): reminders. Add → Reminder opens the panel (src/remind-ui.js, the same as
+// CosmoNotes note window, part 12 of 16 (1.4.1): reminders. Add → Reminder opens the panel (src/remind-ui.js, the same as
 // the notes list's); a reminder that goes off shows a strip under the top bar with its message (or "Missed at …") and
 // Snooze / Done, the note glows until then, wobbles once and plays its sound (main sends remind:ring; one that went off
 // while this window was loading comes in note:get as `ring`). What rings is read from the note (V.note.reminders), so the

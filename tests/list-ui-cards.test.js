@@ -8,7 +8,7 @@ const assert = require('assert');
   const ui = await require('./helpers/list-ui')(async (s) => {
     await s.password();
     A = await s.note({ title: 'Shopping', html: '<ul class="checklist"><li class="done">milk</li><li>bread</li></ul>', color: 'pink', favorite: true, titleFont: 'medieval' });
-    B = await s.note({ html: '<div><font face="Augusta">Call the plumber</font></div><div><b>tomorrow</b> <font color="#D93B3B">early</font></div>' }); // 1.3.11: formatting
+    B = await s.note({ font: 'round', html: '<div><font face="Augusta">Call the plumber</font></div><div><b>tomorrow</b> <font color="#D93B3B">early</font></div>' }); // 1.3.11: formatting
     C = await s.note({ title: 'Secret', html: '<div>my diary text</div>' });
     await s.lock(C);
     D = await s.note({ title: 'Bike', html: '<div>x <img class="att-img" src="stickyfile://x/a.png" alt="A red bike"></div>' });
@@ -45,19 +45,22 @@ const assert = require('assert');
   assert.ok(Number(runs[1][2]) >= 700, 'bold'); assert.equal(runs[2][3], 'rgb(217, 59, 59)', 'its colour');
   assert.equal(await ui.text(`${ui.noteKey(B)} .ln:nth-child(2)`), 'tomorrow early', 'the words are the same');
 
-  // 1.3.12: a font on some words is resized to match the note's font, as the note does (Medieval in Handwritten: 0.8×)
+  // 1.4.12: a font changes no size, as in the note: words in another font are the card's size, the letters matched
+  // (font-size-adjust); every note font has the same card text size
   const px = (sel) => page.$eval(sel, (el) => parseFloat(getComputedStyle(el).fontSize));
   const medPx = await px(`${ui.noteKey(B)} .ln:nth-child(1) .run`); const basePx = await px(`${ui.noteKey(B)} .ln:nth-child(2)`);
-  assert.ok(Math.abs(medPx / basePx - 0.8) < 0.01, `Medieval words ${medPx}px in a ${basePx}px Handwritten card`);
+  assert.ok(Math.abs(medPx - basePx) < 0.01, `Medieval words ${medPx}px in a ${basePx}px Rounded card`);
+  assert.equal(await page.$eval(`${ui.noteKey(B)} .txt`, (el) => getComputedStyle(el).fontSizeAdjust), '0.484', 'the letters matched to Rounded\'s');
+  assert.equal(await px(`${ui.noteKey(A)} .txt`), basePx, 'a Rounded and a Handwritten card: one text size');
 
   // ---- a card's right-click menu: favourites first, then Edit design…; no "Open on desktop" (1.1.23)
   await ui.rclick(ui.noteKey(B));
   const menu = await ui.menuLabels(); await ui.key('Escape');
   assert.ok(!menu.includes('Open on desktop') && !menu.includes('Bring to front'), `no Open on desktop (${menu.join(' | ')})`);
-  assert.ok(menu.indexOf('Add to favourites') >= 0 && menu.indexOf('Add to favourites') < menu.indexOf('Edit design…') && menu.indexOf('Edit design…') < menu.indexOf('Duplicate note'), `menu order: ${menu.join(' | ')}`);
+  assert.ok(menu.indexOf('Add to favourites') >= 0 && menu.indexOf('Add to favourites') < menu.indexOf('Note design…') && menu.indexOf('Note design…') < menu.indexOf('Duplicate note'), `menu order: ${menu.join(' | ')}`);
 
   // ---- Edit design's Title font (1.3.11): the one saved is lit, the preview's title uses it; a pick saves titleFont
-  await ui.menu(ui.noteKey(A), 'Edit design…');
+  await ui.menu(ui.noteKey(A), 'Note design…');
   assert.ok(await ui.visible('#editTFonts [data-tfont="medieval"].on') && !(await ui.visible('#editFontRow')), 'one note: Title font, no Font row');
   assert.equal(await page.getAttribute('#editTitle', 'data-tfont'), 'medieval');
   assert.equal(await page.getAttribute('#editCover', 'data-tfont'), 'medieval', 'Title while locked in it too');
@@ -133,19 +136,22 @@ const assert = require('assert');
   await ui.click(`${ui.noteKey(B)} button[title^="Close this note"]`);
   const b = (await ui.get()).notes.find((n) => n.id === B);
   assert.ok(!b.open && !b.deletedAt, 'closed, still there');
-  // ---- a background refresh (a note was edited) builds only that note's card again (1.2.3: speed); the other cards
-  // stay the same elements, keep their effect, and the new card is measured and gets its effect too
+  // ---- a background refresh (a note was edited) changes only that note's card (1.2.3: speed); the other cards stay as
+  // they were. 1.4.16: the edited card stays too (a new one made it blink): it is filled again, measured again, and keeps
+  // its effect (the same canvas: the snow doesn't start over)
   await ui.H['settings:set']({}, { fxEffect: 'snow' }); await ui.settle(200);
   await ui.H['list:open-note']({}, B); await ui.settle();
   const keepA = await page.$(ui.noteKey(A)); const oldB = await page.$(ui.noteKey(B));
+  await page.$eval(`${ui.noteKey(B)} > canvas.fxc`, (cv) => { window.__fxB = cv; });
   const win = ui.E.__all.find((x) => x.noteId === B && !x.destroyed);
   await ui.H['note:update']({ sender: win.webContents }, { html: '<div>Call the plumber</div><div>on Friday</div>', text: 'Call the plumber\non Friday' });
   await ui.settle(200);
   assert.ok(await keepA.evaluate((el) => el.isConnected), 'an unchanged card is kept as it was');
-  assert.ok(!(await oldB.evaluate((el) => el.isConnected)), 'the edited note’s card is built again');
+  assert.ok(await oldB.evaluate((el) => el.isConnected), 'the edited note’s card stays');
   assert.ok(/Friday/.test(await cardText(ui.noteKey(B))), 'showing the new words');
-  assert.equal(await page.$eval(`${ui.noteKey(B)} > .body`, (b) => b.dataset.m), '1', 'the new card is measured (fade at the bottom)');
-  assert.ok(await ui.count(`${ui.noteKey(B)} > canvas.fxc`) && await keepA.evaluate((el) => !!el.querySelector(':scope > canvas.fxc')), 'both have their effect');
+  assert.equal(await page.$eval(`${ui.noteKey(B)} > .body`, (b) => b.dataset.m), '1', 'its new words are measured (fade at the bottom)');
+  assert.ok(await page.$eval(`${ui.noteKey(B)} > canvas.fxc`, (cv) => cv === window.__fxB && cv.parentElement.firstElementChild === cv), 'its effect carries on (the same canvas, still first)');
+  assert.ok(await keepA.evaluate((el) => !!el.querySelector(':scope > canvas.fxc')), 'the other card keeps its effect');
   await ui.H['settings:set']({}, { fxEffect: 'none' }); await ui.settle(200);
   assert.equal(await ui.count('#cards canvas.fxc'), 0, 'an effect setting changed: every card is looked at again');
   await ui.H['list:close-note']({}, B); await ui.settle();
@@ -196,6 +202,28 @@ const assert = require('assert');
     await ui.H['note:update']({ sender: wA.webContents }, { pinned: false });
     await ui.settle();
     assert.equal(await ui.count(`${ui.noteKey(A)} .over`), 0, 'unpinned: gone');
+  }
+  // 1.4.16: a note that changes keeps its card (a new card swapped in made it blink), and only its new letters write
+  // themselves in (Ink: .ink, one after the other)
+  {
+    const wA = ui.E.__all.find((x) => x.noteId === A && !x.destroyed);
+    const inked = () => page.$$eval(`${ui.noteKey(A)} .ink`, (x) => x.map((s) => s.textContent).join(''));
+    const write = async (lis) => { await ui.H['note:update']({ sender: wA.webContents }, { html: `<ul class="checklist">${lis.map((t, i) => `<li${i ? '' : ' class="done"'}>${t}</li>`).join('')}</ul>`, text: lis.join('\n') }); await ui.settle(); };
+    await page.$eval(ui.noteKey(A), (c) => { window.__card = c; });
+    await write(['milk', 'bread', 'eggs']);
+    assert.ok(await page.$eval(ui.noteKey(A), (c) => c === window.__card), 'the same card, filled again');
+    assert.equal(await inked(), 'eggs', 'only the new line writes itself in');
+    assert.equal(await page.$$eval(`${ui.noteKey(A)} .ink`, (x) => x.map((s) => parseInt(s.style.animationDelay, 10)).join()), '0,22,44,66', 'letter after letter');
+    await write(['milk', 'bread', 'eggs x6']);
+    assert.equal(await inked(), ' x6', 'a line typed on: only its new letters');
+    await write(['milk', 'butter', 'bread', 'eggs x6']);
+    assert.equal(await inked(), 'butter', 'a line put in between: the lines after it don\'t write themselves in again');
+    await write(['milk', 'bread', 'eggs x6']);
+    assert.equal(await inked(), '', 'a line taken out: nothing writes itself in');
+    assert.ok(await page.$eval(ui.noteKey(A), (c) => c === window.__card && c.classList.contains('is-fav') && /eggs x6/.test(c.innerText)), 'still the same card, still a favourite');
+    await ui.rclick(ui.noteKey(A));
+    assert.ok((await ui.menuLabels()).includes('Remove from favourites'), 'its menu is the note\'s as it is now');
+    await ui.key('Escape');
   }
   // Ctrl+N makes a new note
   const before = (await ui.get()).notes.length;

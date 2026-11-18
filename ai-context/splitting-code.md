@@ -130,7 +130,7 @@ The same way as list.js, with `tools/split/plan-note.json` (`node split-page.js 
    already given (here `rec`, `voiceChip`, `keepClip`), and every later part's "part N of 11" header moves up.
    1.3.19 added a twelfth, `checklists`, after editing (it takes `decorate`, `textUndo` / `textRedo`, `setProp`).
    1.4.1 added a thirteenth, `remind` (reminders), 1.4.5 a fourteenth, `pin-apps` (the pin's list), and 1.4.10 a fifteenth,
-   `tags` (the ⋯ menu's Tags row), all **before** eraser-start, not after it: **eraser-start must stay last.**
+   `tags` (the ⋯ menu's Tags row), and 1.4.11 a sixteenth, `top-bar` (a small note's top bar), all **before** eraser-start, not after it: **eraser-start must stay last.**
    Its start-up (`init`) awaits `api.getNote()`, and the browser runs that promise's continuation between two `<script>`s,
    so a part loaded after eraser-start isn't there yet when `init` goes on (the first try put `remind` last: "K[n] is not a
    function"). A part init uses goes before it, and init takes its names in its `const {…} = K;` line.

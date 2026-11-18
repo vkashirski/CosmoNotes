@@ -21,13 +21,16 @@
 //   Undo step in its place among the typing, and so is a checklist tick (1.3.31); Redo goes back the same way.
 //   Every change the note makes itself (photo menu and size handle, voice note and link menus, tables, a typed web
 //   address becoming a link) is one Undo step with Redo (1.3.32).
+// - a link on a picture (1.4.11): right-click → Add link (no "Text to show"), its menu, a click opens it, Shift+click picks
+//   it, the caret beside it stays out of the link, each change one Undo step.
 // - reminders (1.4.1): the strip of one that rings (Snooze, Done, a locked note's), Add → Reminder and its panel.
 // - + and Ctrl+N (1.4.6): every press asks for a note; a ring spins around + until they have all shown.
 // - checklist boxes (1.3.15): one size for the same size of words, whatever their font; an empty line's box is the size its
 //   words will be (also after Backspace emptied it); copying a whole line doesn't bring an empty line along, and an empty
 //   line with nothing in it (no height, its box over the next one) is dropped when the note opens.
 // - text size and font (1.3.17, the CSS since 1.3.18): Small / Normal / Big work on a whole line of words in another font,
-//   a font picked for Big words keeps them big, a size and a font on one tag both count, a font inside a font resizes once.
+//   a size and a font on one tag both count. 1.4.12: a font never changes a size: words in another font, a font picked
+//   for Big words and a whole note in another font keep their size, their line height and their box.
 // - checklists (1.3.19): a click on a box ticks it; dragging a box moves its line (a bar shows where; Esc: nothing moves; out of
 //   a nested list, which goes when empty); only the box itself ticks (1.3.38); ticked lines to the bottom (unticking moves nothing, 1.3.20); drag off = the press ticks; boxes of one
 //   size (still beside their words); ⋯ → Checklists… and its pop-up (1.3.21: set to what Settings says = follow Settings,
@@ -513,6 +516,7 @@ const look = (page) => page.evaluate(() => {
   const CHIP = '<p>x<span class="voice" contenteditable="false" data-src="stickyfile://att/r.webm" data-dur="3"><span class="v-play"></span><span class="v-bars"></span><span class="v-time">0:03</span></span>&nbsp;y</p>';
   const LINK = '<p>go <a href="https://x.com">here</a> now</p>';
   const TAB = '<table><tbody><tr><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr></tbody></table><p>z</p>';
+  const LPIC = '<p>a<a href="https://cats.com"><img class="att-img" src="stickyfile://att/p.png" width="200" height="100"></a>b</p>';
   const own = [
     ['Remove photo', PIC, (pg) => ctxRun(pg, '#editor img', 'Remove photo')],
     ['Small', PIC, (pg) => ctxRun(pg, '#editor img', 'Small')],
@@ -529,6 +533,11 @@ const look = (page) => page.evaluate(() => {
     ['Edit link', LINK, async (pg) => { await ctxRun(pg, '#editor a', 'Edit link'); await pg.fill('#linkText', 'there'); await pg.press('#linkUrl', 'Enter'); await pg.waitForTimeout(50); }],
     ...['Add row below', 'Add column right', 'Delete row', 'Delete column', 'Delete table'].map((l) => [l, TAB, (pg) => ctxRun(pg, '#editor td', l)]),
     ['Tab in the last cell', TAB, async (pg) => { await pg.click('#editor td >> nth=3'); await pg.keyboard.press('End'); await pg.keyboard.press('Tab'); await pg.waitForTimeout(50); }],
+    // 1.4.11: a link on a picture
+    ['a picture\'s Add link', PIC, async (pg) => { await ctxRun(pg, '#editor img', 'Add link'); await pg.fill('#linkUrl', 'cats.com'); await pg.press('#linkUrl', 'Enter'); await pg.waitForTimeout(50); }],
+    ['a picture\'s Edit link', LPIC, async (pg) => { await ctxRun(pg, '#editor img', 'Edit link'); await pg.fill('#linkUrl', 'dogs.com'); await pg.press('#linkUrl', 'Enter'); await pg.waitForTimeout(50); }],
+    ['a picture\'s Remove link', LPIC, (pg) => ctxRun(pg, '#editor img', 'Remove link')],
+    ['Remove photo with a link', LPIC, (pg) => ctxRun(pg, '#editor img', 'Remove photo')],
   ];
   for (const [name, html, act] of own) {
     page = await nu.open({ html }, 420, 360);
@@ -541,6 +550,38 @@ const look = (page) => page.evaluate(() => {
     assert.equal(await plain(page), before, name + ': Undo');
     await page.keyboard.press('Control+y'); await page.waitForTimeout(80);
     assert.equal(await plain(page), mid, name + ': Redo');
+  }
+  // ---- 1.4.11: a link on a picture: <a href><img></a>, the form without "Text to show"; a click opens it (once for a
+  // double-click), Shift+click picks the picture; the caret beside it is outside the link; Remove photo takes the link too
+  {
+    const catchOpen = () => { const old = window.sticky; window.__opened = []; window.sticky = new Proxy({}, { get: (t, k) => (k === 'openExternal' ? (u) => { window.__opened.push(u); return Promise.resolve(); } : old[k]) }); };
+    page = await nu.open({ html: PIC }, 420, 360, catchOpen);
+    await ctxRun(page, '#editor img', 'Add link');
+    assert.ok(await page.isVisible('#linkPop') && !(await page.isVisible('#linkText')), 'the link form, without "Text to show"');
+    assert.equal(await page.textContent('#linkTitle'), 'Link this picture');
+    await page.fill('#linkUrl', 'cats.com'); await page.press('#linkUrl', 'Enter'); await page.waitForTimeout(60);
+    assert.equal(await plain(page), '<p>a<a href="https://cats.com"><img class="att-img" height="100" src="stickyfile://att/p.png" width="200"></a>b</p>', 'the picture is in a link');
+    await page.waitForTimeout(450);
+    assert.ok((await page.updates()).some((u) => typeof u.html === 'string' && u.html.includes('<a href="https://cats.com"><img')), 'saved');
+    await page.locator('#editor img').dispatchEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 });
+    assert.deepEqual(await page.$$eval('#ctx button', (b) => b.map((x) => x.textContent).filter((t) => /link/i.test(t))), ['Open link', 'Edit link…', 'Copy link address', 'Remove link'], 'its right-click menu');
+    await page.keyboard.press('Escape'); await page.mouse.click(5, 300);
+    await page.click('#editor img');
+    await page.waitForTimeout(60);
+    assert.deepEqual(await page.evaluate(() => window.__opened), ['https://cats.com'], 'a click opens the link');
+    assert.ok(!(await page.evaluate(() => !!document.querySelector('#editor img.sel-img'))), 'and doesn\'t pick the picture');
+    await page.dblclick('#editor img');
+    await page.waitForTimeout(60);
+    assert.equal((await page.evaluate(() => window.__opened)).length, 2, 'a double-click opens it once (no photo viewer)');
+    await page.click('#editor img', { modifiers: ['Shift'] });
+    await page.waitForTimeout(60);
+    assert.ok(await page.evaluate(() => !!document.querySelector('#editor img.sel-img')), 'Shift+click picks the picture');
+    // the caret beside it (a click on the picture's left edge) is before the link: typing stays out of it
+    const r = await page.locator('#editor img').boundingBox();
+    await page.mouse.click(r.x + 3, r.y + r.height / 2);
+    await page.keyboard.type('Z'); await page.waitForTimeout(60);
+    assert.match(await plain(page), /^<p>aZ<a href="https:\/\/cats\.com"><img/, 'typed before the link, not in it');
+    await page.close();
   }
   // a typed web address becomes a link: Undo takes the typing after it, the link, then the address, each as it was
   page = await nu.open({ html: '<p>see</p>' });
@@ -555,7 +596,7 @@ const look = (page) => page.evaluate(() => {
 
   // checklist boxes: the same size of words gets the same box, in any font; an empty line's box is its words' size
   const boxes = (pg) => pg.evaluate(() => [...document.querySelectorAll('#editor ul.checklist li')].map((li) => ({
-    w: Math.round(parseFloat(getComputedStyle(li, '::before').width) * 2) / 2, h: Math.round(li.getBoundingClientRect().height),
+    w: Math.round(parseFloat(getComputedStyle(li, '::before').width) * 2) / 2, h: Math.round(li.getBoundingClientRect().height), t: getComputedStyle(li, '::before').top,
     y: Math.round((li.getBoundingClientRect().top + parseFloat(getComputedStyle(li, '::before').top)) * 10) / 10 })));
   const MIX = '<ul class="checklist"><li>own font</li><li><br></li><li><font face="Caveat">hand</font></li><li><font face="Nunito">round</font></li>'
     + '<li><font face="Augusta">medieval</font></li><li><font face="Nunito" size="5">big</font></li><li><font face="Nunito" size="5"><br></font></li></ul>';
@@ -564,6 +605,8 @@ const look = (page) => page.evaluate(() => {
     await page.waitForTimeout(120);
     const b = await boxes(page);
     assert.ok(b.slice(1, 5).every((x) => x.w === b[0].w), `${font}: one box size for every font and the empty line: ${JSON.stringify(b)}`);
+    // 1.4.13 (the owner's wish): static boxes: words in any font, the same box at the same place on its line
+    assert.ok(b.slice(1, 5).every((x) => x.t === b[0].t && x.h === b[0].h), `${font}: every font: the same place, the same line: ${JSON.stringify(b)}`);
     assert.equal(b[6].w, b[5].w, `${font}: an empty line's box is the size its words will be`);
     // Backspace empties the big line: its box stays the size the next words will be typed at
     await page.evaluate(() => { const t = [...document.querySelectorAll('#editor li')][5].querySelector('font').firstChild; const r = document.createRange(); r.setStart(t, 3); r.collapse(true); getSelection().removeAllRanges(); getSelection().addRange(r); document.getElementById('editor').focus(); });
@@ -628,11 +671,11 @@ const look = (page) => page.evaluate(() => {
     const big = await px(page); const box = await page.evaluate(() => getComputedStyle(document.querySelector('#editor li'), '::before').width);
     const other = { hand: 'round', round: 'medieval', medieval: 'hand' }[font];
     await pickAll(page); await tap(page, `#fontSeg button[data-font="${other}"]`); await page.waitForTimeout(60);
-    const k = { hand: { round: 0.68 }, round: { medieval: 1.19 }, medieval: { hand: 1.24 } }[font][other];
-    assert.ok(Math.abs(await px(page) / big - k) < 0.02, `${font} → ${other}: Big words stay big in the other font`);
+    assert.ok(Math.abs(await px(page) - big) < 0.05, `${font} → ${other}: Big words keep their size in the other font`);
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#editor li'), '::before').width), box, 'and the box keeps its size');
   }
-  // the CSS: size and font on one tag both count; a font inside the same font, once; the note's font inside another: its size
+  // the CSS: size and font on one tag both count; no font changes a size or a line's height (1.4.12)
+  const ownLook = {};
   for (const font of ['hand', 'round', 'medieval']) {
     const other = { hand: 'Nunito', round: 'Augusta', medieval: 'Caveat' }[font]; const own = { hand: 'Caveat', round: 'Nunito', medieval: 'Augusta' }[font];
     page = await nu.open({ html: `<p><font face="${other}">a</font></p><p><font face="${other}" size="5">a</font></p><p><font face="${other}"><font face="${other}">a</font></font></p>`
@@ -641,7 +684,17 @@ const look = (page) => page.evaluate(() => {
     assert.ok(Math.abs(fs[1] / fs[0] - 1.45) < 0.01 && Math.abs(fs[3] - fs[1]) < 0.05, `${font}: size and font on one tag = on two tags: ${fs}`);
     assert.ok(Math.abs(fs[2] - fs[0]) < 0.05, `${font}: a font inside the same font isn't resized twice: ${fs}`);
     assert.ok(Math.abs(fs[5] - fs[4]) < 0.05, `${font}: the note's font inside another is the note's size: ${fs}`);
+    assert.ok(Math.abs(fs[0] - fs[4]) < 0.05, `${font}: words in another font are the note's size: ${fs}`);
+    const look = await page.evaluate(() => { const p = [...document.querySelectorAll('#editor p')]; return { h: p.map((x) => x.getBoundingClientRect().height), fs: getComputedStyle(document.getElementById('editor')).fontSize }; });
+    assert.ok([0, 2, 5].every((i) => Math.abs(look.h[i] - look.h[4]) < 0.05), `${font}: words in another font leave their line's height as it is: ${look.h}`);
+    ownLook[font] = { fs: look.fs, h: look.h[4] };
   }
+  assert.ok(Object.values(ownLook).every((x) => x.fs === ownLook.round.fs && x.h === ownLook.round.h), 'every note font: the same text size and line height (the owner, 1.4.12) ' + JSON.stringify(ownLook));
+  for (const font of ['hand', 'round', 'medieval']) {
+    page = await nu.open({ html: '<ul class="checklist"><li>Milk</li></ul>', font }, 420, 300);
+    ownLook[font].box = await page.evaluate(() => getComputedStyle(document.querySelector('#editor li'), '::before').width);
+  }
+  assert.ok(Object.values(ownLook).every((x) => x.box === ownLook.round.box), 'every note font: the same box ' + JSON.stringify(ownLook));
   // pasted from a Rounded note into a Medieval one: Big Rounded words stay Big (as they were)
   page = await nu.open({ html: '<p><br></p>', font: 'medieval' });
   await page.evaluate(() => {
@@ -906,45 +959,58 @@ const look = (page) => page.evaluate(() => {
     assert.ok(!(await dark.isVisible('#eveRow')), 'a dark paper: no evening switch');
     await dark.close();
   }
-  // ---- 1.3.34: click-through. The button sits left of the pin (the panic button left of the title, away from it); while
-  // it's on, nothing else in the note reacts to the mouse, and the mouse on the button tells main (ctAwake)
+  // ---- 1.3.34: click-through; 1.4.11: turned on in the pin's right-click menu, and its button (left of the pin) shows only while
+  // it is on, to turn it off. While it's on, nothing else in the note reacts to the mouse, and the mouse on the button tells
+  // main (ctAwake). The panic button sits left of the title, away from it.
   {
     const catchAwake = () => {
       const old = window.sticky;
       window.__awake = [];
-      window.sticky = new Proxy({}, { get: (t, k) => (k === 'ctAwake' ? (on) => { window.__awake.push(on); } : old[k]) });
+      window.sticky = new Proxy({}, { get: (t, k) => (k === 'ctAwake' ? (on) => { window.__awake.push(on); } : k === 'pinApps' ? () => Promise.resolve([]) : old[k]) });
     };
     const S = { appTheme: 'cream', panicOn: true, clickThroughOn: true };
     const page = await nu.open({ html: '<div>hello</div>', settings: S }, 360, 320, catchAwake);
-    const order = await page.evaluate(() => [...document.querySelectorAll('#bar > :not([hidden])')].map((x) => x.id || x.className));
-    assert.deepEqual(order.slice(0, 4), ['btnList', 'btnNew', 'btnPanic', 'title'], `the panic button is left of the title (${order})`);
-    assert.equal(order[order.indexOf('btnCt') + 1], 'btnPin', 'the click-through button is just left of the pin');
+    const order = () => page.evaluate(() => [...document.querySelectorAll('#bar > :not([hidden])')].map((x) => x.id || x.className));
+    assert.deepEqual((await order()).slice(0, 4), ['btnList', 'btnNew', 'btnPanic', 'title'], `the panic button is left of the title (${await order()})`);
+    assert.ok(!(await page.isVisible('#btnCt')), 'off: no click-through button in the top bar');
     const at = (sel) => page.evaluate((s) => { const r = document.querySelector(s).getBoundingClientRect(); const x = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return x && (x.closest('[id]') || x).id; }, sel);
     assert.equal(await at('#btnPin'), 'btnPin', 'off: the pin works');
-    const box = async (sel) => { const r = await page.locator(sel).boundingBox(); return [r.x + r.width / 2, r.y + r.height / 2]; };
-    await page.mouse.click(...await box('#btnCt'));
+    await page.click('#btnPin', { button: 'right' });
+    await page.waitForTimeout(80);
+    assert.ok(await page.isVisible('#pinCt'), 'the pin\'s right-click menu offers it');
+    await page.click('#pinCt');
     await page.waitForTimeout(60);
     assert.deepEqual((await page.updates()).pop(), { clickThrough: true, pinned: true }, 'on: saved, and pinned');
+    assert.ok(!(await page.isVisible('#pinPop')), 'the menu closes');
     assert.ok(await page.evaluate(() => document.body.classList.contains('ct')) && await page.getAttribute('#btnCt', 'aria-pressed') === 'true');
-    assert.deepEqual(await page.evaluate(() => window.__awake), [true], 'the mouse is still on the button: main is told');
+    const now = await order();
+    assert.equal(now[now.indexOf('btnCt') + 1], 'btnPin', 'its button shows, just left of the pin');
+    assert.deepEqual(await page.evaluate(() => window.__awake), [], 'the mouse isn\'t on the button: main isn\'t told');
     for (const sel of ['#btnPin', '#btnMenu', '#btnClose', '#btnPanic', '#editor']) assert.notEqual(await at(sel), sel.slice(1), `${sel} doesn't take the mouse`);
     assert.equal(await at('#btnCt'), 'btnCt', 'only its button does');
+    const box = async (sel) => { const r = await page.locator(sel).boundingBox(); return [r.x + r.width / 2, r.y + r.height / 2]; };
     await page.mouse.move(...await box('#editor'));
     await page.mouse.move(...await box('#btnCt'));
     await page.mouse.move(...await box('#btnPin'));
-    assert.deepEqual(await page.evaluate(() => window.__awake), [true, false, true, false], 'on the button and off it, each once');
+    await page.mouse.move(...await box('#btnCt'));
+    assert.deepEqual(await page.evaluate(() => window.__awake), [true, false, true], 'on the button and off it, each once');
     await page.mouse.click(...await box('#btnCt'));
     await page.waitForTimeout(60);
     assert.deepEqual((await page.updates()).pop(), { clickThrough: false }, 'off again');
     assert.ok(!(await page.evaluate(() => document.body.classList.contains('ct'))));
+    assert.ok(!(await page.isVisible('#btnCt')), 'and its button goes');
     await page.close();
-    // Settings → Click-through off: no button, and a note that chose it takes the mouse
-    const off = await nu.open({ html: '<div>x</div>', pinned: true, clickThrough: true, settings: { ...S, clickThroughOn: false } });
+    // Settings → Click-through off: not in the pin's menu, and a note that chose it takes the mouse
+    const off = await nu.open({ html: '<div>x</div>', pinned: true, clickThrough: true, settings: { ...S, clickThroughOn: false } }, 360, 320, catchAwake);
     assert.ok(!(await off.isVisible('#btnCt')) && !(await off.evaluate(() => document.body.classList.contains('ct'))), 'off in Settings: nothing');
+    await off.click('#btnPin', { button: 'right' });
+    await off.waitForTimeout(80);
+    assert.ok(await off.isVisible('#pinPop') && !(await off.isVisible('#pinCt')), 'nor in the pin\'s menu');
     await off.close();
-    // the smallest note still fits its top bar with both buttons
-    const small = await nu.open({ html: '<div>x</div>', settings: S }, 200, 200);
+    // the smallest note still fits its top bar, its button too
+    const small = await nu.open({ html: '<div>x</div>', pinned: true, clickThrough: true, settings: S }, 200, 200);
     assert.ok(await small.evaluate(() => { const b = document.querySelector('#bar'); const c = document.querySelector('#btnClose').getBoundingClientRect(); return b.scrollWidth <= b.clientWidth && c.right <= innerWidth; }), 'a 200 px note: every button fits');
+    assert.ok(await small.isVisible('#btnCt'), 'the click-through button never goes into the » menu');
     await small.close();
   }
   // ---- 1.4.1: reminders (main's side: reminders.test.js). A reminder that rings shows a strip under the top bar with its

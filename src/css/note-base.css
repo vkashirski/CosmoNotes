@@ -47,15 +47,11 @@ body {
   --line: color-mix(in oklab, var(--d-line), var(--e-line, var(--d-line)) calc(var(--eve) * 100%));
 }
 
-body[data-font="hand"][data-size="s"]  { --fs: 19px; }
-body[data-font="hand"][data-size="m"]  { --fs: 23px; }
-body[data-font="hand"][data-size="l"]  { --fs: 28px; }
-body[data-font="round"][data-size="s"] { --fs: 13.5px; }
-body[data-font="round"][data-size="m"] { --fs: 15.5px; }
-body[data-font="round"][data-size="l"] { --fs: 18.5px; }
-body[data-font="medieval"][data-size="s"] { --fs: 16px; }
-body[data-font="medieval"][data-size="m"] { --fs: 18.5px; }
-body[data-font="medieval"][data-size="l"] { --fs: 22px; }
+/* 1.4.12 (the owner's wish): one text size for every font, so changing a note's font keeps its lines and boxes as they
+   were. The letters are matched by their small-letter height (note-text.css font-size-adjust). Rounded's sizes. */
+body[data-size="s"] { --fs: 13.5px; }
+body[data-size="m"] { --fs: 15.5px; }
+body[data-size="l"] { --fs: 18.5px; }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
@@ -141,6 +137,8 @@ body[data-tfont="hand"] #title { font: 700 19px var(--hand); line-height: 1; pad
 body[data-tfont="medieval"] #title { font: 400 17px var(--med); line-height: 1; padding-bottom: 1px; }
 body.has-title #title, body.rolled #title { opacity: .95; }
 .hb[hidden] { display: none; }
+/* 1.4.11: buttons the title needs the room of are in the » menu (src/note/top-bar.js) */
+#bar > .over { display: none !important; }
 #btnRoll svg { transition: transform .18s; }
 body.rolled #btnRoll svg { transform: rotate(180deg); }
 body.rolled #scroller, body.rolled #tools, body.rolled .corner, body.rolled #stamp, body.rolled #lockScreen { display: none !important; }

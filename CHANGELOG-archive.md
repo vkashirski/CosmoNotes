@@ -6,6 +6,182 @@ file (`tests/release.test.js` checks that every version is in one of the two fil
 Renumbered in 1.1.41: each heading says its old number (the table is at the top of `CHANGELOG.md`). Version numbers inside
 the entries are the old ones.
 
+## 1.4.15 – 18 November 2026
+
+Several groups' name fonts at once, and the settings for groups and for the notes in them are told apart (the owner's
+wish: "Look" and "Edit design" were confusing).
+
+- **The selection bar says what each button changes:** Look is now **Group look** (the picked groups' own cards: look,
+  colour and, new, name font) and Edit design is now **Note design** (the picked notes and every note in the picked
+  groups; its tooltip says how many). Group look's pop-up starts with "N groups · their cards, not the notes inside" and
+  names its rows (Look, Colour, Name font). `groups:update-many` takes `titleFont`.
+- **The group panel has two parts:** **This group** (its card: Look, Colour, Name font), tinted with the group's
+  colour, and **Notes inside** (with how many: Paper, Font, "Also the notes in groups inside this one", and a new
+  **Note design…** button for see-through, effects and the rest, in the same pop-up as for picked notes, for the notes
+  the part covers), tinted like note paper.
+- "Edit design" is called **Note design** everywhere in the window (the note's right-click menu, the pop-up's title, the
+  feature list). The code keeps its names (`openEdit`, `#editSheet`, `bulkEdit`).
+- Tests: `groups.test.js` (several groups' name font), `list-ui-groups.test.js` (the bar's names and Note design's
+  tooltip, Group look's heading and name font, the panel's two parts, Notes inside → Note design…).
+
+## 1.4.14 – 18 November 2026
+
+Every group card wears the same label (its name and number of notes), and a group's name can have its own font (the owner's
+pick from three designs; the To Do notebook's name could hardly be read on dark themes).
+
+- **One label for every look:** the stack, the folder, the envelope and the notebook all wear the same cream label in the
+  same spot, near the bottom: the name, and "N notes" under it. Nothing is under the card any more. The folder's label
+  rides on its front and the notebook's on its cover, so they tip and turn with them. Before, each look did its own
+  thing (the folder had its count on the front, the notebook its name on its label and an empty gap below, the stack and
+  the envelope their name and a number pill below): `gfoot`, `.gname-l`, `.gcount`, `.f-count`, `.nb-label` are gone.
+  The envelope's seal is a little smaller and higher, and a locked group's padlock sits above the label.
+- **The cause of the unreadable name:** the notebook label is always cream, but its name used the theme's ink
+  (`var(--ink)`), which is light on the dark themes. The label's ink is now fixed (`#3B3226`).
+- **Name font:** Group settings → Name font: Handwritten (as before), Rounded or Medieval. It shows on the card's label and
+  in the group's bar. A font never changes a size (like the note fonts): one size per card size (`--lf`), a fixed line,
+  the letters matched by `font-size-adjust: .484`; the group bar's name is 20 px with it (it looks as before in
+  Handwritten). New group field `titleFont` (store.js `normalizeGroup`: one of `FONTS`, default `hand`); `groups:update`
+  takes it, copies keep it.
+- Tests: `groups.test.js` (the name font: default, unknown, saved, copied), `list-ui-groups.test.js` (one label on every
+  look with name and count, nothing else on the card, dark ink on a dark theme; the panel's Name font, the bar's font, the
+  same size).
+
+## 1.4.13 – 17 November 2026
+
+Checklist boxes are static: a box goes by the size of its words, never their font (the owner's wish: switching words
+to Handwritten still moved the box).
+
+- `alignChecks` (note/editing.js) measures nothing from the letters any more. The box's size = the note's text size
+  (`--fs`) × the sizes from the line's first words up to the line (`sizeOf`: `SIZE` = font size=, `TAG_SIZE` = headings,
+  code, sub / sup; a span's own font-size, which the browser writes while typing). It sits in the middle of the line's
+  first line, whose height is worked out from the same sizes (`LINE_H`: the line's 1.45, a font tag's 1.3). Before, the
+  box was centred on the first letter's measure, and each font's letters sit a little higher or lower, so a font change
+  moved it; its size came from the browser's font size of the words.
+- Empty lines as before: their own font / size tags give the size; with none, the box they had with words, else the line
+  above's. "Keep boxes the same size" as before.
+- Tests: `editor-code.test.js` (the tables = note-text.css; `alignChecks` measures no letters, reads no font),
+  `note-ui.test.js` (words in every font: the same box at the same place, the same line height).
+
+## 1.4.12 – 17 November 2026
+
+A group's bar stays at the top while you scroll, group cards show their name instead of counts, and a font change keeps
+the size of the text and the boxes (the owner's wishes).
+
+- **The group's bar stays in sight:** inside a group, the bar with Back, the name and the settings sticks right under the
+  search row while the cards scroll (it used to scroll away, so going back meant scrolling up). `.groupview` is
+  `display: contents`, so its parts sit straight in the scrolling view; the bar is `.gstick` (`#gStick`, list.html),
+  `position: sticky` at `--stickTop` (the search row's height, from a ResizeObserver in list/events.js). Once the crumbs
+  above it are under the search row it is stuck (`#viewNotes.gstuck`, an IntersectionObserver): it gets the window's
+  background and the search row's shade. Back stays a drop target while stuck. The group's settings open where they are,
+  at the top, so a stuck bar scrolls there first (actions-locks.js `openPanel`).
+- **Group cards:** under the card only the name (no number of groups inside, no number of notes), so it has the room.
+  The folder and the notebook show how many notes on themselves; the stack and the envelope, which don't, keep the number
+  beside the name. The groups inside are in the card's tooltip, as before.
+- **A font change keeps the size** (the owner chose Rounded's size for every note): one text size per size (S 13.5, M
+  15.5, L 18.5 px), one line height (1.45) and one box (1em, indent 1.55em) for every note font. The letters are matched
+  by their small-letter height: `font-size-adjust: .484` (Nunito's) on the editor. So switching a whole note's font, or
+  some words' font in the text panel, keeps the text, its lines and its boxes the same size. Handwritten notes are smaller
+  than before (they were 23 px at M), Medieval a little smaller; Rounded notes are as they were. This replaces the
+  1.3.15–1.4.11 resize per font (`--kf` / `--k` / `--sm`, note-drawing.css; the box's ÷ `--kf`; `BOX` per font): it
+  made words in another font, their line and their box grow. A font tag's `size=` is its only size, and its line height
+  is under the line's (`#editor font { line-height: 1.3 }`), so a normal-size run in any font leaves its line as it is.
+  Cards do the same: one text size per card size for every font, `font-size-adjust` too (store.js `CARD_FACE_SIZE` and
+  `cardRuns`' note font are gone, `FONT_PX` is one table).
+- Tests: `list-ui-groups.test.js` (the stuck bar, Back clickable, the settings scroll up; the group card's footer),
+  `note-ui.test.js` (every note font: same size, line height and box; words in another font: same size and line height),
+  `editor-code.test.js`, `store.test.js`, `list-ui-cards.test.js` (one card size, the letters matched).
+
+## 1.4.11 – 17 November 2026
+
+Right-click → Add, links on pictures, a top bar that keeps a small note's title, and click-through in the pin's menu (the owner's wishes).
+
+- **Right-click → Add:** right-click in a note's text: the menu (spelling, Cut / Copy / Paste) ends with **Add ▸**, the same
+  items as the + Add button, which stays. The note sends main its Add panel's items once (`addItems`, from the panel's tiles,
+  so a new tile shows there too); main adds them only in the text itself (`formControlType` none: not in the title box or a
+  password) and only while the note's words show (`main/web.js`, `note-window.js`); the one picked comes back (`note:add`)
+  and runs as from the panel (`panels.js doInsert`).
+- **A link on a picture:** right-click a photo → **Add link…** (then Open link, Edit link…, Copy link address, Remove link).
+  It is `<a href><img></a>`, the usual HTML, so it stays a link when copied out (pasted linked pictures from the web already
+  were). The link form has no "Text to show" for a picture, and editing a link never replaces a picture inside it (it did
+  for such pasted links). A click on a linked picture opens the link (once for a double-click; Shift+click picks the picture
+  to resize it); the caret beside it goes outside the link (`content.js picLink`, `caretAt`); Remove photo takes its link
+  too. A little chain in the photo's white strip shows it has one (`note-text.css`).
+- **A small note's top bar** (`src/note/top-bar.js`, a new part: 16 now): the title is what matters most. It gets its whole
+  width (up to 220 px; on a small note all but » and Close); the buttons that don't fit go into one **»** button, the least
+  needed first (Maximise, Minimise, +, All notes, effects, Lock again, close-all, panic, ⋯, the pin, Roll up). Close, and
+  click-through's button while it is on, always stay. » shows a real menu from main (`note:bar-menu`: it shows outside the
+  window, so it works on the smallest and on a rolled-up note); the pin is a tick there, with **Pin options…** (its
+  right-click menu). The line picked presses the button itself (`note:bar-act`). This replaces the old rules that hid one
+  button at a time at fixed widths (Effects < 280 px, + < 250 px, Maximise / Minimise with the panic and click-through
+  buttons).
+- **Click-through in the pin's right-click menu:** its first row (while Settings → Click-through is on). The top bar's
+  click-through button now shows only while it is on, as the way back (it still is the one thing that works then); the
+  list's right-click → Turn off click-through stays. Settings' text says where it is now.
+- Tests: `note-ui-bar.test.js` (new: the top bar at 360 / 200 / 700 px, », its lines and picks; right-click → Add in the
+  window), `note-ui.test.js` (a picture's link: the form, the menu, click / double-click / Shift+click, the caret, Undo / Redo
+  of Add / Edit / Remove link and Remove photo; click-through from the pin's menu), `windows.test.js` (main: the text's menu
+  with Add ▸, not in a box or a hidden note; the » menu), `code-structure.test.js` (the new part).
+
+## 1.4.10 – 17 November 2026
+
+Tags: give notes and groups tags (#work, #home…), and filter the notes list by them, one or several at once (the owner's wish).
+
+- **Adding them:** right-click a note or group → **Tags…**, **Tags** in the selection bar for several (a tag only some of
+  them have is faded: click it to give it to all, its × takes it off all), or the note's **⋯ menu → Tags**. Type a tag and
+  press Enter, space or comma; suggestions are the tags already in use. Each change saves at once (main `list:tags`,
+  `note:tags`: add / remove, never the whole list) and is not an edit. A tag is lower case, letters, numbers, - and _, at most
+  30 letters; at most 20 on one note or group (`src/tags.js`, shared by both windows, main and store.js).
+- **Filtering:** a row of every tag in use under the search box (`#tagRow`, `list/cards.js paintTagRow`); click to pick, click
+  again to drop. With two or more picked, **All** (has every one) or **Any** (has one of them), remembered (`settings.tagAny`).
+  Typing `#wo` in the search picks every tag starting with it, with words too (`#work milk`). A card's own tags show under
+  its words; clicking one filters by it. Works in Notes (one flat list, inside the open group only), Favourites, Locked and
+  the reminders filter. Escape, the row's ×, or opening a group forgets the picked tags.
+- **Groups:** a group's tags count for everything inside it (its notes and its groups). Filtering shows the outermost
+  group that matches, and its notes.
+- **Locked notes (the owner's pick):** a note's tags are secret like its words: in `SECRET` / `SECRET_FIELDS`, sealed with a
+  locked note, `[]` on its card, to its hidden window and among the suggestions, and they can't change while its lock hides
+  it. A group's tags are not secret (like its name).
+- New data: `note.tags`, `group.tags`, `settings.tagAny`. Duplicate copies the tags. The note window has a new part,
+  `src/note/tags.js` (15 parts now).
+- Tests: `tags.test.js` (the rules; main: notes, groups, several, not an edit, the ⋯ menu, Duplicate, locked and sealed, a
+  restart), `list-ui-tags.test.js` (the row, All / Any, groups, #typing, card tags, tabs, the Tags pop-up, the bar),
+  `note-ui-tags.test.js` (the ⋯ menu's row).
+
+## 1.4.9 – 16 November 2026
+
+In the notes list: change the look of several groups at once, move picked cards out of a group, cut or copy them and
+paste in another, and undo or redo moves with Ctrl+Z / Ctrl+Y (the owner's wishes, after importing his Evernote notes).
+
+- **Look of several groups:** pick groups (Ctrl+click), then **Look** in the bar (or right-click → Group look…): the four
+  looks and the eight colours of the group panel, for all of them (`#lookPop` in `src/list/picking.js`, `openLook`,
+  `setLook`; main `groups:update-many`). The look or colour they share is lit.
+- **Move out:** inside a group, **Move out** in the bar (or right-click → Move out of this group) puts the picked notes
+  and groups one level up, next to the group (`bulkOut`).
+- **Cut / Paste:** Ctrl+X (or **Cut** in the bar, or right-click → Cut on any card) marks the picked cards (`V.cut`,
+  `.card.cut`: faded with a dashed edge). Open another group, or the top level, and press Ctrl+V or **Paste here** in the
+  bar. Right-click a group card → Paste into this group (N). Esc or the bar's × forgets the cut. A group never goes
+  inside itself. Locked ones are never cut.
+- **Copy / Paste:** Ctrl+C (or **Copy** in the bar or the right-click menus) and then Ctrl+V put copies there; the bar
+  says "N copied", the cards don't fade, and the same copies can be pasted again (`V.cutMode`: 'cut' | 'copy'). Main
+  `groups:copy-many`: a note's copy keeps its title (it is somewhere else, so no "(copy)"), look, words, pictures and lock,
+  through store.js `duplicate` (no reminders, pin or window place); a copied group comes whole, with its name, look,
+  colour, lock and sub-groups. Nothing a lock hides is copied; never into itself.
+- **Undo / Redo of moves** (`main/move-history.js`): every change of where notes and groups sit is one step: a drag
+  (one card or several), up a level, Move out, Paste, a new group from several, Ungroup. Ctrl+Z puts things back,
+  Ctrl+Y (or Ctrl+Shift+Z) does it again; a toast says what was undone. A group a move emptied (it goes away) or that was
+  ungrouped comes back with its own id, look and lock (store.js `restoreGroup`). Notes deleted for good, and things a
+  lock hides, stay where they are. A paste of copies is a step too (`recordCopy`): Undo moves the copies to the Bin
+  (never deletes them; a locked copy stays), Redo brings them back. The last 50 steps are kept in memory: the history
+  starts empty with each start.
+- One IPC for several at once, `groups:move-many` (`how`: 'Move' | 'Paste'): dragging several cards is now one call and
+  one Undo step (was one `groups:move-to` per card).
+- The toast sits above the bar while the bar shows (`body.selecting .toast`); the bar's labels hide below 860 px (was
+  700: it has more buttons).
+- Tests: `groups.test.js` (move-many, update-many, undo / redo of moves, new groups and Ungroup, things gone for good),
+  `list-ui-groups.test.js` (Ctrl+Z / Ctrl+Y, Look for two groups, Move out, Cut / Paste by keys and menus, Copy / Paste
+  twice and Ctrl+Z, not inside itself, a drag of several is one step). `groups.test.js` also copies a note and a group
+  with a sub-group, undoes it to the Bin and redoes it.
+
 ## 1.4.8 – 16 November 2026
 
 The app pin's icon is a little window with the pin stuck into it, and a second right-click on the pin closes its list.

@@ -2,7 +2,8 @@
 const { BrowserWindow, Menu, shell } = require('electron');
 const { BAR_FRAMES, inkBarOptions } = require('./ink-geometry');
 
-function hardenContents(wc, { inkBarFor = null } = {}) {
+// addItems (a note window, 1.4.11): () => the Add panel's items [{ act, label }], or null while the note's words don't show
+function hardenContents(wc, { inkBarFor = null, addItems = null } = {}) {
   wc.setWindowOpenHandler(({ url, frameName }) => {
     // 1.1.15: a note may open one empty little window for its drawing toolbar (see "drawing toolbar outside")
     // 1.1.16: and one for its text toolbar
@@ -30,6 +31,12 @@ function hardenContents(wc, { inkBarFor = null } = {}) {
         { type: 'separator' },
         { label: 'Select all', role: 'selectAll' },
       );
+    }
+    // 1.4.11: in a note's text (its editor, not a box like the title's), Add ▸ the Add panel's items
+    const add = addItems && p.isEditable && p.formControlType === 'none' ? addItems() : null;
+    if (add && add.length) {
+      if (tpl.length) tpl.push({ type: 'separator' });
+      tpl.push({ label: 'Add', submenu: add.map((it) => ({ label: it.label, click: () => { if (!wc.isDestroyed()) wc.send('note:add', it.act); } })) });
     }
     if (tpl.length) Menu.buildFromTemplate(tpl).popup({ window: BrowserWindow.fromWebContents(wc) });
   });

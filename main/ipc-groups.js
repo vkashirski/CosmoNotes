@@ -29,7 +29,7 @@ function registerGroupIpc() {
         text: hiddenInList(n) ? '' : n.text.slice(0, 600),
         pics: hiddenInList(n) ? '' : pictureWords(n.html), // 1.1.23: picture descriptions, so the search finds them
         checks: hiddenInList(n) ? '' : checklistMarks(n.html, n.text.slice(0, 600)), // 1.1.22: which lines are checklist boxes (o) / ticked (x)
-        runs: hiddenInList(n) ? null : cardRuns(n.html, n.text.slice(0, 600), n.font), // 1.3.11: the look of each line (font, colour, bold…), null = plain
+        runs: hiddenInList(n) ? null : cardRuns(n.html, n.text.slice(0, 600)), // 1.3.11: the look of each line (font, colour, bold…), null = plain
         firstImage: hiddenInList(n) ? null : n.firstImage,
         pic: hiddenInList(n) || !n.firstImage ? null : picturePlace(n), // 1.1.46: where the first picture is, and its size
         lines: hiddenInList(n) ? 0 : lineCount(n.text), // 1.1.46: the card's "+3 lines" (text above is cut at 600 letters)
@@ -175,7 +175,7 @@ function registerGroupIpc() {
       const notes = S.store.all().filter((n) => n.groupId === gid && !n.deletedAt); // what it holds now, before the copy
       const kids = [...S.store.groups.values()].filter((c) => c.parentId === gid);
       const copy = S.store.createGroup([], { name: g.name, parentId: parent });
-      S.store.updateGroup(copy.id, { style: g.style, color: g.color, locked: g.locked });
+      S.store.updateGroup(copy.id, { style: g.style, color: g.color, titleFont: g.titleFont, locked: g.locked });
       for (const n of notes) copyNote(n.id, copy.id);
       for (const c of kids) copyGroup(c.id, copy.id);
       return true;
@@ -196,14 +196,14 @@ function registerGroupIpc() {
   ipcMain.handle('groups:update', (e, groupId, patch = {}) => {
     if (groupShut(groupId)) return;
     const clean = {};
-    for (const k of ['name', 'style', 'color']) if (k in patch) clean[k] = patch[k];
+    for (const k of ['name', 'style', 'color', 'titleFont']) if (k in patch) clean[k] = patch[k]; // store.js normalizeGroup checks each
     S.store.updateGroup(groupId, clean);
     notifyList();
   });
-  // 1.4.9: the look (stack / folder / envelope / notebook) and colour of several picked groups at once
+  // 1.4.9: the look (stack / folder / envelope / notebook) and colour of several picked groups at once; 1.4.15: their name font
   ipcMain.handle('groups:update-many', (e, ids = [], patch = {}) => {
     const clean = {};
-    for (const k of ['style', 'color']) if (k in patch) clean[k] = patch[k];
+    for (const k of ['style', 'color', 'titleFont']) if (k in patch) clean[k] = patch[k];
     let count = 0;
     for (const id of [].concat(ids)) {
       if (!S.store.groups.has(id) || groupShut(id)) continue;

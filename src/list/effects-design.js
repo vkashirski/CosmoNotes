@@ -331,7 +331,7 @@
   }
   function editShow(anchor) {
     const several = many();
-    $('#editBox h3').textContent = several ? `Edit design · ${ed.ids.length} notes` : 'Edit design';
+    $('#editBox h3').textContent = several ? `Note design · ${ed.ids.length} notes` : 'Note design';
     $('#editTitle').readOnly = several;
     $('#editTitle').tabIndex = several ? -1 : 0;
     $('#editOpen').textContent = several ? 'Open notes' : 'Open note';
@@ -421,7 +421,7 @@
     if (!notes.length) { ed.pending = null; closeEdit(); return; }
     if (notes.length !== ed.ids.length) { // some went to the Bin (or got locked, 1.3.28)
       ed.ids = notes.map((n) => n.id); ed.id = ed.ids[0];
-      $('#editBox h3').textContent = `Edit design · ${ed.ids.length} notes`;
+      $('#editBox h3').textContent = `Note design · ${ed.ids.length} notes`;
       $('#editTitle').value = `${ed.ids.length} notes`;
     }
     if (!ed.pending && !ed.saving) editLoadMany(notes, document.activeElement === $('#editOpacity'));
