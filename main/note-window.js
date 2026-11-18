@@ -6,7 +6,7 @@ const { paperOf } = require('./evening');
 const { isLocked, viewOf } = require('./locks');
 const { fitBounds, visibleOnSomeDisplay } = require('./display');
 const { hardenContents } = require('./web');
-const { watchInkBar } = require('./ink-window');
+const { liftBars, watchInkBar } = require('./ink-window');
 const { notifyList } = require('./list-notify');
 const { applyState, raised, setRolled, titleOf } = require('./note-state');
 const { groupOpenInList, openForNow } = require('./list-visibility');
@@ -250,6 +250,23 @@ function bringToFront({ unroll = false } = {}) {
   }
 }
 
+// 1.4.18: the window touched last is on top (the owner's wish): a note, its toolbars and menus outside it, the list.
+// Pinned notes stay above the others (Windows' on-top layer); among them, the one touched last (raisedAt, enforcePinned).
+// Windows brings a window up when a click gives it the focus, but not one that never takes the focus (most toolbars and
+// menus outside a note), nor one that has it already while another of ours was brought up over it. So every window
+// tells main when it is pressed (win:touch, main/ipc-notes.js), and main brings it up: the note, then its windows
+// outside it, the one touched (kind) on top (liftBars). Only the order changes: nothing is saved, and no window gets the
+// focus. A note pinned over apps comes up until another app comes in front (appPin.peek, as for Bring to front).
+function touchNote(win, kind = null) {
+  if (!win || win.isDestroyed() || !win.isVisible() || win.isMinimized()) return;
+  const n = S.store.get(win.noteId);
+  if (!n) return;
+  raised(win);
+  if (appPin.appPinned(n) && !win.isFocused()) appPin.peek(win);
+  win.moveTop();
+  liftBars(win, kind);
+}
+
 // every 2.5 s: pinned notes come back up (also above other apps' on-top windows). 1.4.2: one after the other, the one
 // pinned or clicked longest ago first, so the newest stays on top of the others (it used to be the order they opened in).
 function enforcePinned() {
@@ -277,4 +294,4 @@ function refitAll() {
     }
   }
 }
-module.exports = { bringToFront, closeNoteWindow, createNote, duplicateNote, enforcePinned, openNoteWindow, refitAll, reopenClosed, unrollWin };
+module.exports = { bringToFront, closeNoteWindow, createNote, duplicateNote, enforcePinned, openNoteWindow, refitAll, reopenClosed, touchNote, unrollWin };

@@ -26,6 +26,9 @@
   };
   $('#btnNew').addEventListener('click', newNote);
   $('#btnFront').addEventListener('click', () => S.list.bringToFront());
+  // 1.4.18: the window touched last is on top: a press in the list brings it up, also when it has the focus already and a
+  // note came up over it (main/ipc-notes.js win:touch)
+  document.addEventListener('pointerdown', () => S.touch(), true);
   $('#q').addEventListener('input', (e) => { V.query = e.target.value; render(); });
   // the words typed (the X in the box); going to another group forgets the picked tags too (1.4.10)
   const clearText = () => { V.query = ''; $('#q').value = ''; };

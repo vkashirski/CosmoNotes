@@ -11,7 +11,7 @@ class BrowserWindow extends EventEmitter {
   close(){ if(this.destroyed) return; this.destroyed=true; this.emit('closed'); }
   isDestroyed(){return this.destroyed} isMinimized(){return !!this.minimized} isMaximized(){return !!this.maximized} minimize(){this.minimized=true;this.emit('minimize')} maximize(){this.maximized=true;this.emit('maximize')} unmaximize(){this.maximized=false;this.emit('unmaximize')} setMinimizable(v){this.minimizable=v} setMaximizable(){} isVisible(){return this.visible} restore(){ if(this.minimized){this.minimized=false;this.emit('restore')} }
   getBounds(){return {...this.bounds}} setBounds(b){Object.assign(this.bounds,b)} setPosition(x,y){this.bounds.x=x;this.bounds.y=y;this.emit('move')} setSize(w,h){this.bounds.width=w;this.bounds.height=h;this.emit('resize')}
-  setMinimumSize(){} setMaximumSize(){} setOpacity(v){this.opacity=v} setIgnoreMouseEvents(v,o){this.ignoreMouse=v?{forward:!!(o&&o.forward)}:false} setAlwaysOnTop(v){this.top=!!v; if(v) module.exports.__onTopCalls.push(this)} isAlwaysOnTop(){return !!this.top} setBackgroundColor(c){this.bg=c} setTitle(t){this.title=t} moveTop(){} flashFrame(v){this.flashing=!!v}
+  setMinimumSize(){} setMaximumSize(){} setOpacity(v){this.opacity=v} setIgnoreMouseEvents(v,o){this.ignoreMouse=v?{forward:!!(o&&o.forward)}:false} setAlwaysOnTop(v){this.top=!!v; if(v) module.exports.__onTopCalls.push(this)} isAlwaysOnTop(){return !!this.top} setBackgroundColor(c){this.bg=c} setTitle(t){this.title=t} moveTop(){ module.exports.__moveTops.push(this) } flashFrame(v){this.flashing=!!v}
   moveAbove(id){ this.above = id } // 1.4.5: app pins put a note just above its app's window
   getNativeWindowHandle(){ const b=Buffer.alloc(8); b.writeBigUInt64LE(BigInt(5000+this.id)); return b } // 1.4.5: HWND = 5000 + id
   static fromWebContents(wc){ return wc.win } static getAllWindows(){ return all.filter(w=>!w.destroyed) }
@@ -24,6 +24,7 @@ module.exports = {
   __handlers: handlers, __listeners: listeners, __all: all, __loaded: [], __partitions: {},
   __popups: [],
   __onTopCalls: [], // 1.4.2: every setAlwaysOnTop(true), in order: Windows puts each one above the others
+  __moveTops: [], // 1.4.18: every moveTop(), in order: the last one is on top
 
   app: Object.assign(new EventEmitter(), { commandLine: { appendSwitch(){} }, setAppUserModelId(){}, requestSingleInstanceLock:()=>true, whenReady:()=>Promise.resolve(), getPath:(k)=> k==='appData' ? process.env.FAKE_APPDATA : process.env.FAKE_DATA, isPackaged:false, getVersion:()=>'1.0.0', quit(){ module.exports.app.emit('before-quit'); module.exports.app.emit('will-quit'); }, setLoginItemSettings(){} }),
   BrowserWindow,

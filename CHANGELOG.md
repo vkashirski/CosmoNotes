@@ -3,7 +3,7 @@
 The app shows no version history (since 1.1.41): it lives only here and in [`CHANGELOG-archive.md`](CHANGELOG-archive.md).
 Settings → About CosmoNotes shows the version, the date of the last update and the feature list.
 
-This file keeps only the **two newest versions**. Older ones (1.4.15 back to 1.0.0) are in the archive. When a new
+This file keeps only the **two newest versions**. Older ones (1.4.16 back to 1.0.0) are in the archive. When a new
 version is added at the top, move the oldest one here to the top of the archive.
 
 **Renumbered in 1.1.41.** Six big versions were split into smaller ones, so the numbers from 1.1.13 on moved up. Each
@@ -23,6 +23,44 @@ heading says what it was. Version numbers written before 1.1.41 (in code comment
 | 1.1.22 | 1.1.27, 1.1.28 and 1.1.29 |
 | 1.1.23 | 1.1.30, 1.1.31 and 1.1.32 |
 | 1.1.24 – 1.1.31 | 1.1.33 – 1.1.40 (old + 9) |
+
+## 1.4.18 – 18 November 2026
+
+The window you open or touch last is on top: a note, its toolbars and menus outside it, the notes list. Pinned notes
+stay above the rest; of two pinned notes, the one touched last. A small note's » menu and the text's right-click menu are
+now the app's own, in the app theme's colours, not Windows' menus.
+
+- **The cause (window order):** Windows brings a window up only when a click gives it the focus. Most of a note's
+  windows outside it (drawing and text toolbars, Effects, Checklists) never take the focus (the keyboard stays in the
+  note), so a click on one left it under whatever covered it, and its note too; the order of pinned notes (`raisedAt`)
+  was only stamped on a click in the note itself, so 2.5 s later `enforcePinned` could put a note whose toolbar you had
+  just used back under another one. A window that already had the focus didn't come up either once another of ours had
+  come up over it.
+- **Now:** every window tells main when it is pressed (`win:touch`, preload `touch`): the note's page (`touch('')`,
+  panels.js), each window outside a note (`touch(kind)`, `barOut`, also when one is shown) and the list (events.js).
+  Main brings it up (`touchNote`, main/note-window.js: stamps `raisedAt`, `moveTop`, a peek for a note pinned over
+  apps); a note's windows outside it then come up in the order they were opened or touched, the one touched on top
+  (`liftBars`, main/ink-window.js, `c.liftedAt`). Nothing is saved and no window takes the focus.
+- **» menu (src/note/top-bar.js):** it was main's `Menu` (Windows' look, no pictures). Now it is a menu like the
+  right-click one (`#moreMenu`, `.ctx`, `--pop-*` colours), each line with its button's picture and a tick on the pin when
+  it is on. It opens in a see-through window of its own just under » (a new outside kind, `'more'` / `cosmoMoreBar`,
+  `barOut(...).showAt`), so it still shows whole on the smallest and on a rolled-up note (`SHOWS_ROLLED`; toolbars stay
+  hidden while rolled up). Esc, a click in the note, » again, the note losing the focus, rolling up, or a wider note (no
+  ») close it. `note:bar-menu` / `note:bar-act` and preload `barMenu` / `onBarAct` are gone.
+- **One menu for the note (src/note/menus-voice-ink.js `showMenu`):** the » menu, the right-click menus of pictures,
+  links, voice notes and tables (in the note before, cut off on a small note) and the text's Cut / Copy / Paste /
+  spelling / Add ▸ (Windows' menu from main before) are now the same menu (`#ctx`) in its own window (kind `'more'`,
+  made on first use with `K.barOut`). Lines can have a picture, a tick, or › for a sub-menu (Add ▸ shows its lines in the
+  same menu, with a way back). The keyboard stays in the note: ↑ ↓, Enter, → / ←, Esc; any other key closes it. For the
+  text's menu main still knows the spelling and does the line picked: it sends the lines by id (`note:ctx`, main/web.js)
+  and runs the one that comes back (`note:ctx-act` → `runCtx`: Cut / Copy / Paste / Select all, fix a word, Add to
+  dictionary, Add ▸); only an id of the last menu counts. The list and a note's windows outside it keep Windows' menu.
+- Tests: windows.test.js (touch order, pinned notes, the list, the » window on a rolled-up note), safety.test.js (the
+  sixth outside window), note-ui-bar.test.js (the menu in its window: lines, pictures, tick, theme colours, closing,
+  rolled up; the text's menu: its lines, an off line, the keys, Add ▸ and back, picks), windows.test.js (`note:ctx`
+  lines by id, Paste / a suggestion / Add ▸ done by main, an old id does nothing, Windows' menu outside the note),
+  note-ui.test.js (the right-click menus are found in their window). Only a real Windows PC can confirm the order of the
+  windows and the menu's window.
 
 ## 1.4.17 – 18 November 2026
 
@@ -53,23 +91,3 @@ takes them back (the owner lost 45 ticks in the To Do note: Bullets, then Checkl
 - Tests: `note-ui-lists.test.js`, new (Bullets / Checklist on the cursor's line, selected lines, a nested line, a bullet line, words
   under a list; Tab / Shift+Tab / Backspace keep ticks; Enter at a ticked line's start; Undo and Redo of each; the
   drawing). They fail on 1.4.16 at the owner's case.
-
-## 1.4.16 – 18 November 2026
-
-A card no longer blinks while you type in its note: it stays, and the new words write themselves onto it (Ink, the
-owner's pick from five ways shown in a preview).
-
-- **The cause of the blink:** every save of a note made the list build a new card and swap it in (`cached()` in
-  `list/cards.js`). The new card started its effect over (a new canvas and `FX.Layer`), and its picture stayed hidden
-  (`.wait`) until its load event, a frame or more later. Now a note that changed keeps its card: `refreshCard` moves the
-  new card's parts into the card on screen, keeps the effect's canvas (the snow carries on), and keeps the classes others
-  set (selected, favourite, cut…). The card's own handlers read the note as it is now (`noteById`), not the one it was
-  built from. Group cards are still built again.
-- **Pictures:** a picture the window already has is shown at once (fitted then, not at its load event), on every card.
-- **Ink:** only the new letters write themselves in, one after the other (22 ms apart, each fading in over 0.24 s; at
-  most 160 letters, half a second; a longer paste fades in after them). A line typed on writes in only its new letters; a
-  line put in between leaves the lines after it alone; lines taken out, ticked boxes or a new colour write nothing in. A
-  locked card that is unlocked doesn't write itself in. Off with "Reduce animations" in Windows.
-- Tests: `list-ui-cards.test.js` (the edited card stays, keeps its effect's canvas, is measured again; only new letters
-  ink, in order; still a favourite; its menu is the note's as it is now), `list-ui-pictures.test.js` (a picture shows at
-  once on a card filled again).

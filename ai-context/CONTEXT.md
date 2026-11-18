@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 18 November 2026 · App version 1.4.17**
+**Last updated: 18 November 2026 · App version 1.4.18**
 
 Start with `CLAUDE.md` (rules, commands, pitfalls, release checklist). This file is the map: what the app is,
 how the folder is laid out, and which `ai-context/` file to open for the job in hand. Open only the files your

@@ -6,6 +6,26 @@ file (`tests/release.test.js` checks that every version is in one of the two fil
 Renumbered in 1.1.41: each heading says its old number (the table is at the top of `CHANGELOG.md`). Version numbers inside
 the entries are the old ones.
 
+## 1.4.16 – 18 November 2026
+
+A card no longer blinks while you type in its note: it stays, and the new words write themselves onto it (Ink, the
+owner's pick from five ways shown in a preview).
+
+- **The cause of the blink:** every save of a note made the list build a new card and swap it in (`cached()` in
+  `list/cards.js`). The new card started its effect over (a new canvas and `FX.Layer`), and its picture stayed hidden
+  (`.wait`) until its load event, a frame or more later. Now a note that changed keeps its card: `refreshCard` moves the
+  new card's parts into the card on screen, keeps the effect's canvas (the snow carries on), and keeps the classes others
+  set (selected, favourite, cut…). The card's own handlers read the note as it is now (`noteById`), not the one it was
+  built from. Group cards are still built again.
+- **Pictures:** a picture the window already has is shown at once (fitted then, not at its load event), on every card.
+- **Ink:** only the new letters write themselves in, one after the other (22 ms apart, each fading in over 0.24 s; at
+  most 160 letters, half a second; a longer paste fades in after them). A line typed on writes in only its new letters; a
+  line put in between leaves the lines after it alone; lines taken out, ticked boxes or a new colour write nothing in. A
+  locked card that is unlocked doesn't write itself in. Off with "Reduce animations" in Windows.
+- Tests: `list-ui-cards.test.js` (the edited card stays, keeps its effect's canvas, is measured again; only new letters
+  ink, in order; still a favourite; its menu is the note's as it is now), `list-ui-pictures.test.js` (a picture shows at
+  once on a card filled again).
+
 ## 1.4.15 – 18 November 2026
 
 Several groups' name fonts at once, and the settings for groups and for the notes in them are told apart (the owner's

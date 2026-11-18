@@ -33,9 +33,12 @@ contextBridge.exposeInMainWorld('sticky', {
   // 1.4.11: right-click in the text → Add ▸ (main/web.js): the Add panel's items, once; main sends the one picked
   addItems: (list) => ipcRenderer.send('note:add-items', list),
   onAdd: (cb) => ipcRenderer.on('note:add', (e, act) => cb(act)),
-  // 1.4.11: a small note's » button (src/note/top-bar.js): main shows its menu; the line picked comes back
-  barMenu: (items, x, y) => ipcRenderer.send('note:bar-menu', items, x, y),
-  onBarAct: (cb) => ipcRenderer.on('note:bar-act', (e, id) => cb(id)),
+  // 1.4.18: this window was pressed (a note: part = its toolbar or menu outside it, '' = the note; the list too): main
+  // brings it up, on top of the others (main/ipc-notes.js win:touch)
+  touch: (part = '') => ipcRenderer.send('win:touch', String(part || '')),
+  // 1.4.18: the text's right-click menu, shown by the note in the app's look (main/web.js): its lines come, the one picked goes back
+  onCtx: (cb) => ipcRenderer.on('note:ctx', (e, m) => cb(m)),
+  ctxAct: (id) => ipcRenderer.send('note:ctx-act', String(id)),
   saveAttachment: (bytes, ext) => inv('att:save', bytes, ext),
   // 1.2.4: a voice recording is written to disk while it is made
   recStart: () => inv('rec:start'),

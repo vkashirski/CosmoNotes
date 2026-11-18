@@ -19,6 +19,8 @@
   // older { mode: 'free', x, y } was a spot on the screen (maybe on another monitor): it is dropped, and opens inside.
   // 1.1.16: the text toolbar can go outside too, the same way (its own window, 'cosmoTextBar'): barOut() makes
   // one of these for each toolbar. `kind` goes with every message to main.js ('ink' or 'text').
+  // 1.4.18: key null = its place is never kept (the » menu: showAt). A press anywhere in its window tells main
+  // (api.touch), which brings it and its note up, on top of the others; so does showing it (the newest opened is on top).
   function barOut({ el, kind, frame, title, key, mover, onEsc = null }) {
     const PAD = { l: 12, t: 8, r: 12, b: 14 }; // room around the toolbar in its window (for its shadow)
     const INSET = PAD; // where the visible toolbar starts in its window
@@ -27,11 +29,18 @@
     let saved = null;
     let sizeObs = null;
     let ready = Promise.resolve(); // the styles in its window have loaded
-    try { const v = JSON.parse(localStorage.getItem(key) || 'null'); if (v && (v.mode === 'dock' || (v.mode === 'free' && Number.isFinite(v.dx) && Number.isFinite(v.dy)))) saved = v; } catch { /* fine */ }
+    try { const v = key && JSON.parse(localStorage.getItem(key) || 'null'); if (v && (v.mode === 'dock' || (v.mode === 'free' && Number.isFinite(v.dx) && Number.isFinite(v.dy)))) saved = v; } catch { /* fine */ }
     const remember = (v) => {
       saved = v;
+      if (!key) return;
       try { if (v) localStorage.setItem(key, JSON.stringify(v)); else localStorage.removeItem(key); } catch { /* fine */ }
     };
+    // show it at a place ({ mode: 'dock', side, off } or { mode: 'free', dx, dy }), once its styles have loaded (its real size)
+    const showOut = (at) => ready.then(() => requestAnimationFrame(() => {
+      if (!isOut) return;
+      api.ink.show({ ...(typeof at === 'function' ? at(el.offsetWidth, el.offsetHeight) : at), ...size() });
+      api.touch(kind);
+    }));
     const alive = () => !!(w && !w.closed && w.document && w.document.body);
     const size = () => ({ bar: kind, w: el.offsetWidth + PAD.l + PAD.r, h: el.offsetHeight + PAD.t + PAD.b, inset: INSET });
     // the toolbar's window looks like the note (same styles, same body classes: paused, rolled, colour…)
@@ -59,6 +68,7 @@
       ready = Promise.all(loads);
       for (const s of document.querySelectorAll('head style')) d.head.append(d.importNode(s, true));
       if (onEsc) d.addEventListener('keydown', (e) => { if (e.key === 'Escape') onEsc(); });
+      d.addEventListener('pointerdown', () => api.touch(kind), true);
       mirror();
       // the toolbar can change size (eraser options…): its window follows
       try {
@@ -93,10 +103,15 @@
       // the toolbar opens: make the window now; if the toolbar was outside last time, put it there again
       start() {
         if (!open()) return;
-        if (saved && moveOut()) {
-          // show it once its styles have loaded, so it has its real size
-          ready.then(() => requestAnimationFrame(() => { if (isOut) api.ink.show({ ...saved, ...size() }); }));
-        }
+        if (saved && moveOut()) showOut(saved);
+      },
+      // 1.4.18: outside at once, its visible box's top-left at place(w, h) → { x, y } (px from the note's top-left);
+      // false: its window can't open
+      showAt(place) {
+        if (!moveOut()) return false;
+        el.style.width = ''; // a menu takes the width its words need, not the one it had in the note
+        showOut((bw, bh) => { const p = place(bw, bh); return { mode: 'free', dx: Math.round(p.x - INSET.l), dy: Math.round(p.y - INSET.t) }; });
+        return true;
       },
       // the toolbar closes: it goes back into the note (hidden), and its window closes
       stop() {
@@ -332,6 +347,6 @@
     }
   }
 
-  Object.assign(K, { inkOut, textOut, placeInkBar, textMove, scheduleInkSave, saveInk, snapshot, inkUndo, inkRedo,
+  Object.assign(K, { barOut, inkOut, textOut, placeInkBar, textMove, scheduleInkSave, saveInk, snapshot, inkUndo, inkRedo,
     catcher, inkPt, shapeEnd, redrawCurrent, eraseAt });
 })();

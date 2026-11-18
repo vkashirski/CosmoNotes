@@ -1,14 +1,15 @@
 'use strict';
-const { BrowserWindow, Menu, ipcMain } = require('electron');
+const { BrowserWindow, ipcMain } = require('electron');
 const { checkPassword, hashPassword, isLocked, packLock, viewOf, wait } = require('./locks');
 const crypt = require('./crypt');
 const { broadcastSettings, lockInfo, noteSettings } = require('./settings');
 const { notifyList } = require('./list-notify');
 const { applyClickThrough, applyState, clickThroughNow, setWinTitle } = require('./note-state');
-const { createNote, duplicateNote, unrollWin } = require('./note-window');
+const { createNote, duplicateNote, touchNote, unrollWin } = require('./note-window');
 const { applyPatch, senderNote } = require('./ipc-common');
 const { hiddenInList, knownTags, unlockedForNow } = require('./list-visibility');
 const { openApps } = require('./app-pin');
+const { runCtx } = require('./web');
 const TAGS = require('../src/tags');
 const { S } = require('./state');
 
@@ -156,18 +157,16 @@ function registerNoteIpc() {
     const { win } = senderNote(e);
     if (win && !win.isDestroyed()) win.addItems = menuItems(list, 'act');
   });
-  // 1.4.11: a small note's » button (src/note/top-bar.js): the buttons that didn't fit, in a real menu (it shows outside the
-  // window, so it works on the smallest and on a rolled-up note); the line picked goes back and its button does it
-  ipcMain.on('note:bar-menu', (e, items, x, y) => {
-    const { win, note } = senderNote(e);
-    if (!note || win.isDestroyed()) return;
-    const list = menuItems(items, 'id');
-    if (!list.length) return;
-    Menu.buildFromTemplate(list.map((it) => ({
-      label: it.label,
-      ...(typeof it.checked === 'boolean' ? { type: 'checkbox', checked: it.checked } : {}),
-      click: () => { if (!win.isDestroyed()) win.webContents.send('note:bar-act', it.id); },
-    }))).popup({ window: win, x: Math.max(0, Math.round(Number(x) || 0)), y: Math.max(0, Math.round(Number(y) || 0)) });
+  // 1.4.18: a line picked in a note's own right-click menu (main/web.js sent it; only its ids count)
+  ipcMain.on('note:ctx-act', (e, id) => runCtx(e.sender, id));
+  // 1.4.18: a window was pressed: it comes up, on top of the others (the window touched last is on top; pinned notes stay
+  // above the rest). From a note: `part` = which of its windows outside it ('ink', 'menu', 'more'…), or '' for the note.
+  // From the list: the list. Only the order of the windows changes (touchNote), so a hidden locked note may do it too.
+  ipcMain.on('win:touch', (e, part) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win || win.isDestroyed()) return;
+    if (win === S.listWin) { if (win.isVisible() && !win.isMinimized()) win.moveTop(); return; }
+    if (win.noteId) touchNote(win, typeof part === 'string' ? part : null);
   });
 }
 

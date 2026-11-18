@@ -76,7 +76,7 @@
     // two left) and its click never came, so a menu dragged out of the note stayed open
     // (1.4.8: nor a right-click on the pin: it opens and closes the pin's list itself, src/note/pin-apps.js)
     if (!e.target.closest('.pop, #btnMenu, #btnInsert, #btnText, #btnCloseAll') && !(e.button === 2 && e.target.closest('#btnPin'))) closePops(true);
-    if (!e.target.closest('.ctx')) hideCtx();
+    if (!e.target.closest('.ctx, [aria-expanded="true"]')) hideCtx(); // (1.4.18: not on the button that opened it: it closes it itself)
   });
   // 1.1.20: switches one after another are grouped, so each sits right after its text and they still line up
   function groupSwitches(root, sel) {
@@ -98,6 +98,9 @@
   $$('.pop button, .ctx').forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault()));
   // 1.1.20: clicking a menu brings it to the front; the top bar's button closes them all
   for (const id of [...EDIT_POPS, '#textPop']) $(id).addEventListener('pointerdown', (e) => toFront(e.currentTarget), true);
+  // 1.4.18: the window touched last is on top: a press in the note brings it (and its toolbars outside it) up, also when it
+  // has the focus already and another note came up over it (main/note-window.js touchNote; its windows outside: barOut)
+  document.addEventListener('pointerdown', () => api.touch(''), true);
   $('#btnCloseAll').addEventListener('mousedown', (e) => e.preventDefault());
   $('#btnCloseAll').addEventListener('click', closeAllPops);
 

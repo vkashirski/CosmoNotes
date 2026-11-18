@@ -11,25 +11,116 @@
     transcribe = K.later('transcribe'), sttStop = K.later('sttStop'), sttCancel = K.later('sttCancel'), sttMic = K.later('sttMic'),
     sttAbortNow = K.later('sttAbortNow');
   // ================================================================ right-click menus
+  // 1.4.18: one menu for the whole note, in the app's own look (#ctx, --pop-* colours): the right-click menus (pictures,
+  // links, voice notes, tables, and the text's Cut / Copy / Paste / spelling / Add ▸ that main used to show as Windows'
+  // menu) and a small note's » (top-bar.js). It opens in a see-through window of its own (barOut, kind 'more'), so it
+  // shows whole on the smallest and on a rolled-up note; if that window can't open, inside the note. The keyboard stays in
+  // the note: ↑ ↓ pick a line, Enter does it, → / ← go into a sub-menu and back, Esc or any other key closes it; so do a
+  // click anywhere else (panels.js), the note losing the focus, and hideCtx().
+  // showMenu(items, at, { owner }): items = [{ label, run, icon (an svg), checked (true / false: a line that can be
+  // ticked), danger, disabled, sub: [items] } | '-'], at(w, h) = where its top-left goes (px from the note's top-left).
+  // owner: the button that opened it (aria-expanded; a press on it doesn't close it, so it can close it itself).
   const ctx = $('#ctx');
-  function hideCtx() { ctx.hidden = true; }
-  function showCtx(x, y, items) {
-    ctx.innerHTML = '';
+  let ctxOut = null; // its window (barOut is made by a later part: made on first use)
+  let ctxOwner = null;
+  let ctxStack = []; // the lists shown, a sub-menu's last
+  const TICK = '<svg class="mtick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const MORE = '<svg class="msub" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+  const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>';
+  const ctxOpen = () => !ctx.hidden;
+  function hideCtx() {
+    if (ctx.hidden) return;
+    ctx.hidden = true;
+    ctxStack = [];
+    if (ctxOut) ctxOut.stop(); // back into the note; its window closes
+    if (ctxOwner) ctxOwner.setAttribute('aria-expanded', 'false');
+    ctxOwner = null;
+  }
+  function fillCtx(items, back = null) {
+    ctx.textContent = '';
+    const pics = !!back || items.some((it) => it && it.icon);
+    const line = (it, run) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mi' + (it.danger ? ' danger' : '');
+      if (it.id) b.dataset.id = it.id;
+      const box = typeof it.checked === 'boolean';
+      b.setAttribute('role', box ? 'menuitemcheckbox' : 'menuitem');
+      if (box) b.setAttribute('aria-checked', String(it.checked));
+      if (it.disabled) b.disabled = true;
+      if (pics) b.append(it.icon ? it.icon.cloneNode(true) : document.createElement('i')); // (no picture: the words still line up)
+      const words = document.createElement('span');
+      words.textContent = it.label;
+      b.append(words);
+      if (it.checked) b.insertAdjacentHTML('beforeend', TICK);
+      if (it.sub) b.insertAdjacentHTML('beforeend', MORE);
+      b.addEventListener('mousedown', (ev) => ev.preventDefault()); // the note keeps its text selection
+      b.addEventListener('mousemove', () => hot(b));
+      b.addEventListener('click', run);
+      ctx.appendChild(b);
+      return b;
+    };
+    if (back) {
+      const b = line({ label: back }, () => { ctxStack.pop(); fillCtx(...ctxStack[ctxStack.length - 1]); });
+      b.classList.add('mback');
+      b.firstChild.replaceWith(document.createRange().createContextualFragment(BACK));
+      const s = document.createElement('div'); s.className = 'sep'; ctx.appendChild(s);
+    }
     for (const it of items) {
       if (it === '-') { const s = document.createElement('div'); s.className = 'sep'; ctx.appendChild(s); continue; }
-      const b = document.createElement('button');
-      b.className = 'mi' + (it.danger ? ' danger' : '');
-      b.textContent = it.label;
-      b.addEventListener('mousedown', (ev) => ev.preventDefault());
-      b.addEventListener('click', () => { hideCtx(); it.run(); });
-      ctx.appendChild(b);
+      const b = line(it, () => {
+        if (it.sub) { ctxStack.push([it.sub, it.label]); fillCtx(it.sub, it.label); return; }
+        hideCtx();
+        it.run();
+      });
+      b.dataset.sub = it.sub ? '1' : '';
     }
-    ctx.hidden = false;
-    const w = ctx.offsetWidth;
-    const h = ctx.offsetHeight;
-    ctx.style.left = Math.max(4, Math.min(x, innerWidth - w - 4)) + 'px';
-    ctx.style.top = Math.max(4, Math.min(y, innerHeight - h - 4)) + 'px';
   }
+  const lines = () => [...ctx.querySelectorAll('.mi:not(:disabled)')];
+  function hot(b) { for (const x of ctx.querySelectorAll('.mi.hot')) x.classList.remove('hot'); if (b) b.classList.add('hot'); }
+  function showMenu(items, at, { owner = null } = {}) {
+    if (!items.some((it) => it !== '-')) return;
+    hideCtx();
+    ctxStack = [[items, null]];
+    fillCtx(items);
+    ctx.hidden = false;
+    ctx.style.left = '';
+    ctx.style.top = '';
+    ctxOwner = owner;
+    if (owner) owner.setAttribute('aria-expanded', 'true');
+    if (!ctxOut && K.barOut) ctxOut = K.barOut({ el: ctx, kind: 'more', frame: 'cosmoMoreBar', title: 'Menu', key: null, mover: () => null });
+    if (ctxOut && ctxOut.showAt(at)) return;
+    const p = at(ctx.offsetWidth, ctx.offsetHeight);
+    ctx.style.left = Math.max(4, Math.min(p.x, innerWidth - ctx.offsetWidth - 4)) + 'px';
+    ctx.style.top = Math.max(4, Math.min(p.y, innerHeight - ctx.offsetHeight - 4)) + 'px';
+  }
+  // the right-click menus: at the mouse
+  const showCtx = (x, y, items) => showMenu(items, () => ({ x, y }));
+  document.addEventListener('keydown', (e) => {
+    if (!ctxOpen()) return;
+    const all = lines();
+    const at = all.indexOf(ctx.querySelector('.mi.hot'));
+    const k = e.key;
+    const n = all.length;
+    if (k === 'ArrowDown') hot(all[at < 0 ? 0 : (at + 1) % n]);
+    else if (k === 'ArrowUp') hot(all[at < 0 ? n - 1 : (at - 1 + n) % n]);
+    else if ((k === 'Enter' || k === ' ') && at >= 0) all[at].click();
+    else if (k === 'ArrowRight' && at >= 0 && all[at].dataset.sub) { all[at].click(); hot(lines()[1]); }
+    else if (k === 'ArrowLeft' && ctxStack.length > 1) ctx.querySelector('.mback').click();
+    else if (k === 'Escape') hideCtx();
+    else { if (!['Shift', 'Control', 'Alt', 'Meta'].includes(k)) hideCtx(); return; } // anything else: the menu goes, the key works as usual
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
+  window.addEventListener('blur', hideCtx);
+  // the text's own menu (spelling, Cut / Copy / Paste, Add ▸): main knows the spelling, so it sends the lines; the one
+  // picked goes back (main does it: it can paste, and fix a word)
+  if (api.onCtx) api.onCtx((m) => {
+    if (!m || !Array.isArray(m.items)) return;
+    const conv = (list) => list.map((it) => (it === '-' ? '-' : { label: it.label, disabled: it.enabled === false, run: () => api.ctxAct(it.id), ...(it.sub ? { sub: conv(it.sub) } : {}) }));
+    closePops();
+    showCtx(Number(m.x) || 0, Number(m.y) || 0, conv(m.items));
+  });
   editor.addEventListener('contextmenu', (e) => {
     const img = e.target.closest('img');
     const voice = e.target.closest('.voice');
@@ -542,7 +633,7 @@
   window.addEventListener('resize', placeHandle);
   editor.addEventListener('load', placeHandle, true);
 
-  Object.assign(K, { hideCtx, togglePlay, stopPlay, voiceChip, rec, startRecording, stopRecording, stopRecordingNow, keepClip, dropClip,
+  Object.assign(K, { hideCtx, showMenu, ctxOpen, togglePlay, stopPlay, voiceChip, rec, startRecording, stopRecording, stopRecordingNow, keepClip, dropClip,
     openDraw, closeDraw, drawUndo,
     handle, selectImage, placeHandle });
 })();

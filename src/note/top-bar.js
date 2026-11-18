@@ -1,11 +1,12 @@
 'use strict';
 // CosmoNotes note window, part 15 of 16 (1.4.11): a small note's top bar. The title is what matters most: when the buttons
-// leave it too little room, the least needed ones move into one button, » (#btnMore), whose menu lists them. Its menu is
-// main's (a real menu: it shows outside the window, so it works on the smallest note and on a rolled-up one). Close, and
+// leave it too little room, the least needed ones move into one button, » (#btnMore), whose menu lists them. Close, and
 // the click-through button while it is on, always stay. This replaces the old one-button-at-a-time hiding rules.
+// 1.4.18: »'s menu is the app's own (it was Windows' menu; the owner's wish): the note's menu (showMenu), in a small window
+// of its own just under », so it shows whole on the smallest note and on a rolled-up one.
 (() => {
   const K = window.COSMO_NOTE_KIT;
-  const { api, $, body } = K;
+  const { $, body, showMenu, hideCtx, ctxOpen } = K;
   const bar = $('#bar');
   const title = $('#title');
   const more = $('#btnMore');
@@ -15,7 +16,7 @@
   const TITLE_MAX = 220; // px: the most a long title asks for (it may still get more), so a wide note keeps its buttons
 
   const pressed = (id) => $('#' + id).getAttribute('aria-pressed') === 'true';
-  // each button's line in the menu (main's menu has no pictures: short words instead of the tooltips)
+  // each button's line in the menu: short words instead of the tooltips, with the button's picture (checked: a tick)
   const ITEMS = {
     btnList: () => [{ id: 'btnList', label: 'All notes' }],
     btnNew: () => [{ id: 'btnNew', label: 'New note' }],
@@ -89,17 +90,37 @@
   document.fonts.addEventListener('loadingdone', soon); // a title font that loads late
   soon();
 
-  more.addEventListener('click', () => {
-    const items = [];
-    for (const el of bar.children) if (el.classList.contains('over') && ITEMS[el.id]) items.push(...ITEMS[el.id]());
-    if (!items.length) return;
-    const r = more.getBoundingClientRect();
-    api.barMenu(items, Math.round(r.left), Math.round(r.bottom));
-  });
-  // a line picked in main's menu: the button itself does it (so it works the same as in the bar)
-  if (api.onBarAct) api.onBarAct((id) => {
+  // ---- »'s menu (1.4.18): the note's own menu (menus-voice-ink.js showMenu: the app's look, in a window of its own), under
+  // », its right edge at »'s (main keeps it on the screen). It is made afresh each time from the buttons in » now; rolling
+  // up, or » going away (a wide note), closes it.
+  // a button's picture for its line (the one it shows now: Maximise / Normal size; the pin without its little window)
+  function picture(id) {
+    const b = $('#' + id);
+    const svg = b && b.querySelector(id === 'btnMax' ? (body.classList.contains('maxed') ? '.i-restore' : '.i-max') : 'svg:not(.pinwin)');
+    if (!svg) return null; // (Pin options…)
+    const c = svg.cloneNode(true);
+    c.removeAttribute('class');
+    c.setAttribute('aria-hidden', 'true');
+    if (id === 'btnRoll' && body.classList.contains('rolled')) c.style.transform = 'rotate(180deg)'; // Unroll: it points down
+    return c;
+  }
+  // a line picked: the menu has closed; the button itself does it (so it works the same as in the bar)
+  function pick(id) {
     if (id === 'pinMenu') { $('#btnPin').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); return; }
     const b = ORDER.includes(id) ? $('#' + id) : null;
     if (b && b.classList.contains('over') && !b.hidden) b.click();
+  }
+  let rolledAt = false;
+  more.addEventListener('click', () => {
+    if (ctxOpen() && more.getAttribute('aria-expanded') === 'true') { hideCtx(); return; }
+    const items = [];
+    for (const el of bar.children) if (el.classList.contains('over') && ITEMS[el.id]) items.push(...ITEMS[el.id]());
+    if (!items.length) return;
+    rolledAt = body.classList.contains('rolled');
+    const r = more.getBoundingClientRect();
+    showMenu(items.map((it) => ({ ...it, icon: picture(it.id), run: () => pick(it.id) })), (w) => ({ x: r.right - w, y: r.bottom + 3 }), { owner: more });
   });
+  const mine = () => ctxOpen() && more.getAttribute('aria-expanded') === 'true';
+  new MutationObserver(() => { if (mine() && body.classList.contains('rolled') !== rolledAt) hideCtx(); }).observe(body, { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(() => { if (mine() && more.hidden) hideCtx(); }).observe(more, { attributes: true, attributeFilter: ['hidden'] });
 })();

@@ -85,7 +85,7 @@ Open this when working in `src/note.*` or `src/list.*`. Effects have their own f
   formatting buttons scroll sideways (`.tleft`) on narrow notes so Undo, Draw and Add always stay visible.
 - The top bar (1.1.13): All notes, New | title | (lock again) Pin, Roll, ••• | Minimise, Maximise, X. Its buttons are 24 px
   below 330 px. Since 1.4.11 (`src/note/top-bar.js`) the title gets its room first and the buttons that don't fit go into
-  » (main's menu), least needed first (`ORDER`); no CSS hides a top-bar button by width any more. A new top-bar button
+  » (1.4.18: the note's own menu `#ctx`, `showMenu` in menus-voice-ink.js, in an outside window under », kind `'more'`; it was main's), least needed first (`ORDER`); no CSS hides a top-bar button by width any more. A new top-bar button
   needs its place in `ORDER` and a line in `ITEMS` (or it never moves, and a small note's bar runs over:
   `note-ui-bar.test.js` checks the 200 px note).
 - The bottom bar must fit on a 340 px note (the default width). Order: B I U S A | bullets checklist | word wrap

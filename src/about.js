@@ -26,6 +26,7 @@ window.COSMO_ABOUT = {
       title: 'Sticky notes on your desktop',
       items: [
         'Pin a note to keep it above every other window. The one you pinned or clicked last is on top.',
+        'The window you open or click last comes to the front: a note, its toolbars and menus, the notes list.',
         'Click-through: read a pinned note over a video or game, and click what’s under it. Turn it on in Settings, then right-click the pin.',
         'Right-click the pin to pin a note to some apps. It follows them: on top in front, behind other apps, gone while they’re closed.',
         'Tick a whole app, or just one folder or file in it. No note can show over a game in exclusive full screen.',
@@ -33,6 +34,7 @@ window.COSMO_ABOUT = {
         'Roll a note up to just its top bar.',
         'Minimise and maximise buttons next to the X. Double-click the top bar to maximise.',
         'A small note keeps its title. The buttons that don’t fit go into the » button.',
+        'Right-click menus have the app’s colours, and you can use them with the arrow keys.',
         'Notes reopen where you left them, also after a restart.',
         'Starts with Windows (you can turn this off).',
         '17 paper colours, light and dark. The colour row in the ⋯ menu scrolls sideways.',

@@ -354,7 +354,8 @@ const look = (page) => page.evaluate(() => {
   const chip = '<div><span class="voice" contenteditable="false" data-src="stickyfile://att/c1.webm" data-dur="3"><span class="v-play"></span><span class="v-bars"></span><span class="v-time">0:03</span></span>&nbsp;</div><div>after</div>';
   const trMenu = async (pg) => {
     await pg.locator('#editor .voice').dispatchEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 });
-    await pg.locator('#ctx .mi', { hasText: 'Transcribe' }).dispatchEvent('click');
+    await pg.waitForTimeout(60);
+    await pg.evaluate(() => [...window.COSMO_NOTE_KIT.$('#ctx').querySelectorAll('.mi')].find((x) => x.textContent.includes('Transcribe')).click()); // (1.4.18: the menu is in a window of its own)
     await pg.waitForTimeout(150);
   };
   page = await nu.open({ html: chip }, 380, 320, `(${sttInit})()`);
@@ -509,7 +510,7 @@ const look = (page) => page.evaluate(() => {
   const ctxRun = async (pg, sel, label) => {
     await pg.locator(sel).first().dispatchEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 });
     await pg.waitForTimeout(50);
-    assert.ok(await pg.evaluate((l) => { const b = [...document.querySelectorAll('#ctx button')].find((x) => x.textContent.includes(l)); if (b) b.click(); return !!b; }, label), 'menu item ' + label);
+    assert.ok(await pg.evaluate((l) => { const b = [...window.COSMO_NOTE_KIT.$('#ctx').querySelectorAll('button')].find((x) => x.textContent.includes(l)); if (b) b.click(); return !!b; }, label), 'menu item ' + label);
     await pg.waitForTimeout(80);
   };
   const PIC = '<p>a<img class="att-img" src="stickyfile://att/p.png" width="200" height="100">b</p>';
@@ -564,7 +565,8 @@ const look = (page) => page.evaluate(() => {
     await page.waitForTimeout(450);
     assert.ok((await page.updates()).some((u) => typeof u.html === 'string' && u.html.includes('<a href="https://cats.com"><img')), 'saved');
     await page.locator('#editor img').dispatchEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 });
-    assert.deepEqual(await page.$$eval('#ctx button', (b) => b.map((x) => x.textContent).filter((t) => /link/i.test(t))), ['Open link', 'Edit link…', 'Copy link address', 'Remove link'], 'its right-click menu');
+    await page.waitForTimeout(60);
+    assert.deepEqual(await page.evaluate(() => [...window.COSMO_NOTE_KIT.$('#ctx').querySelectorAll('button')].map((x) => x.textContent).filter((t) => /link/i.test(t))), ['Open link', 'Edit link…', 'Copy link address', 'Remove link'], 'its right-click menu');
     await page.keyboard.press('Escape'); await page.mouse.click(5, 300);
     await page.click('#editor img');
     await page.waitForTimeout(60);
@@ -1083,7 +1085,7 @@ const look = (page) => page.evaluate(() => {
     const copied = async (p) => {
       await p.locator('#editor img').dispatchEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 });
       await p.waitForTimeout(50);
-      await p.evaluate(() => [...document.querySelectorAll('#ctx button')].find((x) => x.textContent.includes('Copy image')).click());
+      await p.evaluate(() => [...window.COSMO_NOTE_KIT.$('#ctx').querySelectorAll('button')].find((x) => x.textContent.includes('Copy image')).click());
       await p.waitForFunction(() => /\bcop/i.test(document.getElementById('toast').textContent));
       return p.evaluate(async () => {
         const cp = window.__cp; let size = null;

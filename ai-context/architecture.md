@@ -53,6 +53,8 @@ no loose `store` / `listWin` / `quitting` / `listUnlockedAll` is left.
     update's status, to the list), `update:show` (go to Settings → About's updates: the tray's line), `remind:ring` (1.4.1:
     reminders that just went off, to their note window: it plays the sound)
   - the voice-to-text engine window (1.3.1) talks only `engine:msg`, both ways (`src/engine/preload.js`)
+  - 1.4.18: `note:ctx` (main → note: the text's right-click lines, by id) / `note:ctx-act` (the one picked), `win:touch`
+    (any window: pressed, comes up)
   - **No native message boxes.** The list window asks every question with its own app-styled `modal()`
     (list.js) and only then calls main (`list:destroy`, `list:empty-bin`, `backups:restore` don't ask
     themselves). The only native dialog left is the photo file picker (`att:pick-images`).
@@ -247,6 +249,24 @@ Settings), `main/stt-models.js` (the list), `main/stt-download.js` (the download
 - **Secrets**: `note.remindMsg` is in `SECRET` and crypt.js `SECRET_FIELDS` (one `blank()` for the store's writes and the
   backups): sealed with a locked note, `{}` while sealed, `null` in a hidden window, never in `list:get` (only `list:remind-get`,
   which refuses a note `hiddenInList`). `note.reminders` stays plain: main needs the times before the PIN.
+
+## Which window is on top (1.4.18)
+
+- **Rule (the owner's wish):** the window opened or touched last is on top: a note, its toolbars and menus outside it, the
+  list. Pinned notes stay above the rest (Windows' on-top layer); among them, the one pinned or touched last (`raisedAt`,
+  `enforcePinned` every 2.5 s). A note's windows outside it are its children: always above their note.
+- **Why main has to do it:** Windows raises a window only when a click gives it the focus. Most windows outside a note are
+  `focusable: false` (the keyboard stays in the note), and a window that has the focus already doesn't come up when
+  another of ours came up over it without taking the focus.
+- **How:** every page sends `win:touch` on `pointerdown` (capture): the note's page (`touch('')`), each outside window's
+  document (`touch(kind)`, set up in `barOut`; also right after one is shown), the list. `touchNote` (note-window.js):
+  `raised(win)`, `win.moveTop()`, then `liftBars(win, kind)` (ink-window.js) moves its visible outside windows up in their
+  `liftedAt` order (stamped when made and when touched), the touched one last. A note pinned over apps gets a peek while
+  it doesn't have the focus. Nothing is saved, nothing takes the focus, so a hidden locked note may do it too.
+- A new window outside a note: a kind in `BAR_FRAMES` / `BAR_KINDS` (ink-geometry.js); made with `barOut`, it touches by
+  itself. The note's menu is one (`'more'`, 1.4.18: » and every right-click menu, `showMenu`): placed with `showAt`, shown
+  on a rolled-up note too (`SHOWS_ROLLED`). The text's right-click lines come from main by id (`note:ctx`, main/web.js);
+  the one picked goes back (`note:ctx-act` → `runCtx`, only ids of the last menu): no native menu in a note window.
 
 ## App pins (1.4.5)
 

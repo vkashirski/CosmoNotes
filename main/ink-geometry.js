@@ -13,9 +13,12 @@ const { S } = require('./state');
 // 1.1.16: the text toolbar does the same, in a window of its own: win.textWin, win.textOut, win.textState. Every
 // function and message below takes the toolbar's kind, 'ink' (the default) or 'text' (messages: `bar: 'text'`).
 // The ⋯ menu ('menu') and the Effects pop-up ('fx') can go outside too (1.1.16, same rules), and the Checklists pop-up ('ck', 1.3.21).
-const BAR_FRAMES = { cosmoInkBar: 'ink', cosmoTextBar: 'text', cosmoMenuBar: 'menu', cosmoFxBar: 'fx', cosmoCkBar: 'ck' };
-const BAR_KINDS = ['ink', 'text', 'menu', 'fx', 'ck'];
-const BAR_TITLES = { ink: 'Drawing', text: 'Text', menu: 'Note settings', fx: 'Effects', ck: 'Checklists' };
+// 1.4.18: a small note's » menu ('more', src/note/top-bar.js) is one too: it opens just under its button, never moves, and
+// shows on a rolled-up note as well (SHOWS_ROLLED: it is the top bar's own menu).
+const BAR_FRAMES = { cosmoInkBar: 'ink', cosmoTextBar: 'text', cosmoMenuBar: 'menu', cosmoFxBar: 'fx', cosmoCkBar: 'ck', cosmoMoreBar: 'more' };
+const BAR_KINDS = ['ink', 'text', 'menu', 'fx', 'ck', 'more'];
+const BAR_TITLES = { ink: 'Drawing', text: 'Text', menu: 'Note settings', fx: 'Effects', ck: 'Checklists', more: 'More buttons' };
+const SHOWS_ROLLED = new Set(['more']);
 const barKind = (k) => (BAR_KINDS.includes(k) ? k : 'ink');
 const INK_GAP = 4; // px between the note and a toolbar stuck to it
 const INK_SNAP = 12; // px: this close to a side, it sticks (1.1.20: was 40, it grabbed toolbars and menus from too far away)
@@ -116,4 +119,4 @@ function snapInk(win, p) {
   if (cands.length) return { ...st, mode: 'dock', side: cands[0].side, off: Math.round(cands[0].off) };
   return { ...st, mode: 'free', x: Math.round(x), y: Math.round(y) };
 }
-module.exports = { BAR_FRAMES, BAR_KINDS, barKind, cleanInkSize, fromNote, inkBarOptions, inkSpot, nearNote, snapInk };
+module.exports = { BAR_FRAMES, BAR_KINDS, SHOWS_ROLLED, barKind, cleanInkSize, fromNote, inkBarOptions, inkSpot, nearNote, snapInk };

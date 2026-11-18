@@ -12,6 +12,18 @@
 .ctx[hidden] { display: none; }
 .ctx .mi { padding: 6px 9px; font-size: 12.5px; }
 .ctx .sep { height: 1px; margin: 4px 6px; background: var(--pop-soft2); }
+/* 1.4.18: the note's one menu (menus-voice-ink.js showMenu): the right-click menus and a small note's ». Lines may have a
+   picture, a tick (on) or › (a sub-menu); .hot = the line ↑ ↓ are on. It opens in a see-through window of its own
+   (body.inkbar-out), like the toolbars outside */
+.ctx .mi { white-space: nowrap; }
+.ctx .mi > i { width: 16px; flex: none; }
+.ctx .mi .mtick, .ctx .mi .msub { margin-left: auto; width: 15px; height: 15px; color: var(--pop-ink2); }
+.ctx .mi.hot { background: var(--pop-soft); }
+.ctx .mback { color: var(--pop-mute); }
+body.inkbar-out #ctx {
+  position: absolute; left: 12px !important; top: 8px !important; right: auto !important; bottom: auto !important;
+  box-shadow: 0 4px 12px rgba(60,40,10,.26), 0 1px 3px rgba(0,0,0,.12);
+}
 
 /* ---------- recording ---------- */
 #recbar {

@@ -47,7 +47,13 @@ Keep each file's existing line endings (`.gitattributes` holds them for git sinc
 - **List cards stay (1.4.16, `src/list/cards.js` `refreshCard`):** a changed note keeps its card (a new one blinked). A handler on
   the card element itself reads the note live (`noteById`), never the `n` it was built from. See `ui-gotchas.md`.
 - **Top bar (1.4.11, `src/note/top-bar.js`):** a new top-bar button needs its place in `ORDER` and a line in `ITEMS`, or it
-  never moves into » and a small note's bar runs over. Don't hide top-bar buttons by width in CSS.
+  never moves into » and a small note's bar runs over. Don't hide top-bar buttons by width in CSS. »'s menu and every
+  right-click menu in a note are the note's own menu since 1.4.18 (`showMenu`, an outside window, kind `'more'`; the text's
+  lines come from main by id: `note:ctx`): no native `Menu` in a note window.
+- **Window order (1.4.18):** the window touched last is on top, pinned notes above the rest. Windows can't do it for
+  windows that never take the focus, so every page sends `touch` on a press (main `touchNote` / `liftBars`). A new window
+  outside a note goes through `barOut` (it touches by itself) and needs its kind in `BAR_FRAMES` / `BAR_KINDS`.
+  `architecture.md` → "Which window is on top".
 - **Zoom:** anything that turns mouse or screen pixels into sizes inside a note must divide by `zoomNow()`. Don't use Electron's page zoom.
 - **Effects:** a new effect or follower needs its id in both `src/fx/` (its `effects-*` / `followers-*` file and `ORDER` in `engine.js`) and `store.js`. Draw on the shared canvas loop: no `Path2D`, no per-particle DOM or CSS animation, no per-frame `createRadialGradient` / `filter`, and it must also work with `m === null`. See `effects.md`.
 - **Ink:** never thin out or re-smooth saved points; drawings drift ("dance") a little more on every pass.
