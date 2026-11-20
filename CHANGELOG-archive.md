@@ -6,6 +6,158 @@ file (`tests/release.test.js` checks that every version is in one of the two fil
 Renumbered in 1.1.41: each heading says its old number (the table is at the top of `CHANGELOG.md`). Version numbers inside
 the entries are the old ones.
 
+## 1.4.21 – 20 November 2026
+
+Right-click in a note opens its menu at once, Add ▸ is first in it with the Add panel's pictures, the Add panel is a row
+of pictures over the bottom bar (no more Today's date), and a ticked checklist line's strike goes through the middle of
+big words too.
+
+- **The cause (slow right-click):** since 1.4.18 the note's menu (`#ctx`, `showMenu`) opens in a see-through window of
+  its own, and every right-click (and every ») made a new one (`window.open`, then copying and loading the styles, then
+  showing it) and closed it again. Now that window is made once and kept: shutting the menu only hides it (`barOut`'s
+  new `keep`, `src/note/ink-out.js`; the menu's `menuOut`, `src/note/menus-voice-ink.js`). It is also made ahead of time,
+  so the first right-click is quick too: only while the note doesn't have the focus (it opens in the background, or you
+  leave it), because making a window takes the page's focus for a moment (a stroke being drawn ended in the tests).
+- **The text's right-click menu** (`main/web.js`): Add ▸ first, then a line, then the spelling and Cut / Copy / Paste (the
+  owner's wish). Its lines have the Add panel's pictures in their colours (main sends each item's act as `pic`; the note
+  clones the tile's picture, `addPic`).
+- **The Add panel** (`#insert`, `src/note.html`, `note-toolbars.css`): one row of pictures over the bottom bar, at its
+  right by +; each name shows on hover (`title`, also the name in Add ▸). Too narrow a note: the row wraps. **Today's
+  date** is gone (the owner's wish: `doInsert`'s `date`).
+- **The cause (strike not in the middle):** a ticked line's strike was the line's `text-decoration`. Chromium draws a
+  decoration set on a parent at the parent's size, so on bigger words it ran near their top (and under smaller ones).
+  Now each run of words draws its own strike in its own size and font: in a note the highlight `cn-done` over the ticked
+  lines (`paintDone`, `src/note/editing.js`; nothing goes into the note, so nothing saved changes; an editor
+  MutationObserver keeps it in step with ticks), on a card each run's own decoration (`runSpan(r, done)`,
+  `src/list/cards.js`). The boxes were fine.
+- **Tests:** `note-ui-bar.test.js` (one window for the menu all along, made ahead of time only without the focus, Add ▸
+  first with its pictures, no Today's date), `windows.test.js` (main's order and `pic`), `note-ui.test.js` (the strike
+  follows ticks, not a line decoration), `list-ui-cards.test.js` (a ticked card line's runs).
+
+## 1.4.20 – 20 November 2026
+
+The reminder panel's time box takes typing the way you'd expect, the calendar has a Back button, the day says how far
+it is, and hiding a note is a setting (off).
+
+- **Typing the time** (`src/remind-ui.js`): a click anywhere on a number (between its digits too) picks all of it,
+  and the pick shows, so what you type replaces it. The cause: `maxlength="2"`, a caret between two digits, and a
+  see-through `::selection`, so a click left nothing to type into and showed nothing. A digit into a full box with nothing
+  picked now starts the number again. A first digit that can't start a two-digit number (3–9 for At's hours, 6–9 for
+  minutes) counts as one (7 → 07) and goes on, so 7 then 5 is 07:05, not 23 (75, cut down to the highest hour).
+- **Settings → Reminders → Jump to the next box** (`remindAutoNext`, on: as before): after the hours, on to the minutes.
+- **Settings → Reminders → Hiding notes** (`remindHide`, off): the panel offers "Hide the note until then" only when it's on.
+  A note whose reminder already hides it still shows the row, so it can be turned off; nothing that hides is changed.
+- **"Choose how long."** (grey, a hint) when In is at 0, in place of "Set a little time first." (red).
+- **The calendar's header is Back** with an arrow (one button: both go back), in place of "Pick a day" and an X.
+- **The day** says its date and how far: "Fri 20 Nov (Today)", "Tue 15 Dec (in 25 days)", "Sat 20 Nov 2027 (in 1y 1d)".
+- **The panel's height** comes from the editor now (`height`: `H_BASE` 448 + `H_ROW` 42 for each of Hide the note and
+  Unlock to dismiss that shows), set as `--rm-h` on `#remPop` / `.rbox` when it opens; `.locked` is gone. Two tick boxes
+  in a row now have the same 6 px gap as the other rows, so every such row is 42 px.
+- **Tests:** `note-ui.test.js` (a click between digits, 7 5 → 07:05, a full box starts again, Jump off, the hint, Back,
+  the day's words, Hiding notes on/off, the height), `list-ui-cards.test.js` and `reminders.test.js` (the two settings).
+
+## 1.4.19 – 19 November 2026
+
+Setting a reminder is one question at a time now, in one panel that never moves (the owner's design, like Windows
+Clock's "Edit alarm"). A chip at the bottom of a note shows its next reminder.
+
+- **Why:** the old panel showed everything at once (quick picks, date and time boxes, repeat kinds, ends, message,
+  sound, hiding), so you had to read it all to find the time. The owner went through four previews before this one.
+- **The panel** (`src/remind-ui.js`, the same in a note and in All notes): **In… / At…**, a big time box with arrows
+  (hours and minutes; mouse wheel, ↑ ↓ and typing work too; two digits jump to the next box), a line saying when it goes
+  off, then a message, **Repeat** (round Mo–Su buttons, like the Clock app) or the **day**, the sound, "Hide the note until
+  then" ("Can be unhidden from Settings."), and on a locked note "Unlock to dismiss". **Set reminder / Cancel**, or **Save /
+  Cancel** with a bin when changing one. Set closes the panel and says "Set for tomorrow 09:00.".
+- **Nothing moves:** the panel has one fixed size (`#remPop`, `.mbox.rbox`; it scrolls inside on a small note). In fades
+  Repeat and the day instead of removing them; Repeat puts the week days in the day's row; the calendar opens in the same
+  box. A click only redraws the panel; it fades only when the view changes (a fade on every redraw made it look like it
+  jumped).
+- **The day:** its own calendar (no Windows date box): the month name shows the months, the year shows twelve years
+  from this one. It always shows six weeks. **Several days** (a new reminder only) makes one reminder per day, with the same
+  time and message.
+- **It remembers** In / At, the times, the sound and the repeat days from the last one (`localStorage` `remindLast`, like
+  the drawing tools'); the message starts empty.
+- **Settings → Reminders → Show seconds** (`remindSeconds`, off): the time box gets seconds. `src/reminders.js`
+  `nextFrom` now keeps a repeat's seconds (it dropped them).
+- **The chip** (`#remChip`, `src/note/remind.js` `paintChip`): the next reminder that isn't ringing ("+2" for more); click
+  it to change it (one) or see them (several). Never on a hidden locked note.
+- **Repeat is week days now.** "Every month", "every few minutes/days/weeks" and end dates can't be made any more. Old
+  reminders with them keep working: the panel shows them in words ("Every month on the 20th") and keeps them unless you
+  click "Week days". A repeat whose time and days are as they were keeps its start, so main keeps it as it was.
+- **Rules:** `src/reminders.js` has `dayWord` and `status` (the panel's and the chip's words); the quick picks
+  (`presets`) are gone with the old panel.
+- **Tests:** `note-ui.test.js` (the panel: nothing moves, the calendar, several days, seconds, a repeat kept as it was,
+  a locked note), `list-ui-cards.test.js` (All notes' panel, Show seconds), `reminders.test.js` (seconds in a repeat,
+  the words, the setting).
+
+## 1.4.18 – 18 November 2026
+
+The window you open or touch last is on top: a note, its toolbars and menus outside it, the notes list. Pinned notes
+stay above the rest; of two pinned notes, the one touched last. A small note's » menu and the text's right-click menu are
+now the app's own, in the app theme's colours, not Windows' menus.
+
+- **The cause (window order):** Windows brings a window up only when a click gives it the focus. Most of a note's
+  windows outside it (drawing and text toolbars, Effects, Checklists) never take the focus (the keyboard stays in the
+  note), so a click on one left it under whatever covered it, and its note too; the order of pinned notes (`raisedAt`)
+  was only stamped on a click in the note itself, so 2.5 s later `enforcePinned` could put a note whose toolbar you had
+  just used back under another one. A window that already had the focus didn't come up either once another of ours had
+  come up over it.
+- **Now:** every window tells main when it is pressed (`win:touch`, preload `touch`): the note's page (`touch('')`,
+  panels.js), each window outside a note (`touch(kind)`, `barOut`, also when one is shown) and the list (events.js).
+  Main brings it up (`touchNote`, main/note-window.js: stamps `raisedAt`, `moveTop`, a peek for a note pinned over
+  apps); a note's windows outside it then come up in the order they were opened or touched, the one touched on top
+  (`liftBars`, main/ink-window.js, `c.liftedAt`). Nothing is saved and no window takes the focus.
+- **» menu (src/note/top-bar.js):** it was main's `Menu` (Windows' look, no pictures). Now it is a menu like the
+  right-click one (`#moreMenu`, `.ctx`, `--pop-*` colours), each line with its button's picture and a tick on the pin when
+  it is on. It opens in a see-through window of its own just under » (a new outside kind, `'more'` / `cosmoMoreBar`,
+  `barOut(...).showAt`), so it still shows whole on the smallest and on a rolled-up note (`SHOWS_ROLLED`; toolbars stay
+  hidden while rolled up). Esc, a click in the note, » again, the note losing the focus, rolling up, or a wider note (no
+  ») close it. `note:bar-menu` / `note:bar-act` and preload `barMenu` / `onBarAct` are gone.
+- **One menu for the note (src/note/menus-voice-ink.js `showMenu`):** the » menu, the right-click menus of pictures,
+  links, voice notes and tables (in the note before, cut off on a small note) and the text's Cut / Copy / Paste /
+  spelling / Add ▸ (Windows' menu from main before) are now the same menu (`#ctx`) in its own window (kind `'more'`,
+  made on first use with `K.barOut`). Lines can have a picture, a tick, or › for a sub-menu (Add ▸ shows its lines in the
+  same menu, with a way back). The keyboard stays in the note: ↑ ↓, Enter, → / ←, Esc; any other key closes it. For the
+  text's menu main still knows the spelling and does the line picked: it sends the lines by id (`note:ctx`, main/web.js)
+  and runs the one that comes back (`note:ctx-act` → `runCtx`: Cut / Copy / Paste / Select all, fix a word, Add to
+  dictionary, Add ▸); only an id of the last menu counts. The list and a note's windows outside it keep Windows' menu.
+- Tests: windows.test.js (touch order, pinned notes, the list, the » window on a rolled-up note), safety.test.js (the
+  sixth outside window), note-ui-bar.test.js (the menu in its window: lines, pictures, tick, theme colours, closing,
+  rolled up; the text's menu: its lines, an off line, the keys, Add ▸ and back, picks), windows.test.js (`note:ctx`
+  lines by id, Paste / a suggestion / Add ▸ done by main, an old id does nothing, Windows' menu outside the note),
+  note-ui.test.js (the right-click menus are found in their window). Only a real Windows PC can confirm the order of the
+  windows and the menu's window.
+
+## 1.4.17 – 18 November 2026
+
+Bullets, Checklist, Tab and Shift+Tab change only the lines you're on, keep every other line's tick, and Undo always
+takes them back (the owner lost 45 ticks in the To Do note: Bullets, then Checklist, wiped the whole list's ticks).
+
+- **The cause:** Bullets in a checklist (`toggleBullets`, note/fx-format.js) made the whole list, every level, bullets and
+  took every tick off; Checklist on a bullet list then made the whole list a checklist again, with empty boxes. Both
+  changed classes outside Undo (no `domStep`), so Ctrl+Z did nothing. Ctrl+Shift+L / Ctrl+Shift+C (VS Code's "select all
+  occurrences", the browser's copy and inspect) or a miss on the two buttons side by side was enough.
+- **Now (new "list lines" section in fx-format.js):** both work on the cursor's line or the selected lines (`selLines`),
+  each one Undo step with Redo. Those lines go into a list of their own (`splitOff`; the rest of the list stays as it
+  was, ticks too; touching lists are still saved as one). A line has a box when any list around it is a checklist, so
+  Bullets in a nested line changes its top-level line with what is nested in it (`checkLine`). A line made bullets loses
+  its tick (it has no box); Undo gives it back. Checklist on lines that all have boxes is still the editor's own
+  command (they leave the list); on words outside a list or a numbered line, the editor makes the list first, and a list
+  that only holds those lines becomes a checklist in the same step, as before.
+- **Tab / Shift+Tab** (`indentLines` / `outdentLines`): the same line moves one level in (into the list nested in the line
+  above, a new one if it has none; a list's first line stays) or out (right after the line it was in; the lines after it
+  at its level stay below it, nested in it). The editor's indent / outdent built a new line, so a ticked line came back
+  unticked, and Tab left a list right inside a list. A top-level line with Shift+Tab still leaves the list (the editor's
+  outdent).
+- **Backspace at a checklist line's start:** a nested line goes one level out and keeps its tick; a top-level one leaves
+  the list as before. Its tick is no longer taken off first, outside Undo (Undo brought the line back unticked).
+- **Enter at the start of a ticked line:** the new, empty line above it has no tick (it took the tick along). The line a
+  cut leaves empty keeps its tick on purpose: it is the same line, and taking it off would again be outside Undo.
+- **A drawing cleared and Done** goes as one Undo step (`domStep`; before, Undo couldn't bring it back).
+- Tests: `note-ui-lists.test.js`, new (Bullets / Checklist on the cursor's line, selected lines, a nested line, a bullet line, words
+  under a list; Tab / Shift+Tab / Backspace keep ticks; Enter at a ticked line's start; Undo and Redo of each; the
+  drawing). They fail on 1.4.16 at the owner's case.
+
 ## 1.4.16 – 18 November 2026
 
 A card no longer blinks while you type in its note: it stays, and the new words write themselves onto it (Ink, the

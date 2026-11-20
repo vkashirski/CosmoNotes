@@ -20,6 +20,13 @@ function hardenContents(wc, { inkBarFor = null, addItems = null } = {}) {
   wc.on('will-navigate', (e) => e.preventDefault());
   wc.on('context-menu', (e, p) => {
     const tpl = [];
+    // 1.4.11: in a note's text (its editor, not a box like the title's), Add ▸ the Add panel's items (1.4.21: first, the
+    // owner's wish; each line with the panel's picture: `pic` = its act, the note finds the picture)
+    const add = addItems && p.isEditable && p.formControlType === 'none' ? addItems() : null;
+    if (add && add.length) {
+      tpl.push({ label: 'Add', submenu: add.map((it) => ({ label: it.label, pic: it.act, click: () => { if (!wc.isDestroyed()) wc.send('note:add', it.act); } })) });
+      tpl.push({ type: 'separator' });
+    }
     if (p.misspelledWord) {
       for (const s of p.dictionarySuggestions.slice(0, 5)) tpl.push({ label: s, click: () => wc.replaceMisspelling(s) });
       if (!p.dictionarySuggestions.length) tpl.push({ label: 'No suggestions', enabled: false });
@@ -36,12 +43,7 @@ function hardenContents(wc, { inkBarFor = null, addItems = null } = {}) {
         { label: 'Select all', role: 'selectAll' },
       );
     }
-    // 1.4.11: in a note's text (its editor, not a box like the title's), Add ▸ the Add panel's items
-    const add = addItems && p.isEditable && p.formControlType === 'none' ? addItems() : null;
-    if (add && add.length) {
-      if (tpl.length) tpl.push({ type: 'separator' });
-      tpl.push({ label: 'Add', submenu: add.map((it) => ({ label: it.label, click: () => { if (!wc.isDestroyed()) wc.send('note:add', it.act); } })) });
-    }
+    if (tpl[tpl.length - 1] && tpl[tpl.length - 1].type === 'separator') tpl.pop(); // (Add ▸ alone: no line after it)
     if (!tpl.length) return;
     if (!addItems) { Menu.buildFromTemplate(tpl).popup({ window: BrowserWindow.fromWebContents(wc) }); return; }
     // a note: the same lines, by id, to its own menu
@@ -52,7 +54,7 @@ function hardenContents(wc, { inkBarFor = null, addItems = null } = {}) {
       if (it.submenu) return { id: `sub${n++}`, label: it.label, sub: lines(it.submenu) };
       const id = `m${n++}`;
       acts[id] = it.click || (() => { if (!wc.isDestroyed() && typeof wc[it.role] === 'function') wc[it.role](); });
-      return { id, label: it.label, ...(it.enabled === false ? { enabled: false } : {}) };
+      return { id, label: it.label, ...(it.enabled === false ? { enabled: false } : {}), ...(it.pic ? { pic: it.pic } : {}) };
     });
     const items = lines(tpl);
     ctxActs.set(wc, acts);

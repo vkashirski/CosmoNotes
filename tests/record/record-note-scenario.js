@@ -277,7 +277,7 @@ exports.fresh = async ({ page, step, H }) => {
   const { click, check, setVal, type, key, select, box, rclick, ctx, stroke, submit } = kit(page);
   await step('type a line', () => type('First line'));
   await step('enter, type', async () => { await key('Enter'); await type('Second line here'); });
-  for (const act of ['date', 'divider', 'numbers', 'table']) await step(`insert ${act}`, async () => { await click('#btnInsert'); await click(`#insert [data-act="${act}"]`); });
+  for (const act of ['divider', 'numbers', 'table']) await step(`insert ${act}`, async () => { await click('#btnInsert'); await click(`#insert [data-act="${act}"]`); });
   await step('insert link', async () => { await click('#btnInsert'); await click('#insert [data-act="link"]'); });
   await step('link fields', async () => { await setVal('#linkText', 'Example'); await setVal('#linkUrl', 'example.com'); });
   await step('link save', () => submit('#linkPop'));

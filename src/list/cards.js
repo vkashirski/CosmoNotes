@@ -156,8 +156,11 @@
     h: () => 'font-weight:700',
     a: () => 'color:var(--accent);text-decoration-line:underline',
   };
-  function runSpan(r) {
+  // 1.4.21: done = a ticked line's run: struck through by itself, in its own size and font (a strike on the line was drawn
+  // at the line's size, so not in the middle of bigger or smaller words: note-text.css cn-done)
+  function runSpan(r, done = false) {
     if (!r || typeof r.t !== 'string') return '';
+    if (done) r = { ...r, s: true };
     const css = [];
     for (const k of Object.keys(runCss)) if (r[k] !== undefined && r[k] !== null) css.push(runCss[k](r[k]));
     // underline and strike together: one text-decoration-line with both
@@ -178,13 +181,13 @@
     const lines = (n.text || '').split('\n').map((s) => s.trim()).filter(Boolean);
     // 1.3.11: each line in the look it has in the note (store.js cardRuns; null = plain)
     const runs = Array.isArray(n.runs) && n.runs.length === lines.length ? n.runs : null;
-    const words = (i) => (runs && Array.isArray(runs[i]) ? runs[i].map((r) => runSpan(r)) : [lines[i]]);
+    const words = (i, done) => (runs && Array.isArray(runs[i]) ? runs[i] : [{ t: lines[i] }]).map((r) => runSpan(r, done));
     // 1.1.22: checklist lines get their box (ticked or not) like in the note; `checks` has one letter per line (main.js)
     const marks = typeof n.checks === 'string' ? n.checks : '';
     // 1.1.46: each line is its own row (`.ln`), so the card can tell how many fit (markMore)
     const line = (i, cls) => {
       const mk = marks[i]; const box = mk === 'o' || mk === 'x' ? h('span', { class: 'cb' + (mk === 'x' ? ' done' : ''), 'aria-hidden': 'true' }) : null;
-      const txt = box ? h('span', { class: 'ck' + (mk === 'x' ? ' done' : '') }, ...words(i)) : words(i);
+      const txt = box ? h('span', { class: 'ck' + (mk === 'x' ? ' done' : '') }, ...words(i, mk === 'x')) : words(i);
       return h('span', { class: 'ln' + (cls ? ` ${cls}` : '') }, box, ...[].concat(txt));
     };
     // A note that is just a picture or drawing gets the stand-in text "🖼️ Photo" / "✏️ Drawing" (for search and

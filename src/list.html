@@ -305,7 +305,7 @@
   </div>
 
   <!-- 1.4.1: reminders (main/reminders.js; a note's own are in Add → Reminder, or right-click → Reminders… here) -->
-  <div data-find="alarm alarms remind remember notification notify timer schedule sound sounds chime snooze due hidden volume" class="panel">
+  <div data-find="alarm alarms remind remember notification notify timer schedule sound sounds chime snooze due hidden volume seconds second next box hide hiding" class="panel">
     <h3>Reminders</h3>
     <p class="muted">Add one in a note (Add → Reminder), or right-click a note here.</p>
     <div class="row">
@@ -319,6 +319,18 @@
     <label class="row toggle">
       <span><b>Show hidden notes</b><small>Notes a reminder hides still show here, faded.</small></span>
       <input type="checkbox" id="sRemShow"><i></i>
+    </label>
+    <label class="row toggle">
+      <span><b>Show seconds</b><small>Set a reminder to the second.</small></span>
+      <input type="checkbox" id="sRemSec"><i></i>
+    </label>
+    <label class="row toggle">
+      <span><b>Jump to the next box</b><small>After two digits, go on to the minutes.</small></span>
+      <input type="checkbox" id="sRemNext"><i></i>
+    </label>
+    <label class="row toggle">
+      <span><b>Hiding notes</b><small>Let a reminder hide its note until it goes off.</small></span>
+      <input type="checkbox" id="sRemHide"><i></i>
     </label>
   </div>
 
@@ -415,13 +427,9 @@
     <div class="mbtns"><button type="button" class="pill" id="tagClose">Done</button></div>
   </div>
 </div>
-<!-- 1.4.1: a note's reminders (src/remind-ui.js fills it; list/actions-locks.js openRemindSheet) -->
+<!-- 1.4.1: a note's reminders (src/remind-ui.js fills it, with its own title and X; list/actions-locks.js openRemindSheet) -->
 <div class="modal" id="remSheet" hidden>
-  <div class="mbox rbox">
-    <h3 id="remTitle">Reminders</h3>
-    <div id="remHere"></div>
-    <div class="mbtns"><button type="button" class="pill" id="remClose">Close</button></div>
-  </div>
+  <div class="mbox rbox"><div id="remHere"></div></div>
 </div>
 <!-- 1.1.16: Settings → Effects → Choose…: the effect and mouse follower for all notes -->
 <div class="modal esheet" id="fxSheet" hidden>

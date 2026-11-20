@@ -1,6 +1,6 @@
 'use strict';
-// CosmoNotes note window, part 12 of 16 (1.4.1): reminders. Add → Reminder opens the panel (src/remind-ui.js, the same as
-// the notes list's); a reminder that goes off shows a strip under the top bar with its message (or "Missed at …") and
+// CosmoNotes note window, part 12 of 16 (1.4.1): reminders. Add → Reminder opens the panel on a new one (src/remind-ui.js,
+// the same as the notes list's); 1.4.19: a chip at the bottom of the note shows the next one, and opens it. A reminder that goes off shows a strip under the top bar with its message (or "Missed at …") and
 // Snooze / Done, the note glows until then, wobbles once and plays its sound (main sends remind:ring; one that went off
 // while this window was loading comes in note:get as `ring`). What rings is read from the note (V.note.reminders), so the
 // strip is right after a restart too. A locked note shows no message until it is unlocked, and Snooze / Done wait for the
@@ -15,8 +15,8 @@
   let panel = null;
   let shown = null; // the id of the reminder the strip shows
 
-  // ---- the panel (Add → Reminder)
-  async function openRemind() {
+  // ---- the panel: Add → Reminder ('new'), the chip ('mine': the one there is, or the list of them)
+  async function openRemind(start = 'new') {
     if (!R || !UI || V.hidden) return;
     await saveNow(); // a reminder that hides the note closes its window: what was typed is saved first
     panel = UI.editor({
@@ -24,22 +24,38 @@
       msgs: V.note.remindMsg || {},
       locked: !!V.note.lockedBy,
       settings: V.settings,
+      start,
+      close: () => closePop('#remPop'),
+      done: (text) => toast(text),
       save: async (list, msgs) => {
         await saveNow();
         const n = await api.remindSet(list, msgs);
-        if (!n || n.error) { toast('Couldn’t save the reminder'); return null; }
+        if (!n || n.error) return null; // the panel says it couldn't
         V.note.reminders = n.reminders;
         V.note.remindMsg = n.remindMsg;
         paintRemind();
         return { reminders: n.reminders, msgs: n.remindMsg || {} };
       },
     });
-    const box = $('#remHere');
-    box.innerHTML = '';
-    box.append(panel.el);
+    $('#remPop').style.setProperty('--rm-h', `${panel.height}px`); // 1.4.20: its rows decide its one size
+    $('#remHere').replaceChildren(panel.el);
     openPop('#remPop');
   }
-  $('#remX').addEventListener('click', () => closePop('#remPop'));
+
+  // ---- 1.4.19: the chip with the next reminder (not on a hidden locked note: nothing of it shows there)
+  function paintChip() {
+    const chip = $('#remChip');
+    const list = R && V.note && !V.hidden ? (V.note.reminders || []).filter((r) => !r.firing) : [];
+    const next = list.filter((r) => Number.isFinite(R.dueAt(r))).sort((a, b) => R.dueAt(a) - R.dueAt(b))[0];
+    chip.hidden = !next;
+    if (!next) return;
+    const t = R.dueAt(next);
+    chip.innerHTML = `${next.repeat ? UI.ICON.rep : UI.ICON.bell}<span></span>${list.length > 1 ? `<span class="more">+${list.length - 1}</span>` : ''}`;
+    chip.querySelector('span').textContent = next.snooze ? `Snoozed until ${R.when(t)}` : R.when(t);
+    chip.title = list.map((r) => R.line(r)).join('\n');
+  }
+  $('#remChip').addEventListener('click', () => { if (!$('#remPop').hidden) closePop('#remPop'); else openRemind('mine'); });
+  window.addEventListener('focus', paintChip); // "Tomorrow" becomes "Today" overnight (no clock in a window: main keeps the one)
 
   // ---- the strip, the glow
   function paintRemind() {
@@ -47,7 +63,8 @@
     const ring = R ? R.ringing(list) : [];
     const bar = $('#remBar');
     body.classList.toggle('ringing', ring.length > 0);
-    if (panel && !$('#remPop').hidden && !panel.formOpen()) panel.refresh({ reminders: list, msgs: V.note.remindMsg || {} });
+    if (panel && !$('#remPop').hidden) panel.refresh({ reminders: list, msgs: V.note.remindMsg || {} });
+    paintChip();
     if (!ring.length) { bar.hidden = true; shown = null; $('#remMenu').hidden = true; return; }
     const r = ring.find((x) => x.id === shown) || ring[0];
     shown = r.id;

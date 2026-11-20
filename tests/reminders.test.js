@@ -40,6 +40,12 @@ const local = (y, m, d, h, mi = 0) => new Date(y, m - 1, d, h, mi).getTime();
   assert.equal(rung.at, local(2026, 11, 30, 9), 'then next Monday');
   assert.ok(rung.firing && rung.late && rung.count === 4, 'ringing, late, four times so far');
   assert.equal(R.line(rung, local(2026, 11, 27, 12)), 'Missed yesterday at 09:00 · Every Mon, Thu');
+  // 1.4.19: a repeat set to the second (Settings → Show seconds) keeps its seconds; the words: the day, where it is
+  const sec = R.cleanOne({ id: 'secs1', start: local(2026, 11, 16, 9) + 42000, repeat: { k: 'week', days: [1] } });
+  assert.equal(R.ring(sec, local(2026, 11, 16, 9, 1)).at, local(2026, 11, 23, 9) + 42000, 'next Monday 09:00:42');
+  assert.equal(R.dayWord(local(2026, 11, 17, 9), local(2026, 11, 16, 20)), 'Tomorrow');
+  assert.equal(R.dayWord(local(2026, 11, 20, 9), local(2026, 11, 16, 20)), 'Fri 20 Nov');
+  assert.equal(R.status(rung, local(2026, 11, 27, 12)), 'Missed yesterday at 09:00', 'where it is, without the repeat');
   // every N minutes, N times; Done ends a one-off and a repeat that has ended
   let ev = R.cleanOne({ id: 'evry1', start: 1e12, repeat: { k: 'every', u: 'min', n: 20, times: 2 } });
   ev = R.ring(ev, 1e12 + 1000);
@@ -60,7 +66,6 @@ const local = (y, m, d, h, mi = 0) => new Date(y, m - 1, d, h, mi).getTime();
   // hiding: a reminder with hide on, and none ringing
   assert.ok(R.hiddenNow([{ hide: true, firing: false }]));
   assert.ok(!R.hiddenNow([{ hide: true, firing: false }, { hide: false, firing: true }]), 'one rings: it shows');
-  assert.deepEqual(R.presets(local(2026, 11, 14, 16)).map((p) => p.label), ['In 20 min', 'In 1 hour', 'Tomorrow 09:00', 'Next Monday 09:00'], 'no 15:00 once it has passed');
 }
 
 (async () => {
@@ -163,6 +168,17 @@ const local = (y, m, d, h, mi = 0) => new Date(y, m - 1, d, h, mi).getTime();
   await H['settings:set']({}, { remindSound: 'crickets', remindVolume: 0.33 });
   s = (await H['note:get'](evOf(w))).settings;
   assert.equal(s.remindSound, 'crickets'); assert.equal(s.remindVolume, 0.35, 'steps of 5 %');
+  assert.equal(s.remindSeconds, false, '1.4.19: Show seconds is off at first');
+  await H['settings:set']({}, { remindSeconds: 'yes' });
+  assert.equal((await app.list()).settings.remindSeconds, true);
+  assert.equal((await H['note:get'](evOf(w))).settings.remindSeconds, true, 'the notes get it (their panel’s time box)');
+  await H['settings:set']({}, { remindSeconds: false });
+  s = (await H['note:get'](evOf(w))).settings;
+  assert.ok(s.remindAutoNext === true && s.remindHide === false, '1.4.20: Jump to the next box on, Hiding notes off, at first');
+  await H['settings:set']({}, { remindAutoNext: 0, remindHide: 'on' });
+  s = (await H['note:get'](evOf(w))).settings;
+  assert.ok(s.remindAutoNext === false && s.remindHide === true, 'both cleaned, and sent to the notes');
+  await H['settings:set']({}, { remindAutoNext: true, remindHide: false });
 
   // ---- a locked note: its messages are secret; Snooze / Done without the PIN only when the reminder allows it
   await H['remind:set'](evOf(w), [{ id: 'sec01', start: now + 6 * H0, unlock: true }, { id: 'sec02', start: now + 6 * H0 }], { sec01: 'bank pin 4321', sec02: 'call mum' });

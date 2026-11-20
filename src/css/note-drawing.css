@@ -20,6 +20,9 @@
 .ctx .mi .mtick, .ctx .mi .msub { margin-left: auto; width: 15px; height: 15px; color: var(--pop-ink2); }
 .ctx .mi.hot { background: var(--pop-soft); }
 .ctx .mback { color: var(--pop-mute); }
+/* 1.4.21: Add ▸'s lines have the Add panel's pictures (in their colours; as wide as the other lines' pictures) */
+.ctx .mi > .ic { width: 18px; height: 18px; margin: -1px; flex: none; border-radius: 5px; display: grid; place-items: center; background: var(--tc); }
+.ctx .mi > .ic svg { width: 12px; height: 12px; color: #4A3D2A; }
 body.inkbar-out #ctx {
   position: absolute; left: 12px !important; top: 8px !important; right: auto !important; bottom: auto !important;
   box-shadow: 0 4px 12px rgba(60,40,10,.26), 0 1px 3px rgba(0,0,0,.12);

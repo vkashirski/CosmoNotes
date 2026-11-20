@@ -21,7 +21,9 @@
   // one of these for each toolbar. `kind` goes with every message to main.js ('ink' or 'text').
   // 1.4.18: key null = its place is never kept (the » menu: showAt). A press anywhere in its window tells main
   // (api.touch), which brings it and its note up, on top of the others; so does showing it (the newest opened is on top).
-  function barOut({ el, kind, frame, title, key, mover, onEsc = null }) {
+  // 1.4.21: keep = its window is made once and only hidden when it closes (the note's menu: a new window and its styles
+  // for every right-click made the menu slow); warm() makes it ahead of time.
+  function barOut({ el, kind, frame, title, key, mover, onEsc = null, keep = false }) {
     const PAD = { l: 12, t: 8, r: 12, b: 14 }; // room around the toolbar in its window (for its shadow)
     const INSET = PAD; // where the visible toolbar starts in its window
     let w = null; // its window
@@ -113,13 +115,15 @@
         showOut((bw, bh) => { const p = place(bw, bh); return { mode: 'free', dx: Math.round(p.x - INSET.l), dy: Math.round(p.y - INSET.t) }; });
         return true;
       },
-      // the toolbar closes: it goes back into the note (hidden), and its window closes
+      // the toolbar closes: it goes back into the note (hidden), and its window closes (keep: is only hidden)
       stop() {
         if (isOut) { moveIn(); api.ink.hide(kind); }
+        if (keep) return;
         if (w && !w.closed) { try { w.close(); } catch { /* fine */ } }
         w = null;
         sizeObs = null;
       },
+      warm: () => { open(); },
       // the pointer holds the toolbar at (gx, gy) of the toolbar itself → move it out; returns the hold point in its window
       popOut(gx, gy) {
         if (!moveOut()) return null;

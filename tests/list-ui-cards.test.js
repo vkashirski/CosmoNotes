@@ -1,6 +1,6 @@
 'use strict';
 // The notes list in a real browser (tests/helpers/list-ui.js): the tabs and their counts, what a card shows (and what a locked
-// note's card never shows; a title in its own font, 1.3.3), a card's menu, search (title, text, picture descriptions), sorting and card sizes, opening a note, reminders on cards (1.4.1), "Over …" on a note pinned over some apps (1.4.5).
+// note's card never shows; a title in its own font, 1.3.3), a card's menu, search (title, text, picture descriptions), sorting and card sizes, opening a note, reminders on cards (1.4.1), "Over …" on a note pinned over some apps (1.4.5), a ticked line's strike (1.4.21).
 const assert = require('assert');
 
 (async () => {
@@ -27,6 +27,11 @@ const assert = require('assert');
   // ---- what a card shows
   assert.ok(/Shopping/.test(await cardText(ui.noteKey(A))) && /milk/.test(await cardText(ui.noteKey(A))), 'title and text');
   assert.equal(await page.$$eval(`${ui.noteKey(A)} .cb`, (x) => x.length), 2, 'a checklist shows its boxes');
+  // 1.4.21: a ticked line's words are struck through by themselves, each run in its own size (a strike on the line was
+  // drawn at the line's size: not in the middle of bigger words)
+  assert.deepEqual(await page.$eval(`${ui.noteKey(A)} .ck.done`, (c) => [getComputedStyle(c).textDecorationLine, [...c.querySelectorAll('.run')].map((r) => r.textContent + ' ' + getComputedStyle(r).textDecorationLine)]),
+    ['none', ['milk line-through']], 'a ticked line: its words struck through, not the line');
+  assert.equal(await page.$eval(`${ui.noteKey(A)} .ck:not(.done)`, (c) => c.querySelectorAll('.run').length), 0, 'an unticked line: plain words');
   assert.ok(/^"?Augusta/.test(await page.$eval(`${ui.noteKey(A)} .tt`, (t) => getComputedStyle(t).fontFamily)), '1.3.3: the title in its own font (Medieval)');
   assert.equal(await ui.count(`${ui.noteKey(C)} [data-tfont]`), 0, 'a card without a title font: none');
   assert.ok(/plumber/.test(await cardText(ui.noteKey(B))), 'a note without a title shows its text');
@@ -176,13 +181,33 @@ const assert = require('assert');
     await ui.H['settings:set']({}, { remindShowHidden: true }); await ui.settle();
     assert.ok((await shown()).includes(X), 'Settings → Show hidden notes');
     await ui.H['settings:set']({}, { remindShowHidden: false }); await ui.settle();
+    await ui.click('#sRemSec');
+    assert.equal((await ui.get()).settings.remindSeconds, true, 'Settings → Show seconds (1.4.19)');
+    await ui.click('#sRemSec');
+    assert.equal((await ui.get()).settings.remindSeconds, false);
+    await ui.click('#sRemHide');
+    assert.equal((await ui.get()).settings.remindHide, true, 'Settings → Hiding notes (1.4.20)');
+    await ui.click('#sRemNext');
+    assert.equal((await ui.get()).settings.remindAutoNext, false, 'Settings → Jump to the next box (1.4.20)');
+    await ui.click('#sRemNext');
+    // 1.4.19: the same panel as a note's (src/remind-ui.js): the note's reminders, then New reminder: In 1 h 30 min
     await ui.menu(ui.noteKey(A), 'Reminders…');
     assert.ok(await ui.visible('#remSheet'), 'right-click → Reminders…');
     assert.match(await ui.text('#remSheet .rm-item small'), /Before 6/, 'with its message');
-    await ui.click('#remSheet .rm-add');
-    await ui.click('#remSheet .rm-chip[data-p="h1"]');
+    await ui.click('#remSheet .rm-new');
+    assert.ok(await ui.visible('#remSheet .rm-hide'), 'Hiding notes is on: Hide the note');
+    assert.equal(await page.evaluate(() => document.querySelector('#remSheet .rbox').style.getPropertyValue('--rm-h')), '490px', 'its height, that row too');
+    assert.equal(await ui.text('#remSheet .rm-hd b'), `New reminder${(await ui.get()).notes.find((n) => n.id === A).title || ''}`, 'a new one (the note’s name beside it)');
+    await ui.click('#remSheet .rm-mode [data-mode="in"]');
+    await page.fill('#remSheet .rm-frame input[data-k="inH"]', '01');
+    await page.fill('#remSheet .rm-frame input[data-k="inM"]', '30');
+    const t0 = Date.now();
     await ui.click('#remSheet .rm-save');
-    assert.equal((await ui.get()).notes.find((n) => n.id === A).reminders.length, 2, 'one more, saved');
+    const mine = (await ui.get()).notes.find((n) => n.id === A).reminders;
+    assert.equal(mine.length, 2, 'one more, saved');
+    assert.ok(Math.abs(mine.find((r) => r.id !== 'shop1').start - (t0 + 90 * 60e3)) < 5000, 'in 1 h 30 min');
+    assert.ok(!(await ui.visible('#remSheet')), 'Set closes it');
+    await ui.menu(ui.noteKey(A), 'Reminders…');
     assert.equal(await ui.count('#remSheet .rm-item'), 2);
     await ui.key('Escape');
     assert.ok(!(await ui.visible('#remSheet')), 'Esc closes it');

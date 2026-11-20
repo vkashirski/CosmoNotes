@@ -189,6 +189,9 @@
   $('#sRemVol').addEventListener('input', (e) => { $('#sRemVolVal').textContent = `${e.target.value}%`; });
   $('#sRemVol').addEventListener('change', (e) => { V.state.settings.remindVolume = Number(e.target.value) / 100; S.settings.set({ remindVolume: Number(e.target.value) / 100 }); });
   $('#sRemShow').addEventListener('change', (e) => S.settings.set({ remindShowHidden: e.target.checked }));
+  $('#sRemSec').addEventListener('change', (e) => { V.state.settings.remindSeconds = e.target.checked; S.settings.set({ remindSeconds: e.target.checked }); }); // 1.4.19
+  $('#sRemNext').addEventListener('change', (e) => { V.state.settings.remindAutoNext = e.target.checked; S.settings.set({ remindAutoNext: e.target.checked }); }); // 1.4.20
+  $('#sRemHide').addEventListener('change', (e) => { V.state.settings.remindHide = e.target.checked; S.settings.set({ remindHide: e.target.checked }); }); // 1.4.20
   $('#btnRem').addEventListener('click', () => {
     V.remOnly = !V.remOnly;
     $('#btnRem').classList.toggle('on', V.remOnly);

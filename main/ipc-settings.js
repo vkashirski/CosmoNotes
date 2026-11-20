@@ -68,10 +68,13 @@ function registerSettingsIpc() {
     if (ctChanged) S.store.settings.clickThroughOn = !!patch.clickThroughOn;
     if ('updateCheck' in patch) S.store.settings.updateCheck = !!patch.updateCheck; // 1.4.0: main/ipc-update.js
     // 1.4.1: Settings → Reminders (main/reminders.js): the sound, how loud, and whether hidden notes show in the list
-    const remindChanged = 'remindSound' in patch || 'remindVolume' in patch;
+    const remindChanged = ['remindSound', 'remindVolume', 'remindSeconds', 'remindAutoNext', 'remindHide'].some((k) => k in patch);
     if ('remindSound' in patch) S.store.settings.remindSound = cleanRemindSound(patch.remindSound);
     if ('remindVolume' in patch) S.store.settings.remindVolume = cleanVolume(patch.remindVolume);
     if ('remindShowHidden' in patch) S.store.settings.remindShowHidden = !!patch.remindShowHidden;
+    if ('remindSeconds' in patch) S.store.settings.remindSeconds = !!patch.remindSeconds; // 1.4.19: the panel's seconds
+    if ('remindAutoNext' in patch) S.store.settings.remindAutoNext = !!patch.remindAutoNext; // 1.4.20: on to the next box
+    if ('remindHide' in patch) S.store.settings.remindHide = !!patch.remindHide; // 1.4.20: the panel offers hiding
     if ('tagAny' in patch) S.store.settings.tagAny = !!patch.tagAny; // 1.4.10: the list's tag filter, All / Any
     if (patch.listSort && typeof patch.listSort === 'object') {
       const ls = { ...S.store.settings.listSort };

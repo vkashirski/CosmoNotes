@@ -89,6 +89,9 @@
 <span id="stamp"></span>
 <div id="imgHandle" hidden title="Drag to resize"></div>
 
+<!-- 1.4.19: the next reminder, at the bottom of the note (src/note/remind.js); click it to change it -->
+<button type="button" id="remChip" hidden></button>
+
 <footer id="tools">
   <div class="tleft">
   <button class="tb b" data-cmd="bold" title="Bold (Ctrl+B)">B</button>
@@ -209,19 +212,18 @@
   <div class="btns"><button type="button" class="btn ghost" id="pwCancel">Cancel</button><button type="submit" class="btn">Lock note</button></div>
 </form>
 
-<!-- Add panel -->
+<!-- Add panel (1.4.22: pictures with their names in a row over the bottom bar, wrapping when the note is narrow) -->
 <div class="pop" id="insert" hidden>
-  <div class="grid">
-    <button class="tile" data-act="photo"><span class="ic" style="--tc:#FFD6E6"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg></span>Photo</button>
-    <button class="tile" data-act="voice"><span class="ic" style="--tc:#FFDFBF"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>Voice</button>
-    <button class="tile" data-act="speak"><span class="ic" style="--tc:#FFE8A3"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="5" height="9" rx="2.5"/><path d="M2.5 10a5 5 0 0 0 10 0M7.5 15v3"/><path d="M14 7h7M14 11h7M14 15h5M11 19h10"/></svg></span>Voice to text</button>
-    <button class="tile" data-act="drawing"><span class="ic" style="--tc:#D2ECFF"><svg viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/><path d="m15 5 4 4"/></svg></span>Sketch</button>
-    <button class="tile" data-act="link"><span class="ic" style="--tc:#D8F5C4"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span>Link</button>
-    <button class="tile" data-act="table"><span class="ic" style="--tc:#E8DDFF"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></span>Table</button>
-    <button class="tile" data-act="numbers"><span class="ic" style="--tc:#CDF3E8"><svg viewBox="0 0 24 24"><path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></span>Numbers</button>
-    <button class="tile" data-act="divider"><span class="ic" style="--tc:#FFF4A3"><svg viewBox="0 0 24 24"><path d="M3 12h3M10 12h4M18 12h3"/></svg></span>Divider</button>
-    <button class="tile" data-act="remind"><span class="ic" style="--tc:#DDEBFF"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M5 3 2 6M19 3l3 3"/></svg></span>Reminder</button>
-    <button class="tile" data-act="date"><span class="ic" style="--tc:#FFE1DC"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></span>Today’s date</button>
+  <div class="row">
+    <button class="tile" data-act="photo"><span class="ic" style="--tc:#FFD6E6"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg></span><span class="tl">Photo</span></button>
+    <button class="tile" data-act="voice"><span class="ic" style="--tc:#FFDFBF"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span><span class="tl">Voice</span></button>
+    <button class="tile" data-act="speak"><span class="ic" style="--tc:#FFE8A3"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="5" height="9" rx="2.5"/><path d="M2.5 10a5 5 0 0 0 10 0M7.5 15v3"/><path d="M14 7h7M14 11h7M14 15h5M11 19h10"/></svg></span><span class="tl">Voice to text</span></button>
+    <button class="tile" data-act="drawing"><span class="ic" style="--tc:#D2ECFF"><svg viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/><path d="m15 5 4 4"/></svg></span><span class="tl">Sketch</span></button>
+    <button class="tile" data-act="link"><span class="ic" style="--tc:#D8F5C4"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span><span class="tl">Link</span></button>
+    <button class="tile" data-act="table"><span class="ic" style="--tc:#E8DDFF"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></span><span class="tl">Table</span></button>
+    <button class="tile" data-act="numbers"><span class="ic" style="--tc:#CDF3E8"><svg viewBox="0 0 24 24"><path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></span><span class="tl">Numbers</span></button>
+    <button class="tile" data-act="divider"><span class="ic" style="--tc:#FFF4A3"><svg viewBox="0 0 24 24"><path d="M3 12h3M10 12h4M18 12h3"/></svg></span><span class="tl">Divider</span></button>
+    <button class="tile" data-act="remind"><span class="ic" style="--tc:#DDEBFF"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M5 3 2 6M19 3l3 3"/></svg></span><span class="tl">Reminder</span></button>
   </div>
 </div>
 
@@ -385,10 +387,8 @@
   <div id="pinList"></div>
 </div>
 
-<!-- 1.4.1: this note's reminders (src/remind-ui.js fills it; src/note/remind.js) -->
+<!-- 1.4.1: this note's reminders (src/remind-ui.js fills it, with its own title and X; src/note/remind.js) -->
 <div class="pop" id="remPop" hidden>
-  <button class="ix" id="remX" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-  <h4>Reminders</h4>
   <div id="remHere"></div>
 </div>
 

@@ -131,6 +131,9 @@
     if (document.activeElement !== $('#sRemVol')) $('#sRemVol').value = vol; // not while it's being dragged
     $('#sRemVolVal').textContent = `${$('#sRemVol').value}%`;
     $('#sRemShow').checked = !!s.remindShowHidden;
+    $('#sRemSec').checked = !!s.remindSeconds; // 1.4.19
+    $('#sRemNext').checked = s.remindAutoNext !== false; // 1.4.20
+    $('#sRemHide').checked = !!s.remindHide; // 1.4.20
   }
 
   // ---- 1.3.27: "Use on all notes". Settings a note can change for itself (store.js OVERRIDES says what each puts back):

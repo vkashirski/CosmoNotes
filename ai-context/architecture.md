@@ -245,7 +245,9 @@ Settings), `main/stt-models.js` (the list), `main/stt-download.js` (the download
   from the list still works.
 - **Changes**: windows send only what the panel sets (`setReminders` takes time, repeat, sound, hide, unlock); a reminder
   whose `start` and repeat are unchanged keeps its state, a new time starts again (`firstAt`); one for a time that has passed
-  rings at once. Not an edit (`updatedAt` stays).
+  rings at once. Not an edit (`updatedAt` stays). So the panel (1.4.19) sends a repeat's old `start` and repeat object when
+  its time and days are as they were (`plan` → `F.keep`), and a changed repeat starts at its first time from now (`nextFrom`
+  from now): never a start in the past. Repeats it can't show as week days (every month, every N, an end) stay as they are.
 - **Secrets**: `note.remindMsg` is in `SECRET` and crypt.js `SECRET_FIELDS` (one `blank()` for the store's writes and the
   backups): sealed with a locked note, `{}` while sealed, `null` in a hidden window, never in `list:get` (only `list:remind-get`,
   which refuses a note `hiddenInList`). `note.reminders` stays plain: main needs the times before the PIN.

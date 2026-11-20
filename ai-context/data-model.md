@@ -97,7 +97,9 @@ is put back at load), panicOn (1.3.27, false: the panic button), panicKey ('' = 
 clickThroughOn (1.3.34, false: the click-through button in each note; off = no note is click-through, each keeps note.clickThrough),
 updateCheck (1.4.0, true: the installed app checks GitHub for a newer version 30 s after it starts and once a day; the button in Settings → About works either way),
 remindSound (1.4.1, 'drops': the sound of a reminder that has none of its own, an id of src/reminders.js SOUNDS or 'none'), remindVolume (0 – 1 in
-steps of 0.05, 0.6; both sent to note windows: `noteSettings`), remindShowHidden (false: notes a reminder hides still show in the list, faded),
+steps of 0.05, 0.6; both sent to note windows: `noteSettings`), remindShowHidden (false: notes a reminder hides still show in the list, faded), remindSeconds (1.4.19, false: the reminder panel's time box has
+seconds too), remindAutoNext (1.4.20, true: two digits in the time box go on to the next box), remindHide (1.4.20, false: the panel
+offers "Hide the note until then"; a reminder that already hides keeps it); all three sent to note windows: `noteSettings`. Not saved by main: `localStorage.remindLast` (1.4.19, src/remind-ui.js: the panel's last In / At, times, sound and repeat days; never a message),
 sttWhen (1.3.5: Settings → Voice to text → "Words appear": 'live' = while you talk, 'stop' = when you stop; missing =
 by the PC: graphics card live, processor stop), sttWebgpu (1.3.1: whether the engine found WebGPU last time; decides which set of the model is downloaded; sttModel and
 sttTests, 1.3.1–1.3.3, are deleted at start since 1.3.4),

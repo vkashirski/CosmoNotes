@@ -21,18 +21,30 @@
   // ticked), danger, disabled, sub: [items] } | '-'], at(w, h) = where its top-left goes (px from the note's top-left).
   // owner: the button that opened it (aria-expanded; a press on it doesn't close it, so it can close it itself).
   const ctx = $('#ctx');
-  let ctxOut = null; // its window (barOut is made by a later part: made on first use)
+  let ctxOut = null; // its window (menuOut)
   let ctxOwner = null;
   let ctxStack = []; // the lists shown, a sub-menu's last
   const TICK = '<svg class="mtick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   const MORE = '<svg class="msub" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
   const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>';
   const ctxOpen = () => !ctx.hidden;
+  // 1.4.21: its window is made once and kept (hidden while the menu is shut), so a right-click shows it at once. It is made
+  // ahead of time too, so the first right-click is quick: only while the note doesn't have the focus (it opens in the
+  // background, or you leave it), since making a window takes the page's focus for a moment (a stroke being drawn ends).
+  // (barOut is a later part: K.barOut)
+  function menuOut() {
+    if (!ctxOut && K.barOut) ctxOut = K.barOut({ el: ctx, kind: 'more', frame: 'cosmoMoreBar', title: 'Menu', key: null, mover: () => null, keep: true });
+    return ctxOut;
+  }
+  const idle = window.requestIdleCallback || ((f) => setTimeout(f, 200));
+  const warmMenu = () => idle(() => { if (ctx.hidden && !document.hasFocus() && menuOut()) ctxOut.warm(); }, { timeout: 2000 });
+  window.addEventListener('blur', warmMenu);
+  if (!document.hasFocus()) warmMenu();
   function hideCtx() {
     if (ctx.hidden) return;
     ctx.hidden = true;
     ctxStack = [];
-    if (ctxOut) ctxOut.stop(); // back into the note; its window closes
+    if (ctxOut) ctxOut.stop(); // back into the note; its window hides (kept for next time)
     if (ctxOwner) ctxOwner.setAttribute('aria-expanded', 'false');
     ctxOwner = null;
   }
@@ -88,8 +100,7 @@
     ctx.style.top = '';
     ctxOwner = owner;
     if (owner) owner.setAttribute('aria-expanded', 'true');
-    if (!ctxOut && K.barOut) ctxOut = K.barOut({ el: ctx, kind: 'more', frame: 'cosmoMoreBar', title: 'Menu', key: null, mover: () => null });
-    if (ctxOut && ctxOut.showAt(at)) return;
+    if (menuOut() && ctxOut.showAt(at)) return;
     const p = at(ctx.offsetWidth, ctx.offsetHeight);
     ctx.style.left = Math.max(4, Math.min(p.x, innerWidth - ctx.offsetWidth - 4)) + 'px';
     ctx.style.top = Math.max(4, Math.min(p.y, innerHeight - ctx.offsetHeight - 4)) + 'px';
@@ -113,11 +124,13 @@
     e.stopImmediatePropagation();
   }, true);
   window.addEventListener('blur', hideCtx);
-  // the text's own menu (spelling, Cut / Copy / Paste, Add ▸): main knows the spelling, so it sends the lines; the one
-  // picked goes back (main does it: it can paste, and fix a word)
+  // the text's own menu (Add ▸, spelling, Cut / Copy / Paste): main knows the spelling, so it sends the lines; the one
+  // picked goes back (main does it: it can paste, and fix a word). 1.4.21: Add ▸'s lines have the Add panel's pictures
+  // (`pic`: the item's act)
+  const addPic = (act) => { const ic = /^[A-Za-z]{1,20}$/.test(act || '') && $(`#insert [data-act="${act}"] .ic`); return ic ? ic.cloneNode(true) : null; };
   if (api.onCtx) api.onCtx((m) => {
     if (!m || !Array.isArray(m.items)) return;
-    const conv = (list) => list.map((it) => (it === '-' ? '-' : { label: it.label, disabled: it.enabled === false, run: () => api.ctxAct(it.id), ...(it.sub ? { sub: conv(it.sub) } : {}) }));
+    const conv = (list) => list.map((it) => (it === '-' ? '-' : { label: it.label, disabled: it.enabled === false, icon: addPic(it.pic), run: () => api.ctxAct(it.id), ...(it.sub ? { sub: conv(it.sub) } : {}) }));
     closePops();
     showCtx(Number(m.x) || 0, Number(m.y) || 0, conv(m.items));
   });

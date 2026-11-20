@@ -8,7 +8,7 @@
  * Keep each item short: one or two plain sentences.
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-11-18',
+  LAST_UPDATED: '2026-11-20',
 
   FEATURES: [
     {
@@ -49,11 +49,15 @@ window.COSMO_ABOUT = {
       title: 'Reminders',
       items: [
         'Add a reminder to a note: Add → Reminder, or right-click it in All notes. A note can have several.',
-        'Pick a quick time or your own. Repeat it every day, on weekdays, on some days of the week, every month, or every few minutes.',
+        'Set it in a while (In) or at a time (At). Pick a day on the calendar, or several days.',
+        'Repeat it on the days of the week you tick.',
+        'The chip at the bottom of a note shows its next reminder. Click it to change it.',
         'At its time the note pops up on the screen you’re using. It glows, wobbles and plays a calm sound. Snooze or Done.',
         'Missed one while the PC was off? It shows when CosmoNotes starts.',
-        'A reminder can carry a message, and hide its note until it goes off.',
+        'A reminder can carry a message. It can also hide its note until it goes off: turn on Hiding notes in Settings.',
         'The clock button in All notes shows only notes with reminders. Pick the sound and volume in Settings.',
+        'Want seconds too? Turn on Show seconds in Settings.',
+        'Click a number and type over it. After two digits it jumps to the next box (Settings can turn that off).',
       ],
     },
     {
@@ -110,8 +114,9 @@ window.COSMO_ABOUT = {
         'Voice to text needs a one-time download in Settings. Then it works offline.',
         'Pick in Settings if the words appear while you talk or when you stop.',
         'Sketches: a small drawing pad that becomes a picture.',
-        'Links, tables, numbered lists, dividers and today’s date.',
-        'Right-click in the text → Add, for all of these without the button.',
+        'Links, tables, numbered lists and dividers.',
+        'The Add button opens a row of everything you can add, over the bottom bar.',
+        'Right-click in the text → Add, at the top of the menu, for all of these without the button.',
       ],
     },
     {

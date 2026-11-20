@@ -138,7 +138,7 @@
       const s = new Date(r.start);
       const from = new Date(Math.max(t, r.start));
       for (let i = 0; i < 3700 && out === null; i++) {
-        const c = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i, s.getHours(), s.getMinutes()).getTime();
+        const c = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i, s.getHours(), s.getMinutes(), s.getSeconds()).getTime();
         if (c >= t && c >= r.start && onDay(rep, r.start, c)) out = c;
       }
     }
@@ -198,16 +198,18 @@
   // ---------------------------------------------------------------- words (short and plain)
   const pad = (x) => String(x).padStart(2, '0');
   const clock = (t) => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-  // "Today 15:00", "Tomorrow 09:00", "Mon 17 Nov 09:00" (with the year when it isn't this one)
-  function when(t, now = Date.now()) {
+  // the day: "Today", "Tomorrow", "Yesterday", "Mon 17 Nov" (with the year when it isn't this one)
+  function dayWord(t, now = Date.now()) {
     const gap = dayOf(t) - dayOf(now);
-    if (gap === 0) return `Today ${clock(t)}`;
-    if (gap === 1) return `Tomorrow ${clock(t)}`;
-    if (gap === -1) return `Yesterday ${clock(t)}`;
+    if (gap === 0) return 'Today';
+    if (gap === 1) return 'Tomorrow';
+    if (gap === -1) return 'Yesterday';
     const d = new Date(t);
     const y = d.getFullYear() !== new Date(now).getFullYear() ? ` ${d.getFullYear()}` : '';
-    return `${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}${y} ${clock(t)}`;
+    return `${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}${y}`;
   }
+  // "Today 15:00", "Tomorrow 09:00", "Mon 17 Nov 09:00"
+  const when = (t, now = Date.now()) => `${dayWord(t, now)} ${clock(t)}`;
   // "Missed at 14:00" (today), "Missed yesterday at 14:00", "Missed on Mon 16 Nov 14:00"
   function missed(t, now = Date.now()) {
     const w = when(t, now);
@@ -231,32 +233,21 @@
     if (rep.times) s += ` · ${rep.times} ${rep.times === 1 ? 'time' : 'times'}`;
     return s;
   }
-  // one line about a reminder: "Tomorrow 09:00 · Every Mon", "Snoozed until 14:10", "Missed at 14:00", "Now"
+  // where a reminder is: "Tomorrow 09:00", "Snoozed until 14:10", "Missed at 14:00", "Now", "Ended"
+  function status(r, now = Date.now()) {
+    if (r.firing) return r.late && r.firedAt ? missed(r.firedAt, now) : 'Now';
+    if (r.snooze) return `Snoozed until ${when(r.snooze, now)}`;
+    if (r.at === null) return 'Ended';
+    return when(r.at, now);
+  }
+  // one line about a reminder: "Tomorrow 09:00 · Every Mon"
   function line(r, now = Date.now()) {
-    let s;
-    if (r.firing) s = r.late && r.firedAt ? missed(r.firedAt, now) : 'Now';
-    else if (r.snooze) s = `Snoozed until ${when(r.snooze, now)}`;
-    else if (r.at === null) s = 'Ended';
-    else s = when(r.at, now);
     const rep = repeatText(r.repeat, r.start);
-    return rep ? `${s} · ${rep}` : s;
+    return rep ? `${status(r, now)} · ${rep}` : status(r, now);
   }
-  // the quick picks: in 20 minutes, in an hour, 15:00 today (while it's still ahead), tomorrow 09:00, next Monday 09:00
-  function presets(now = Date.now()) {
-    const d = new Date(now);
-    const at = (days, h, m = 0) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + days, h, m).getTime();
-    const round = (t) => Math.ceil(t / 60e3) * 60e3;
-    const out = [{ id: 'm20', label: 'In 20 min', at: round(now + 20 * 60e3) }, { id: 'h1', label: 'In 1 hour', at: round(now + 3600e3) }];
-    if (at(0, 15) > now + 60e3) out.push({ id: 'pm', label: 'Today 15:00', at: at(0, 15) });
-    out.push({ id: 'tom', label: 'Tomorrow 09:00', at: at(1, 9) });
-    const toMon = ((8 - d.getDay()) % 7) || 7;
-    out.push({ id: 'mon', label: 'Next Monday 09:00', at: at(toMon, 9) });
-    return out;
-  }
-
   const api = { LATE, MAX, MSG_MAX, KINDS, UNITS, UNIT_NAMES, MIN_EVERY, SNOOZES, SOUNDS, SOUND_IDS, DEFAULT_SOUND, DAY_NAMES,
     cleanRepeat, cleanOne, cleanAll, cleanMsgs, newId, nextFrom, firstAt, dueAt, ring, done, snooze, hiddenNow, ringing, nextOf,
-    clock, when, missed, repeatText, line, presets };
+    MONTHS, clock, dayWord, when, missed, repeatText, status, line };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.COSMO_REMIND = api;
 })(typeof window !== 'undefined' ? window : globalThis);

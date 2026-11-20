@@ -33,7 +33,8 @@ Keep each file's existing line endings (`.gitattributes` holds them for git sinc
   main keeps the one clock (never a timer in a window). `note.remindMsg` is secret (in `SECRET` and crypt.js `SECRET_FIELDS`,
   one `blank()` for both sealers): never send it to the list with the cards, nor to a hidden window. A hidden locked note may
   only get Snooze / Done (and only when its reminder's `unlock` is off): any other reminder change needs the `hiddenInList` /
-  revealed check in main. Rules: `architecture.md` → "Reminders".
+  revealed check in main. Rules: `architecture.md` → "Reminders". The panel (1.4.19, `src/remind-ui.js`) has one fixed size
+  and keeps every row in place: a new row needs a new height (`ui-gotchas.md` → "The reminders panel never moves").
 - **App pins (1.4.5, `main/app-pin.js`):** a note pinned over some apps (`note.pinApps`) mirrors them: on top while one is in
   front, just above its app (`win.appBehind`, not on top) while it is behind another app, hidden (`win.hide`, `win.appHidden`)
   while none is open; its window stays open. Anything that shows note windows or sets on-top must leave `appHidden` /

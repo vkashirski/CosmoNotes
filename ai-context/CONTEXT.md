@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 18 November 2026 · App version 1.4.18**
+**Last updated: 20 November 2026 · App version 1.4.23**
 
 Start with `CLAUDE.md` (rules, commands, pitfalls, release checklist). This file is the map: what the app is,
 how the folder is laid out, and which `ai-context/` file to open for the job in hand. Open only the files your
@@ -84,7 +84,7 @@ src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/n
                    word wrap, zoom: zoomNow/setZoom, sideways scroll) · draw-over (draw-over: inkState, renderInk, saveInk; floating
                    toolbars: movable) · ink-out (toolbars in their own little windows: barOut, inkOut/textOut; whole-stroke
                    eraser) · remind (1.4.1: Add → Reminder's panel, the strip of a reminder that rings: Snooze / Done, the glow,
-                   the sound) · pin-apps (1.4.5: the pin's right-click list, "Pin over": the open apps to tick) · tags (1.4.10: the ⋯ menu's Tags row) · top-bar (1.4.11: a small note's top bar: the buttons the title needs the room of go into » and main's menu) · eraser-start (the Partial eraser, toast(), start-up: init; it stays last: see splitting-code.md).
+                   the sound; 1.4.19: the chip with the next reminder, #remChip) · pin-apps (1.4.5: the pin's right-click list, "Pin over": the open apps to tick) · tags (1.4.10: the ⋯ menu's Tags row) · top-bar (1.4.11: a small note's top bar: the buttons the title needs the room of go into » and main's menu) · eraser-start (the Partial eraser, toast(), start-up: init; it stays last: see splitting-code.md).
                    Before its own code it loads src/reminders.js, src/remind-ui.js and src/tags.js (below).
                    Its styles: src/css/note-*.css, loaded by note.html in this order:
                    note-base (colours, base, top bar) · note-text (locked note, photo handle, writing area) ·
@@ -114,7 +114,7 @@ src/evening.js     1.3.27: evening colours: each light paper's evening shade, th
                    (window.COSMO_EVENING) and required by main and store.js: one list, so they never differ
 src/reminders.js   1.4.1 reminders: the rules (cleaning, repeats and their next time, Snooze, Done, missed, hiding) and their words.
                    Like evening.js: loaded by both windows (window.COSMO_REMIND) and required by main and store.js
-src/remind-ui.js   1.4.1 the reminders panel (the same in both windows) and the 10 sounds (Web Audio, no files): window.COSMO_REMIND_UI
+src/remind-ui.js   1.4.1 the reminders panel (the same in both windows; 1.4.19: one fixed size, In / At, time box, its own calendar) and the 10 sounds (Web Audio, no files): window.COSMO_REMIND_UI
 src/tags.js        1.4.10 tags: the rules (clean, the search box's #tags, All / Any) and the editor (chips + a box), the same in both
                    windows (window.COSMO_TAGS); main and store.js require it
 src/about.js       In-app feature list (window.COSMO_ABOUT.FEATURES) + LAST_UPDATED date; no version history since 1.1.41

@@ -114,6 +114,12 @@ const DEFAULT_SETTINGS = {
   remindSound: REMIND.DEFAULT_SOUND,
   remindVolume: 0.6,
   remindShowHidden: false,
+  // 1.4.19: the reminder panel's time box has seconds too (src/remind-ui.js); off = hours and minutes
+  remindSeconds: false,
+  // 1.4.20: typing two digits in the panel's time box goes on to the next box
+  remindAutoNext: true,
+  // 1.4.20: the panel offers "Hide the note until then" (off: it doesn't; reminders that already hide keep it)
+  remindHide: false,
   // 1.4.10: the notes list's tag filter with several tags picked: false = notes with all of them, true = with any of them
   tagAny: false,
 };
@@ -640,6 +646,9 @@ class Store {
     // 1.4.1: reminders' sound and volume, cleaned
     this.settings.remindSound = cleanRemindSound(this.settings.remindSound);
     this.settings.remindVolume = cleanVolume(this.settings.remindVolume);
+    this.settings.remindSeconds = !!this.settings.remindSeconds;
+    this.settings.remindAutoNext = this.settings.remindAutoNext !== false;
+    this.settings.remindHide = !!this.settings.remindHide;
     this.groups = new Map();
     const g = readJson(this.groupsFile) || readJson(this.groupsFile + '.bak') || {};
     for (const x of Array.isArray(g.groups) ? g.groups : []) {

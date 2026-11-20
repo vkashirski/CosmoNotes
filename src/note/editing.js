@@ -170,12 +170,31 @@
       return d;
     }));
   }
+  // 1.4.21: a ticked line's words are struck through by the highlight cn-done (note-text.css), not by a text-decoration on
+  // the line: that one is drawn at the line's own size (Chromium), so on bigger or smaller words it wasn't in the middle;
+  // a highlight is drawn by each run of words in its own size and font. The whole line, its lines inside too, as before.
+  // Nothing goes into the note (a highlight is not in the page), so nothing changes in what is saved.
+  const HL = typeof Highlight === 'function' && window.CSS && CSS.highlights; // (Ctrl+F uses it too)
+  function paintDone() {
+    if (!HL) return;
+    const ranges = [];
+    for (const li of editor.querySelectorAll('ul.checklist li.done')) {
+      if (li.parentElement.closest('li.done')) continue; // inside a ticked line: struck with it
+      const r = document.createRange(); r.selectNodeContents(li); ranges.push(r);
+    }
+    if (ranges.length) CSS.highlights.set('cn-done', new Highlight(...ranges)); else CSS.highlights.delete('cn-done');
+  }
   let decoQueued = false;
   function decorate() {
     if (decoQueued) return; decoQueued = true;
-    requestAnimationFrame(() => { decoQueued = false; try { alignChecks(); paintStrikes(); } catch {} });
+    requestAnimationFrame(() => { decoQueued = false; try { paintDone(); alignChecks(); paintStrikes(); } catch {} });
   }
   editor.addEventListener('input', decorate);
+  // a line ticked or not, lines moved, a note shown or hidden: the strikes go with them (not a voice note playing: its
+  // bars and time change all the while)
+  new MutationObserver((recs) => {
+    if (recs.some((r) => (r.type === 'childList' ? !(r.target.closest && r.target.closest('.voice')) : r.target.nodeName === 'LI'))) decorate();
+  }).observe(editor, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
   editor.addEventListener('load', decorate, true); // a photo finished loading (lines move)
   if (window.ResizeObserver) new ResizeObserver(decorate).observe(editor);
   new MutationObserver(decorate).observe(body, { attributes: true, attributeFilter: ['data-font', 'data-size'] });
@@ -187,7 +206,6 @@
   // the note scrolls to it. Marks beside the scrollbar show where they all are (click one to go there). Esc closes it and
   // leaves the found words selected, so you can type over them or carry on from there. Not case-sensitive.
   const find = { on: false, hits: [], cur: -1, timer: null };
-  const HL = typeof Highlight === 'function' && window.CSS && CSS.highlights;
   const BLOCKS = /^(DIV|P|LI|UL|OL|H1|H2|H3|H4|PRE|BLOCKQUOTE|TABLE|TR|TD|TH|IMG|BR|HR)$/;
   const fold = (t) => t.replace(/ /g, ' ').toLowerCase();
   function findHits(q) {

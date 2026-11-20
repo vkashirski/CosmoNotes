@@ -116,7 +116,7 @@ function checkKit(page, dir, ORDER, kitName, crlf, sandbox, shared) {
   return { K, parts };
 }
 const i0 = (p, parts) => p === parts[0];
-const doc = () => ({ querySelector: (s) => fake(s), querySelectorAll: () => [], createElement: (t) => fake(t), createElementNS: (n, t) => fake(t), addEventListener() {}, body: fake('body'), documentElement: fake('html'), hidden: false, fonts: { ready: new Promise(() => {}), addEventListener() {} } });
+const doc = () => ({ querySelector: (s) => fake(s), querySelectorAll: () => [], createElement: (t) => fake(t), createElementNS: (n, t) => fake(t), addEventListener() {}, hasFocus: () => true, body: fake('body'), documentElement: fake('html'), hidden: false, fonts: { ready: new Promise(() => {}), addEventListener() {} } });
 const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {}, requestAnimationFrame: () => 0, cancelAnimationFrame() {}, getComputedStyle: () => fake('style'),
   ResizeObserver: class { observe() {} }, MutationObserver: class { observe() {} }, IntersectionObserver: class { observe() {} unobserve() {} },
   Intl, Date, Math, JSON, Object, Array, Set, Map, WeakMap, String, Number, Boolean, Promise, RegExp, Error, parseFloat, parseInt, isFinite, Uint8Array, encodeURIComponent };

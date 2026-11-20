@@ -157,7 +157,13 @@ body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[da
 body:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) #editor ul.checklist li.done::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232B2A30' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
 }
-#editor ul.checklist li.done { text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: .55; }
+/* 1.4.21: a ticked line's strike is drawn by each run of words in its own size and font (the highlight cn-done, editing.js
+   paintDone), never as the line's text-decoration: one set on the line is drawn at the line's own size, so it ran near the
+   top of bigger words and under smaller ones. 1.4.23: it goes through the middle of the small letters (half an ex above
+   the baseline, the ex of each run's own font), not where the font puts its line-through (Nunito's: above the middle).
+   It is an underline moved up, since a line-through can't be moved; no gaps at the letters (skip-ink). */
+#editor ul.checklist li.done { opacity: .55; }
+::highlight(cn-done) { text-decoration-line: underline; text-decoration-thickness: 1.5px; text-underline-offset: calc(-0.5ex - 0.75px); text-decoration-skip-ink: none; }
 #editor ul.checklist li.done li:not(.done) { opacity: 1; }
 /* 1.3.19: dragging a box moves its line (src/note/checklists.js): the line stays faint where it was, a bar shows where it goes */
 #editor ul.checklist li.cb-moving { opacity: .35; }

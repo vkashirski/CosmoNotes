@@ -117,7 +117,9 @@
 .card:is([data-color="charcoal"],[data-color="night"],[data-color="midnight"],[data-color="forest"],[data-color="plum"]) .txt .cb.done {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232B2A30' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
 }
-.card .txt .ck.done { text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: .55; }
+.card .txt .ck.done { opacity: .55; }
+/* 1.4.21: each run of a ticked line is struck through by itself, in its own size (cards.js runSpan) */
+.card .txt .ck.done .run { text-decoration-thickness: 1.5px; }
 .card[data-font="hand"] .t1 { font-weight: 600; }
 .card[data-font="hand"] .t1.tt { font-weight: 700; }
 .sheet[data-font="hand"] .t1 { font-weight: 600; }
@@ -322,7 +324,9 @@ code { display: block; padding: 8px 10px; margin-bottom: 10px; border-radius: 9p
 .tsg { height: 24px; padding: 0 9px; border: 0; border-radius: 999px; background: var(--soft); color: var(--ink2); font: 800 11.5px var(--ui); cursor: pointer; }
 .tsg:hover { background: var(--soft2); color: var(--ink); }
 /* the reminders pop-up (list/actions-locks.js openRemindSheet) and Settings → Reminders */
-.mbox.rbox { max-width: 380px; max-height: calc(100vh - 40px); overflow-y: auto; text-align: left; }
-.mbox.rbox h3 { margin: 0 0 10px; }
+/* 1.4.19: one fixed size, like a note's (src/remind-ui.js scrolls inside it when the window is small); 1.4.20: --rm-h is the
+   editor's own height, set when it opens */
+.mbox.rbox { max-width: 344px; height: min(var(--rm-h, 490px), calc(100vh - 40px)); padding: 0; overflow: hidden; text-align: left; }
+.mbox.rbox #remHere { height: 100%; }
 .rsound { display: flex; align-items: center; gap: 6px; }
 .rsound select { border: 1.5px solid var(--soft2); border-radius: 9px; padding: 4px 7px; background: var(--card); color: var(--ink); font: 700 12.5px var(--ui); outline: none; }

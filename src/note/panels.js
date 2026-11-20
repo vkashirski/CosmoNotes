@@ -536,13 +536,6 @@
       case 'table': insertTable(3, 2); toast('Tip: right-click a cell to add rows or columns'); break;
       case 'numbers': runCmd('numbers'); break;
       case 'divider': restoreSel(); document.execCommand('insertHorizontalRule'); changed(); break;
-      case 'date': {
-        restoreSel();
-        const d = new Date().toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-        document.execCommand('insertText', false, d + ' ');
-        changed();
-        break;
-      }
       default: break;
     }
   }

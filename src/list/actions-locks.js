@@ -381,16 +381,18 @@
       reminders: data.reminders,
       msgs: data.msgs,
       locked: data.locked,
+      name: n.title && n.title.trim() ? n.title.trim().slice(0, 40) : '', // 1.4.19: whose reminders, beside the title
       settings: V.state.settings,
+      start: 'list', // the note's reminders (none yet: a new one)
+      close: closeRemindSheet,
+      done: (text) => toast(text),
       save: (list, msgs) => S.list.remindSet(n.id, list, msgs),
     });
-    $('#remTitle').textContent = n.title && n.title.trim() ? `Reminders: ${n.title.trim().slice(0, 40)}` : 'Reminders';
-    $('#remHere').innerHTML = '';
-    $('#remHere').append(ed.el);
+    $('#remSheet .rbox').style.setProperty('--rm-h', `${ed.height}px`); // 1.4.20: its rows decide its one size
+    $('#remHere').replaceChildren(ed.el);
     $('#remSheet').hidden = false;
   }
   function closeRemindSheet() { $('#remSheet').hidden = true; $('#remHere').innerHTML = ''; }
-  $('#remClose').addEventListener('click', closeRemindSheet);
   $('#remSheet').addEventListener('mousedown', (e) => { if (e.target.id === 'remSheet') closeRemindSheet(); });
 
   // 1.4.10: the tags of a note, a group, or several (right-click → Tags…, the selection bar): the src/tags.js editor. Each

@@ -18,9 +18,12 @@ function noteSettings() {
   // appTheme (1.1.16): the notes list's colours; a note's pop-ups and toolbars use them too
   return { spellCheck: !!S.store.settings.spellCheck, hasPassword: !!S.store.settings.lock, ...lockInfo(), ...fxSettings(), ...checkSettings(), ...eveningAndPanic(), ...remindSettings(), appTheme: S.store.settings.listTheme || 'cream' };
 }
-// 1.4.1: the sound a reminder plays (unless it has its own) and how loud: the note window plays it (src/note/remind.js)
+// 1.4.1: the sound a reminder plays (unless it has its own) and how loud: the note window plays it (src/note/remind.js);
+// 1.4.19: and whether the reminder panel's time box has seconds; 1.4.20: whether it goes on to the next box by itself, and
+// whether it offers "Hide the note until then"
 function remindSettings() {
-  return { remindSound: S.store.settings.remindSound, remindVolume: S.store.settings.remindVolume };
+  const s = S.store.settings;
+  return { remindSound: s.remindSound, remindVolume: s.remindVolume, remindSeconds: !!s.remindSeconds, remindAutoNext: s.remindAutoNext !== false, remindHide: !!s.remindHide };
 }
 // 1.3.27: evening colours (on for notes that follow Settings, and how far into the evening it is now) and the panic button
 // (1.3.34: and the click-through button)

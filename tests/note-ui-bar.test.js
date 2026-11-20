@@ -7,7 +7,10 @@
 //   options), in the app theme's colours; a line picked does what the button does; Esc, a click in the note, » again, a
 //   wider note close it; it opens on a rolled-up note too; showing it or a press in it brings it up (touch).
 // - the text's right-click menu (1.4.18: the same menu, not Windows'): main's lines (onCtx) at the mouse, an off line, the
-//   keys (↑ ↓ Enter, → into Add ▸ and ← back, Esc, another key closes it), the line picked goes back (ctxAct).
+//   keys (↑ ↓ Enter, → into Add ▸ and ← back, Esc, another key closes it), the line picked goes back (ctxAct). Add ▸ is
+//   first (1.4.21), its lines with the Add panel's pictures.
+// - 1.4.21: the menu's window is made once and kept (only hidden when the menu shuts), and made ahead of time while the note
+//   doesn't have the focus: a right-click opens no new window (that made the menu slow).
 // - a press in the note brings it up (touch '').
 // - right-click in the text → Add ▸ (main/web.js): the window gives main the Add panel's items once (addItems); the one
 //   main sends back (onAdd) runs as from the panel; not while the note's words are hidden.
@@ -36,20 +39,39 @@ const assert = require('assert');
   const titleW = (page) => page.evaluate(() => document.querySelector('#title').getBoundingClientRect().width);
   const textW = (page) => page.evaluate(() => { const r = document.createRange(); r.selectNodeContents(document.querySelector('#title')); return r.getBoundingClientRect().width; });
   const settle = (page) => page.waitForTimeout(120);
-  // » pressed: its menu's window opens; its lines
+  // a note window that keeps the windows it opens (page.pops)
+  const openNote = async (...a) => { const pg = await nu.open(...a); pg.pops = []; pg.on('popup', (x) => pg.pops.push(x)); return pg; };
+  // 1.4.21: the menu's one window (made once, kept)
+  const menuWin = async (page) => {
+    for (let i = 0; i < 80; i++) {
+      for (const x of page.pops) if (!x.isClosed() && await x.evaluate(() => window.name).catch(() => '') === 'cosmoMoreBar') return x;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    throw new Error('the menu has no window');
+  };
+  const menuWins = async (page) => { let n = 0; for (const x of page.pops) if (!x.isClosed() && await x.evaluate(() => window.name).catch(() => '') === 'cosmoMoreBar') n++; return n; };
+  // » pressed: its menu shows in its window; its lines
   const openMore = async (page) => {
-    const [pop] = await Promise.all([page.waitForEvent('popup'), page.click('#btnMore')]);
+    await page.evaluate(() => { window.__main = window.__main.filter(([w]) => w !== 'show'); });
+    await page.click('#btnMore');
     await page.waitForFunction(() => window.__main.some(([w, s]) => w === 'show' && s.bar === 'more'));
-    return pop;
+    const pop = await menuWin(page); pop.page = page; return pop;
   };
   const lines = (pop) => pop.evaluate(() => [...document.querySelectorAll('#ctx .mi')].map((b) => ({ id: b.dataset.id, label: b.textContent, checked: b.getAttribute('aria-checked'), pic: !!b.querySelector('svg:not(.mtick)'), tick: !!b.querySelector('.mtick') })));
   const pickLine = (pop, id) => pop.evaluate((i) => document.querySelector(`#ctx .mi[data-id="${i}"]`).click(), id);
-  const shut = async (pop) => { for (let i = 0; i < 20 && !pop.isClosed(); i++) await new Promise((r) => setTimeout(r, 25)); return pop.isClosed(); };
+  // the menu shut: back in the note, hidden (1.4.21: its window stays, hidden by main)
+  const shut = async (pop) => {
+    for (let i = 0; i < 20; i++) {
+      if (await pop.page.evaluate(() => { const m = document.getElementById('ctx'); return !!m && m.hidden; })) return !pop.isClosed();
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    return false;
+  };
   const mainSaw = (page) => page.evaluate(() => window.__main.splice(0));
   const ALL = ['btnList', 'btnNew', 'title', 'btnPin', 'btnRoll', 'btnMenu', 'hsep', 'btnMin', 'btnMax', 'btnClose'];
 
   // ---- no title, wide enough: every button, no »
-  let page = await nu.open({ html: '<p>milk</p>' }, 360, 320, catchMain);
+  let page = await openNote({ html: '<p>milk</p>' }, 360, 320, catchMain);
   await settle(page);
   assert.deepEqual(await inBar(page), ALL, 'a 360 px note: every button');
   // ---- a long title: it gets room, the least needed buttons go into »
@@ -77,7 +99,7 @@ const assert = require('assert');
   assert.deepEqual(await mainSaw(page), [['touch', 'more']], 'a press in it brings it up');
   // Esc closes it (the keyboard stays in the note)
   await page.keyboard.press('Escape');
-  assert.ok(await shut(pop), 'Esc: its window closes');
+  assert.ok(await shut(pop), 'Esc: the menu shuts, its window stays (hidden)');
   assert.ok((await mainSaw(page)).some(([w, b]) => w === 'hide' && b === 'more'), 'main hides it');
   // a click in the note, or » again, closes it too
   pop = await openMore(page);
@@ -88,6 +110,7 @@ const assert = require('assert');
   await page.click('#btnMore');
   assert.ok(await shut(pop), '» again closes it');
   assert.equal(await page.evaluate(() => document.querySelector('#ctx').hidden), true, 'back in the note, hidden');
+  assert.equal(await menuWins(page), 1, 'one window for the menu all along');
   // ---- a 200 px note: the title, then », Close (and Roll up while it fits)
   await page.setViewportSize({ width: 200, height: 320 });
   await settle(page);
@@ -121,7 +144,7 @@ const assert = require('assert');
   await page.close();
 
   // ---- the app theme's colours (like the right-click menu); a rolled-up note's » opens it too
-  page = await nu.open({ html: '<p>x</p>', title: 'A long title for a rolled up note', rolled: true, settings: { appTheme: 'night' } }, 200, 34, catchMain);
+  page = await openNote({ html: '<p>x</p>', title: 'A long title for a rolled up note', rolled: true, settings: { appTheme: 'night' } }, 200, 34, catchMain);
   await settle(page);
   assert.ok((await inBar(page)).includes('btnMore'), 'rolled up: » is there');
   pop = await openMore(page);
@@ -136,60 +159,75 @@ const assert = require('assert');
   await page.close();
 
   // ---- the smallest note without a title still fits every button it shows
-  page = await nu.open({ html: '<p>x</p>', settings: { appTheme: 'cream', panicOn: true } }, 200, 200, catchMain);
+  page = await openNote({ html: '<p>x</p>', settings: { appTheme: 'cream', panicOn: true } }, 200, 200, catchMain);
   await settle(page);
   assert.ok(await fits(page) && (await inBar(page)).includes('btnMore'), 'a 200 px note: » holds what doesn\'t fit');
   await page.close();
   // ---- a short title keeps its whole width
-  page = await nu.open({ html: '<p>x</p>', title: 'Hi' }, 260, 200, catchMain);
+  page = await openNote({ html: '<p>x</p>', title: 'Hi' }, 260, 200, catchMain);
   await settle(page);
   assert.ok(await titleW(page) >= await textW(page), 'a short title shows whole');
   await page.close();
 
   // ---- 1.4.18: the text's right-click menu: main sends its lines; the note shows them in its own menu
-  page = await nu.open({ html: '<p>one two</p>' }, 220, 200, catchMain);
+  page = await openNote({ html: '<p>one two</p>' }, 220, 200, catchMain);
   await settle(page);
   await mainSaw(page);
-  const LINES = { x: 30, y: 60, items: [{ id: 'm0', label: 'Cut', enabled: false }, { id: 'm1', label: 'Copy' }, { id: 'm2', label: 'Paste' }, '-', { id: 'sub3', label: 'Add', sub: [{ id: 'm4', label: 'Photo' }, { id: 'm5', label: 'Today’s date' }] }] };
+  // (main/web.js: Add ▸ first, then a line; `pic` = the Add item's act)
+  const LINES = { x: 30, y: 60, items: [{ id: 'sub0', label: 'Add', sub: [{ id: 'm1', label: 'Photo', pic: 'photo' }, { id: 'm2', label: 'Divider', pic: 'divider' }, { id: 'm3', label: 'Odd', pic: 'no such' }] }, '-', { id: 'm4', label: 'Cut', enabled: false }, { id: 'm5', label: 'Copy' }, { id: 'm6', label: 'Paste' }] };
+  // 1.4.21: the menu's window is made ahead of time while the note doesn't have the focus (here: it never had it, or it
+  // lost it), never while you type or draw in it
+  await page.mouse.move(60, 60); await page.waitForTimeout(400);
+  assert.equal(await menuWins(page), 0, 'not while the note has the focus');
+  await page.evaluate(() => { document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); });
+  const warm = await menuWin(page);
+  await page.evaluate(() => { delete document.hasFocus; });
+  assert.equal(await page.evaluate(() => !!document.getElementById('ctx')), true, 'made ahead of time, the menu still in the note');
   const rightClick = async () => {
-    const [p] = await Promise.all([page.waitForEvent('popup'), page.evaluate((m) => window.__onCtx(m), LINES)]);
+    await page.evaluate(() => { window.__main = window.__main.filter(([w]) => w !== 'show'); });
+    await page.evaluate((m) => window.__onCtx(m), LINES);
     await page.waitForFunction(() => window.__main.some(([w, s]) => w === 'show' && s.bar === 'more'));
-    return p;
+    const p = await menuWin(page); p.page = page; return p;
   };
   const words = (p) => p.evaluate(() => [...document.querySelectorAll('#ctx .mi')].map((b) => b.textContent + (b.disabled ? ' (off)' : '') + (b.classList.contains('hot') ? ' *' : '')));
   pop = await rightClick();
-  assert.deepEqual(await words(pop), ['Cut (off)', 'Copy', 'Paste', 'Add'], 'main\'s lines, Cut off');
+  assert.equal(pop, warm, 'shown in the window made ahead of time');
+  assert.deepEqual(await words(pop), ['Add', 'Cut (off)', 'Copy', 'Paste'], 'main\'s lines, Add first, Cut off');
   saw = await mainSaw(page);
   const at = saw.find(([w]) => w === 'show')[1];
   assert.ok(at.dx + at.inset.l === 30 && at.dy + at.inset.t === 60, `at the mouse (${JSON.stringify(at)})`);
-  await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown');
-  assert.deepEqual(await words(pop), ['Cut (off)', 'Copy', 'Paste *', 'Add'], '↓ ↓: on Paste (an off line is skipped)');
+  await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown');
+  assert.deepEqual(await words(pop), ['Add', 'Cut (off)', 'Copy', 'Paste *'], '↓ ↓ ↓: on Paste (an off line is skipped)');
   await page.keyboard.press('Enter');
   assert.ok(await shut(pop), 'Enter: the menu closes');
-  assert.ok((await mainSaw(page)).some(([w, id]) => w === 'act' && id === 'm2'), 'and main is asked to paste');
+  assert.ok((await mainSaw(page)).some(([w, id]) => w === 'act' && id === 'm6'), 'and main is asked to paste');
   pop = await rightClick();
-  await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowRight');
-  assert.deepEqual(await words(pop), ['Add', 'Photo *', 'Today’s date'], '↑ is on Add, →: its lines, a way back first');
+  assert.equal(pop, warm, 'the same window again (no new one)');
+  await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowRight');
+  assert.deepEqual(await words(pop), ['Add', 'Photo *', 'Divider', 'Odd'], '↓ is on Add, →: its lines, a way back first');
+  const pics = await pop.evaluate(() => [...document.querySelectorAll('#ctx .mi')].slice(1).map((b) => (b.querySelector(':scope > .ic svg') ? getComputedStyle(b.querySelector(':scope > .ic')).backgroundColor : null)));
+  assert.ok(pics[0] && pics[1] && pics[0] !== pics[1] && pics[2] === null, `Add ▸'s lines have the Add panel's pictures, in their colours (${pics})`);
   await page.keyboard.press('ArrowLeft');
-  assert.deepEqual(await words(pop), ['Cut (off)', 'Copy', 'Paste', 'Add'], '←: back');
+  assert.deepEqual(await words(pop), ['Add', 'Cut (off)', 'Copy', 'Paste'], '←: back');
   await pop.evaluate(() => [...document.querySelectorAll('#ctx .mi')].find((b) => b.textContent === 'Add').click());
-  await pop.evaluate(() => [...document.querySelectorAll('#ctx .mi')].find((b) => b.textContent === 'Today’s date').click());
+  await pop.evaluate(() => [...document.querySelectorAll('#ctx .mi')].find((b) => b.textContent === 'Divider').click());
   assert.ok(await shut(pop));
-  assert.ok((await mainSaw(page)).some(([w, id]) => w === 'act' && id === 'm5'), 'a click in Add ▸ picks it');
+  assert.ok((await mainSaw(page)).some(([w, id]) => w === 'act' && id === 'm2'), 'a click in Add ▸ picks it');
   pop = await rightClick();
   await page.keyboard.press('Escape');
   assert.ok(await shut(pop), 'Esc closes it');
   pop = await rightClick();
   await page.keyboard.press('x');
   assert.ok(await shut(pop), 'another key closes it');
+  assert.equal(await menuWins(page), 1, 'every right-click in the one window');
   await page.close();
 
   // ---- right-click → Add: the panel's items go to main once; the one main sends back runs
-  page = await nu.open({ html: '<p>one two</p>' }, 360, 320, catchMain);
+  page = await openNote({ html: '<p>one two</p>' }, 360, 320, catchMain);
   await settle(page);
   const add = await page.evaluate(() => window.__add);
-  assert.deepEqual(add.map((a) => a.act), ['photo', 'voice', 'speak', 'drawing', 'link', 'table', 'numbers', 'divider', 'remind', 'date'], 'every Add item, in the panel\'s order');
-  assert.deepEqual(add.find((a) => a.act === 'date'), { act: 'date', label: 'Today’s date' }, 'with the panel\'s words');
+  assert.deepEqual(add.map((a) => a.act), ['photo', 'voice', 'speak', 'drawing', 'link', 'table', 'numbers', 'divider', 'remind'], 'every Add item, in the panel\'s order (1.4.21: no Today’s date)');
+  assert.deepEqual(add.find((a) => a.act === 'speak'), { act: 'speak', label: 'Voice to text' }, 'with the panel\'s names');
   await page.evaluate(() => {
     const ed = document.getElementById('editor'); ed.focus();
     const t = ed.querySelector('p').firstChild; const r = document.createRange(); r.setStart(t, 3); r.collapse(true);
@@ -206,7 +244,7 @@ const assert = require('assert');
   await page.evaluate(() => window.__onAdd('nothing'));
   await page.close();
   // a hidden locked note adds nothing
-  page = await nu.open({ html: '', locked: true, lockedBy: 'self', hidden: true }, 360, 320, catchMain);
+  page = await openNote({ html: '', locked: true, lockedBy: 'self', hidden: true }, 360, 320, catchMain);
   await settle(page);
   await page.evaluate(() => window.__onAdd('divider'));
   await settle(page);

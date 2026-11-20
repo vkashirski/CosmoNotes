@@ -33,7 +33,7 @@
 //   for Big words and a whole note in another font keep their size, their line height and their box.
 // - checklists (1.3.19): a click on a box ticks it; dragging a box moves its line (a bar shows where; Esc: nothing moves; out of
 //   a nested list, which goes when empty); only the box itself ticks (1.3.38); ticked lines to the bottom (unticking moves nothing, 1.3.20); drag off = the press ticks; boxes of one
-//   size (still beside their words); ⋯ → Checklists… and its pop-up (1.3.21: set to what Settings says = follow Settings,
+//   size (still beside their words); a ticked line's strike in each word's own size (1.4.21), through the middle of the small letters (1.4.23); ⋯ → Checklists… and its pop-up (1.3.21: set to what Settings says = follow Settings,
 //   "this note" marks, Use Settings); Undo / Redo of each. Pop-ups (1.3.22): a drag moves once a frame; "close all"
 //   closes nothing on press, everything on click.
 // - evening colours and the panic button (1.3.27): the paper mixes into its evening shade by the phase main sends (and back),
@@ -830,6 +830,25 @@ const look = (page) => page.evaluate(() => {
     page = await nu.open({ html: CL, checklist: { drag: false, sink: null, fixed: null }, settings: { appTheme: 'cream', checkDrag: true } });
     bx = await boxOf(page, 'Tea'); await drag(page, bx, (await boxOf(page, 'Milk')).top + 2);
     assert.equal(await items(page), 'Milk, Big eggs, Bread, x Tea', 'drag off: the press ticks it, nothing moves');
+    // 1.4.21: a ticked line is struck through by each run of its words in its own size (the highlight cn-done), not by a
+    // text-decoration on the line (drawn at the line's size: near the top of big words); ticking and unticking move it
+    const struck = (pg) => pg.evaluate(() => { const h = CSS.highlights.get('cn-done'); return h ? [...h].map((r) => r.toString().replace(/\s+/g, ' ')).join(' | ') : ''; });
+    page = await nu.open({ html: '<ul class="checklist"><li class="done">a <font size="7">Big</font> b<ul><li class="done">inner</li></ul></li><li>Bread</li></ul>', settings: { appTheme: 'cream', checkDrag: false } });
+    assert.equal(await struck(page), 'a Big binner', 'the ticked line\'s words are struck through, its lines inside with it (once)');
+    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('#editor li')].map((l) => getComputedStyle(l).textDecorationLine)), ['none', 'none', 'none'], '(never as a line\'s text-decoration)');
+    // 1.4.23: through the middle of the small letters: half an ex of each run's own font above the baseline (the font's own
+    // line-through was above the middle in Nunito)
+    const mid = await page.evaluate(() => [...document.querySelectorAll('#editor li.done, #editor li.done font')].map((el) => {
+      const h = getComputedStyle(el, '::highlight(cn-done)'); const probe = document.createElement('span'); probe.style.cssText = 'display:inline-block;width:1ex'; el.append(probe);
+      const ex = probe.getBoundingClientRect().width; probe.remove();
+      return [h.textDecorationLine, h.textDecorationSkipInk, Math.abs(parseFloat(h.textUnderlineOffset) + ex / 2 + 0.75) < 0.6];
+    }));
+    assert.ok(mid.length === 3 && mid.every(([l, skip, ok]) => l === 'underline' && skip === 'none' && ok), `the strike: in the middle of each run's small letters (${JSON.stringify(mid)})`);
+    bx = await boxOf(page, 'Bread'); await page.mouse.click(bx.x, bx.y); await page.waitForTimeout(150);
+    assert.equal(await struck(page), 'a Big binner | Bread', 'ticked: struck through');
+    await page.evaluate(() => document.querySelector('#editor li').classList.remove('done')); await page.waitForTimeout(80);
+    assert.equal(await struck(page), 'inner | Bread', 'a tick taken off any way: no strike there');
+    assert.ok(!/cn-done|highlight/.test(await page.evaluate(() => document.getElementById('editor').innerHTML)), 'nothing of it in the note');
     // boxes of one size: Big words get the note's own box, still beside them; the ⋯ menu's switch shows and changes it
     const sizes = (pg) => pg.evaluate(() => [...document.querySelectorAll('#editor li')].map((l) => parseFloat(getComputedStyle(l, '::before').width)));
     page = await nu.open({ html: CL, settings: { appTheme: 'cream', checkDrag: true, checkFixed: false } });
@@ -1017,8 +1036,8 @@ const look = (page) => page.evaluate(() => {
   }
   // ---- 1.4.1: reminders (main's side: reminders.test.js). A reminder that rings shows a strip under the top bar with its
   // message ("Missed at …" when late), Snooze 10 min (the arrow: other times) and Done, and the note glows; a locked note
-  // shows no message and waits for the PIN when the reminder asks for it. Add → Reminder opens the panel; adding one sends it
-  // to main (remindSet) with its message, and the panel shows it.
+  // shows no message and waits for the PIN when the reminder asks for it. Add → Reminder opens the panel (1.4.19: the
+  // owner's design, below); setting one sends it to main (remindSet) with its message, and the chip shows it.
   {
     const catchRemind = () => {
       const old = window.sticky;
@@ -1048,25 +1067,135 @@ const look = (page) => page.evaluate(() => {
     assert.ok(await page.isVisible('#remBar') && !(await page.isVisible('#remMsg')), 'locked: the strip, no message');
     assert.ok(await page.isDisabled('#remDone') && await page.isVisible('#remLockHint'), 'Unlock to dismiss');
     await page.close();
-    // Add → Reminder: the panel, Tomorrow 09:00 with a message
-    page = await nu.open({ html: '<div>x</div>', settings: S }, 380, 520, catchRemind);
+    // Add → Reminder (1.4.19, the owner's design): one panel of a fixed size: In / At, a time box (hours and minutes;
+    // Settings can add seconds), a message, Repeat (week days) or the day (its own calendar), a sound, hiding. Set saves it
+    // with its message, the panel closes, and a chip at the bottom of the note shows it; the chip opens it again
+    page = await nu.open({ html: '<div>x</div>', settings: S }, 380, 620, catchRemind);
     assert.ok(!(await page.isVisible('#remBar')), 'nothing rings: no strip');
+    assert.ok(!(await page.isVisible('#remChip')), 'no reminder: no chip');
     await nu.press(page, '#btnInsert');
     await page.click('#insert [data-act="remind"]');
     await page.waitForTimeout(80);
     assert.ok(await page.isVisible('#remPop'), 'the panel opens');
-    assert.equal(await page.textContent('#remPop .rm-none'), 'No reminders yet.');
-    await page.click('#remPop .rm-add');
-    await page.click('#remPop .rm-chip[data-p="tom"]');
-    assert.ok(!(await page.isVisible('#remPop .rm-row:has(input[type=date])')), 'a quick pick hides the date fields');
-    await page.fill('#remPop textarea', 'Water the plants');
+    assert.equal(await page.textContent('#remPop .rm-hd b'), 'New reminder', 'straight to a new one');
+    await page.click('#remPop .rm-mode [data-mode="at"]');
+    assert.equal(await page.locator('#remPop .rm-frame input').count(), 2, 'hours and minutes');
+    // nothing moves: In, At, Repeat, and the calendar keep the panel and its rows where they are
+    const where = () => page.evaluate(() => ['.rmd', '.rm-mode', '.rm-frame', '.rm-row textarea', '.rm-save'].map((s) => {
+      const e = document.querySelector('#remPop ' + s); if (!e) return null; const b = e.getBoundingClientRect(); return [b.x, b.y, b.width, b.height].map(Math.round).join(',');
+    }));
+    const atPlace = await where();
+    await page.click('#remPop .rm-mode [data-mode="in"]');
+    assert.deepEqual(await where(), atPlace, 'In: nothing moves');
+    assert.ok(await page.evaluate(() => document.querySelector('#remPop .rm-repeat').classList.contains('rm-off')), 'In: Repeat and the day fade, they stay');
+    await page.click('#remPop .rm-mode [data-mode="at"]');
+    await page.click('#remPop .rm-repeat');
+    assert.deepEqual(await where(), atPlace, 'Repeat: the week days take the day’s row');
+    assert.equal(await page.locator('#remPop .rm-days button').count(), 7);
+    await page.click('#remPop .rm-repeat');
+    const panelSize = await page.evaluate(() => { const b = document.querySelector('#remPop').getBoundingClientRect(); return [b.y, b.height].map(Math.round).join(','); });
+    assert.match(await page.textContent('#remPop .rm-day span'), /^\w{3} \d{1,2} \w{3}( \d{4})? \((Today|Tomorrow)\)$/, 'the day: its date, and how far (1.4.20)');
+    assert.ok(!(await page.$('#remPop .rm-hide')), 'Settings → Hiding notes is off: no Hide the note');
+    await page.click('#remPop .rm-day');
+    assert.equal((await page.textContent('#remPop .rm-back')).trim(), 'Back', 'the calendar, in the same box: its header is Back');
+    assert.equal(await page.evaluate(() => { const b = document.querySelector('#remPop').getBoundingClientRect(); return [b.y, b.height].map(Math.round).join(','); }), panelSize);
+    assert.equal(await page.locator('#remPop .rm-grid.d button').count(), 42, 'always six weeks');
+    await page.click('#remPop .rm-ttl');
+    assert.equal(await page.locator('#remPop .rm-grid.m button').count(), 12, 'the month: the months');
+    await page.click('#remPop .rm-ttl');
+    assert.equal(await page.textContent('#remPop .rm-grid.y button.now'), String(new Date().getFullYear()), 'the year: the years, from this one');
+    await page.click('#remPop .rm-back svg');
+    assert.equal(await page.textContent('#remPop .rm-hd b'), 'New reminder', 'Back (its arrow too) goes back');
+    // 1.4.20: a click between the digits picks the number; 7 then 5 is 07:05 (7 can't start an hour: on to the minutes)
+    const hb = await page.locator('#remPop .rm-frame input[data-k="atH"]').boundingBox();
+    await page.mouse.click(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.keyboard.type('75');
+    assert.deepEqual([await page.inputValue('#remPop [data-k="atH"]'), await page.inputValue('#remPop [data-k="atM"]')], ['07', '5'], 'typed over, on to the minutes');
+    await page.keyboard.type('8');
+    assert.equal(await page.inputValue('#remPop [data-k="atM"]'), '58', 'the minutes: two digits');
+    await page.keyboard.type('3');
+    assert.equal(await page.inputValue('#remPop [data-k="atM"]'), '3', 'a full box starts again (it never just stops)');
+    await page.click('#remPop .rm-mode [data-mode="in"]');
+    await page.fill('#remPop [data-k="inH"]', '00'); await page.fill('#remPop [data-k="inM"]', '00');
+    assert.equal(await page.textContent('#remPop .rm-when'), 'Choose how long.', 'In at 0: a hint');
+    assert.ok(await page.evaluate(() => document.querySelector('#remPop .rm-when').classList.contains('wait')) && await page.isDisabled('#remPop .rm-save'), 'not an error; nothing to set yet');
+    await page.click('#remPop .rm-mode [data-mode="at"]');
+    // 09:30 with a message: today if it's still ahead, else tomorrow
+    await page.fill('#remPop .rm-frame input[data-k="atH"]', '09');
+    await page.fill('#remPop .rm-frame input[data-k="atM"]', '30');
+    await page.fill('#remPop .rm-row textarea', 'Water the plants');
     await page.click('#remPop .rm-save');
     await page.waitForTimeout(80);
-    const sent = await page.evaluate(() => window.__rem.filter((x) => x[0] === 'set').pop());
+    let sent = await page.evaluate(() => window.__rem.filter((x) => x[0] === 'set').pop());
     const d = new Date(sent[1][0].start);
-    assert.ok(d.getHours() === 9 && d.getMinutes() === 0 && sent[1][0].start > Date.now(), 'tomorrow 09:00');
+    assert.ok(d.getHours() === 9 && d.getMinutes() === 30 && sent[1][0].start > Date.now() && sent[1][0].start - Date.now() < 864e5, 'the next 09:30');
+    assert.equal(sent[1][0].repeat, null);
     assert.deepEqual(Object.values(sent[2]), ['Water the plants'], 'with its message');
-    assert.match(await page.textContent('#remPop .rm-item b'), /^Tomorrow 09:00/, 'the panel shows it');
+    assert.ok(!(await page.isVisible('#remPop')), 'Set closes the panel');
+    assert.match(await page.textContent('#remChip'), /(Today|Tomorrow) 09:30/, 'the chip shows it');
+    // the chip opens it; a repeat on Mondays and Fridays
+    await page.click('#remChip');
+    assert.equal(await page.textContent('#remPop .rm-hd b'), 'Edit reminder');
+    assert.equal(await page.inputValue('#remPop .rm-row textarea'), 'Water the plants');
+    await page.click('#remPop .rm-repeat');
+    const isOn = (x) => page.evaluate((k) => document.querySelector(`#remPop .rm-days [data-d="${k}"]`).classList.contains('on'), x);
+    for (const x of [1, 5]) if (!(await isOn(x))) await page.click(`#remPop .rm-days [data-d="${x}"]`); // each click draws the row again
+    for (const x of [0, 2, 3, 4, 6]) if (await isOn(x)) await page.click(`#remPop .rm-days [data-d="${x}"]`);
+    const on = await page.$$eval('#remPop .rm-days button.on', (bs) => bs.map((b) => Number(b.dataset.d)));
+    assert.deepEqual(on, [1, 5], 'Monday and Friday');
+    await page.click('#remPop .rm-save');
+    await page.waitForTimeout(80);
+    sent = await page.evaluate(() => window.__rem.filter((x) => x[0] === 'set').pop());
+    assert.equal(sent[1].length, 1, 'changed, not added');
+    assert.deepEqual(sent[1][0].repeat, { k: 'week', days: on.sort() }, 'the week days');
+    assert.ok([0, 1, 2, 3, 4, 5, 6].filter((x) => on.includes(x)).includes(new Date(sent[1][0].start).getDay()) && sent[1][0].start > Date.now(), 'it starts on its first day from now');
+    await page.close();
+    // several days: one reminder each, the same time and message; Settings → Show seconds: a third box
+    page = await nu.open({ html: '<div>x</div>', settings: { ...S, remindSeconds: true, remindAutoNext: false, remindHide: true } }, 380, 620, catchRemind);
+    await nu.press(page, '#btnInsert');
+    await page.click('#insert [data-act="remind"]');
+    await page.waitForTimeout(80);
+    await page.click('#remPop .rm-mode [data-mode="at"]');
+    assert.equal(await page.locator('#remPop .rm-frame input').count(), 3, 'seconds too');
+    await page.click('#remPop [data-k="atH"]');
+    await page.keyboard.type('11');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.k), 'atH', 'Settings → Jump to the next box off: it stays');
+    assert.ok(await page.isVisible('#remPop .rm-hide'), 'Settings → Hiding notes on: Hide the note');
+    assert.equal(await page.evaluate(() => { const r = document.querySelector('#remPop .rmd'); return r.scrollHeight - r.clientHeight; }), 0, 'it fits, that row too');
+    await page.click('#remPop .rm-day');
+    await page.click('#remPop .rm-multi');
+    await page.click('#remPop .rm-dphd .rm-ib[title="Next"]');
+    await page.click('#remPop .rm-grid.d button:not(.other):not(.past) >> nth=2'); // each click draws the month again
+    await page.click('#remPop .rm-grid.d button:not(.other):not(.past) >> nth=9');
+    await page.click('#remPop .rm-done');
+    assert.match(await page.textContent('#remPop .rm-day span'), /^2 days: /);
+    await page.fill('#remPop .rm-row textarea', 'Pay the bills');
+    await page.click('#remPop .rm-save');
+    await page.waitForTimeout(80);
+    sent = await page.evaluate(() => window.__rem.filter((x) => x[0] === 'set').pop());
+    assert.equal(sent[1].length, 2, 'two reminders');
+    assert.deepEqual(Object.values(sent[2]), ['Pay the bills', 'Pay the bills']);
+    assert.equal(new Set(sent[1].map((r) => new Date(r.start).toTimeString().slice(0, 8))).size, 1, 'the same time');
+    await page.close();
+    // a repeat as it was (only its message changed) keeps its start, so main keeps it as it is; one that isn't week days
+    // (every month) shows as words and stays
+    const start = Date.now() - 20 * 864e5;
+    const mon = { id: 'mon01', start, at: Date.now() + 5 * 864e5, repeat: { k: 'month', until: null, times: null }, sound: null, hide: false, unlock: false, target: 'note', firing: false, firedAt: null, late: false, snooze: null, count: 3 };
+    page = await nu.open({ html: '<div>x</div>', lockedBy: 'note', reminders: [mon], remindMsg: {}, settings: S }, 380, 660, catchRemind);
+    assert.match(await page.textContent('#remChip'), /^\D*\w/, 'the chip');
+    await page.click('#remChip');
+    assert.match(await page.textContent('#remPop .rm-other'), /Every month on the/, 'every month, in words');
+    assert.ok(await page.isVisible('#remPop .rm-unlock'), 'a locked note: Unlock to dismiss');
+    assert.equal(await page.evaluate(() => document.querySelector('#remPop').style.getPropertyValue('--rm-h')), '490px', 'one row more (1.4.20: the panel says its height)');
+    assert.equal(await page.evaluate(() => { const r = document.querySelector('#remPop .rmd'); return r.scrollHeight - r.clientHeight; }), 0, 'it fits');
+    await page.fill('#remPop .rm-row textarea', 'Rent');
+    await page.click('#remPop .rm-save');
+    await page.waitForTimeout(80);
+    sent = await page.evaluate(() => window.__rem.filter((x) => x[0] === 'set').pop());
+    assert.equal(sent[1][0].start, start, 'its start stays');
+    assert.deepEqual(sent[1][0].repeat, mon.repeat, 'and its repeat');
+    assert.deepEqual(sent[2], { mon01: 'Rent' });
+    assert.deepEqual(page.errors, []);
     await page.close();
   }
   // Copy image (1.4.3): the page asks main for the photo (its own fetch() of stickyfile:// fails in the app), makes a PNG
