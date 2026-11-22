@@ -32,4 +32,5 @@ assert.ok(listHtml.includes('Also with the sparkle button, or the CosmoNotes ico
 for (const [f, html] of [['note.html', noteHtml], ['list.html', listHtml]]) {
   assert.ok(html.includes('Mouse can interact with the background') && !html.includes('Mouse plays with the background'), `${f}: the switch’s name`);
 }
+assert.ok(listHtml.indexOf('<b>Let reminders hide notes</b>') > 0 && listHtml.indexOf('<b>Let reminders hide notes</b>') < listHtml.indexOf('<b>Show hidden notes</b>'), 'Reminders: Let reminders hide notes, then Show hidden notes');
 console.log('ok');

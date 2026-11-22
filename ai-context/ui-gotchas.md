@@ -41,6 +41,10 @@ Open this when working in `src/note.*` or `src/list.*`. Effects have their own f
 
 ## Toolbars, menus and pop-ups
 
+- **Settings is a sidebar of sections (1.4.25, the owner's pick):** a new setting goes into a `.panel` (with `data-find`
+  words) inside the right `.setsec` in list.html, never loose in `#viewSettings`. A new section = a `.setsec` and a
+  `#setNav` button with the same `data-sec`, an icon and a short name (`.ls`, the slim rail under 560 px). No folds and no
+  animation when switching: it is done often. `#viewSettings` stays the scroller (1.1.43's background, `.scrolling`).
 - **Pop-up colours (1.1.16):** everything on a note's pop-ups/toolbars uses `--pop-*` variables, set per app theme by
   `body[data-apptheme]` (note.css end; `appTheme` = `listTheme`, in `noteSettings()`). Don't hard-code colours there.
 - **Menus don't close each other (1.1.20, the owner's wish):** `openPop` leaves the other editing menus (`EDIT_POPS`: ⋯, Effects, Add)
@@ -53,7 +57,12 @@ Open this when working in `src/note.*` or `src/list.*`. Effects have their own f
 - **Switches (1.1.20):** a sliding switch sits right after its text (grid, text column `fit-content`), and switches one
   after another are wrapped in `.switches` at start-up (`groupSwitches` in note.js and list.js; CSS subgrid) so they
   line up. A new switch needs nothing extra; keep the `<span>` text + hidden `<input>` + `<i>` structure.
-- **⋯ menu and Effects pop-up outside the note (1.1.16):** like the toolbars (`barOut` kinds `menu`, `fx`; 1.3.21: the Checklists pop-up `#ckPop`, kind `ck`, `cosmoCkBar` in main/ink-geometry.js). Dragging (`movable`, draw-over.js) takes one step per frame, the last move (1.3.22: each move used to send main a window move, and they queued up). The note's "click elsewhere closes the menus" mousedown must skip `#btnCloseAll` (1.3.22: it closed the inside ones, the button hid, its click never came), dragged only
+- **Renaming from the bar (1.4.26):** the title must stay a drag area (Windows maximises on a double-click there and the page
+  never sees it): renaming is the pencil's (`#btnRename`, no-drag). Hover over the drag area isn't reported either (1.4.29): main polls the
+  mouse (`main/bar-hover.js`) and sends `note:bar-hover`; the pencil shows on `body.bar-hover`. Never use `body:hover` for
+  anything that must follow the bar. `fit` (top-bar.js) leaves out `.barfill` and `#titleEdit`, does nothing while
+  `body.renaming`, and never moves the undo arrow into ». A title change goes through `#titleInput`'s `input` (one save path).
+- **⋯ menu and Effects pop-up outside the note (1.1.16):** like the toolbars (`barOut` kinds `menu`, `fx`; 1.3.21: the Checklists pop-up `#ckPop` (1.4.26: Other settings), kind `ck`, `cosmoCkBar` in main/ink-geometry.js). Dragging (`movable`, draw-over.js) takes one step per frame, the last move (1.3.22: each move used to send main a window move, and they queued up). The note's "click elsewhere closes the menus" mousedown must skip `#btnCloseAll` (1.3.22: it closed the inside ones, the button hid, its click never came), dragged only
   by their `.igrip`, placed from the top (`movable(…, { handle, top })`). The menu's window is focusable (title field).
 - **Text toolbar outside the note (1.1.16)** works exactly like the drawing toolbar below: `barOut()` makes one helper per
   toolbar (`kind` 'ink' / 'text', window name `cosmoInkBar` / `cosmoTextBar`); main keeps `win.<kind>Win/Out/State` and
@@ -112,7 +121,7 @@ Open this when working in `src/note.*` or `src/list.*`. Effects have their own f
   list.html) only draws it above y 11, the middle of the body's top line, so no sliver of it ever shows inside the body
   (1.1.15). Keep that if the icon changes.
 
-## Added in 1.1.22 – 1.1.23 (details in CHANGELOG.md and CHANGELOG-archive.md)
+## Editor details and the notes list
 
 - **Ctrl+F in notes (1.1.23):** `#find`, `findHits` over the editor's text nodes → Ranges, shown with `CSS.highlights` `cn-find` / `cn-find-cur`, scrollbar marks `#findMarks`; Enter/F3 next, Shift prev, Esc closes and selects the match; nothing saved.
 - **Picture descriptions (1.1.23):** right-click → Add description…, stored as the picture's `alt` / `title`; Ctrl+F finds and outlines the picture; the list's search looks in `pics` = `pictureWords(html)` from store.js, sent by `list:get`.

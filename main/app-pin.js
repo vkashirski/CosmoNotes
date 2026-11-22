@@ -5,8 +5,10 @@
 // - its app is open but another app is in front: the note stays on screen, but just above its app's window instead of
 //   on top of everything (win.appBehind: not always-on-top, moveAbove the app's window), so the app in front covers it
 //   like it covers the app ('behind');
-// - its app is minimised or closed (no window of it in the list): the note is hidden ('hide'), and comes back when the
-//   app (or that workspace) opens again. Its window is hidden (win.hide, win.appHidden), never closed: `open` stays true.
+// - its app is minimised or closed (no window of it in the list): the note is minimised ('hide'), and comes back when
+//   the app (or that workspace) opens again. 1.4.28 (the owner's wish): minimised (win.minimize, win.appHidden), so it
+//   stays in the taskbar and a click there brings it back; before, win.hide() took it off the taskbar, as if closed.
+//   Never closed: `open` stays true.
 //
 // Which windows are open: Electron's desktopCapturer lists the top-level windows with their titles, front to back
 // (Windows' EnumWindows order; WebRTC, which makes the list, leaves out minimised and hidden windows). Our own windows
@@ -21,7 +23,8 @@
 // windows has the focus, the app in front is ours and no other app can come in front until the focus leaves, so there is
 // nothing to read; when it leaves, a check runs at once (focusMoved).
 //
-// Coming and going is animated (animate: it fades in while dropping into place, and fades out rising).
+// Coming and going is animated (animate: it fades in while dropping into place, and fades out rising, then minimises).
+// Brought back from the taskbar while its app is still away (restored): it shows, on top, until the focus leaves it.
 // On top anyway: a note whose window has the focus (you are ticking its list), one opened from the list or brought to
 // front (win.peek: until another window comes in front), one whose reminder rings. One minimised with its own button
 // is left alone.
@@ -118,8 +121,8 @@ function endPeek(win) {
   else if (win.peekFrom !== at) { win.peek = false; win.peekFrom = undefined; }
 }
 // ------------------------------------------------------------------ the animation (the owner's pick B, "Drop in")
-// Coming: the window fades in while it drops ANIM.drop px into its place; going: it fades out while it rises, then
-// hides and is put back. Only its opacity and place change (a window can't scale); its saved place never does (the
+// Coming: the window fades in while it drops ANIM.drop px into its place; going: it fades out while it rises, is put
+// back while it can't be seen, then minimises (1.4.28). Only its opacity and place change (a window can't scale); its saved place never does (the
 // moves end where they started, and rememberBounds skips an unchanged place). A turn the other way mid-way goes on from
 // where it is. 0 ms = at once (the tests). A maximised note only fades (moving it would un-maximise it).
 const ANIM = { in: 180, out: 130, drop: 10 };
@@ -130,6 +133,13 @@ function animate(win, n, dir) {
   if (prev) clearTimeout(prev.timer);
   win.appAnim = null;
   if (win.isDestroyed()) return;
+  // coming back from the taskbar (or never shown yet): clear first, then in its place, so its place is known (a
+  // minimised window has none to move)
+  if (dir === 'in' && !onScreen(win)) {
+    win.setOpacity(0);
+    win.showInactive(); // (restores a minimised window without taking the focus)
+    if (win.isMinimized()) win.restore();
+  }
   const home = prev ? prev.home : { x: win.getBounds().x, y: win.getBounds().y };
   const full = n.opacity;
   const move = !win.isMaximized();
@@ -141,12 +151,12 @@ function animate(win, n, dir) {
   };
   const done = () => {
     win.appAnim = null;
-    if (dir === 'out') win.hide();
     if (move) win.setPosition(home.x, home.y);
+    if (dir === 'out') minimise(win);
     win.setOpacity(full);
     if (dir === 'in') showInk(win, !n.rolled);
   };
-  if (dir === 'in') { set(from); if (!win.isVisible()) win.showInactive(); } else showInk(win, false);
+  if (dir === 'in') set(from); else showInk(win, false);
   const span = Math.abs(to - from) * ANIM[dir];
   if (!span) { done(); return; }
   const a = { home, p: from, timer: null };
@@ -162,14 +172,33 @@ function animate(win, n, dir) {
   };
   a.timer = setTimeout(step, 16);
 }
-// show / hide by the app in front (a window still loading is only marked: openNoteWindow shows it when ready)
+// on screen: shown and not minimised (Electron's isVisible says nothing of minimised on every system)
+const onScreen = (win) => win.isVisible() && !win.isMinimized();
+// minimised by app pins (win.appHidden is set first: note-window.js's 'minimize' then leaves it, though it is pinned).
+// Only its own button and this may minimise a note (minimizable: false); 'restore' turns it off again.
+function minimise(win) {
+  win.setMinimizable(true);
+  win.minimize();
+}
+// show / minimise by the app in front (a window still loading is only marked: openNoteWindow minimises it when ready)
 function comeIn(win, n) {
   win.appHidden = false;
-  if (win.loaded && (!win.isVisible() || win.appAnim)) animate(win, n, 'in');
+  if (win.loaded && (!onScreen(win) || win.appAnim)) animate(win, n, 'in');
 }
 function goAway(win, n) {
   win.appHidden = true;
-  if (win.isVisible()) animate(win, n, 'out');
+  if (onScreen(win)) animate(win, n, 'out');
+}
+// note-window.js 'restore': brought back from the taskbar (or by a reminder, the list…) while app pins had it
+// minimised. It shows on top (its window has the focus, or a peek / reminder says so); once its app is still away
+// and the focus leaves it, the next check minimises it again. (comeIn clears appHidden before it shows: no-op there.)
+function restored(win) {
+  if (win.isDestroyed() || !win.appHidden) return;
+  win.appHidden = false;
+  const n = S.store.get(win.noteId);
+  if (!n) return;
+  place(win, n, 'top');
+  showInk(win, !n.rolled);
 }
 
 // on top of everything, or just above its app's window (applyState reads win.appBehind: note-state.js onTop)
@@ -196,7 +225,7 @@ function apply() {
     if (st === null) continue;
     // (a window shown by something else meanwhile, e.g. a reminder's pop-up for a note that stopped ringing, goes too)
     if (st === 'hide') {
-      if (!win.appHidden || (win.isVisible() && !win.appAnim)) goAway(win, n);
+      if (!win.appHidden || (onScreen(win) && !win.appAnim)) goAway(win, n);
       continue;
     }
     place(win, n, st);
@@ -263,7 +292,8 @@ function changed() {
   sync();
   apply();
 }
-// openNoteWindow, when the window is ready: show it now? (no: it shows once one of its apps is in front)
+// openNoteWindow, when the window is ready: show it now? (no: it starts minimised, and shows once one of its apps is
+// in front)
 // (and, its app open behind another, not on top: shown(win) then puts it just above that app)
 function mayShow(win) {
   const n = S.store.get(win.noteId);
@@ -286,4 +316,4 @@ function peek(win) {
 }
 const watching = () => active;
 const ticking = () => !!timer; // (tests)
-module.exports = { ANIM, appPinned, changed, check, matches, mayShow, openApps, parseTitle, peek, shown, ticking, watching };
+module.exports = { ANIM, appPinned, changed, check, matches, mayShow, minimise, openApps, parseTitle, peek, restored, shown, ticking, watching };

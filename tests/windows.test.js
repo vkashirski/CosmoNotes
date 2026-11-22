@@ -287,6 +287,21 @@ const app = require('./helpers/app');
     for (const id of ids) await H['list:close-note'](null, id);
   }
 
+  // ---- 1.4.29: the mouse over a note's top bar (main/bar-hover.js). A page never sees the mouse over a drag area, so main
+  // asks for it and tells the window only when it goes onto or off its bar (the rename pencil shows with it)
+  {
+    const bw = app.noteWins().find((x) => x.isVisible());
+    const told = () => (bw.webContents.sentArgs || []).filter((a) => a[0] === 'note:bar-hover').map((a) => a[1]);
+    const at = (dx, dy) => { E.__cursor = { x: bw.bounds.x + dx, y: bw.bounds.y + dy }; return tick(250); };
+    const n0 = told().length;
+    await at(40, 10); assert.deepEqual(told().slice(n0), [true], 'onto the bar: told once');
+    await at(60, 12); assert.equal(told().length, n0 + 1, 'moving along the bar: nothing more is sent');
+    await at(40, 100); assert.deepEqual(told().slice(n0), [true, false], 'down into the note: off the bar');
+    await at(-30, 10); assert.equal(told().length, n0 + 2, 'beside the note, level with its bar: not on it');
+    await at(40, 10); await at(40, -20); assert.deepEqual(told().slice(n0), [true, false, true, false], 'above the note: off the bar');
+    delete E.__cursor;
+  }
+
   // ---- the last save when a window goes away, then quitting: open notes stay open for next time
   const e3 = ev(app.winOf(firstId)); L['note:update-sync'](e3, { html: 'final words', text: 'final words' }); assert.equal(e3.returnValue, true);
   E.app.quit(); E.__all.forEach((x) => x.close()); await tick(2700);

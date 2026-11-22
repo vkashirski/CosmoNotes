@@ -7,7 +7,7 @@ const { notifyList } = require('./list-notify');
 const { applyClickThrough, applyState, clickThroughNow, setWinTitle } = require('./note-state');
 const { createNote, duplicateNote, touchNote, unrollWin } = require('./note-window');
 const { applyPatch, senderNote } = require('./ipc-common');
-const { hiddenInList, knownTags, unlockedForNow } = require('./list-visibility');
+const { hiddenInList, unlockedForNow } = require('./list-visibility');
 const { openApps } = require('./app-pin');
 const { runCtx } = require('./web');
 const TAGS = require('../src/tags');
@@ -91,7 +91,6 @@ function registerNoteIpc() {
     notifyList();
     return S.store.get(note.id).tags;
   });
-  ipcMain.handle('note:tags-known', () => knownTags());
   ipcMain.handle('note:dates', (e) => {
     const { note } = senderNote(e);
     return note ? { createdAt: note.createdAt, updatedAt: note.updatedAt } : null;

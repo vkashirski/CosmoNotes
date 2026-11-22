@@ -183,20 +183,26 @@ body.inkbar-out #textPop.tbar {
 .fxi .nt, .fxi .nm small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 1.1.16: the ⋯ menu and Effects pop-up have the same top bar as the toolbars: a grip to drag them (also out of
    the note) and the X at the top right */
-#menu > .igrip, #fxPop > .igrip, #ckPop > .igrip { height: 18px; margin: -4px 24px 4px; }
-#menu > .ix, #fxPop > .ix, #ckPop > .ix { top: 4px; right: 5px; }
-#menu > .igrip + h4, #fxPop > .igrip + h4, #ckPop > .igrip + h4 { margin-top: 0; }
+#menu > .igrip, #fxPop > .igrip, #ckPop > .igrip, #tagPop > .igrip { height: 18px; margin: -4px 24px 4px; }
+#menu > .ix, #fxPop > .ix, #ckPop > .ix, #tagPop > .ix { top: 4px; right: 5px; }
+#menu > .igrip + h4, #fxPop > .igrip + h4, #ckPop > .igrip + h4, #tagPop > .igrip + h4 { margin-top: 0; }
 #fxPop .fxtabs { margin-right: 0; }
 /* outside the note, in their own windows */
-body.inkbar-out #menu, body.inkbar-out #fxPop, body.inkbar-out #ckPop {
+body.inkbar-out #menu, body.inkbar-out #fxPop, body.inkbar-out #ckPop, body.inkbar-out #tagPop {
   position: absolute; left: 12px !important; top: 8px !important; right: auto !important; bottom: auto !important;
   max-height: none !important; overflow: visible; animation: none;
   box-shadow: 0 4px 12px rgba(60,40,10,.26), 0 1px 3px rgba(0,0,0,.12);
 }
 /* 1.3.21: this note's checklists, a pop-up of its own (⋯ → Checklists…), placed like the Effects pop-up (src/note/checklists.js) */
-#ckPop { left: auto; right: 4px; top: 34px; width: clamp(260px, 78vw, calc(100vw - 8px)); max-width: 300px; max-height: min(calc(100vh - 42px), 440px); }
+/* 1.4.30: Manage tags, placed like Other settings (src/note/tags.js) */
+#ckPop, #tagPop { left: auto; right: 4px; top: 34px; width: clamp(260px, 78vw, calc(100vw - 8px)); max-width: 300px; max-height: min(calc(100vh - 42px), 440px); }
 #ckPop .switches { grid-template-columns: minmax(0, 1fr) auto; } /* the words take the room, the switch keeps its size */
 #ckPop .ckopt { padding: 5px 2px; }
+#miChecks > span { white-space: nowrap; } /* 1.4.26: "Other settings…" on one line; its value gives way */
+#ckPop > h4 + .ckopt, #ckPop > h4 ~ h4 { margin-top: 2px; }
+#ckPop > h4 ~ h4 { margin-top: 12px; }
+/* 1.4.26: Other settings' second heading (1.4.27: "Other"), only while one of its two switches shows (dark paper: no evening; panic off) */
+#ckPop:has(#eveRow[hidden]):has(#panicRow[hidden]) #ckOwnH { display: none; }
 #ckPop .ckopt b { font-weight: 700; }
 #ckPop .ckopt small { display: block; margin-top: 1px; font: 700 11.5px/1.35 var(--ui); color: var(--pop-mute); }
 .cktag { display: inline-block; margin-right: 5px; padding: 0 6px; border-radius: 999px; background: var(--pop-soft); font: 800 10px/16px var(--ui); font-style: normal; color: var(--pop-ink2); vertical-align: 1px; }

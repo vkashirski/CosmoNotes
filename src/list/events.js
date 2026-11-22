@@ -7,16 +7,280 @@
     dropTarget, canMove, moveInto, visibleKeys, clearSel, paintCards, bulkTrash, renderSettings, renderBackups,
     bulkCut, bulkCopy, cancelCut, pasteCut, undoMove, openLook,
     pickBackup, modal, toast, hideCtx, closeFxSheet, closeEdit, emptyBin, NEW_INPUTS, checkNew, savedLock, closePanel,
-    showKeyIfNeeded, clearSettingsSearch, setFold, closeRemindSheet, closeTagSheet } = K;
+    showKeyIfNeeded, clearSettingsSearch, showSection, closeRemindSheet, closeTagSheet, h, isShut, notesInTree,
+    chainOf, showCtx, tabsNow, pinnedTab, tabKey, openGroupView } = K;
   // ================================================================ events
-  // Settings is a toggle: clicking it while it's open goes back to Notes or Bin, whichever was open before
+  // Settings is a toggle: clicking it while it's open goes back to the tab that was open before. v is a tabKey():
+  // 'g:<id>' is a group's tab (it opens at the group itself; a locked one asks for the password first)
   function setTab(v) {
     if (v === 'settings' && V.tab === 'settings') v = V.lastTab;
+    if (String(v).startsWith('g:')) {
+      const g = groupById(v.slice(2));
+      if (g && pinnedTab(g.id)) { clearSearch(); openGroupView(g, { root: true }); return; }
+      v = 'notes';
+    }
+    if (V.tabRoot) { V.tabRoot = null; V.openGroup = null; } // leaving a group tab: Notes starts at the top again
     if (v !== 'settings') V.lastTab = v;
     V.tab = v;
     render(true);
   }
-  $$('.tab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
+
+  // ================================================================ the tab bar
+  // Notes first, Settings last; between them the tabs of settings.listTabs in order: Favourites, Locked, Bin and the groups
+  // pinned as tabs (.gtab). The pencil (#btnTabsEdit) edits them: drag to move, × unpins a group, the eye shows / hides
+  // Locked, + Group pins one. A group card dragged onto the bar is pinned, and right-click a group card → Pin as tab.
+  // Tabs that don't fit go into » (#tabMore), the last ones first, never the one open.
+  const bar = $('#tabs');
+  const saveTabs = (list) => {
+    V.state.settings.listTabs = list;
+    S.settings.set({ listTabs: list });
+    render();
+  };
+  const tabOf = (t) => (t.group ? `g:${t.group}` : t.id);
+  function pinTab(gid) {
+    if (pinnedTab(gid) || !groupById(gid) || isShut('group', groupById(gid))) return;
+    saveTabs([...tabsNow(), { group: gid }]);
+    toast('Pinned as a tab');
+  }
+  function unpinTab(gid) { saveTabs(tabsNow().filter((t) => t.group !== gid)); }
+  function moveTab(key, to) { // to: the key it goes before, or null = the end
+    const list = tabsNow();
+    const it = list.find((t) => tabOf(t) === key);
+    if (!it || key === to) return;
+    const rest = list.filter((t) => t !== it);
+    const at = to ? rest.findIndex((t) => tabOf(t) === to) : -1;
+    rest.splice(at < 0 ? rest.length : at, 0, it);
+    saveTabs(rest);
+  }
+  const groupLabel = (g) => chainOf(g.id).reverse().map((c) => c.name || 'Group').join(' › ');
+  // a group's tab: its icon (if it has one: src/tab-icons.js), its name, how many notes (a hidden one: a lock instead)
+  const TI = window.COSMO_TAB_ICONS;
+  function groupTab(g) {
+    const key = `g:${g.id}`;
+    let el = bar.querySelector(`.gtab[data-key="${CSS.escape(key)}"]`);
+    if (!el) el = h('button', { class: 'tab gtab', 'data-key': key });
+    const shut = isShut('group', g);
+    const icon = TI.clean(g.icon);
+    el.title = groupLabel(g);
+    el.innerHTML = (icon ? TI.svg(icon) : '');
+    el.append(h('span', { class: 'gtname' }, g.name || 'Group'),
+      shut ? h('span', { class: 'tlock', html: ICON.lock }) : h('span', { class: 'count' }, String(notesInTree(g.id).length)),
+      h('span', { class: 'tx', title: 'Remove from tabs', html: ICON.x }));
+    return el;
+  }
+  // how a tab shows: 'both' | 'icon' | 'name'; a group with no icon: its name
+  const showOf = (t) => (t.group && !TI.clean(groupById(t.group)?.icon) ? 'name' : t.show || 'both');
+  function paintTabs() {
+    const list = tabsNow();
+    const now = tabKey();
+    const editing = V.tabsEditing;
+    bar.classList.toggle('editing', editing);
+    $('#btnTabsEdit').setAttribute('aria-pressed', String(editing));
+    $('#btnTabsEdit').title = editing ? 'Done' : 'Edit tabs';
+    const keep = new Set();
+    const before = $('#tabAddGroup');
+    for (const t of list) {
+      const el = t.group ? groupTab(groupById(t.group)) : bar.querySelector(`.tab[data-tab="${t.id}"]`);
+      el.dataset.key = tabOf(t);
+      keep.add(el);
+      bar.insertBefore(el, before);
+      // Locked can be hidden (only it): while editing it still shows, faded, with its eye
+      const off = !!t.hidden;
+      el.hidden = off && !editing;
+      el.classList.toggle('off', off);
+      const show = showOf(t);
+      el.classList.toggle('t-icon', show === 'icon');
+      el.classList.toggle('t-name', show === 'name');
+      if (!t.group) el.title = { favs: 'Your starred notes and groups', locks: 'Your locked notes and groups', bin: 'Deleted notes' }[t.id] + (show === 'icon' ? ` (${tabName(t.id)})` : '');
+      if (t.id === 'locks') {
+        let eye = el.querySelector('.teye');
+        if (!eye) { eye = h('span', { class: 'teye' }); el.append(eye); }
+        eye.innerHTML = off ? ICON.eyeOff : ICON.eye;
+        eye.title = off ? 'Show this tab' : 'Hide this tab';
+      }
+    }
+    bar.querySelectorAll('.gtab').forEach((el) => { if (!keep.has(el)) el.remove(); });
+    $$('.tab').forEach((el) => {
+      const key = el.dataset.key || el.dataset.tab;
+      el.classList.toggle('on', key === now);
+      const movable = keep.has(el);
+      el.classList.toggle('movable', movable && editing);
+      el.draggable = movable && editing;
+    });
+    $('#tabAddGroup').hidden = !editing;
+    fitTabs();
+  }
+  let tabsOut = []; // the keys of the tabs in » now
+  // tabs that don't fit go into »: the last movable ones first, never the open one; while editing the bar wraps instead
+  function fitTabs() {
+    const more = $('#tabMore');
+    const tabs = [...bar.querySelectorAll('.tab.movable, .tab[data-key]')].filter((el) => el.dataset.key);
+    tabs.forEach((el) => el.classList.remove('ovf'));
+    more.hidden = true;
+    if (V.tabsEditing || !bar.clientWidth) return;
+    const shown = tabs.filter((el) => !el.hidden);
+    const out = [];
+    for (let i = shown.length - 1; i >= 0 && bar.scrollWidth > bar.clientWidth + 1; i--) {
+      if (shown[i].classList.contains('on')) continue;
+      shown[i].classList.add('ovf');
+      out.unshift(shown[i]);
+      more.hidden = false;
+    }
+    more.classList.toggle('on', false);
+    tabsOut = out.map((el) => el.dataset.key);
+  }
+  window.addEventListener('resize', () => { clearTimeout(fitTabs.t); fitTabs.t = setTimeout(fitTabs, 80); });
+  const tabName = (key) => {
+    if (key.startsWith('g:')) { const g = groupById(key.slice(2)); return g ? g.name || 'Group' : ''; }
+    return { favs: 'Favourites', locks: 'Locked', bin: 'Bin' }[key] || key;
+  };
+  // the groups not pinned yet, A–Z by their path (a sub-group shows it). A hidden one (shut) can't be pinned
+  function addGroupMenu(e) {
+    const free = V.state.groups.filter((g) => !pinnedTab(g.id) && !isShut('group', g));
+    free.sort((a, b) => groupLabel(a).localeCompare(groupLabel(b)));
+    if (!free.length) { toast(V.state.groups.length ? 'Every group is a tab' : 'No groups yet'); return; }
+    showCtx(e, free.map((g) => ({ label: groupLabel(g), icon: ICON.folder, run: () => pinTab(g.id) })));
+  }
+  // ---- 1.4.33: a tab's icon and how it shows. A group picks one of the 40 icons, or none (then only its name shows);
+  // Favourites, Locked and the Bin keep theirs. Only the tab bar and the group's icon change, never anything inside it,
+  // and never a hidden group's icon (main's groups:update leaves a shut group as it is)
+  // what the pop-up is for: { key } a tab (its tabKey), { gid } a group (its tab, if it has one, or none)
+  let iconFor = null;
+  function closeIconPop() { $('#iconPop').hidden = true; iconFor = null; }
+  function paintIconPop() {
+    if (!iconFor) return;
+    const gid = iconFor.gid || (iconFor.key.startsWith('g:') ? iconFor.key.slice(2) : null);
+    const g = gid ? groupById(gid) : null;
+    const t = tabsNow().find((x) => tabOf(x) === (gid ? `g:${gid}` : iconFor.key));
+    if ((gid && !g) || (!gid && !t)) { closeIconPop(); return; }
+    const canPick = !!g && !isShut('group', g);
+    const icon = g ? TI.clean(g.icon) : TI.FIXED[t.id];
+    $('#iconHead').textContent = g ? `Icon for “${g.name || 'Group'}”` : tabName(t.id);
+    const grid = $('#iconGrid');
+    grid.hidden = !canPick;
+    if (canPick) {
+      grid.innerHTML = '';
+      for (const id of TI.IDS) grid.append(h('button', { type: 'button', class: id === icon ? 'on' : null, title: TI.name(id), 'data-icon': id, html: TI.svg(id) }));
+      grid.append(h('button', { type: 'button', class: 'noicon' + (icon ? '' : ' on'), 'data-icon': '' }, 'No icon'));
+    }
+    // how its tab shows: only with a tab, and an icon (with no icon there is only the name)
+    const show = t && icon ? t.show || 'both' : null;
+    $('#iconShowHead').hidden = $('#iconShow').hidden = !show;
+    $$('#iconShow button').forEach((x) => x.classList.toggle('on', x.dataset.v === show));
+    iconFor.tab = t ? tabOf(t) : null;
+    iconFor.g = canPick ? g.id : null;
+  }
+  function openIconPop(what, anchor, at) {
+    iconFor = what;
+    const pop = $('#iconPop');
+    pop.hidden = false;
+    paintIconPop();
+    const r = anchor ? anchor.getBoundingClientRect() : { left: at.clientX, bottom: at.clientY };
+    pop.style.left = `${Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8))}px`;
+    pop.style.top = `${Math.max(8, Math.min(r.bottom + 6, innerHeight - pop.offsetHeight - 8))}px`;
+  }
+  // right-click a group card → Icon… (list/settings-menus.js groupMenu)
+  const openGroupIcon = (g, e) => openIconPop({ gid: g.id }, tabEl(`g:${g.id}`), e);
+  $('#iconGrid').addEventListener('click', async (e) => {
+    const b = e.target.closest('button');
+    const g = b && iconFor && iconFor.g ? groupById(iconFor.g) : null;
+    if (!g || isShut('group', g)) return;
+    g.icon = b.dataset.icon || null;
+    render();
+    paintIconPop();
+    await S.groups.update(g.id, { icon: g.icon });
+  });
+  $('#iconShow').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || !iconFor || !iconFor.tab) return;
+    saveTabs(tabsNow().map((x) => (tabOf(x) === iconFor.tab ? { ...x, show: b.dataset.v } : x)));
+    paintIconPop();
+  });
+  document.addEventListener('mousedown', (e) => { if (iconFor && !e.target.closest('#iconPop, #ctx')) closeIconPop(); });
+  const tabEl = (key) => bar.querySelector(`.tab[data-key="${CSS.escape(key)}"]`);
+  function tabMenu(e, key) {
+    const list = tabsNow().map(tabOf);
+    const i = list.indexOf(key);
+    const t = tabsNow().find((x) => tabOf(x) === key);
+    const g = t && t.group ? groupById(t.group) : null;
+    const hasIcon = g ? !!TI.clean(g.icon) : true;
+    const show = t ? showOf(t) : 'both';
+    showCtx(e, [
+      // a hidden group: no icon to pick (only the tab's place, or taking it away)
+      !g || !isShut('group', g) ? { label: g ? 'Icon…' : 'Show…', icon: TI.svg(g ? TI.clean(g.icon) || 'folder' : TI.FIXED[key]), run: () => openIconPop({ key }, tabEl(key) || bar) } : null,
+      hasIcon && show !== 'icon' ? { label: 'Show icon only', icon: '', run: () => saveTabs(tabsNow().map((x) => (tabOf(x) === key ? { ...x, show: 'icon' } : x))) } : null,
+      hasIcon && show === 'icon' ? { label: 'Show icon and name', icon: '', run: () => saveTabs(tabsNow().map((x) => (tabOf(x) === key ? { ...x, show: 'both' } : x))) } : null,
+      '-',
+      i > 0 ? { label: 'Move left', icon: '', run: () => moveTab(key, list[i - 1]) } : null,
+      i >= 0 && i < list.length - 1 ? { label: 'Move right', icon: '', run: () => moveTab(key, list[i + 2] || null) } : null,
+      { label: 'Edit tabs', icon: ICON.edit, run: () => { V.tabsEditing = true; paintTabs(); } },
+      key.startsWith('g:') ? '-' : null,
+      key.startsWith('g:') ? { label: 'Remove from tabs', icon: ICON.pin, run: () => unpinTab(key.slice(2)) } : null,
+    ]);
+  }
+  // a menu opened by a button of the bar opens under it
+  const under = (el) => { const r = el.getBoundingClientRect(); return { target: el, clientX: r.left, clientY: r.bottom + 4 }; };
+  bar.addEventListener('click', (e) => {
+    const t = e.target;
+    if (t.closest('#btnTabsEdit')) { V.tabsEditing = !V.tabsEditing; paintTabs(); return; }
+    if (t.closest('#tabAddGroup')) { addGroupMenu(under(t.closest('#tabAddGroup'))); return; }
+    if (t.closest('#tabMore')) {
+      showCtx(under(t.closest('#tabMore')), tabsOut.map((key) => ({ label: tabName(key), icon: key.startsWith('g:') ? ICON.folder : '', run: () => setTab(key) })));
+      return;
+    }
+    const tab = t.closest('.tab');
+    if (!tab) return;
+    const key = tab.dataset.key || tab.dataset.tab;
+    if (t.closest('.tx') && key.startsWith('g:')) { unpinTab(key.slice(2)); return; }
+    if (t.closest('.teye')) { saveTabs(tabsNow().map((x) => (x.id === key ? { id: key, hidden: !x.hidden } : x))); return; }
+    setTab(key);
+  });
+  bar.addEventListener('contextmenu', (e) => {
+    const tab = e.target.closest('.tab');
+    const key = tab && (tab.dataset.key || '');
+    if (!key || key === 'notes') return;
+    e.preventDefault();
+    tabMenu(e, key);
+  });
+  // a group card dropped on the bar is pinned (at the end)
+  dropTarget(bar, () => !V.drag.many && V.drag.kind === 'group' && !pinnedTab(V.drag.id), (d) => pinTab(d.id), () => 'Pin as tab');
+  // while editing, a tab is dragged to its new place: before or after the tab it is dropped on
+  let tabDrag = null;
+  const dropSpot = (e) => {
+    const over = e.target.closest('.tab.movable');
+    if (!over || over.dataset.key === tabDrag) return null;
+    const r = over.getBoundingClientRect();
+    return { over, after: e.clientX > r.left + r.width / 2 };
+  };
+  const clearSpots = () => bar.querySelectorAll('.drop-before, .drop-after').forEach((el) => el.classList.remove('drop-before', 'drop-after'));
+  bar.addEventListener('dragstart', (e) => {
+    const tab = e.target.closest && e.target.closest('.tab.movable');
+    if (!tab || !V.tabsEditing) return;
+    tabDrag = tab.dataset.key;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', tabDrag);
+    requestAnimationFrame(() => tab.classList.add('tdrag'));
+  });
+  bar.addEventListener('dragover', (e) => {
+    if (!tabDrag) return;
+    e.preventDefault();
+    clearSpots();
+    const at = dropSpot(e);
+    if (at) at.over.classList.add(at.after ? 'drop-after' : 'drop-before');
+  });
+  bar.addEventListener('drop', (e) => {
+    if (!tabDrag) return;
+    e.preventDefault();
+    const at = dropSpot(e);
+    const key = tabDrag;
+    tabDrag = null;
+    clearSpots();
+    if (!at) return;
+    const list = tabsNow().map(tabOf).filter((k) => k !== key);
+    const i = list.indexOf(at.over.dataset.key) + (at.after ? 1 : 0);
+    moveTab(key, list[i] || null);
+  });
+  bar.addEventListener('dragend', () => { tabDrag = null; clearSpots(); bar.querySelectorAll('.tdrag').forEach((el) => el.classList.remove('tdrag')); });
   // inside a group, a new note is made right there. 1.4.6: every click makes a note; the + spins until they have shown
   let coming = 0;
   const newNote = () => {
@@ -41,10 +305,11 @@
   $('#btnEmpty').addEventListener('click', emptyBin);
 
   // inside a group: up one level / drop to move up
-  const upLevel = () => (V.openGroup ? (groupById(V.openGroup)?.parentId || null) : null);
+  // (a group tab's own group is its top: no level above it there)
+  const upLevel = () => (!V.openGroup || V.openGroup === V.tabRoot ? V.openGroup : groupById(V.openGroup)?.parentId || null);
   $('#btnBack').addEventListener('click', () => { V.openGroup = upLevel(); clearSearch(); closePanel(); render(true); });
   // the back button (left of the group's name) is where to drop a note or group to move it up a level
-  dropTarget($('#btnBack'), () => !!V.openGroup && canMove(V.drag, upLevel()), (d) => moveInto(d, upLevel()), () => 'Move up');
+  dropTarget($('#btnBack'), () => !!V.openGroup && V.openGroup !== V.tabRoot && canMove(V.drag, upLevel()), (d) => moveInto(d, upLevel()), () => 'Move up');
   let nameTimer = null;
   $('#groupName').addEventListener('input', (e) => {
     const id = V.openGroup;
@@ -200,9 +465,8 @@
   });
   // 1.4.0: the tray's "Update to …" (and a start Windows refused): Settings, at About's updates
   S.updates.onShow(() => {
-    clearSettingsSearch();
     if (V.tab !== 'settings') setTab('settings');
-    setFold($('#viewSettings .panel.about'), true);
+    showSection('about');
     requestAnimationFrame(() => $('#updRow').scrollIntoView({ block: 'center' }));
   });
   // password or PIN: set / change in an app-styled pop-up
@@ -288,7 +552,9 @@
       else if (cardsTab && V.tagPick.length) { V.tagPick = []; render(); } // 1.4.10
       else if (V.tab === 'settings' && $('#sq').value) clearSettingsSearch();
       else if (!$('#groupPanel').hidden) closePanel();
-      else if (V.tab === 'notes' && V.openGroup && document.activeElement !== $('#groupName')) { V.openGroup = upLevel(); render(true); }
+      else if (iconFor) closeIconPop();
+      else if (V.tabsEditing) { V.tabsEditing = false; paintTabs(); }
+      else if (V.tab === 'notes' && V.openGroup && V.openGroup !== V.tabRoot && document.activeElement !== $('#groupName')) { V.openGroup = upLevel(); render(true); }
     }
   });
   window.addEventListener('focus', load);
@@ -298,5 +564,5 @@
   });
 
   (async () => { V.state = await S.list.get(); V.lastSig = JSON.stringify(V.state); render(true); showKeyIfNeeded(); })(); // 1.1.30: a recovery key waiting to be seen
-  Object.assign(K, { newNote, clearSearch });
+  Object.assign(K, { newNote, clearSearch, paintTabs, pinTab, unpinTab, openGroupIcon });
 })();

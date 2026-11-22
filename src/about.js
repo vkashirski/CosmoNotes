@@ -1,14 +1,14 @@
 'use strict';
 /*
  * CosmoNotes - what the app can do.
- * Shown in the notes list -> Settings -> About CosmoNotes.
+ * Shown in the notes list -> Settings -> About.
  *
  * Since 1.1.41 the app shows no version history: it is only in CHANGELOG.md (and CHANGELOG-archive.md).
  * On every update set LAST_UPDATED, and keep FEATURES in step with what you added or changed.
  * Keep each item short: one or two plain sentences.
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-11-20',
+  LAST_UPDATED: '2026-11-23',
 
   FEATURES: [
     {
@@ -28,7 +28,7 @@ window.COSMO_ABOUT = {
         'Pin a note to keep it above every other window. The one you pinned or clicked last is on top.',
         'The window you open or click last comes to the front: a note, its toolbars and menus, the notes list.',
         'Click-through: read a pinned note over a video or game, and click what’s under it. Turn it on in Settings, then right-click the pin.',
-        'Right-click the pin to pin a note to some apps. It follows them: on top in front, behind other apps, gone while they’re closed.',
+        'Right-click the pin to pin a note to some apps. It follows them: on top in front, behind other apps, minimised while they’re closed.',
         'Tick a whole app, or just one folder or file in it. No note can show over a game in exclusive full screen.',
         'Make a note see-through. It can turn solid while your mouse is over it.',
         'Roll a note up to just its top bar.',
@@ -41,6 +41,7 @@ window.COSMO_ABOUT = {
         'Evening colours: light notes turn a softer shade in the evening, so they don’t glare. Pick the times in Settings.',
         'Three fonts for each note: Handwritten, Rounded or Medieval. A font change keeps the size of the text and the boxes.',
         'An optional title on the top bar, in the note’s font or its own.',
+        'Rename a note from its top bar: click the pencil next to the title. Changed your mind? Click the arrow that follows.',
         'Ctrl + mouse wheel zooms a note. Ctrl + 0 goes back to 100%.',
         'Shows when a note was last edited. The ⋯ menu shows when it was made.',
       ],
@@ -54,7 +55,7 @@ window.COSMO_ABOUT = {
         'The chip at the bottom of a note shows its next reminder. Click it to change it.',
         'At its time the note pops up on the screen you’re using. It glows, wobbles and plays a calm sound. Snooze or Done.',
         'Missed one while the PC was off? It shows when CosmoNotes starts.',
-        'A reminder can carry a message. It can also hide its note until it goes off: turn on Hiding notes in Settings.',
+        'A reminder can carry a message. It can also hide its note until it goes off: turn on Let reminders hide notes in Settings.',
         'The clock button in All notes shows only notes with reminders. Pick the sound and volume in Settings.',
         'Want seconds too? Turn on Show seconds in Settings.',
         'Click a number and type over it. After two digits it jumps to the next box (Settings can turn that off).',
@@ -66,7 +67,7 @@ window.COSMO_ABOUT = {
         'Bold, italic, underline, strikethrough, bullet lists and checklists.',
         'Drag a checkbox to move its item. Ticked items can move to the bottom. Turning that on in a note tidies its lists.',
         'A checkbox goes by the size of its words, never their font.',
-        'Checkboxes can keep one size. Change these in Settings, or for one note in its ⋯ menu.',
+        'Checkboxes can keep one size. Change these in Settings, or for one note in ⋯ → Other settings.',
         'Copy and paste keeps checklist boxes, fonts, sizes and colours.',
         'Ctrl+F finds words in a note.',
         'The A button opens a text toolbar: font, colour, highlight and size (0.7 to 1.9). It changes the selected text, or what you type next.',
@@ -96,7 +97,7 @@ window.COSMO_ABOUT = {
         'Moving pictures behind a note: snow, rain, fireworks, fish, a night sky, magic and many more.',
         'Mouse followers: a trail behind your pointer, one for every background.',
         'The mouse can play with the background: bubbles pop, rain splashes, fish dart away.',
-        'Pick them for all notes in Settings → Effects, or for one note in its ⋯ menu. Set how often and how faint.',
+        'Pick them for all notes in Settings → Look & effects, or for one note in its ⋯ menu. Set how often and how faint.',
         'Pause one note’s effects with the sparkle button, or all of them in the notes list.',
         'Cards in the notes list show their note’s effect too.',
         'Effects are kept light. They stop while a note is paused, rolled up or hidden.',
@@ -126,7 +127,7 @@ window.COSMO_ABOUT = {
         'Locked notes are encrypted on this device, backups too. Nobody can read them from the files.',
         'A “Title while locked” tells you which note it is. You can change it only while the note is unlocked.',
         'A locked note can’t be changed until you unlock it. You can only select it or use its lock options.',
-        'Forgot your PIN? A recovery key opens everything (Settings → Locked notes).',
+        'Forgot your PIN? A recovery key opens everything (Settings → Privacy).',
         'A PIN opens as soon as you type the last digit.',
         'Right-click a locked note or group → Unlock. It stays unlocked until CosmoNotes restarts.',
         '“Remove lock” takes the lock off for good.',
@@ -134,7 +135,7 @@ window.COSMO_ABOUT = {
         'Locking plays a short padlock animation.',
         'Panic button: one click closes your notes, locks them and hides CosmoNotes. Turn it on in Settings.',
         'The panic button can have a shortcut that works in every app, like Alt+Z or F8.',
-        'A note can stay open on panic. Opening CosmoNotes again brings the other notes back.',
+        'A note can stay open on panic (⋯ → Other settings). Opening CosmoNotes again brings the other notes back.',
       ],
     },
     {
@@ -147,15 +148,20 @@ window.COSMO_ABOUT = {
         'As you type in a note, the new words write themselves onto its card.',
         'Search titles and text. Inside a group, search looks only there. The Bin has its own search.',
         'Tags for notes and groups: right-click → Tags…, or the note’s ⋯ menu. A group’s tags count for all inside it.',
+        'The ⋯ menu shows every tag. Click one to add it to this note. Grey ones are not on it.',
+        '+ Add opens Manage tags: make, rename, colour or delete a tag in every note. Locked notes need your PIN.',
         'Click tags under the search to see only what has them. Pick several: All of them or Any. Or type #tag in the search.',
         'A locked note’s tags stay hidden, like its words, until it is unlocked.',
-        'Settings has a search too. Type a word to see only the sections with it. It knows other names too, like “dark mode”.',
+        'Settings has its sections in a list on the left. Its search looks in all of them. It knows other names too, like “dark mode”.',
         'Five card sizes, also with Ctrl + mouse wheel.',
         'Nine colour themes for this window, light and dark.',
         'Right-click a note or group for quick actions.',
         'Right-click → Note design… changes a note’s title, title font, colour and effects right in the list.',
         'The Locked tab shows every locked note. “Unlock all” lets you read and search them.',
         'Favourites: click the star on a card. The Favourites tab shows them all.',
+        'Pin a group as a tab: right-click it → Pin as tab, or drag it onto the tabs.',
+        'The pencil by the tabs edits them. Drag to move them, add groups, hide Locked.',
+        'Right-click a tab to show it as an icon, a name, or both. Groups can pick one of 40 icons.',
         'Ctrl+click picks several cards. A bar then opens, stars, groups, locks or bins them at once.',
         'Group look in that bar changes the picked groups themselves: look, colour and name font.',
         'Move picked cards out of a group, or cut (Ctrl+X) or copy (Ctrl+C) them and paste in another group (Ctrl+V).',

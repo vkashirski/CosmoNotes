@@ -25,6 +25,46 @@ body:is([data-apptheme="night"], [data-apptheme="midnight"], [data-apptheme="for
 .tsugg { display: flex; flex-wrap: wrap; gap: 4px; }
 .tsg { height: 22px; padding: 0 8px; border: 0; border-radius: 999px; background: var(--pop-soft); color: var(--pop-ink2); font: 800 11px var(--ui); cursor: pointer; }
 .tsg:hover { background: var(--pop-soft2); color: var(--pop-ink); }
+/* 1.4.30: the ⋯ menu's Tags (src/tags.js picker): every tag to press, this note's lit, the rest greyed; + Add opens Manage
+   tags (#tagPop, src/tags.js manager). A tag's colour is set on the chip itself (src/tags.js COLORS); without one it is the
+   dark pill */
+.tagpick { display: flex; flex-wrap: wrap; gap: 5px; }
+.tq, .tqadd { height: 26px; padding: 0 10px; border: 0; border-radius: 999px; font: 800 12px var(--ui); cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tq { background: var(--pop-pick); color: var(--pop-pickfg); }
+.tq:not(.on) { opacity: .38; filter: grayscale(1); }
+.tq:not(.on):hover { opacity: .7; filter: grayscale(.4); }
+.tq:disabled { cursor: default; opacity: .2; }
+.tq.on { box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--pop-ink) 30%, transparent); }
+.tqadd { background: transparent; color: var(--pop-ink2); box-shadow: inset 0 0 0 1.5px var(--pop-soft2); }
+.tqadd:hover { background: var(--pop-soft); color: var(--pop-ink); }
+.tagman { display: flex; flex-direction: column; gap: 6px; }
+.tagman .tchip { padding: 0 9px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tmlist { display: flex; flex-direction: column; gap: 1px; }
+.tpin[hidden] { display: none; }
+.tcount { margin-left: auto; padding-left: 6px; flex: none; color: var(--pop-ink2); font: 700 11px var(--ui); }
+.tmadd, .tmcancel, .tmsave { height: 28px; padding: 0 10px; border: 0; border-radius: 999px; font: 800 12px var(--ui); cursor: pointer; flex: none; }
+.tmcancel:hover { background: var(--pop-soft2); }
+.tmhead { display: flex; align-items: center; gap: 6px; }
+.tmhead .tinput { flex: 1; min-width: 0; width: auto; }
+.tmcancel { background: transparent; color: var(--pop-ink); }
+.tmadd, .tmsave { background: var(--pop-pick); color: var(--pop-pickfg); }
+.tmsave:disabled { opacity: .45; cursor: default; }
+.tmremove { background: #8F2347; color: #FFF8F2; }
+.tmrow { display: flex; align-items: center; gap: 4px; min-height: 32px; padding: 2px 2px 2px 6px; border-radius: 9px; }
+.tmrow:hover { background: var(--pop-soft); }
+.tmrow .tcount { margin-right: 2px; }
+.tmedit-b, .tmdel-b { flex: none; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--pop-ink2); font: 800 14px/1 var(--ui); cursor: pointer; }
+.tmedit-b:hover, .tmdel-b:hover { background: var(--pop-soft2); color: var(--pop-ink); }
+.tmedit { display: flex; flex-direction: column; gap: 7px; margin: 2px 0; padding: 9px; border-radius: 12px; background: var(--pop-soft); }
+.tmedit > .tchip { align-self: flex-start; }
+.tmdel { background: color-mix(in oklab, #FBE1E8 80%, var(--pop-soft)); }
+.tmq { font: 800 12.5px var(--ui); color: var(--pop-ink); }
+.tmmsg, .tmnote, .tmempty { margin: 0; font: 700 11.5px/1.4 var(--ui); color: var(--pop-ink2); }
+.tmmsg:empty { display: none; }
+.tmbtns { display: flex; justify-content: flex-end; gap: 6px; }
+.tswatch { display: flex; flex-wrap: wrap; gap: 5px; }
+.tsw { width: 20px; height: 20px; padding: 0; border: 1.5px solid color-mix(in oklab, var(--pop-ink) 18%, transparent); border-radius: 50%; background: var(--pop-pick); cursor: pointer; }
+.tsw.on { box-shadow: 0 0 0 2px var(--pop-bg), 0 0 0 4px var(--pop-ink); }
 
 /* ---------- 1.1.22 (ninth round): Ctrl+F, find in the note ---------- */
 #find {

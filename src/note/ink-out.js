@@ -161,8 +161,8 @@
   const textMove = movable($('#textPop'), { key: 'textBarPos', out: textOut });
   // 1.1.16: the ⋯ menu (note settings) and the Effects pop-up: dragged by their grip, inside or out of the note.
   // The menu's window can take the keyboard (for its title field); Esc there closes it.
-  // 1.3.21: the Checklists pop-up too ('ck')
-  for (const [id, kind, frame, title] of [['#menu', 'menu', 'cosmoMenuBar', 'Note settings'], ['#fxPop', 'fx', 'cosmoFxBar', 'Effects'], ['#ckPop', 'ck', 'cosmoCkBar', 'Checklists']]) {
+  // 1.3.21: the Checklists pop-up too ('ck'; 1.4.26: Other settings); 1.4.30: Manage tags ('tags')
+  for (const [id, kind, frame, title] of [['#menu', 'menu', 'cosmoMenuBar', 'Note settings'], ['#fxPop', 'fx', 'cosmoFxBar', 'Effects'], ['#ckPop', 'ck', 'cosmoCkBar', 'Other settings'], ['#tagPop', 'tags', 'cosmoTagBar', 'Manage tags']]) {
     const el = $(id);
     const po = { out: null, move: null };
     po.out = barOut({ el, kind, frame, title, key: `${kind}PopOut`, mover: () => po.move, onEsc: () => closePop(id) });
@@ -181,7 +181,7 @@
     box.addEventListener('scroll', keep, { passive: true });
     if (window.ResizeObserver) new ResizeObserver(keep).observe(box); // also when it opens again (back at the top)
   }
-  [$('#menu'), $('#fxPop'), $('#ckPop'), $('#textPop'), inkBar].forEach(pinX);
+  [$('#menu'), $('#fxPop'), $('#ckPop'), $('#tagPop'), $('#textPop'), inkBar].forEach(pinX);
 
   $('#btnInk').addEventListener('mousedown', (e) => e.preventDefault());
   // Drawing ⇄ typing: using the bottom bar or the text toolbar puts drawing on hold so you can

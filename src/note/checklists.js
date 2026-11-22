@@ -22,9 +22,10 @@
   function applyChecks() {
     if (!V.note) return;
     for (const k of Object.keys(OPTS)) $(SWITCH[k]).checked = checkOn(k);
-    $$('#ckPop .cktag').forEach((t) => { t.hidden = !own(t.dataset.k); });
-    const n = Object.keys(OPTS).filter(own).length;
-    $('#miChecksVal').textContent = n ? `${n} changed` : 'As in Settings';
+    $$('#ckPop .cktag[data-k]').forEach((t) => { t.hidden = !own(t.dataset.k); }); // (evening's and panic's: base.js)
+    // 1.4.26: Other settings holds evening colours and the panic button too: they count as changed when this note chose them
+    const n = Object.keys(OPTS).filter(own).length + (typeof V.note.evening === 'boolean' ? 1 : 0) + (V.note.panic === false ? 1 : 0);
+    $('#miChecksVal').textContent = n ? `${n} changed` : ''; // 1.4.26: nothing when it's all as in Settings (the row stays one line)
     $('#ckFoot').textContent = n ? 'Different from Settings.' : 'Same as Settings.';
     $('#ckReset').disabled = !n;
     const fixed = checkOn('fixed');
@@ -32,9 +33,9 @@
   }
   // 1.3.24 (the owner's wish): turning "ticked lines to the bottom" on here (its switch or Use Settings) tidies the note's
   // lists at once (gather, below). Settings → Checklists doesn't rearrange notes: only what is ticked from then on moves.
-  function setChecks(checklist) {
+  function setChecks(checklist, more = {}) {
     const was = checkOn('sink');
-    setProp({ checklist });
+    setProp({ checklist, ...more });
     if (!was && checkOn('sink') && !V.hidden) gather();
   }
   for (const k of Object.keys(OPTS)) {
@@ -45,7 +46,7 @@
   }
   $('#miChecks').addEventListener('click', () => { openPop('#ckPop'); applyChecks(); });
   $('#ckX').addEventListener('click', () => closePop('#ckPop'));
-  $('#ckReset').addEventListener('click', () => setChecks({ drag: null, sink: null, fixed: null }));
+  $('#ckReset').addEventListener('click', () => setChecks({ drag: null, sink: null, fixed: null }, { evening: null, panic: null })); // 1.4.26: all of Other settings
 
   // ================================================================ moving lines (one Undo step each)
   // Ticking and moving lines aren't the editor's own changes, so its undo can't take them back: each is a step of ours

@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes "All notes" window, part 6 of 7: actions (Bin, delete), passwords and locks, the Locked tab, the group panel, folds and search in Settings, back / forward
+// CosmoNotes "All notes" window, part 6 of 7: actions (Bin, delete), passwords and locks, the Locked tab, the group panel, sections and search in Settings, back / forward
 // (src/list.js until 1.1.28; the parts load in order from list.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_LIST_KIT;
@@ -203,13 +203,18 @@
     const r = await askPassword('Remove the lock?', `Type your password to remove the lock from “${g.name || 'Group'}”.`, 'Remove lock', (pw) => S.groups.setLocked(g.id, false, pw));
     if (r) toast('Lock removed');
   }
-  async function openGroupView(g) {
+  // root: open it as its group tab (its own place). Else a group inside the group tab being looked at stays in that tab, and
+  // any other one opens in Notes (from Favourites or Locked too)
+  async function openGroupView(g, { root = false } = {}) {
     if (!g.open) {
       const r = await askPassword('This group is locked', `Type your password to open “${g.name || 'Group'}”.`, 'Open', (pw) => S.groups.reveal(g.id, pw));
       if (!r) return;
       await load();
     }
-    if (V.tab !== 'notes') { V.tab = 'notes'; V.lastTab = 'notes'; } // from Favourites or Locked: the group opens in Notes
+    const inTab = V.tab === 'notes' && V.tabRoot && (g.id === V.tabRoot || isInside(g.id, V.tabRoot));
+    V.tabRoot = root ? g.id : inTab ? V.tabRoot : null;
+    V.tab = 'notes';
+    V.lastTab = V.tabRoot ? `g:${V.tabRoot}` : 'notes';
     V.openGroup = g.id;
     closePanel();
     V.query = '';
@@ -281,35 +286,38 @@
     toast('Locked again 🔒');
   });
 
-  // ---- Settings: every section folds open and closed by clicking its title (all closed at first)
-  const setFold = (panel, open) => {
-    panel.classList.toggle('open', open);
-    panel.querySelector(':scope > .phead').setAttribute('aria-expanded', String(open));
-  };
-  (function foldPanels() {
-    $$('#viewSettings .panel').forEach((panel) => {
-      const head = panel.querySelector(':scope > h3, :scope > .abouthead');
-      if (!head) return;
-      const inner = h('div', { class: 'pinner' });
-      [...panel.children].filter((c) => c !== head).forEach((c) => inner.append(c));
-      panel.append(h('div', { class: 'pbody' }, inner));
-      head.classList.add('phead');
-      head.setAttribute('role', 'button');
-      head.setAttribute('aria-expanded', 'false');
-      head.tabIndex = 0;
-      head.title = 'Click to open or close';
-      const toggle = () => setFold(panel, !panel.classList.contains('open'));
-      head.addEventListener('mousedown', (e) => e.preventDefault()); // no focus ring after a mouse click
-      head.addEventListener('click', toggle);
-      head.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  // ---- 1.4.25 (the owner's pick): Settings is a sidebar of sections, one shown at a time (list.html #setNav and
+  // .setsec, the same data-sec). Switching is instant: it is done often. The section stays while CosmoNotes runs.
+  // Wide window: names, search above them; narrow: a slim rail (list-settings-fx.css, all CSS). Up / Down in the
+  // sidebar go to the section above or below it.
+  let secNow = 'general';
+  function showSection(id) {
+    if (!$(`#setNav [data-sec="${id}"]`)) return;
+    if ($('#sq').value) clearSettingsSearch();
+    secNow = id;
+    $$('#setNav [data-sec]').forEach((b) => {
+      const on = b.dataset.sec === id;
+      b.classList.toggle('on', on);
+      if (on) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
     });
-  })();
+    $$('#viewSettings .setsec').forEach((x) => x.classList.toggle('on', x.dataset.sec === id));
+    $('#viewSettings').scrollTop = 0;
+  }
+  $$('#setNav [data-sec]').forEach((b) => b.addEventListener('click', () => showSection(b.dataset.sec)));
+  $('#setNav').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const all = $$('#setNav [data-sec]');
+    const at = all.findIndex((b) => b.dataset.sec === secNow);
+    const next = all[Math.max(0, Math.min(all.length - 1, at + (e.key === 'ArrowDown' ? 1 : -1)))];
+    showSection(next.dataset.sec);
+    next.focus();
+  });
 
-  // ---- 1.3.35: search in Settings. A section matches when every word typed starts a word in it: its title, the
+  // ---- 1.3.35: search in Settings. A panel matches when every word typed starts a word in it: its title, the
   // text it shows (not what is hidden, nor About's feature list) and its data-find words (1.3.36: other names for what
-  // it does, in list.html, e.g. "dark mode" → General). Only the matching sections show, and they open.
-  // Clearing the search puts every section back, open or closed, as it was before the search began.
-  let foldsBefore = null; // the sections open when the search began (null: no search)
+  // it does, in list.html, e.g. "dark mode" → Start and theme). 1.4.25: the matching panels of every section show,
+  // under their section's name (#viewSettings.finding, list-settings-fx.css); clearing it shows the section again.
   const plain = (s) => s.toLocaleLowerCase().replace(/[’‘]/g, "'");
   const shownText = (el) => (el.hidden || el.matches('svg, details.fold') ? ''
     : [...el.childNodes].map((c) => (c.nodeType === 3 ? c.data : c.nodeType === 1 ? shownText(c) : '')).join(' '));
@@ -318,19 +326,18 @@
     const words = plain($('#sq').value).split(/\s+/).filter(Boolean).map(startsWord);
     const panels = $$('#viewSettings .panel');
     $('#sqClear').hidden = !words.length;
+    $('#viewSettings').classList.toggle('finding', words.length > 0);
     if (!words.length) {
-      if (foldsBefore) panels.forEach((p) => { p.classList.remove('unfound'); setFold(p, foldsBefore.has(p)); });
-      foldsBefore = null;
+      panels.forEach((p) => p.classList.remove('unfound'));
       $('#sqNone').hidden = true;
       return;
     }
-    if (!foldsBefore) foldsBefore = new Set(panels.filter((p) => p.classList.contains('open')));
     let found = 0;
     panels.forEach((p) => {
       const text = plain(shownText(p) + ' ' + (p.dataset.find || ''));
       const hit = words.every((re) => re.test(text));
       p.classList.toggle('unfound', !hit);
-      if (hit) { setFold(p, true); found++; }
+      if (hit) found++;
     });
     $('#sqNone').hidden = found > 0;
     $('#viewSettings').scrollTop = 0;
@@ -407,7 +414,7 @@
     const every = lists[0].filter((t) => lists.every((l) => l.includes(t)));
     const some = [...new Set(lists.flat())].filter((t) => !every.includes(t));
     const ed = T.editor({
-      tags: every, some, known: knownTags().map((k) => k.tag),
+      tags: every, some, known: knownTags().map((k) => k.tag), colors: V.state.settings.tagColors || {}, // 1.4.30: their colours
       add: (t) => S.list.tags(ids, { add: [t] }),
       remove: (t) => S.list.tags(ids, { remove: [t] }),
     });
@@ -478,7 +485,7 @@
     saveBtn.addEventListener('click', async () => { if (await S.crypt.saveKey(code)) saveBtn.innerHTML = ICON.check + 'Saved'; });
     const r = await modal({
       title: 'Your recovery key',
-      text: `Your locked notes are now encrypted. If you forget your ${pinWord()}, only this key can open them. Nobody else can.`,
+      text: `Your locked notes are now encrypted. If you forget your ${pinWord()}, this key is the only way to open them.`,
       tip: 'Print it or write it down. Keep it away from this device. You only see it now.',
       icon: ICON.lock,
       noCancel: true,
@@ -554,7 +561,7 @@
     if (r) { toast(on ? 'Encryption is off' : 'Locked notes are encrypted again 🔐'); await load(); }
   });
 
-  Object.assign(K, { setFold, trashNote, destroyNote, emptyBin, dissolveGroup, trashGroup, NEW_INPUTS, checkNew, savedLock,
+  Object.assign(K, { showSection, trashNote, destroyNote, emptyBin, dissolveGroup, trashGroup, NEW_INPUTS, checkNew, savedLock,
     ensurePassword, paintLockBar, lockNote, unlockNote, lockGroup, unlockGroup, unlockNoteNow, relockNote, unlockGroupNow,
     relockGroup, openGroupView, openPanel, closePanel,
     paintPanel, showKeyIfNeeded, paintCrypt, clearSettingsSearch, openRemindSheet, closeRemindSheet, openTagSheet, closeTagSheet });

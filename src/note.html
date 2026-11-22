@@ -27,6 +27,12 @@
        1.3.34: on the left, away from the click-through button (the owner's wish) -->
   <button class="hb" id="btnPanic" title="Panic: close your notes, lock them, hide CosmoNotes" hidden><svg viewBox="0 0 24 24"><path d="M17.9 17.9A10 10 0 0 1 12 20c-7 0-11-8-11-8a18.4 18.4 0 0 1 5.1-5.9M9.9 4.2A9 9 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.2 3.2m-6.7-1.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/></svg></button>
   <div id="title"></div>
+  <!-- 1.4.26 (the owner's idea): rename from the bar. The pencil shows while the mouse is over the note (the title itself stays
+       a drag area: dragging, double-click = maximise and snapping are as before); it opens #titleEdit in the title's place.
+       After a rename it is an undo arrow for a few seconds. src/note/top-bar.js; into » after Maximise, Minimise, +, All notes -->
+  <button class="hb" id="btnRename" title="Rename" aria-label="Rename"><svg class="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg><svg class="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+  <input id="titleEdit" maxlength="120" spellcheck="false" autocomplete="off" aria-label="Title" placeholder="Title" hidden>
+  <div class="barfill"></div>
   <button class="hb" id="btnRelock" title="Unlocked for now. Click to lock it again" hidden><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></svg></button>
   <button class="hb" id="btnFx" title="Pause effects on this note" aria-pressed="false" hidden><svg viewBox="0 0 24 24"><path d="M12 3c.6 3.6 2.4 5.4 6 6-3.6.6-5.4 2.4-6 6-.6-3.6-2.4-5.4-6-6 3.6-.6 5.4-2.4 6-6z"/><path d="M18.5 15c.3 1.6 1 2.3 2.5 2.5-1.5.3-2.2 1-2.5 2.5-.3-1.5-1-2.2-2.5-2.5 1.5-.2 2.2-.9 2.5-2.5z"/></svg></button>
   <!-- 1.3.34: click-through (Settings → Click-through; main/note-state.js): the mouse goes through the note to the window
@@ -128,9 +134,6 @@
     <button data-tfont="round" title="Rounded title">Rounded</button>
     <button data-tfont="medieval" class="med" title="Medieval title">Medieval</button>
   </div>
-  <!-- 1.4.10: this note's tags (src/note/tags.js, src/tags.js); the notes list filters by them -->
-  <h4>Tags</h4>
-  <div id="tagHere"></div>
   <h4>Colour</h4>
   <div class="swstrip"><div class="swatches" id="colors">
     <button class="sw" data-color="yellow" title="Lemon"></button>
@@ -154,13 +157,14 @@
   <h4>See-through <span id="opVal" class="val">100%</span></h4>
   <input type="range" id="opacity" min="25" max="100" step="5" value="100">
   <label class="check switch"><span>Turn solid when my mouse is over it</span><input type="checkbox" id="solidHover"><i></i></label>
-  <!-- 1.3.27: this note's own choice of two settings ("this note" = differs from Settings; set it like Settings and it follows
-       Settings again). Evening colours only for light papers; the panic switch only while the panic button is on -->
-  <label class="check switch" id="eveRow"><span><em class="cktag" id="eveTag" hidden>this note</em>Softer colours in the evening</span><input type="checkbox" id="eveSwitch"><i></i></label>
-  <label class="check switch" id="panicRow" hidden><span><em class="cktag" id="panicTag" hidden>this note</em>Close with the panic button</span><input type="checkbox" id="panicSwitch"><i></i></label>
+  <!-- 1.4.10: this note's tags (src/note/tags.js, src/tags.js); the notes list filters by them. 1.4.30 (the owner's pick):
+       under See-through; every tag to press (this note's lit), + Add opens Manage tags (#tagPop) -->
+  <h4>Tags</h4>
+  <div id="tagHere"></div>
   <button class="mi" id="miFx"><svg viewBox="0 0 24 24"><path d="M12 3c.6 3.6 2.4 5.4 6 6-3.6.6-5.4 2.4-6 6-.6-3.6-2.4-5.4-6-6 3.6-.6 5.4-2.4 6-6z"/><path d="M18.5 15c.3 1.6 1 2.3 2.5 2.5-1.5.3-2.2 1-2.5 2.5-.3-1.5-1-2.2-2.5-2.5 1.5-.2 2.2-.9 2.5-2.5z"/></svg><span>Effects…</span><small class="mival" id="miFxVal"></small></button>
   <!-- 1.3.21: this note's checklists open their own pop-up (#ckPop), like Effects… (the owner's pick) -->
-  <button class="mi" id="miChecks"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="6" height="6" rx="1.5"/><path d="m4.5 7 1.2 1.2L8 5.8M12 7h9M12 17h9"/><rect x="3" y="14" width="6" height="6" rx="1.5"/></svg><span>Checklists…</span><small class="mival" id="miChecksVal"></small></button>
+  <!-- 1.4.26 (the owner's wish): Other settings… = the checklist switches, evening colours and the panic button -->
+  <button class="mi" id="miChecks"><svg viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg><span>Other settings…</span><small class="mival" id="miChecksVal"></small></button>
   <div class="divider"></div>
   <button class="mi" id="miDuplicate"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2.5"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg><span>Duplicate note</span></button>
   <button class="mi" id="miLock"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="miLockText">Lock note</span></button>
@@ -190,15 +194,31 @@
 </div>
 
 <!-- 1.3.19: this note's checklists (src/note/checklists.js); 1.3.21: a pop-up of their own, opened from ⋯ → Checklists….
+     1.4.26: Other settings (⋯ → Other settings…): the checklists, evening colours and the panic button.
      A switch set to what Settings says follows Settings again -->
 <div class="pop" id="ckPop" hidden>
   <button class="ix" id="ckX" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
   <div class="igrip" title="Drag to move, also out of the note (double-click: back)"><i></i></div>
-  <h4>Checklists in this note</h4>
+  <h4>Checklists</h4>
   <label class="check switch ckopt"><span><b>Reorder by dragging the box</b><small><em class="cktag" data-k="drag" hidden>this note</em>Drag a box to move its item.</small></span><input type="checkbox" id="ckDrag"><i></i></label>
   <label class="check switch ckopt"><span><b>Move ticked items to the bottom</b><small><em class="cktag" data-k="sink" hidden>this note</em>Unticking leaves it in place.</small></span><input type="checkbox" id="ckSink"><i></i></label>
   <label class="check switch ckopt"><span><b>Keep boxes the same size</b><small><em class="cktag" data-k="fixed" hidden>this note</em>Big text keeps a normal box.</small></span><input type="checkbox" id="ckFixed"><i></i></label>
+  <!-- 1.3.27: this note's own choice of two settings ("this note" = differs from Settings; set it like Settings and it follows
+       Settings again). Evening colours only for light papers; the panic switch only while the panic button is on.
+       1.4.26: here (they were in the ⋯ menu); the heading hides when neither shows (note-effects-lock.css) -->
+  <h4 id="ckOwnH">Other</h4>
+  <label class="check switch ckopt" id="eveRow"><span><b>Softer colours in the evening</b><small><em class="cktag" id="eveTag" hidden>this note</em>Light paper turns softer.</small></span><input type="checkbox" id="eveSwitch"><i></i></label>
+  <label class="check switch ckopt" id="panicRow" hidden><span><b>Close with the panic button</b><small><em class="cktag" id="panicTag" hidden>this note</em>Off: this note stays open.</small></span><input type="checkbox" id="panicSwitch"><i></i></label>
   <div class="ckfoot"><span id="ckFoot"></span><button type="button" id="ckReset">Use Settings</button></div>
+</div>
+
+<!-- 1.4.30: Manage tags (⋯ → Tags → + Add), a pop-up of its own like Other settings: rename, colour, make or delete a
+     tag in every note (src/tags.js manager, src/note/tags.js, main/ipc-tags.js) -->
+<div class="pop" id="tagPop" hidden>
+  <button class="ix" id="tagX" title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  <div class="igrip" title="Drag to move, also out of the note (double-click: back)"><i></i></div>
+  <h4>Manage tags</h4>
+  <div id="tagManage"></div>
 </div>
 
 <!-- create the one password for locked notes -->

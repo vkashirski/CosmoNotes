@@ -1,9 +1,9 @@
 # CosmoNotes – version history
 
 The app shows no version history (since 1.1.41): it lives only here and in [`CHANGELOG-archive.md`](CHANGELOG-archive.md).
-Settings → About CosmoNotes shows the version, the date of the last update and the feature list.
+Settings → About shows the version, the date of the last update and the feature list.
 
-This file keeps only the **two newest versions**. Older ones (1.4.21 back to 1.0.0) are in the archive. When a new
+This file keeps only the **two newest versions**. Older ones (1.4.31 back to 1.0.0) are in the archive. When a new
 version is added at the top, move the oldest one here to the top of the archive.
 
 **Renumbered in 1.1.41.** Six big versions were split into smaller ones, so the numbers from 1.1.13 on moved up. Each
@@ -24,27 +24,35 @@ heading says what it was. Version numbers written before 1.1.41 (in code comment
 | 1.1.23 | 1.1.30, 1.1.31 and 1.1.32 |
 | 1.1.24 – 1.1.31 | 1.1.33 – 1.1.40 (old + 9) |
 
-## 1.4.23 – 20 November 2026
+## 1.4.33 – 23 November 2026
 
-A ticked checklist line's strike goes through the middle of the small letters, and Settings → Reminders → Hiding notes
-says what it does more plainly.
+Tabs can wear icons, and each tab can show its icon, its name, or both (the owner's wishes and picks).
 
-- **The strike** (`note-text.css` `::highlight(cn-done)`): the owner found it still a little high. A line-through sits
-  where each font says (Nunito's is above the middle of its small letters) and CSS can't move it, so the strike is now an
-  underline moved up: `text-underline-offset: calc(-0.5ex - 0.75px)` puts the 1.5 px line's middle half an ex above the
-  baseline, the ex of each run's own font and size (the note's `font-size-adjust` included), with no gaps at the letters
-  (`text-decoration-skip-ink: none`). Cards keep their runs' line-through (a run can have its own underline too).
-- **Hiding notes** (`src/list.html`): the hint is now "Let a reminder hide its note until it goes off." (was "A reminder
-  can hide its note until then."; the owner offered "Hide a note until a reminder goes off.": the switch only lets the
-  reminder panel offer it, so it says "let").
-- **Tests:** `note-ui.test.js` (the strike's offset is half of each run's ex, no skip-ink).
+- **40 icons** (`src/tab-icons.js`, the owner's set): Favourites is always the star, Locked the lock, the Bin the trash can.
+- **A group's icon is optional.** Right-click its card or its tab → Icon… and pick one of the 40, or No icon. It shows on
+  its tab and on its bar in the list (not on its card). With no icon, its tab shows only its name: the colour dot of
+  1.4.32 is gone.
+- **Icon / Icon + name / Name** for each tab with an icon: in the same pop-up, or right-click → Show icon only / Show icon
+  and name. Shown as its icon only, a tab hides its count; its name is in its tooltip.
+- A hidden group's icon can't be changed (main's `groups:update` leaves a shut group as it is).
+- Saved: the group's `icon` (store.js `normalizeGroup`: one of the 40 or null), the tab's `show` in `settings.listTabs`.
+- **Tests:** `list-ui-tabs.test.js` (icons), `code-structure.test.js` (the new shared file, list only).
 
-## 1.4.22 – 20 November 2026
+## 1.4.32 – 22 November 2026
 
-The Add panel's pictures have their names under them again (the owner's wish: 1.4.21 had pictures only).
+A group can be a tab of its own in the notes list, and the tabs can be moved (the owner's wish).
 
-- **The Add panel** (`#insert`, `src/note.html`, `note-toolbars.css`): still a row over the bottom bar at its right by +,
-  each tile now a picture with its name (`.tl`, 10.5 px) under it, 56 px wide. Nine don't fit on a 340 px note, so the
-  row wraps (two rows there; one row from about 540 px). The names are the tiles' words again (`addItems`, Add ▸'s lines),
-  not a `title`.
-- **Tests:** `note-ui.test.js` (the tile's name is its words).
+- **Pin a group as a tab:** right-click a group card → Pin as tab, drag its card onto the tab bar, or use + Group while
+  editing the tabs. The tab shows the group's colour, name and number of notes (a hidden group's tab shows a lock and no
+  number; a hidden group can't be pinned). Renaming the group renames the tab; the tab goes when the group does.
+- **A group tab is its own place:** it opens at the group, its path starts there, Back and Esc stop there, and a new note
+  goes into it. Notes starts at the top again. Clicking Settings again goes back to the group tab.
+- **Edit tabs (the pencil):** drag tabs to move them, × removes a group's tab, the eye hides or shows Locked, + Group pins
+  one. Notes stays first and Settings last. Right-click a tab: Move left / Move right / Remove from tabs.
+- Tabs that don't fit go into » (the last ones first, never the open one).
+- Saved in `settings.listTabs` (store.js `cleanListTabs`): unknown tabs dropped, missing built-in ones added, only Locked
+  can be hidden, pinned groups that are gone dropped at start.
+- **Code:** `list/events.js` "the tab bar" (`paintTabs`, `fitTabs`, `setTab`, `pinTab`, `unpinTab`, `moveTab`); `V.tabRoot`
+  (the group tab open: `V.tab` stays `'notes'`), `tabsNow` / `pinnedTab` / `tabKey` in `list/base.js`; `render()` lets go of
+  `V.tabRoot` once the view is outside that group; `openGroupView(g, { root })`.
+- **Tests:** `list-ui-tabs.test.js` (new).

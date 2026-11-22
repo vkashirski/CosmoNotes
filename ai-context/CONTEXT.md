@@ -1,181 +1,155 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 20 November 2026 · App version 1.4.23**
+**Last updated: 23 November 2026 · App version 1.4.33**
 
-Start with `CLAUDE.md` (rules, commands, pitfalls, release checklist). This file is the map: what the app is,
-how the folder is laid out, and which `ai-context/` file to open for the job in hand. Open only the files your
-task needs. Keep the "Last updated" line above current on every update.
-
-> ## ⭐ Versioning rule (the owner's instruction)
-> **Every update raises the version number**, unless the owner says not to.
-> - Always raise the **third digit** (1.0.2 → 1.0.3 → 1.0.4 …).
-> - The **first or second digit** only goes up when the owner says so.
-> - Each version gets an entry, with its date and what changed, in **`CHANGELOG.md`** (the app shows no version
->   history since 1.1.41), plus `LAST_UPDATED` in `src/about.js` and the "Last updated" line above.
-> - Version numbers were renumbered in 1.1.41: numbers written before then (code comments, test file names, these
->   files) are the old ones. Table at the top of `CHANGELOG.md`. The full checklist is in `CLAUDE.md`.
+`CLAUDE.md` comes first (rules, commands, the areas' rules, which topic file to open, the release checklist). This file
+is the map: what the app is and where each piece of code lives. Keep the "Last updated" line above current on every
+update (`release.test.js` checks it).
 
 ---
 
 ## What this is
 
-CosmoNotes is a Windows desktop sticky-notes app (Electron), a cuter and more trustworthy replacement
-for Microsoft Sticky Notes. It was called **Sticky Pins** in 1.0.0.
+CosmoNotes is a Windows desktop sticky-notes app (Electron), a cuter and more trustworthy replacement for Microsoft
+Sticky Notes. It was called **Sticky Pins** in 1.0.0 (the install folder, `appId` and `stickyfile://` keep that name).
 
 **The owner's priorities, in order:**
-1. **Never lose a note.** This is the reason the app exists: Microsoft's app lost their notes through
-   cloud sync. Everything is local, saved instantly, crash-safe and backed up daily. Never add cloud
-   sync, accounts or anything that could overwrite or delete data without an explicit user action.
-2. **Notes stay put.** Pinned notes stay on top and won't minimise. Notes reopen in the same spots
-   after a restart.
-3. **Cute, like real paper sticky notes:** pastel paper colours, a handwritten font option, little
-   touches (tilted cards, pins, clips). Keep this design language.
-4. **Simple surface, power behind one button.** Basic formatting is always visible; complex things
-   (photos, voice, drawing…) live behind **+ Add**.
+1. **Never lose a note.** This is the reason the app exists: Microsoft's app lost their notes through cloud sync.
+   Everything is local, saved instantly, crash-safe and backed up daily. Nothing may overwrite or delete data without an
+   explicit user action.
+2. **Notes stay put.** Pinned notes stay on top and won't minimise. Notes reopen in the same spots after a restart.
+3. **Cute, like real paper sticky notes:** pastel paper colours, a handwritten font option, little touches (tilted
+   cards, pins, clips). Keep this design language.
+4. **Simple surface, power behind one button.** Basic formatting is always visible; complex things (photos, voice,
+   drawing…) live behind **+ Add**.
 
-**The owner** is a programmer (older notes said otherwise; fixed in 1.2.4): technical detail is fine. Texts inside the
-app stay short and plain. Since 1.4.0 they release a version by double-clicking `release.bat` (GitHub Actions builds and
-publishes it; every installed CosmoNotes then offers it in Settings → About and the tray). `build.bat` still builds
-`dist/CosmoNotes-Setup-<version>.exe` on their PC. The project is a git
-repo (public on GitHub: `vkashirski/CosmoNotes`); on the owner's PC it's at `C:\Workspaces\CosmoNotes` (it used
-to be `C:\Users\User\Desktop\Sticky Pins\Sticky Pins`). They want edits made **in that folder, in place**, not
-as new copies. Keep each file's existing line endings (they are mixed: see CLAUDE.md).
+The project is a git repo (public on GitHub: `vkashirski/CosmoNotes`); on the owner's PC it is at
+`C:\Workspaces\CosmoNotes`.
 
 ---
 
 ## Project layout
 
 ```
-main.js            Electron main process, entry only (1.1.27): start-up, single instance, app lifecycle. The rest is in main/:
-main/              state (S.store, S.listWin, S.quitting, S.listUnlockedAll + wins) · constants (paper colours, sizes, paths) ·
-                   locks (isLocked, viewOf, checkPassword) · crypt (1.1.30: encryption of locked notes, the store's sealer/opener,
-                   keys, recovery key, syncSeals) · migrate (Sticky Pins folder) · settings (spelling, noteSettings, broadcastSettings) ·
-                   display (fitBounds) · web (hardenContents, openExternal) · ink-geometry + ink-window (toolbars outside the note) ·
-                   list-notify (notifyList) · note-state (applyState, setRolled, titles) · list-visibility (hidden-in-list rules, pushLook) ·
-                   note-window (openNoteWindow, createNote, duplicateNote, bringToFront, enforcePinned) · list-window (showList, themes) ·
-                   tray (buildTray, startup, pause effects) · recordings (1.2.4: voice recordings on disk while made, finished on
-                   close / lock / quit, recovered after a crash) · ipc-common (senderNote, applyPatch) · ipc-notes · ipc-ink · ipc-files (+ rec:*) ·
-                   ipc-groups (list:get, groups:*) · move-history (1.4.9: Undo / Redo of moves and pastes in the list: recorded, recordCopy, undoMove, redoMove) · ipc-list-actions (list locks, open/close/trash/edit/apply, bin) · ipc-settings
-                   (settings:set, backups) · ipc-crypt (crypt:* from Settings → Locked notes) · 1.3.1 voice to text: stt-models (the
-                   model list: files, commits, sha256; where they are) · stt-engine (the hidden engine window, cosmomodel://, its
-                   session) · stt-download (the model's download, Remove, .part cleanup) · ipc-stt (stt:* jobs + Settings) ·
-                   1.3.27: evening (evening colours: the one clock, a window's background) · panic (the panic button, its
-                   global shortcut, reopening what it closed) ·
-                   1.3.30: closed-notes (the notes closed by hand, for "Reopen closed note": Ctrl+Shift+T, the tray) ·
-                   1.4.0: updater (updates: GitHub's latest.yml, the installer's download + sha512, starting it on quit) ·
-                   ipc-update (update:*, the check at start and once a day, Install, the tray's "Update to …") ·
-                   1.4.1: reminders (the reminders' one clock, a note popping up when one goes off, hiding, remind:* and
-                   list:remind-* IPC) · 1.4.5: app-pin (notes pinned over some apps: which app is in front, from the
-                   window titles of desktopCapturer; hides / shows their windows; the open apps for pin:apps) ·
-                   ipc (registerIpc calls the nine ipc-* parts and reminders' registerRemindIpc)
+main.js            Electron main process, entry only: start-up, single instance, app lifecycle. The rest is in main/.
+main/              (grep a function name here; files only require() files below them)
+  state            S.store, S.listWin, S.quitting, S.listUnlockedAll + wins
+  constants        paper colours, sizes, paths, SECRET
+  locks            isLocked, viewOf, checkPassword
+  crypt            encryption of locked notes: the store's sealer/opener, keys, recovery key, syncSeals
+  migrate          the old Sticky Pins folder
+  settings         spelling, noteSettings, broadcastSettings
+  display · web    fitBounds · hardenContents, openExternal, the text's right-click lines (note:ctx)
+  ink-geometry · ink-window   windows outside a note (toolbars, menus): places, BAR_FRAMES / BAR_KINDS, liftBars
+  list-notify      notifyList
+  note-state       applyState, onTop, setRolled, titles
+  list-visibility  hidden-in-list rules, unlockedForNow, pushLook
+  note-window      openNoteWindow, createNote, duplicateNote, bringToFront, enforcePinned, touchNote
+  list-window      showList, themes
+  tray             buildTray, start with Windows, pause effects
+  recordings       voice recordings on disk while made, finished on close / lock / quit, recovered after a crash
+  move-history     Undo / Redo of moves and pastes in the list
+  evening · panic · closed-notes   evening colours' one clock · the panic button and its shortcut · "Reopen closed note"
+  stt-models · stt-engine · stt-download   voice to text: the model (files, commit, sha256) · the hidden engine window,
+                   cosmomodel://, its session · the download, Remove, .part cleanup
+  updater          updates: GitHub's latest.yml, the installer's download + sha512, starting it on quit
+  reminders        the reminders' one clock, popping a note up, hiding, remind:* / list:remind-* IPC
+  app-pin          notes pinned over some apps: which app is in front (desktopCapturer titles), hide / show
+  bar-hover        the mouse over a note's top bar (a drag area the page can't see): polled, sent as note:bar-hover
+  ipc + ipc-*      registerIpc calls ipc-common (senderNote, applyPatch) · ipc-notes · ipc-ink · ipc-files (+ rec:*) ·
+                   ipc-groups (list:get, groups:*) · ipc-list-actions (list locks, open/close/trash/edit/apply, Bin) ·
+                   ipc-settings (settings:set, backups) · ipc-crypt · ipc-stt · ipc-update · ipc-tags (tags:*: every
+                   tag from any note, 1.4.30), and reminders' registerRemindIpc
 store.js           All disk storage (notes, groups, settings, attachments, backups). No Electron imports.
 preload.js         Safe bridge: exposes window.sticky.* to both windows (contextIsolation + sandbox)
-src/note.html      One sticky-note window (the editor). Its code (1.1.44): src/note/*.js, 16 parts (1.4.11) loaded in this order, sharing
-                   names through window.COSMO_NOTE_KIT (K) and its V (V.note, V.settings, V.hidden, V.dirty, V.savedRange…; see
-                   splitting-code.md): base (api, $, colour row, saving: collect/changed/saveNow, dates, applyLook, effects on the
-                   note) · fx-format (the Effects pop-up, spelling, selection helpers: saveSel/restoreSel/insertNodes, formatting:
-                   runCmd) · panels (pop-overs: openPop/closePops, header buttons, ⋯ menu, Add panel: doInsert, text panel A,
-                   Undo/Redo) · content (links, picture descriptions, tables, paste/drop and cleanTree, clicks in the note) ·
-                   editing (editing helpers: line joins, checklist boxes' size and place: alignChecks, decorate; Ctrl+F find;
-                   keyboard) · checklists (1.3.19: the checklist options checkOn/applyChecks, the box: click to tick, drag to move,
-                   ticked lines to the bottom; their Undo steps) · menus-voice-ink
-                   (right-click menus, voice notes, drawing sketch, photo resizing) · speech (1.3.1: Speak to text, Transcribe;
-                   part 8 of 13) · lock-zoom (locking, password/PIN, ask(),
-                   word wrap, zoom: zoomNow/setZoom, sideways scroll) · draw-over (draw-over: inkState, renderInk, saveInk; floating
-                   toolbars: movable) · ink-out (toolbars in their own little windows: barOut, inkOut/textOut; whole-stroke
-                   eraser) · remind (1.4.1: Add → Reminder's panel, the strip of a reminder that rings: Snooze / Done, the glow,
-                   the sound; 1.4.19: the chip with the next reminder, #remChip) · pin-apps (1.4.5: the pin's right-click list, "Pin over": the open apps to tick) · tags (1.4.10: the ⋯ menu's Tags row) · top-bar (1.4.11: a small note's top bar: the buttons the title needs the room of go into » and main's menu) · eraser-start (the Partial eraser, toast(), start-up: init; it stays last: see splitting-code.md).
-                   Before its own code it loads src/reminders.js, src/remind-ui.js and src/tags.js (below).
-                   Its styles: src/css/note-*.css, loaded by note.html in this order:
-                   note-base (colours, base, top bar) · note-text (locked note, photo handle, writing area) ·
-                   note-toolbars (bottom bar, pop-overs) · note-drawing (right-click menu, recording, drawing, toast, 1.1.0–1.1.10 additions) ·
-                   note-effects-lock (effects, lock animation, small notes) · note-popups-find (pop-ups in the app's colours, Ctrl+F)
-src/list.html      The "All notes" window: Notes / Bin / Settings tabs, groups, sorting. Its code (1.1.28): src/list/*.js, 7 parts
-                   loaded in this order, sharing names through window.COSMO_LIST_KIT (K) and its V (V.tab, V.openGroup…; see
-                   splitting-code.md): base (colours, themes, sizes, ICON, h(), colour row, data: load/live/groups/sorting) ·
-                   cards (render, drag & drop, note/group cards, card cache, group header) · picking (favourites, Ctrl/Shift-click,
-                   lock animation, the picked-cards bar) · settings-menus (Settings: new-note colours, About, backups; modal(),
-                   toast(); right-click menus) · effects-design (effects on cards, Settings → Effects, Edit design) ·
-                   actions-locks (Bin/delete, passwords, lock/unlock, Locked tab, group panel, folds and search in Settings, back/forward) ·
-                   events (tabs, search, sort, sizes, settings inputs, keys, first load).
-                   Its styles: src/css/list-*.css, in this order:
-                   list-base (themes, title bar, tabs, search, group view, drag) · list-cards (cards, buttons, settings) ·
-                   list-groups-menus (about, group looks, menus, pop-up, toast, card sizes) · list-settings-fx (window themes, folds,
-                   effects, Edit design, favourites) · list-picking-edit (picked-cards bar, colour rows, Edit sheet, lock animations)
-src/note.css, src/list.css  Not used since 1.1.26: only notes saying the styles moved to src/css/ (can be deleted)
-src/list.js        Not used since 1.1.28: only a note saying the code moved to src/list/ (can be deleted)
-src/note.js        Not used since 1.1.44: only a note saying the code moved to src/note/ (can be deleted)
-src/fonts/         Augusta.ttf, the Medieval note font (1.2.1; free, by Dieter Steffmann). Binary: no line endings to keep.
-src/engine/        1.3.1 voice to text: the engine page (engine.mjs, engine-core.mjs: the live session, pauses, text clean-up),
-                   its preload, lib/ (Transformers.js + ONNX Runtime, vendored unchanged:
-                   big files, never open them; README.md there says what they are). Served only through cosmomodel://
-src/mic-worklet.js 1.3.1: the AudioWorklet of Speak to text (16 kHz pieces)
-src/evening.js     1.3.27: evening colours: each light paper's evening shade, the fade (phase), the styles. Loaded by both windows
-                   (window.COSMO_EVENING) and required by main and store.js: one list, so they never differ
-src/reminders.js   1.4.1 reminders: the rules (cleaning, repeats and their next time, Snooze, Done, missed, hiding) and their words.
-                   Like evening.js: loaded by both windows (window.COSMO_REMIND) and required by main and store.js
-src/remind-ui.js   1.4.1 the reminders panel (the same in both windows; 1.4.19: one fixed size, In / At, time box, its own calendar) and the 10 sounds (Web Audio, no files): window.COSMO_REMIND_UI
-src/tags.js        1.4.10 tags: the rules (clean, the search box's #tags, All / Any) and the editor (chips + a box), the same in both
-                   windows (window.COSMO_TAGS); main and store.js require it
-src/about.js       In-app feature list (window.COSMO_ABOUT.FEATURES) + LAST_UPDATED date; no version history since 1.1.41
-src/fx/            Note effects + mouse followers (window.COSMO_FX), used by both windows: 8 files loaded in order (see effects.md)
-src/fx.js          Not used since 1.1.24: only a note saying the code moved to src/fx/ (can be deleted)
+
+src/note.html      One sticky-note window (the editor). Its code is src/note/*.js, 16 parts loaded in this order, sharing
+                   names through window.COSMO_NOTE_KIT (K) and its V (see CLAUDE.md, "Rules for every code change"):
+  base             api, $, colour row, saving (collect / changed / saveNow), dates, applyLook, effects on the note
+  fx-format        the Effects pop-up, spelling, selection helpers (saveSel / restoreSel / insertNodes), runCmd, list lines
+  panels           pop-overs (openPop / closePops), header buttons, ⋯ menu, Add panel (doInsert), text panel A, Undo / Redo
+  content          links, picture descriptions, tables, paste / drop and cleanTree, clicks in the note
+  editing          line joins, checklist boxes' size and place (alignChecks, decorate), Ctrl+F, keyboard
+  checklists       checklist options (checkOn / applyChecks), ticking, dragging, ticked lines to the bottom, their Undo
+  menus-voice-ink  right-click menus (showMenu), voice notes, drawing sketch, photo resizing
+  speech           Speak to text, Transcribe
+  lock-zoom        locking, password / PIN, ask(), word wrap, zoom (zoomNow / setZoom), sideways scroll
+  draw-over        inkState, renderInk, saveInk; floating toolbars (movable)
+  ink-out          windows outside the note (barOut, inkOut / textOut); whole-stroke eraser
+  remind           Add → Reminder's panel, the ringing strip (Snooze / Done), the glow, the sound, the chip (#remChip)
+  pin-apps         the pin's right-click list, "Pin over"
+  tags             the ⋯ menu's Tags row
+  top-bar          a small note's top bar: buttons the title needs the room of go into »
+  eraser-start     the Partial eraser, toast(), start-up (init). Always the last part (splitting-code.md).
+                   Before its own code the page loads src/reminders.js, src/remind-ui.js and src/tags.js.
+src/css/note-*.css The note's styles, in this order: note-base (colours, base, top bar) · note-text (locked note, photo
+                   handle, writing area) · note-toolbars (bottom bar, pop-overs) · note-drawing (right-click menu,
+                   recording, drawing, toast) · note-effects-lock (effects, lock animation, small notes) ·
+                   note-popups-find (pop-ups in the app's colours, Ctrl+F)
+
+src/list.html      The "All notes" window: Notes / Bin / Settings tabs, groups, sorting. Its code is src/list/*.js, 7 parts
+                   in this order, sharing names through window.COSMO_LIST_KIT (K) and its V:
+  base             colours, themes, sizes, ICON, h(), colour row, data (load / live / groups / sorting), isShut, tag filter
+  cards            render, drag & drop, note / group cards, card cache (refreshCard), group header, tag row
+  picking          favourites, Ctrl / Shift-click, lock animation, the picked-cards bar
+  settings-menus   Settings: new-note colours, About, backups, OWN; modal(), toast(); right-click menus
+  effects-design   effects on cards, Settings → Effects, Edit design
+  actions-locks    Bin / delete, passwords, lock / unlock, Locked tab, group panel, Settings sections and search, back / forward
+  events           the tab bar (groups pinned as tabs, edit mode, »), search, sort, sizes, settings inputs, keys, first load
+src/css/list-*.css The list's styles, in this order: list-base (themes, title bar, tabs, search, group view, drag) ·
+                   list-cards (cards, buttons, settings) · list-groups-menus (about, group looks, menus, pop-up, toast,
+                   card sizes) · list-settings-fx (window themes, Settings sidebar, effects, Edit design, favourites) ·
+                   list-picking-edit (picked-cards bar, colour rows, Edit sheet, lock animations)
+
+Shared by both windows (window.COSMO_*), and required by main and store.js where they hold rules:
+src/evening.js     evening colours: each light paper's evening shade (PALETTE), the fade (phase), the styles
+src/reminders.js   the reminders' rules (cleaning, repeats and their next time, Snooze, Done, missed, hiding) and words
+src/remind-ui.js   the reminders panel (one fixed size, In / At, time box, its own calendar) and the 10 sounds (Web Audio)
+src/tags.js        tags: the rules (clean, the search box's #tags, All / Any) and the editor (chips + a box)
+src/tab-icons.js   the 40 icons of the list's tabs (window.COSMO_TAB_ICONS; store.js checks a group's icon with it)
+src/fx/            note effects + mouse followers (window.COSMO_FX): 8 files loaded in order (effects.md)
+src/about.js       the in-app feature list (FEATURES) + LAST_UPDATED
+
+src/engine/        voice to text: the engine page (engine.mjs, engine-core.mjs: the live session, pauses, text clean-up),
+                   its preload, lib/ (Transformers.js + ONNX Runtime, vendored: never open; its README.md says what is
+                   there). Served only through cosmomodel://
+src/mic-worklet.js the AudioWorklet of Speak to text (16 kHz pieces)
+src/fonts/         Augusta.ttf, the Medieval note font (binary)
 assets/            icon.ico/png (windows), tray.ico/png
-build/             icon.ico/png for the installer/shortcuts; afterPack.js is an unused stub (see build-and-release.md, Smart App Control);
-                   fetch-model.js: an unused stub since 1.3.4 (no model comes with the app; can be deleted)
-build.bat          One-click: (private Node if needed) + npm install + electron-builder → dist/CosmoNotes-Setup-<ver>.exe (local only)
-release.bat        1.4.0: sends the version in package.json to everyone: pushes main and the tag v<ver> (checks first)
-.github/           1.4.0: workflows/release.yml (a tag v<ver>: tests on Linux, build + Smart App Control check on Windows,
-                   publish to GitHub Releases; its notes: build/release-notes.js, that version's CHANGELOG.md entry)
-.gitattributes     1.4.0: each file's line endings in git (the CRLF ones CLAUDE.md lists; the rest LF)
-HOW TO INSTALL.txt Plain-language guide for the owner (install, data folder, forgot password, tips)
-test-run.bat       Runs CosmoNotes from this folder with Electron's original exe (no build needed)
-build/installer.nsh  Installer addition: shortcuts get the CosmoNotes icon (exe stays untouched, see build-and-release.md)
-CHANGELOG.md       Version history, the two newest versions (the only place it is kept, with the archive)
-CHANGELOG-archive.md  Older versions (1.3.38 back to 1.0.0); the app doesn't read it (release.test.js does)
-tests/             npm test – one *.test.js per area (notes, groups, locks, crypt, effects-…, list-ui-…; testing.md lists
-                   them), run side by side; helpers/ (the real main process under fake-electron/, the list and a note in
-                   Chromium, the effects in a vm); record/ records a refactor before and after (not run by npm test)
-CLAUDE.md         Short rules every AI session reads first (rules, commands, pitfalls, release checklist)
-ai-context/        Docs for AI assistants: this map + one file per topic (table below)
-tools/node/        Private Node.js 22 that build.bat downloads when the computer's Node is missing/too old (git-ignored)
-tools/stt-prototype/  The voice-to-text prototype (Step 1, git-ignored). Its code lives in the app since 1.3.1: delete it once
-                   Speak to text works on the owner's PC.
-tools/split/       Helper scripts for splitting big files (map, circles, CSS cuts, style compare); see splitting-code.md. Not packed.
+build/             icon.ico/png for the installer / shortcuts; installer.nsh (shortcuts get the CosmoNotes icon, the exe
+                   stays untouched); release-notes.js (a version's CHANGELOG entry → the GitHub release's notes)
+build.bat          one click: (private Node if needed) + npm install + electron-builder → dist/CosmoNotes-Setup-<ver>.exe
+release.bat        sends package.json's version to everyone: pushes main and the tag v<ver> (checks first)
+.github/           workflows/release.yml: a tag v<ver> → tests on Linux, build + Smart App Control check on Windows,
+                   publish to GitHub Releases
+.gitattributes     each file's line endings (the list CLAUDE.md points to)
+test-run.bat       runs CosmoNotes from this folder with Electron's original exe (no build needed)
+HOW TO INSTALL.txt plain-language guide for the owner (install, data folder, forgot password, tips)
+CHANGELOG.md       the two newest versions; CHANGELOG-archive.md the older ones (the app reads neither; release.test.js does)
+tests/             npm test: one *.test.js per area (testing.md lists them); helpers/ (the real main process under
+                   fake-electron/, the list and a note in Chromium, the effects in a vm); record/ records a refactor before
+                   and after (not run by npm test)
+tools/             node/ (the private Node 22 build.bat downloads; git-ignored) · split/ (helper scripts for splitting big
+                   files, splitting-code.md; not packed) · stt-prototype/ (git-ignored; delete once Speak to text works on
+                   the owner's PC)
+Stubs, unused:     src/note.js, src/list.js, src/note.css, src/list.css, src/fx.js (each only says where its code moved),
+                   build/afterPack.js, build/fetch-model.js, build/models/. All can be deleted.
 ```
 
-Fonts come from npm (`@fontsource/caveat` = handwritten, `@fontsource/nunito` = rounded/UI) and are
-referenced from HTML as `../node_modules/@fontsource/...`, so they work offline and are packaged.
-The Medieval font (1.2.1) is a file in the app: `src/fonts/Augusta.ttf`, loaded by an `@font-face` at the top of
-`src/css/note-base.css` and `list-base.css` (`--med`). The note fonts are `FONTS` in `store.js`: hand, round, medieval.
+Fonts come from npm (`@fontsource/caveat` = handwritten, `@fontsource/nunito` = rounded / UI), referenced from HTML as
+`../node_modules/@fontsource/...`, so they work offline and are packaged. The Medieval font is loaded by an `@font-face` at
+the top of `src/css/note-base.css` and `list-base.css` (`--med`). The note fonts are `FONTS` in `store.js`: hand, round,
+medieval.
 
 ---
 
-## Which file to open
-
-| You are… | Open |
-|---|---|
-| Changing `main.js`, `main/`, `preload.js`, IPC, windows, the tray, security, or anything about locks / hidden notes | `ai-context/architecture.md` |
-| Adding or changing a note field, a setting, backups, the Bin, groups or ink data | `ai-context/data-model.md` |
-| Looking for where a feature lives (function, element id, CSS) | `ai-context/feature-map.md` |
-| Working on the note editor, toolbars, pop-ups, drawing, the notes list or its cards | `ai-context/ui-gotchas.md` |
-| Touching effects or mouse followers (`src/fx/`) | `ai-context/effects.md` |
-| Building or packaging: `build.bat`, Node / Electron version, Smart App Control, build errors, saving files into the owner's folder | `ai-context/build-and-release.md` |
-| Writing or running tests, or checking the UI | `ai-context/testing.md` |
-| Splitting a big file (`note.js`, `list.js`, `main.js`, a CSS file) into smaller ones | `ai-context/splitting-code.md` |
-
----
-
-## Ideas mentioned or likely next
+## Ideas the owner mentioned (not built)
 
 - Per-note passwords (the owner said "one password for all notes **for now**").
-- Maybe: drag to reorder notes by hand (currently only sorting), and custom group icons/stickers.
-- A global "new note" shortcut, and export/import to a single file (offered in 1.0.0, not chosen yet). (Reminders came in 1.4.1.)
-- Reminders, next (the owner's picks in 1.4.1): a reminder on one checklist line ("buy milk · 18:00"; `target` is ready for
-  it), and maybe an email for a missed reminder (nothing built for it yet). Real nature recordings could replace the
-  made sounds (src/remind-ui.js MAKE): the owner asked for sounds from a free site; this workspace couldn't download them.
-- Updates (1.4.0) were turned down after 1.1.5 and chosen in 1.4.0, with the owner's picks: a ready installer from
-  GitHub Releases, built by GitHub Actions from a tag that `release.bat` pushes; a quiet check at start and once a day
-  (switch on), a dot and a tray line, no pop-up and no "what's new" in the app; Install saves, updates silently and
-  reopens; a blocked download offers the release page; our own small updater (no electron-updater). Still unknown:
-  whether Smart App Control lets an installer built by GitHub (not on the owner's PC) start: the first real update shows it.
+- Maybe: drag to reorder notes by hand (currently only sorting), and custom group icons / stickers.
+- A global "new note" shortcut, and export / import to a single file (offered in 1.0.0, not chosen yet).
+- Reminders, next (the owner's picks): a reminder on one checklist line ("buy milk · 18:00"; `target` is ready for it),
+  and maybe an email for a missed reminder. Real nature recordings could replace the made sounds (src/remind-ui.js
+  `MAKE`): the owner asked for sounds from a free site; the cloud workspace couldn't download them.
+- Open question about updates: whether Smart App Control lets an installer built by GitHub (not on the owner's PC)
+  start. The first real update shows it (`build-and-release.md` → "Releasing").

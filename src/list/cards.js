@@ -6,7 +6,7 @@
   const { V, S, $, $$, GCOLORS, THEMES, SIZES, sizeNow, themeNow, ICON, cardsTabNow, navBack, sel, h, when, full,
     plural, tilt, live, groupById, childGroups, chainOf, subtreeIds, notesInTree, isInside, noteIsLocked,
     groupIsLocked, isShut, noteById, lockedOnes, favourites, sortItems, groupShown, finding, noteFits, groupFits,
-    knownTags } = K;
+    knownTags, pinnedTab } = K;
   // defined in a later part:
   const selItems = K.later('selItems'), starBtn = K.later('starBtn'), lockBtn = K.later('lockBtn'),
     pickCard = K.later('pickCard'), clearSel = K.later('clearSel'), paintCards = K.later('paintCards'),
@@ -15,7 +15,7 @@
     groupMenu = K.later('groupMenu'), paintFxPause = K.later('paintFxPause'), trashNote = K.later('trashNote'),
     paintLockBar = K.later('paintLockBar'), openGroupView = K.later('openGroupView'),
     closePanel = K.later('closePanel'), paintPanel = K.later('paintPanel'), newNote = K.later('newNote'),
-    clearSearch = K.later('clearSearch'), openRemindSheet = K.later('openRemindSheet');
+    clearSearch = K.later('clearSearch'), openRemindSheet = K.later('openRemindSheet'), paintTabs = K.later('paintTabs');
   const R = window.COSMO_REMIND;
   // 1.3.27: evening colours (src/evening.js): each light paper's evening shade for the cards. --evp on the body says how far
   // into the evening it is (main's clock); a card whose note has them on (.eve) mixes in by it (list-cards.css)
@@ -33,6 +33,10 @@
       const up = chainOf(V.openGroup).find((g) => g.id !== V.openGroup && g.open && notesInTree(g.id).length);
       V.openGroup = up ? up.id : null;
     }
+    // a group tab (V.tabRoot) holds while the view is that group or inside it, and the group is still a tab; else this is
+    // the Notes tab again (the group was unpinned, ungrouped, emptied or locked again, or the mouse's Back went outside it)
+    if (V.tabRoot && (V.tab !== 'notes' || !pinnedTab(V.tabRoot) || !V.openGroup || !(V.openGroup === V.tabRoot || isInside(V.openGroup, V.tabRoot)))) V.tabRoot = null;
+    if (String(V.lastTab).startsWith('g:') && !pinnedTab(V.lastTab.slice(2))) V.lastTab = 'notes';
     // every move between group levels (opening a group, the back button, the path, Esc…) is remembered
     // for the mouse's back and forward buttons, like in a web browser
     if (V.openGroup !== V.shownGroup) {
@@ -48,7 +52,7 @@
     $('#cFavs').textContent = favNow.notes.length + favNow.groups.length;
     const lockNow = lockedOnes();
     $('#cLocks').textContent = lockNow.notes.length + lockNow.groups.length + lockNow.hidden;
-    $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === V.tab));
+    paintTabs();
     if (K.FX) paintFxPause();
     $('#viewNotes').hidden = !cardsTabNow();
     $('#viewNotes').classList.toggle('favs', V.tab === 'favs' || V.tab === 'locks');
@@ -71,14 +75,33 @@
     else paintBulk();
     if (V.tab === 'bin') renderBin(binned);
     if (V.tab === 'settings') renderSettings();
+    filterDone(); // 1.4.31
   }
 
   // ---------- 1.4.10: tags. The row under the search box: every tag in use (the picked ones first, then A–Z); a click
   // picks or drops one; with two or more picked, All / Any. A card's own tags under its words: a click picks that tag.
+  // 1.4.31 (the owner's wish): a press shows at once (only the row is painted), then the notes are filtered under a spinner:
+  // the browser paints the row and the spinner first (a frame, then a turn), then render(). Presses in a row: only the last
+  // one filters. render() ends the spinner, whoever calls it.
+  let filterJob = 0;
   function setTagPick(list) {
     V.tagPick = list;
-    render();
-    $('#viewNotes').scrollTop = 0;
+    paintTagRow();
+    filterSoon();
+  }
+  function filterSoon() {
+    const job = ++filterJob;
+    $('#cards').classList.add('filtering');
+    $('#filterSpin').classList.add('on');
+    requestAnimationFrame(() => setTimeout(() => {
+      if (job !== filterJob) return;
+      render();
+      $('#viewNotes').scrollTop = 0;
+    }, 0));
+  }
+  function filterDone() {
+    $('#cards').classList.remove('filtering');
+    $('#filterSpin').classList.remove('on');
   }
   const toggleTag = (t) => setTagPick(V.tagPick.includes(t) ? V.tagPick.filter((x) => x !== t) : [...V.tagPick, t]);
   const pickTag = (t) => { if (!V.tagPick.includes(t)) setTagPick([...V.tagPick, t]); };
@@ -88,16 +111,17 @@
     const have = new Set(known.map((k) => k.tag));
     if (V.tagPick.some((t) => !have.has(t))) V.tagPick = V.tagPick.filter((t) => have.has(t)); // its last note went
     row.hidden = !known.length;
+    row.classList.toggle('picking', V.tagPick.length > 0); // 1.4.30: the others fade (list-base.css)
     if (row.hidden) return;
     const picked = known.filter((k) => V.tagPick.includes(k.tag));
     const rest = known.filter((k) => !V.tagPick.includes(k.tag));
     const chip = ({ tag, count }) => h('button', {
-      class: 'tagchip' + (V.tagPick.includes(tag) ? ' on' : ''),
+      class: 'tagchip' + (V.tagPick.includes(tag) ? ' on' : '') + (tagStyle(tag) ? ' tc' : ''), style: tagStyle(tag) || null, // 1.4.30: its colour
       title: V.tagPick.includes(tag) ? 'Click to stop filtering by it' : `Show only what has it (${count})`,
       onclick: () => toggleTag(tag),
     }, `#${tag}`, h('small', {}, String(count)));
     const any = !!V.state.settings.tagAny;
-    const setAny = (v) => { if (v === any) return; V.state.settings.tagAny = v; S.settings.set({ tagAny: v }); render(); };
+    const setAny = (v) => { if (v === any) return; V.state.settings.tagAny = v; S.settings.set({ tagAny: v }); paintTagRow(); filterSoon(); };
     row.replaceChildren(...[
       h('span', { class: 'tagico', title: 'Tags: click one to filter, or type #tag in the search', html: ICON.tag }),
       h('div', { class: 'tagchips' }, ...picked.map(chip), ...rest.map(chip)),
@@ -107,10 +131,12 @@
       V.tagPick.length ? h('button', { class: 'qclear tagclear', title: 'Stop filtering by tags', html: ICON.x, onclick: () => setTagPick([]) }) : null,
     ].filter(Boolean));
   }
+  // 1.4.30: a tag's colour (settings.tagColors, src/tags.js COLORS): '' = the usual look
+  const tagStyle = (t) => (window.COSMO_TAGS ? window.COSMO_TAGS.chipStyle(t, V.state.settings.tagColors) : '');
   function tagPills(tags) {
     if (!tags || !tags.length) return null;
     return h('div', { class: 'ctags' }, ...tags.map((t) => h('button', {
-      class: 'ctag', title: `Show only what has #${t}`, draggable: 'false',
+      class: 'ctag' + (tagStyle(t) ? ' tc' : ''), style: tagStyle(t) || null, title: `Show only what has #${t}`, draggable: 'false',
       onclick: (e) => { e.stopPropagation(); pickTag(t); },
     }, `#${t}`)));
   }
@@ -459,7 +485,10 @@
   }
 
   function renderGroupHeader(g) {
-    const chain = chainOf(g.id).reverse(); // outermost first
+    let chain = chainOf(g.id).reverse(); // outermost first
+    // in a group tab the path starts at its group (the tab's top: no "All notes", no Back there)
+    const root = V.tabRoot ? chain.findIndex((c) => c.id === V.tabRoot) : -1;
+    if (root >= 0) chain = chain.slice(root);
     const crumbs = $('#crumbs');
     crumbs.innerHTML = '';
     const crumb = (label, gid, current) => {
@@ -467,14 +496,19 @@
       if (!current) dropTarget(el, () => canMove(V.drag, gid), (d) => moveInto(d, gid), () => 'Move here');
       return el;
     };
-    crumbs.append(crumb('All notes', null, false));
-    chain.forEach((c) => crumbs.append(h('span', { class: 'sep' }, '›'), crumb(c.name || 'Group', c.id, c.id === g.id)));
+    if (root < 0) crumbs.append(crumb('All notes', null, false));
+    chain.forEach((c, i) => { if (root < 0 || i) crumbs.append(h('span', { class: 'sep' }, '›')); crumbs.append(crumb(c.name || 'Group', c.id, c.id === g.id)); });
+    $('#btnBack').hidden = root >= 0 && g.id === V.tabRoot;
     const parent = groupById(g.parentId);
     $('#backLabel').textContent = parent ? (parent.name || 'Group') : 'All notes';
     const input = $('#groupName');
     if (document.activeElement !== input) input.value = g.name || '';
     input.dataset.font = g.titleFont || 'hand';
-    $('#gIcon').innerHTML = $(`#gStyles [data-style="${g.style || 'stack'}"] svg`).outerHTML;
+    // 1.4.33: its own icon (src/tab-icons.js), else its look's
+    const TI = window.COSMO_TAB_ICONS;
+    const own = TI && TI.clean(g.icon);
+    $('#gIcon').innerHTML = own ? TI.svg(own) : $(`#gStyles [data-style="${g.style || 'stack'}"] svg`).outerHTML;
+    $('#gIcon').classList.toggle('own', !!own);
     $('#groupHead').style.setProperty('--gc', GCOLORS[g.color] || GCOLORS.kraft);
     $('#btnRelockGroup').hidden = !chain.some((c) => c.locked);
     paintPanel(g);
@@ -711,12 +745,13 @@
   // a card is reused when everything it shows (and its buttons use) is the same as last time
   // (the star and the selection outline are painted afterwards by paintCards, so starring doesn't rebuild a card)
   const sigOf = (x) => JSON.stringify(x, (k, v) => (k === 'favorite' ? undefined : v));
+  const tagLook = (tags) => (tags || []).map(tagStyle).join('|'); // 1.4.30: a tag's new colour builds its cards again
   function noteEl(n, i, inGroup, used) {
-    return cached(`n:${n.id}:${inGroup ? 1 : 0}`, sigOf([n, noteIsLocked(n)]), () => noteCard(n, i, { inGroup }), used);
+    return cached(`n:${n.id}:${inGroup ? 1 : 0}`, sigOf([n, noteIsLocked(n), tagLook(n.tags)]), () => noteCard(n, i, { inGroup }), used);
   }
   function groupEl(g, notes, i, used) {
     const subs = subtreeIds(g.id).size - 1;
-    return cached(`g:${g.id}`, sigOf([g, notes, subs, groupIsLocked(g)]), () => groupCard(g, i), used);
+    return cached(`g:${g.id}`, sigOf([g, notes, subs, groupIsLocked(g), tagLook(g.tags)]), () => groupCard(g, i), used);
   }
 
   Object.assign(K, { render, cardBody, markMore, dropTarget, canMove, moveInto, emptyState });

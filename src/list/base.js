@@ -76,6 +76,9 @@
     check: '<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
     // 1.3.34: click-through (the note's top-bar button has the same arrow)
     clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M5 3 2 6M19 3l3 3"/></svg>', // 1.4.1: reminders
+    pin: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1H3z"/><path d="M3 10h18v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>', // a group pinned as a tab
+    eye: '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    eyeOff: '<svg viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
     tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>', // 1.4.10: tags
     through: '<svg viewBox="0 0 24 24"><path d="M4.04 4.69a.5.5 0 0 1 .65-.65l16 6.5a.5.5 0 0 1-.06.95l-6.13 1.58a2 2 0 0 0-1.43 1.43l-1.58 6.13a.5.5 0 0 1-.95.06z"/></svg>',
     x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
@@ -86,7 +89,11 @@
   V.lastSig = '';
   V.tab = 'notes';
   const cardsTabNow = () => V.tab === 'notes' || V.tab === 'favs' || V.tab === 'locks'; // tabs that show cards
-  V.lastTab = 'notes'; // notes, favourites or bin: where clicking Settings again goes back to
+  V.lastTab = 'notes'; // the tab (tabKey) clicking Settings again goes back to
+  // a group pinned as a tab is its own place: V.tab stays 'notes', V.tabRoot is that group (the top of its view: Back and
+  // Esc stop there). null = the Notes tab. render() lets go of it once the view is outside that group (list/cards.js)
+  V.tabRoot = null;
+  V.tabsEditing = false; // the tab bar's edit mode (the pencil): move tabs, unpin groups, + Group, show / hide Locked
   // group levels visited, for the mouse's back / forward buttons (null = all notes)
   let navBack = [];
   V.navFwd = [];
@@ -338,6 +345,19 @@
     }
     return by === 'created' ? item.note.createdAt : item.note.updatedAt;
   }
+  // ---------- the tabs between Notes (always first) and Settings (always last), in order: { id: 'favs' | 'locks' | 'bin' }
+  // or { group } (store.js cleanListTabs). A pinned group that is gone (an Undo can bring it back) is left out here.
+  const BUILT_TABS = ['favs', 'locks', 'bin'];
+  function tabsNow() {
+    const list = Array.isArray(V.state.settings.listTabs) ? V.state.settings.listTabs : [];
+    const out = list.filter((t) => t && (BUILT_TABS.includes(t.id) || (t.group && groupById(t.group))));
+    for (const id of BUILT_TABS) if (!out.some((t) => t.id === id)) out.push({ id });
+    return out;
+  }
+  const pinnedTab = (gid) => tabsNow().some((t) => t.group === gid);
+  // the tab being looked at: 'notes' | 'favs' | 'locks' | 'bin' | 'settings' | 'g:<group id>'
+  const tabKey = () => (V.tab === 'notes' && V.tabRoot ? `g:${V.tabRoot}` : V.tab);
+
   function sortItems(items) {
     const p = sortPrefs();
     const sign = p.dir === 'asc' ? 1 : -1;
@@ -354,5 +374,5 @@
     sizeNow, themeNow, ICON, cardsTabNow, navBack, sel, h, when, full, plural, tilt, swatchStrip, load, live, noteById,
     groupById, childGroups, chainOf, subtreeIds, notesInTree, isInside, noteIsLocked, groupIsLocked, LOCKED_NO_DELETE,
     isShut, noteShown, groupShown, lockedOnes, favourites, tagsOfNote, tagsOfGroup, finding, noteFits, groupFits, knownTags,
-    sortPrefs, sortItems });
+    sortPrefs, sortItems, tabsNow, pinnedTab, tabKey });
 })();

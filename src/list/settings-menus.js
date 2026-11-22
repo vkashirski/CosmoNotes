@@ -4,7 +4,7 @@
 (() => {
   const K = window.COSMO_LIST_KIT;
   const { V, S, $, $$, COLORS, DARK_COLORS, COLOR_NAMES, SWATCH, THEMES, themeNow, ICON, sel, h, plural, noteIsLocked,
-    groupIsLocked, isShut, render, setFav, paintCards, unlockedNow, bulkCut, bulkCopy, pasteCut } = K;
+    groupIsLocked, isShut, render, setFav, paintCards, unlockedNow, bulkCut, bulkCopy, pasteCut, pinnedTab } = K;
   // defined in a later part:
   const fxSummary = K.later('fxSummary'), openEdit = K.later('openEdit'), trashNote = K.later('trashNote'),
     dissolveGroup = K.later('dissolveGroup'), trashGroup = K.later('trashGroup'), lockNote = K.later('lockNote'),
@@ -12,7 +12,8 @@
     unlockNoteNow = K.later('unlockNoteNow'), relockNote = K.later('relockNote'), unlockGroupNow = K.later('unlockGroupNow'),
     relockGroup = K.later('relockGroup'),
     openGroupView = K.later('openGroupView'), openPanel = K.later('openPanel'), paintCrypt = K.later('paintCrypt'),
-    openRemindSheet = K.later('openRemindSheet'), openTagSheet = K.later('openTagSheet');
+    openRemindSheet = K.later('openRemindSheet'), openTagSheet = K.later('openTagSheet'), pinTab = K.later('pinTab'),
+    unpinTab = K.later('unpinTab'), openGroupIcon = K.later('openGroupIcon');
   // ---- Settings → For new notes → Colour (1.1.15): pick one or more colours; each new note gets one of them at random
   const newColors = () => {
     const s = V.state.settings || {};
@@ -341,6 +342,7 @@
     const ready = u.state === 'available' || u.state === 'failed';
     $('.tab[data-tab="settings"]').classList.toggle('hasupd', ready);
     $('.abouthead h3').classList.toggle('hasupd', ready);
+    $('#setNav [data-sec="about"]').classList.toggle('hasupd', ready); // 1.4.25: and on About in the sidebar
     const line = $('#updLine');
     line.textContent = UPD_LINE[u.state](u);
     line.classList.toggle('err', u.state === 'failed' || u.state === 'checkfailed');
@@ -595,9 +597,15 @@
           : { label: 'Unlock…', icon: ICON.unlock, run: () => unlockGroupNow(g) },
       g.locked ? { label: 'Remove lock…', icon: ICON.unlock, run: () => unlockGroup(g) } : null,
     ];
+    // a group as a tab of its own (list/events.js): only the tab bar changes, never the group. Not for a hidden one
+    const tab = pinnedTab(g.id)
+      ? { label: 'Remove from tabs', icon: ICON.pin, run: () => unpinTab(g.id) }
+      : { label: 'Pin as tab', icon: ICON.pin, run: () => pinTab(g.id) };
     if (isShut('group', g)) { showCtx(e, [pickItem(`g:${g.id}`), '-', ...locks]); return; }
     showCtx(e, [
       { label: 'Open group', icon: ICON.folder, run: () => openGroupView(g) },
+      tab,
+      { label: 'Icon…', icon: ICON.pin, run: () => openGroupIcon(g, e) }, // 1.4.33: on its tab and its bar
       { label: 'Group settings…', icon: ICON.palette, run: async () => { await openGroupView(g); openPanel(); } },
       { label: 'Tags…', icon: ICON.tag, run: () => openTagSheet([{ kind: 'group', group: g }]) }, // 1.4.10
       g.favorite

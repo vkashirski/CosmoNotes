@@ -19,7 +19,7 @@
   // the others open, the newest on top (clicking one brings it to the front). Each closes with its own button (or X),
   // and the "close all" button in the top bar (shown when two or more are open, text toolbar included) or Esc
   // closes them all. The small dialogs (password, link, questions) still replace each other.
-  const EDIT_POPS = ['#menu', '#fxPop', '#ckPop', '#insert', '#remPop', '#pinPop']; // 1.3.21: #ckPop, this note's checklists; 1.4.1: #remPop, its reminders; 1.4.5: #pinPop, the apps it is pinned over
+  const EDIT_POPS = ['#menu', '#fxPop', '#ckPop', '#tagPop', '#insert', '#remPop', '#pinPop']; // 1.3.21: #ckPop, this note's checklists; 1.4.1: #remPop, its reminders; 1.4.5: #pinPop, the apps it is pinned over; 1.4.30: #tagPop, Manage tags
   const DIALOGS = ['#pwPop', '#linkPop', '#askPop', '#descPop'];
   function closePop(id) {
     const p = $(id);

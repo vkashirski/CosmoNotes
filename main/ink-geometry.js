@@ -12,12 +12,12 @@ const { S } = require('./state');
 // visible toolbar starts inside its window: l, t, r, b).
 // 1.1.16: the text toolbar does the same, in a window of its own: win.textWin, win.textOut, win.textState. Every
 // function and message below takes the toolbar's kind, 'ink' (the default) or 'text' (messages: `bar: 'text'`).
-// The ⋯ menu ('menu') and the Effects pop-up ('fx') can go outside too (1.1.16, same rules), and the Checklists pop-up ('ck', 1.3.21).
+// The ⋯ menu ('menu') and the Effects pop-up ('fx') can go outside too (1.1.16, same rules), and the Checklists pop-up ('ck', 1.3.21), and Manage tags ('tags', 1.4.30).
 // 1.4.18: a small note's » menu ('more', src/note/top-bar.js) is one too: it opens just under its button, never moves, and
 // shows on a rolled-up note as well (SHOWS_ROLLED: it is the top bar's own menu).
-const BAR_FRAMES = { cosmoInkBar: 'ink', cosmoTextBar: 'text', cosmoMenuBar: 'menu', cosmoFxBar: 'fx', cosmoCkBar: 'ck', cosmoMoreBar: 'more' };
-const BAR_KINDS = ['ink', 'text', 'menu', 'fx', 'ck', 'more'];
-const BAR_TITLES = { ink: 'Drawing', text: 'Text', menu: 'Note settings', fx: 'Effects', ck: 'Checklists', more: 'More buttons' };
+const BAR_FRAMES = { cosmoInkBar: 'ink', cosmoTextBar: 'text', cosmoMenuBar: 'menu', cosmoFxBar: 'fx', cosmoCkBar: 'ck', cosmoTagBar: 'tags', cosmoMoreBar: 'more' };
+const BAR_KINDS = ['ink', 'text', 'menu', 'fx', 'ck', 'tags', 'more'];
+const BAR_TITLES = { ink: 'Drawing', text: 'Text', menu: 'Note settings', fx: 'Effects', ck: 'Checklists', tags: 'Manage tags', more: 'More buttons' };
 const SHOWS_ROLLED = new Set(['more']);
 const barKind = (k) => (BAR_KINDS.includes(k) ? k : 'ink');
 const INK_GAP = 4; // px between the note and a toolbar stuck to it
@@ -29,7 +29,7 @@ function inkBarOptions(win, kind = 'ink') {
     width: 320, height: 200, show: false,
     frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false,
     resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
-    skipTaskbar: true, focusable: kind === 'menu', // clicking it never takes the focus from the note (the menu: its title field needs the keyboard)
+    skipTaskbar: true, focusable: kind === 'menu' || kind === 'tags', // clicking it never takes the focus from the note (the menu: its title field needs the keyboard; 1.4.30: Manage tags its fields)
     alwaysOnTop: !!(n && n.pinned),
     parent: win, // stays above its note, and goes with it when the note is minimised or closed
     title: BAR_TITLES[barKind(kind)],

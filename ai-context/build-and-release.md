@@ -84,10 +84,5 @@ checklist is in `CLAUDE.md`.
 
 ## Saving files to the owner's folder
 
-- **Saving files to the owner's folder can fail silently (stale writes)**: when files are written to
-  `C:\Workspaces\CosmoNotes` through the Claude desktop app's folder bridge (`device_commit_files`), the call can report
-  success while the file on disk still has the OLD content (seen several times in 1.1.23: `note.js`, `note.css`,
-  `list.css`, `CHANGELOG.md`). The owner then builds from stale files and the "fixed" bug is still there. Always:
-  copy to the outputs folder, wait a moment, commit (use `force: true` if the mtime guard blocks it), **stage the
-  file back from the device and compare its sha256 (or size) with the copy you meant to save** – never trust the
-  success message alone. Do the same for every file of a round, and tell the owner honestly if a write did not land.
+- The bridge can keep the OLD file while reporting success: the check after every commit is in `CLAUDE.md` →
+  "Saving into the owner's folder".

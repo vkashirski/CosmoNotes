@@ -124,8 +124,9 @@ body.ct * { pointer-events: none !important; }
 body.ct #btnCt { pointer-events: auto !important; }
 body.ct #bar { -webkit-app-region: no-drag; }
 body.ct #bar > :not(#btnCt, #title) { opacity: .3; }
+body.ct #bar > #btnRename:not(.undo) { opacity: 0; } /* 1.4.26: no pencil while the mouse goes through */
 #title {
-  flex: 1; min-width: 0;
+  flex: 0 1 auto; min-width: 0; /* 1.4.26: as wide as its words; .barfill takes the rest of the bar (a drag area too) */
   padding: 0 6px;
   font: 800 13px var(--ui);
   color: var(--accent);
@@ -136,6 +137,28 @@ body.ct #bar > :not(#btnCt, #title) { opacity: .3; }
 body[data-tfont="hand"] #title { font: 700 19px var(--hand); line-height: 1; padding-bottom: 1px; }
 body[data-tfont="medieval"] #title { font: 400 17px var(--med); line-height: 1; padding-bottom: 1px; }
 body.has-title #title, body.rolled #title { opacity: .95; }
+/* 1.4.26: no title: it takes no room, so the pencil sits right after the buttons on the left */
+body:not(.has-title):not(.rolled) #title { flex: 0 0 0; padding: 0; }
+.barfill { flex: 1 1 0; min-width: 0; align-self: stretch; }
+/* 1.4.26: rename from the bar (src/note/top-bar.js). 1.4.29: the pencil shows only while the mouse is over the bar. The bar is a
+   drag area, so the page never sees the mouse there: main tells it (main/bar-hover.js) and the body gets `bar-hover` */
+#btnRename { width: 22px; opacity: 0; transition: opacity .15s, background .12s; }
+body.bar-hover #btnRename, #btnRename:focus-visible, #btnRename.undo { opacity: .72; }
+#btnRename:hover { opacity: 1; }
+#btnRename svg { width: 14px; height: 14px; }
+#btnRename .i-undo, #btnRename.undo .i-pen { display: none; }
+#btnRename.undo .i-undo { display: block; }
+#titleEdit {
+  -webkit-app-region: no-drag;
+  flex: 1 1 auto; min-width: 60px; height: 24px; margin: 0 2px; padding: 0 6px;
+  border: 0; border-radius: 7px; outline: none;
+  background: rgba(255,255,255,.75); box-shadow: inset 0 0 0 1.5px #D6B13A;
+  color: #3B3226; font: 800 13px var(--ui);
+}
+body[data-tfont="hand"] #titleEdit { font: 700 19px var(--hand); }
+body[data-tfont="medieval"] #titleEdit { font: 400 16px var(--med); }
+#titleEdit[hidden] { display: none; }
+body.renaming #title, body.renaming #btnRename, body.renaming .barfill { display: none; }
 .hb[hidden] { display: none; }
 /* 1.4.11: buttons the title needs the room of are in the » menu (src/note/top-bar.js) */
 #bar > .over { display: none !important; }

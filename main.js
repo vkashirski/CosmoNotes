@@ -14,6 +14,7 @@ const { startEveningClock } = require('./main/evening');
 const { registerIpc } = require('./main/ipc');
 const { finishUpdate, startUpdates } = require('./main/ipc-update');
 const { startReminders } = require('./main/reminders');
+const { startBarHover } = require('./main/bar-hover');
 const REMIND = require('./src/reminders');
 const { S } = require('./main/state');
 const { attachmentBytes, clearOpenCopies, install: installCrypt, mimeOf } = require('./main/crypt');
@@ -84,6 +85,7 @@ function start() {
   S.store.backupIfNeeded();
   setInterval(() => S.store.backupIfNeeded(), 3 * 3600e3);
   setInterval(enforcePinned, 2500);
+  startBarHover(); // 1.4.29: the mouse over a note's top bar (the rename pencil)
   screen.on('display-removed', () => setTimeout(refitAll, 800));
   screen.on('display-metrics-changed', () => setTimeout(refitAll, 800));
 }

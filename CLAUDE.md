@@ -1,100 +1,135 @@
 # CosmoNotes
 
 Windows sticky-notes app (Electron 39, plain JavaScript, no framework or bundler). Notes are stored locally only.
-The owner is a programmer: technical detail is fine (texts inside the app stay short and plain). Edit files in this folder in place.
-Keep each file's existing line endings (`.gitattributes` holds them for git since 1.4.0: a new CRLF file needs a line there too): they are mixed (`main.js`, `main/*.js`, `preload.js`, `src/note.*`, `src/note/*.js`, `src/css/note-*.css`, `*.bat`, `build/installer.nsh`, `build/afterPack.js`, `.gitignore`, `CLAUDE.md`, `HOW TO INSTALL.txt` are CRLF;
-`store.js`, `src/list.*`, `src/list/*.js`, `src/fx/*.js`, `src/engine/*`, `src/mic-worklet.js`, `src/about.js`, `src/evening.js`, `src/reminders.js`, `src/remind-ui.js`, `src/tags.js`, `package.json`, `CHANGELOG.md` and `ai-context/*.md` are LF).
+The owner is a programmer: technical detail is fine in chat; texts inside the app stay short and plain.
+Edit files in this folder in place. Keep each file's line endings: `.gitattributes` is the list (the CRLF files are named
+there, everything else is LF); a new CRLF file needs a line there.
 
 ## Commands
-- `npm test`: all tests, side by side (~30 s), under plain Node (`tests/fake-electron` stands in for Electron); prints only failures and a summary. `npm test -- notes` runs only the files whose name contains "notes". Run the area's file while working and everything once before saying a change is done. The browser tests (`tests/list-ui-*`, `note-ui`) need Playwright: the cloud workspace has it; without it they show as skipped.
-- `npm start` or `test-run.bat`: run the app from this folder (Windows only).
-- `build.bat`: the owner double-clicks it to build `dist/CosmoNotes-Setup-<version>.exe` on his PC. Don't build yourself.
-- `release.bat` (1.4.0): the owner double-clicks it to send a version to everyone: GitHub Actions tests, builds and publishes it, and the apps update themselves (`ai-context/build-and-release.md` → "Releasing"). Never run it or push a tag yourself. There is no linter. No voice model comes with the app since 1.3.4 (it is a download in Settings; `build/fetch-model.js` and `build/models/` are unused).
-- Only a real Windows PC can confirm the installer, always-on-top, the tray, start with Windows, the microphone, the graphics card (voice to text) and the spellchecker download. Say so; don't claim they work.
+- `npm test`: all tests, side by side (~30 s), under plain Node (`tests/fake-electron` stands in for Electron); prints only
+  failures and a summary. `npm test -- notes` runs only the files whose name contains "notes". Run the area's file while
+  working; a change is done when the full `npm test` shows 0 failed. The browser tests (`list-ui-*`, `note-ui*`) need
+  Playwright: the cloud workspace has it; without it they show as skipped (say so).
+- `npm start` or `test-run.bat`: run the app from this folder (Windows only). There is no linter.
+- `build.bat` and `release.bat` are the owner's buttons. He double-clicks `build.bat` to build
+  `dist/CosmoNotes-Setup-<version>.exe` on his PC, and `release.bat` to send a version to everyone (GitHub Actions tests,
+  builds and publishes it; the apps update themselves: `build-and-release.md` → "Releasing"). Your part ends at a green
+  `npm test`: you never build, run `release.bat` or push a tag.
+- Only a real Windows PC can confirm the installer, always-on-top, the tray, start with Windows, the microphone, the
+  graphics card (voice to text) and the spellchecker download. Name the ones your change touches as unconfirmed.
 
 ## Golden rules
-1. **Never risk losing a note.** Local-only, atomic saves, backups, the Bin. No cloud, no accounts, no destructive change without asking.
-2. **Every update raises the version** in `package.json`: always the third digit (1.1.23 → 1.1.24), unless the owner says not to. The owner decides when the first or second digit goes up.
-3. **Never modify `CosmoNotes.exe`** (no rcedit / resedit / afterPack / fuses / asar integrity). It must stay byte-identical to Electron's own `electron.exe`, or Windows Smart App Control blocks the app. Details: `ai-context/build-and-release.md`.
+1. **Never risk losing a note.** Local-only, atomic saves, backups, the Bin. No cloud, no accounts, no destructive change
+   without asking.
+2. **Every update raises the version** in `package.json`: always the third digit (1.1.23 → 1.1.24), unless the owner says
+   not to. The owner decides when the first or second digit goes up.
+3. **`CosmoNotes.exe` stays byte-identical to Electron's own `electron.exe`** (no rcedit / resedit / afterPack / fuses /
+   asar integrity), or Windows Smart App Control blocks the app. Details: `build-and-release.md`.
 4. **Keep `appId` `com.stickypins.app` and the `stickyfile://` scheme.** Existing installs and saved notes depend on them.
-5. **Fix the cause, not the symptom** (the owner's wish, 1.3.18): when a bug comes from a design flaw, change the design and remove the workarounds it needed, so the code doesn't pile up patches. If the proper fix would change how the owner's notes look or behave, say so and ask first.
+5. **Fix the cause, not the symptom** (the owner's wish): when a bug comes from a design flaw, change the design and remove
+   the workarounds it needed, so the code doesn't pile up patches. If the proper fix would change how the owner's notes
+   look or behave, say so and ask first.
 
-## Pitfalls that have bitten before
-- **Saves into the owner's folder can silently keep the OLD file** (seen in 1.1.23). After writing through the folder bridge (`device_commit_files`), stage the file back and compare its sha256 or size with what you meant to save. Tell the owner if a write did not land.
-- **Voice recordings (1.2.4, `main/recordings.js`):** a recording is on disk while it is made (`<name>.part` + `<stem>.rec.json`). Anything that ends a recording (close, lock, quit, crash) must keep it as a 🎤 chip; only the X throws it away. The sweep keeps files with a `.rec.json`; never delete one by hand in code.
-- **Hidden locked notes:** never send their `title` / `html` / `text` / `firstImage` / `ink` to a window or the list, and a hidden window must never save. Since 1.3.28 nothing else of them changes either (only select, lock options, open): a new list or note action needs the `hiddenInList` / `groupShut` check in main. See `architecture.md`.
-- **Encrypted locked notes (1.1.30, `main/crypt.js`):** `checkPassword` is async (always `await` it); every note write goes through `S.store.diskForm` (backups too), or a locked note lands on disk in plain text; a note with `enc` set is still sealed: never save its empty fields. No "reset by editing settings.json" for encrypted notes: the recovery key is the only way back. Rules: `architecture.md` → "Encryption".
-- **Main-process shared state:** it is `S.store`, `S.listWin`, `S.quitting`, `S.listUnlockedAll` (`main/state.js`). Always write `S.…`; never copy one into a variable or destructure it. A new file in `main/` must only `require()` files below it (no circles); `package.json` packs `main/**/*` (`code-structure.test.js` checks both).
-- **Voice to text (1.3.1, `main/ipc-stt.js`, `main/stt-engine.js`, `src/note/speech.js`):** a job never outlives its note window, and nothing goes to a hidden one (`mayShow`); main never writes text into a note. The engine window's session must keep blocking every non-`cosmomodel:` request, and `cosmomodel://` must serve only its fixed list (`route`). A new library file = `LIB_FILES` + `IMPORT_MAP`; a model change = `main/stt-models.js` only (with its sha256; one model since 1.3.4, `MODEL`). The marker `.stt-pending` is never saved (`collect`). Rules: `architecture.md` → "Voice to text".
-- **Tags (1.4.10, `src/tags.js`):** a note's `tags` are secret like its words (`SECRET`, crypt.js `SECRET_FIELDS`, `blank()`):
-  `[]` on the card and to a hidden window, no change while hidden. They change only by add / remove (`list:tags`,
-  `note:tags`), never in a note's save (not in `EDITABLE`). A group's tags count for everything inside it (list `tagsOfNote`).
-- **Reminders (1.4.1, `main/reminders.js`, `src/reminders.js`):** the rules are one file both windows, main and store.js use;
-  main keeps the one clock (never a timer in a window). `note.remindMsg` is secret (in `SECRET` and crypt.js `SECRET_FIELDS`,
-  one `blank()` for both sealers): never send it to the list with the cards, nor to a hidden window. A hidden locked note may
-  only get Snooze / Done (and only when its reminder's `unlock` is off): any other reminder change needs the `hiddenInList` /
-  revealed check in main. Rules: `architecture.md` → "Reminders". The panel (1.4.19, `src/remind-ui.js`) has one fixed size
-  and keeps every row in place: a new row needs a new height (`ui-gotchas.md` → "The reminders panel never moves").
-- **App pins (1.4.5, `main/app-pin.js`):** a note pinned over some apps (`note.pinApps`) mirrors them: on top while one is in
-  front, just above its app (`win.appBehind`, not on top) while it is behind another app, hidden (`win.hide`, `win.appHidden`)
-  while none is open; its window stays open. Anything that shows note windows or sets on-top must leave `appHidden` /
-  `appBehind` ones alone (`enforcePinned` skips them, `onTop(n, win)`) or show them as a peek (`appPin.peek`, like the list's
-  open and Bring to front). A list of
-  windows that can't be read shows every note: a broken check must never hide notes. Reading the list is costly (moving notes hitched): its clock
-  rests while one of our windows has the focus (1.4.7, `focusMoved`); don't add checks that run while ours is in front. Rules: `architecture.md` → "App pins".
-- **`preload.js` (1.4.1):** a name used twice in one object of `window.sticky` silently replaces the first: 1.4.0's `update`
-  (the updates) replaced the note window's save, so notes only saved when closed. `code-structure.test.js` checks it.
-- **Window parts (`src/list/`, `src/note/`):** each part is its own `(() => {…})()` block. Variables more than one part changes are `V.x` (list: `V.tab`, `V.openGroup`, `V.state`…; note: `V.note`, `V.settings`, `V.hidden`, `V.dirty`, `V.savedRange`…): always write `V.…`, never copy one into a local. A part takes earlier parts' names in its `const {…} = K;` line, calls a later part's function through `K.later('name')` (a later part's value: `K.name`), and hands names on in `Object.assign(K, {…})` at its end; a name another part needs must be in both (`code-structure.test.js` checks). A `let` only one part uses stays private there. Note parts are CRLF. The note's `eraser-start.js` (start-up) stays the last part (1.4.1, `splitting-code.md`).
-- **List cards stay (1.4.16, `src/list/cards.js` `refreshCard`):** a changed note keeps its card (a new one blinked). A handler on
-  the card element itself reads the note live (`noteById`), never the `n` it was built from. See `ui-gotchas.md`.
-- **Top bar (1.4.11, `src/note/top-bar.js`):** a new top-bar button needs its place in `ORDER` and a line in `ITEMS`, or it
-  never moves into » and a small note's bar runs over. Don't hide top-bar buttons by width in CSS. »'s menu and every
-  right-click menu in a note are the note's own menu since 1.4.18 (`showMenu`, an outside window, kind `'more'`; the text's
-  lines come from main by id: `note:ctx`): no native `Menu` in a note window.
-- **Window order (1.4.18):** the window touched last is on top, pinned notes above the rest. Windows can't do it for
-  windows that never take the focus, so every page sends `touch` on a press (main `touchNote` / `liftBars`). A new window
-  outside a note goes through `barOut` (it touches by itself) and needs its kind in `BAR_FRAMES` / `BAR_KINDS`.
-  `architecture.md` → "Which window is on top".
-- **Zoom:** anything that turns mouse or screen pixels into sizes inside a note must divide by `zoomNow()`. Don't use Electron's page zoom.
-- **Effects:** a new effect or follower needs its id in both `src/fx/` (its `effects-*` / `followers-*` file and `ORDER` in `engine.js`) and `store.js`. Draw on the shared canvas loop: no `Path2D`, no per-particle DOM or CSS animation, no per-frame `createRadialGradient` / `filter`, and it must also work with `m === null`. See `effects.md`.
-- **Ink:** never thin out or re-smooth saved points; drawings drift ("dance") a little more on every pass.
-- **Pop-up colours:** use the `--pop-*` variables, never hard-coded colours.
-- **Paper colours (1.3.27):** a note's (and a card's) colours are day `--d-*` mixed with evening `--e-*` by `--eve`; set
-  `--d-*`, never `--paper` itself. Evening shades are only in `src/evening.js` (a new light paper needs one there).
-- **Settings a note can change for itself (1.3.27):** one table, `OVERRIDES` in `store.js` (what "Use on all notes"
-  puts back). A new one also needs `OWN` (list/settings-menus.js), a `.reapply` row (list.html) and the note's
-  `onLook` keys (lock-zoom.js).
-- **Font sizes (1.4.12):** a font never changes a size: one text size, line height and box for every note font, the letters
-  matched by `font-size-adjust` (notes and cards). A `font[face]` rule must never set a `font-size` or a bigger
-  line-height. Details: `ui-gotchas.md` → "Font sizes".
-- **Formatting in a note shows on its card (1.3.11):** a new tag or look in the editor (`ALLOWED` / `RICH` in `src/note/content.js`) also goes into `store.js` `CARD_TAGS` / `cardLook` and `src/list/cards.js` `runCss`; `store.test.js` fails until it does.
-- **Version numbers were renumbered in 1.1.41** (big versions split up; old 1.1.24 and later = old + 9). Numbers written before then, in code comments, test file names, `ai-context/` and older changelog text, are the old ones. The table is at the top of `CHANGELOG.md`.
-- **Texts in the app:** short and plain, in short sentences (the owner's wish, 1.1.41). One idea per sentence; no long explanations in hints, pop-ups or the feature list.
-- **Tests are by area, never by version** (1.1.49): add a check to the file for the area you changed (`ai-context/testing.md` has the list), once (grep first). `release.test.js` checks that `package.json`, the newest `CHANGELOG.md` heading, `LAST_UPDATED` and `CONTEXT.md` agree: it fails until the checklist below is done.
-- Don't open `app.asar` with the Claude desktop app's file tools: it keeps the archive open and the next build fails with `EBUSY`.
+## Rules for every code change
+- **Shared state is read at the point of use.** Main process: `S.store`, `S.listWin`, `S.quitting`, `S.listUnlockedAll`
+  (`main/state.js`). Windows: `V.x` (list: `V.tab`, `V.openGroup`, `V.state`…; note: `V.note`, `V.settings`, `V.hidden`,
+  `V.dirty`, `V.savedRange`…). Always write `S.…` / `V.…`: a local copy or a destructuring keeps a stale value.
+- **How code is cut into files** (`code-structure.test.js` checks all of it): a `main/` file only `require()`s files below
+  it (no circles; `package.json` packs `main/**/*`). Each window part (`src/list/`, `src/note/`) is its own `(() => {…})()`
+  block: it takes earlier parts' names in its `const {…} = K;` line, calls a later part's function through
+  `K.later('name')` (a later part's value: `K.name`), and hands names on in `Object.assign(K, {…})` at its end; a name
+  another part needs must be in both. A `let` only one part uses stays private there. The note's `eraser-start.js` stays
+  the last part.
+- **`preload.js`:** each name appears once per object of `window.sticky`; a second one silently replaces the first (1.4.0's
+  `update` replaced the note window's save, so notes only saved when closed).
+- **Secret fields** are a note's contents: `title`, `html`, `text`, `firstImage`, `ink`, `remindMsg`, `tags`. A secret field
+  is in `SECRET` (constants.js) and crypt.js `SECRET_FIELDS`, with its empty value in crypt.js `blank()` (one for the store
+  and the backups) and locks.js `viewOf`. It is sealed with a locked note and goes neither to a hidden window nor to the
+  list with the cards. A new field with note contents is a secret field.
+- **Hidden** = a locked note `hiddenInList` or a group `groupShut`. A hidden window never saves, and nothing of a hidden
+  note changes: it can only be selected, unlocked / have its lock options changed, and opened. Every new list or note
+  action in main does the hidden check. `architecture.md` → "Locks and hidden notes".
+- **Encrypted notes** (`main/crypt.js`): `checkPassword` is async (always `await` it); every note write goes through
+  `S.store.diskForm` (backups too), or a locked note lands on disk in plain text; a note with `enc` set is sealed: its
+  empty fields are never saved. The recovery key is the only way back (no "reset by editing settings.json").
+- **Texts in the app:** short and plain, in short sentences, one idea per sentence; no long explanations in hints, pop-ups
+  or the feature list (`texts.test.js`).
+- **Tests are by area, never by version:** add a check to the area's file (`testing.md` has the list), once (grep first).
+- **Version numbers written before 1.1.41 are the old ones** (code comments, test names, older docs and changelog text;
+  new = old + 9 from old 1.1.24 on). The table is at the top of `CHANGELOG.md`.
 
-## Every update (checklist)
-1. Raise the version in `package.json` (third digit).
-2. `src/about.js`: set `LAST_UPDATED`, and keep the in-app feature list (`FEATURES`) in step with any feature you add or change: one or two short sentences per item. The app shows no version history since 1.1.41 (the owner's wish): it is only in the changelog.
-3. `CHANGELOG.md`: the entry at the top: a one-line summary, then the details. It keeps only the two newest versions: move the oldest one into `CHANGELOG-archive.md` (top of its list).
-4. `ai-context/CONTEXT.md`: the "Last updated" line, plus the one `ai-context/` file whose topic changed (new feature → `feature-map.md`; new field or setting → `data-model.md`; a new rule or trap → the matching file).
-5. `HOW TO INSTALL.txt` and `build.bat`, only if they mention the version or file name (neither hard-codes it since 1.1.5).
-6. `npm test`. The owner then runs `build.bat` to try it, and `release.bat` to send it to everyone.
-7. If files go into the owner's folder through the desktop app, verify each one on the device (see Pitfalls). If his build then stops with `EBUSY ... app.asar`, the app is still running (`build-and-release.md`).
+## Before you change an area
+These rules have bitten before. When your change touches the files in the first column, follow the rule and read the
+full rules where the last column points.
+
+| Area (files) | The rule | Full rules |
+|---|---|---|
+| Voice recordings (`main/recordings.js`, `rec:*`) | A recording is on disk while it is made (`<name>.part` + `<stem>.rec.json`). Anything that ends it (close, lock, quit, crash) keeps it as a 🎤 chip; only the X throws it away. The sweep keeps files with a `.rec.json`; code never deletes one by hand. | `data-model.md` → "Voice recordings"; `architecture.md` → "Recording while a note gets locked" |
+| Voice to text (`main/stt-*.js`, `main/ipc-stt.js`, `src/engine/`, `src/note/speech.js`) | A job never outlives its note window, and nothing goes to a hidden one (`mayShow`); main never writes text into a note. The engine's session blocks every non-`cosmomodel:` request; `cosmomodel://` serves only `route`'s fixed list. A new library file = `LIB_FILES` + `IMPORT_MAP`; a model change = `main/stt-models.js` only (with its sha256). The `.stt-pending` marker is never saved (`collect`). | `architecture.md` → "Voice to text" |
+| Reminders (`main/reminders.js`, `src/reminders.js`, `src/remind-ui.js`, `src/note/remind.js`) | `src/reminders.js` is the one rules file (both windows, main, store.js); main keeps the one clock, no timer in a window. `remindMsg` is a secret field. A hidden note gets only Snooze / Done, and only when its reminder's `unlock` is off. The panel has one fixed size: a new row needs a new height. | `architecture.md` → "Reminders"; `ui-gotchas.md` → "The reminders panel never moves" |
+| Tags (`src/tags.js`, `list:tags`, `note:tags`, `main/ipc-tags.js`) | A secret field: `[]` on the card and to a hidden window. Changed only by add / remove, never in a note's save (not in `EDITABLE`). A group's tags count for everything inside it (list `tagsOfNote`). Renaming / deleting a tag everywhere reaches a hidden note or shut group only with the PIN (`pinCheck`). | `data-model.md` (note fields, groups); `architecture.md` → "Locks and hidden notes" |
+| App pins (`main/app-pin.js`, `note.pinApps`, `src/note/pin-apps.js`) | Code that shows note windows or sets on-top leaves `appHidden` / `appBehind` windows as they are (`enforcePinned` skips them, `onTop(n, win)`) or shows them as a peek (`appPin.peek`). While its apps are away a note is minimised, not hidden (1.4.28: it stays in the taskbar); anything that restores it shows it until the focus leaves (`restored`). A window list that can't be read shows every note. The watch rests while one of our windows has the focus (`focusMoved`): checks run only while another app is in front. | `architecture.md` → "App pins" |
+| Window order (`win:touch`, `barOut`, `main/ink-geometry.js`) | The window touched last is on top, pinned notes above the rest: every page sends `touch` on a press (main `touchNote` / `liftBars`). A new window outside a note is made with `barOut` and has its kind in `BAR_FRAMES` / `BAR_KINDS`. A note window's menus are its own `showMenu` (kind `'more'`; the text's lines come from main by id: `note:ctx`), never a native `Menu`. | `architecture.md` → "Which window is on top" |
+| Top bar (`src/note/top-bar.js`) | A new button gets its place in `ORDER` and a line in `ITEMS`, or it never moves into » and a small note's bar runs over. Buttons leave the bar only through `ORDER`, never by a width rule in CSS. | `ui-gotchas.md` → "Sizes and bars" |
+| List cards (`src/list/cards.js`) | A changed note keeps its card (`refreshCard`): a handler on the card element reads the note live (`noteById`), never the `n` it was built from. | `ui-gotchas.md` → "List cards stay" |
+| Editor formatting (`src/note/content.js` `ALLOWED` / `RICH`) | A new tag or look also goes into store.js `CARD_TAGS` / `cardLook` and `src/list/cards.js` `runCss` (`store.test.js` fails until it does). | `feature-map.md` → "A card's words" |
+| Zoom (mouse or screen px turned into sizes inside a note) | Divide by `zoomNow()`. Zoom is CSS `zoom` on `#sheet`; Electron's page zoom is shared by every note. | `feature-map.md` → "Zoom inside a note" |
+| Font sizes (`font[face]`, `note-base.css`) | A font never changes a size: one text size, line height and box for every note font, letters matched by `font-size-adjust`. A `font[face]` rule sets no `font-size` and no bigger line-height. | `ui-gotchas.md` → "Font sizes" |
+| Ink (`src/note/draw-over.js`, `ink-out.js`) | Saved points stay exactly as they are: thinning or re-smoothing makes drawings drift ("dance") a little more on every pass. | `ui-gotchas.md` → "Drawing" |
+| Effects (`src/fx/`) | A new effect or follower has its id in its `effects-*` / `followers-*` file, `ORDER` in `engine.js` and `store.js`. It draws on the shared canvas loop and works with `m === null`; no `Path2D`, per-particle DOM or CSS animation, per-frame `createRadialGradient` / `filter`. | `effects.md` |
+| Colours (pop-ups, paper) | Pop-ups use the `--pop-*` variables. A note's (and card's) paper is day `--d-*` mixed with evening `--e-*` by `--eve`: set `--d-*`, never `--paper`. Evening shades live only in `src/evening.js` (a new light paper needs one). | `ui-gotchas.md` → "Pop-up colours"; `architecture.md` → "Evening colours" |
+| Per-note settings (store.js `OVERRIDES`) | One table says what a note can change for itself (and what "Use on all notes" puts back). A new one also needs `OWN` (list/settings-menus.js), a `.reapply` row (list.html) and the note's `onLook` keys (lock-zoom.js). | `feature-map.md` → "Use on all notes" |
+
+## Where to read more
+`ai-context/CONTEXT.md` is the map: what the app is, the folder layout, and which part file holds what. Then open only
+the topic file the task needs:
+
+| You are… | Open |
+|---|---|
+| changing `main.js`, `main/`, `preload.js`, IPC, windows, the tray, security, locks / hidden notes | `architecture.md` |
+| adding or changing a note field, a setting, backups, the Bin, groups or ink data | `data-model.md` |
+| looking for where a feature lives (function, element id, CSS) | `feature-map.md` |
+| working on the note editor, toolbars, pop-ups, drawing, the notes list or its cards | `ui-gotchas.md` |
+| touching effects or mouse followers (`src/fx/`) | `effects.md` |
+| building, packaging, releasing, Node / Electron versions, Smart App Control, build errors | `build-and-release.md` |
+| writing or running tests, or checking the UI by eye | `testing.md` |
+| splitting a big file into parts | `splitting-code.md` |
 
 ## Saving tokens (these files are big)
-- **Never read a big file whole:** `CHANGELOG-archive.md` (~140 KB). The note window's code is in `src/note/` since 1.1.44 (sixteen parts since 1.4.11, 3–30 KB; `CONTEXT.md` says which holds what; `src/note.js` is only a note). `main.js` is small since 1.1.27: the main-process code is in `main/` (`CONTEXT.md` says what is where; grep a function name there). The notes list's code is in `src/list/` since 1.1.28 (seven parts, 11–25 KB; `CONTEXT.md` says which holds what; `src/list.js` is only a note). Grep for the name first (`ai-context/feature-map.md` lists them), then read only those lines. Each file is split into sections by comment headers (`// ----…` in JS): grep them for an outline. The styles were split in 1.1.26 into `src/css/note-*.css` and `src/css/list-*.css` (5–20 KB each; `CONTEXT.md` says what is where): grep `src/css/` for a selector to find its file. The effects are split into `src/fx/*.js` (9–34 KB each): `ai-context/effects.md` says which file holds what; open only that one. Never open `src/engine/lib/` (Transformers.js and ONNX Runtime, vendored, up to 27 MB): its `README.md` says what is there.
-- **Never list the folder recursively** (it walks `node_modules`): list the one folder you need.
-- **Adding a version entry:** read only the top of `CHANGELOG.md` and insert the new entry there. Don't open `CHANGELOG-archive.md` unless you need old history.
-- **Tests:** open only the area's test file (its first lines say what is in it), to add a check or when it fails; run only it while working (`npm test -- groups`).
-- **Previews for the owner's picks:** update the existing preview page (a new version of the same artifact) instead of building a new page each round, and show only the options still being decided.
+- **Grep first, then read only those lines:** `feature-map.md` lists the names; every code file is cut into sections by
+  comment headers (`// ----…` in JS: grep them for an outline). `CONTEXT.md` says which part of `main/`, `src/note/`,
+  `src/list/` and `src/css/` holds what; `effects.md` does the same for `src/fx/`. Find a selector by grepping `src/css/`.
+- **Read only for old history:** `CHANGELOG-archive.md` (~140 KB). **Never open** `src/engine/lib/` (Transformers.js and
+  ONNX Runtime, vendored, up to 27 MB; its `README.md` says what is there).
+- **List one folder at a time** (a recursive listing walks `node_modules`).
+- **A version entry:** read only the top of `CHANGELOG.md` and insert the new entry there.
+- **Tests:** open only the area's test file (its first lines say what is in it).
+- **Previews for the owner's picks:** a new version of the same artifact each round, showing only the options still being
+  decided.
 
-## Where to read more (open only what the task needs)
-`ai-context/CONTEXT.md` is the map: what the app is, the folder layout, and which file to open for which job.
-`architecture.md` (processes, IPC, security, locks) · `data-model.md` (files on disk, note fields, settings, groups) ·
-`feature-map.md` (feature → code) · `ui-gotchas.md` (editor, toolbars, list) · `effects.md` (`src/fx/`) ·
-`build-and-release.md` (build, Smart App Control, saving files) · `testing.md` · `splitting-code.md` (before splitting a big file).
+## Saving into the owner's folder
+- **A write through the folder bridge (`device_commit_files`) can report success and leave the OLD file** (seen in
+  1.1.23). After every commit, stage the file back and compare its sha256 (or size) with what you meant to save
+  (`force: true` if the mtime guard blocks a re-commit). Tell the owner about any write that did not land.
+- Inspect `app.asar` only with shell tools: the Claude desktop app's file tools keep it open and the next build fails
+  with `EBUSY`.
+
+## Every update (checklist)
+Done = every step, in order. `release.test.js` fails until steps 1–4 agree.
+1. Raise the version in `package.json` (third digit).
+2. `src/about.js`: set `LAST_UPDATED`, and keep the in-app feature list (`FEATURES`) in step with any feature you add or
+   change: one or two short sentences per item. The app shows no version history: it is only in the changelog.
+3. `CHANGELOG.md`: the new entry at the top (a one-line summary, then the details). It keeps only the two newest
+   versions: move the oldest one to the top of `CHANGELOG-archive.md`'s list.
+4. `ai-context/CONTEXT.md`: the "Last updated" line, plus the one `ai-context/` file whose topic changed (new feature →
+   `feature-map.md`; new field or setting → `data-model.md`; a new rule or trap → the matching file).
+5. `npm test`: 0 failed.
+6. Every file sent to the owner's folder is verified on the device (above). Then the owner runs `build.bat` to try it and
+   `release.bat` to send it. If his build stops with `EBUSY ... app.asar`, the app is still running
+   (`build-and-release.md` → "Build errors").
 
 ## Keeping these docs useful
-Write down what the code does not make obvious: where something lives, a rule, a trap, a decision of the owner's.
-Version-by-version history belongs in `CHANGELOG.md`, not here. Don't copy long how-it-works prose into this file.
+- Write down what the code does not make obvious: where something lives, a rule, a trap, a decision of the owner's. Put
+  it in the one `ai-context/` file for its topic; it goes here only when it bites across areas (then as one row above).
+- Write rules in the present tense. Version-by-version history belongs in `CHANGELOG.md`.
+- Leave what one lookup answers to the lookup (`package.json` scripts, `.gitattributes`, a file's header comment).

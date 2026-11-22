@@ -42,7 +42,7 @@ if (app.phase === 'new-pin') {
     await ui.menu(ui.noteKey(A), 'Lock again');
     assert.ok(/Bank/.test(await ui.text(ui.noteKey(A))) && !/secret title/.test(await page.content()), 'locked again: the card shows it');
     // Settings → Locked notes
-    await ui.tab('settings');
+    await ui.section('privacy'); // 1.4.25: Locked notes is in Privacy
     assert.ok(/encrypted on this device/.test(await ui.text('#cryptInfo')));
     assert.ok(!(await ui.visible('#pinWarn')), 'an 8-digit PIN: no warning');
     assert.ok(await ui.visible('#cryptForgot') && await ui.visible('#cryptToggle') && !(await ui.visible('#cryptNow')));
@@ -82,7 +82,7 @@ if (app.phase === 'old-pin') {
     assert.ok(!(await ui.modalOpen()));
     const data = await ui.get();
     assert.ok(data.settings.crypt.setUp && !data.settings.crypt.needPin, 'encrypted now');
-    await ui.tab('settings');
+    await ui.section('privacy');
     assert.ok(/encrypted on this device/.test(await ui.text('#cryptInfo')));
     assert.ok(await ui.visible('#pinWarn'), 'a 4-digit PIN: the warning');
     await ui.done();

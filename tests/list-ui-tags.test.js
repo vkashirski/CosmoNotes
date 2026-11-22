@@ -3,7 +3,7 @@
 // locked note's stay hidden), cards' own tags, picking one or several (All / Any, saved), a group's tags count for what is
 // inside it (the group card shows, its notes too), #tag typed in the search (with words), a card's tag picks it, Escape and
 // opening a group forget them, the Favourites and Locked tabs, right-click → Tags… (add, suggestions) and the selection bar's Tags
-// (several: faded ones only some have).
+// (several: faded ones only some have). 1.4.30: a tag's colour on its chip and cards.
 const assert = require('assert');
 
 (async () => {
@@ -30,11 +30,36 @@ const assert = require('assert');
   assert.deepEqual(await page.$$eval(`${ui.noteKey(MILK)} .ctag`, (x) => x.map((e) => e.textContent)), ['#home', '#urgent'], 'a card shows its own tags');
   assert.equal(await ui.count(`${ui.noteKey(DIARY)} .ctag`), 0, 'a locked card shows none');
   assert.deepEqual(await page.$$eval(`${ui.groupKey(KITCHEN)} .ctag`, (x) => x.map((e) => e.textContent)), ['#home'], 'a group card shows its tags');
+  // 1.4.30: a tag's colour (Manage tags in a note) on its chip under the search and on the cards; the others as before
+  const lw = ui.E.__all.find((w) => w.file && w.file.endsWith('list.html') && !w.destroyed);
+  assert.ok((await ui.H['tags:color']({ sender: lw.webContents }, 'work', 'blue')).ok);
+  await ui.settle(150);
+  assert.ok(((await page.getAttribute(chip('work'), 'style')) || '').includes('background'), 'its chip has its colour');
+  assert.ok(((await page.getAttribute(`${ui.noteKey(REPORT)} .ctag:has-text("#work")`, 'style')) || '').includes('background'), 'and its card');
+  assert.equal(await page.getAttribute(chip('home'), 'style'), null, 'a tag without one looks as before');
 
   // ---- pick one, then two: All, then Any
-  await ui.click(chip('urgent'));
+  // 1.4.31 (the owner's wish): the press shows at once, the cards follow under a spinner (list/cards.js filterSoon)
+  const right = await page.evaluate(() => {
+    const before = document.querySelectorAll('#cards .card').length;
+    [...document.querySelectorAll('#tagRow .tagchip')].find((c) => c.firstChild.textContent === '#urgent').click();
+    return { lit: document.querySelector('#tagRow .tagchip.on') && document.querySelector('#tagRow .tagchip.on').textContent,
+      spin: document.querySelector('#filterSpin').classList.contains('on'), faded: document.querySelector('#cards').classList.contains('filtering'),
+      same: document.querySelectorAll('#cards .card').length === before };
+  });
+  assert.deepEqual(right, { lit: '#urgent2', spin: true, faded: true, same: true }, `lit at once, the spinner on, the cards not yet (${JSON.stringify(right)})`);
+  await ui.settle();
+  assert.ok(!(await page.$eval('#filterSpin', (e) => e.classList.contains('on'))) && !(await page.$eval('#cards', (e) => e.classList.contains('filtering'))), 'filtered: the spinner goes');
   assert.deepEqual(await shown(), [MILK, REPORT].sort(), 'one tag: what has it');
   assert.deepEqual(await chips(), ['#urgent*', '#home', '#work'], 'the picked one first, lit');
+  // 1.4.30 (the owner's wish): easy to tell which: a tick on it (a coloured one gets a ring too), the others fade
+  assert.equal(await page.$eval(chip('urgent'), (c) => getComputedStyle(c, '::before').content), '"✓"', 'the picked one has a tick');
+  assert.ok(Number(await page.$eval(chip('home'), (c) => getComputedStyle(c).opacity)) < 0.6, 'the others fade');
+  assert.ok(Number(await page.$eval(chip('urgent'), (c) => getComputedStyle(c).opacity)) === 1);
+  await ui.click(chip('work'));
+  assert.ok((await page.$eval(chip('work'), (c) => getComputedStyle(c).boxShadow)) !== 'none', 'a coloured one picked: a ring');
+  assert.ok((await page.$eval(chip('work'), (c) => getComputedStyle(c).boxShadow)).includes('inset'), 'inside the chip, never cut off by the row');
+  await ui.click(chip('work'));
   assert.ok(!(await ui.visible('#tagRow .tagmode')), 'All / Any only with two or more');
   await ui.click(chip('home'));
   assert.deepEqual(await shown(), [MILK], 'All: both tags');
@@ -47,6 +72,7 @@ const assert = require('assert');
   assert.deepEqual(await shown(), [MILK, KITCHEN, SPOONS].sort(), '#home: the group’s tag counts for its note');
   await ui.click('#tagRow .tagclear');
   assert.deepEqual(await chips(), ['#home', '#urgent', '#work'], 'the X drops them all');
+  assert.equal(Number(await page.$eval(chip('home'), (c) => getComputedStyle(c).opacity)), 1, 'none picked: none faded');
   assert.ok((await shown()).includes(LOOSE) && !(await shown()).includes(SPOONS), 'back to the normal view');
 
   // ---- typed in the search: #tag (its start), with words

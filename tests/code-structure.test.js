@@ -145,7 +145,7 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
   const want = ORDER.map((n) => `fx/${n}.js`);
   const SHARED = ['evening.js', 'reminders.js', 'remind-ui.js', 'tags.js']; // 1.3.27 evening colours; 1.4.1 reminders (rules, then the panel); 1.4.10 tags
   assert.deepEqual(tagsIn('note'), [...want, ...SHARED, ...src.files.note], 'note.html: the effects, the evening colours, the reminders, then its own code');
-  assert.deepEqual(tagsIn('list'), ['about.js', ...want, ...SHARED, ...src.files.list], 'list.html: about.js, the effects, the evening colours, the reminders, then its own code');
+  assert.deepEqual(tagsIn('list'), ['about.js', ...want, ...SHARED, 'tab-icons.js', ...src.files.list], 'list.html: about.js, the effects, the evening colours, the reminders, the tab icons (1.4.33, list only), then its own code');
   // 1.3.27: src/evening.js is shared by both windows and main: strict, LF, only window.COSMO_EVENING in a window, module.exports in Node
   const eve = read('src/evening.js');
   assert.ok(eve.startsWith("'use strict';") && isLF(eve), 'src/evening.js: strict, LF');
@@ -171,6 +171,15 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
   vm.runInContext(tg, tbox, { filename: 'src/tags.js' });
   assert.deepEqual(Object.keys(tbox.window).filter((k) => k !== 'window'), ['COSMO_TAGS'], 'src/tags.js: only COSMO_TAGS on window');
   assert.equal(typeof require('../src/tags').cleanAll, 'function', 'src/tags.js: main and store.js require it');
+  // 1.4.33: src/tab-icons.js the same way (window.COSMO_TAB_ICONS; store.js requires it), only in the list window
+  const ti = read('src/tab-icons.js');
+  assert.ok(ti.startsWith("'use strict';") && isLF(ti), 'src/tab-icons.js: strict, LF');
+  const ibox = { window: {} }; ibox.window.window = ibox.window; vm.createContext(ibox);
+  vm.runInContext(ti, ibox, { filename: 'src/tab-icons.js' });
+  assert.deepEqual(Object.keys(ibox.window).filter((k) => k !== 'window'), ['COSMO_TAB_ICONS'], 'src/tab-icons.js: only COSMO_TAB_ICONS on window');
+  const TI = require('../src/tab-icons');
+  assert.equal(TI.IDS.length, 40, 'the owner\'s 40 tab icons');
+  assert.deepEqual(TI.FIXED, { favs: 'star', locks: 'lock', bin: 'trash' }, 'Favourites, Locked and the Bin keep their icons');
   assert.deepEqual(src.files.fx, want, 'the tests load what the windows load');
   assert.deepEqual(fs.readdirSync(path.join(SRC, 'fx')).sort(), want.map((f) => f.slice(3)).sort(), 'every file in src/fx/ is loaded');
   const sandbox = { window: {}, document: { hidden: false, createElement: () => ({ width: 0, height: 0, getContext: () => fake('ctx') }) }, performance: { now: () => 0 },

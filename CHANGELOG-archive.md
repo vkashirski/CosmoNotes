@@ -6,6 +6,190 @@ file (`tests/release.test.js` checks that every version is in one of the two fil
 Renumbered in 1.1.41: each heading says its old number (the table is at the top of `CHANGELOG.md`). Version numbers inside
 the entries are the old ones.
 
+## 1.4.31 – 22 November 2026
+
+Filtering the notes list by a tag feels quicker: the tag lights up at once and a spinner shows while the notes are
+filtered. A picked coloured tag's ring is no longer cut off (the owner's wishes).
+
+- **At once, then the notes** (`list/cards.js` `setTagPick`, `filterSoon`, `filterDone`): a press on a tag under the
+  search (or on a card's tag, the X, All / Any) paints only the tag row, fades the cards and turns a spinner
+  (`#filterSpin`, list.html; `list-base.css`); after the browser has painted that (a frame, then a turn), `render()`
+  filters the cards. Presses in a row: only the last one filters. `render()` always ends the spinner, so a refresh from
+  main in between ends it too. The spinner fades out, so a quick filter doesn't flash.
+- **The ring** (`list-base.css` `.tagchip.tc.on`): inside the chip (`inset`). The outer ring of 1.4.30 was cut off by the
+  tag row, which scrolls sideways.
+- **Tests:** `list-ui-tags.test.js` (lit at once with the cards not yet changed, the spinner on, then off; the ring inset).
+
+## 1.4.30 – 22 November 2026
+
+Tags work like GitHub labels: every tag can be controlled from any note. The ⋯ menu's Tags (now under See-through)
+shows every tag to press, and **+ Add** opens Manage tags, a pop-up of its own, to rename, colour, make or delete a tag in
+every note and group (the owner's picks). A tag on a locked note can only be renamed or deleted with the PIN (the owner's
+rule).
+
+- **The ⋯ menu's Tags** (`src/tags.js` `picker`, `src/note/tags.js`, `note.html`): under See-through (it was under
+  Colour). Every tag (main `tags:all`) as a chip in its colour, A to Z: this note's lit, the rest greyed; a press adds or
+  removes it (`note:tags`, as before). It replaces the chips + suggestions row (`note:tags-known` and main's `knownTags`
+  are gone). The list's Tags pop-up keeps its editor.
+- **Manage tags** (`#tagPop`, `src/tags.js` `manager`): opened by + Add, placed like Other settings and draggable out of
+  the note (window kind `tags`, `cosmoTagBar`, focusable for its fields: `main/ink-geometry.js`, `ink-out.js`). Find a
+  tag, each with its notes, a pencil (name + colour; a name already there joins the two) and × (confirm in place: "The
+  notes stay. Only the tag goes."). "+ New tag" makes one and puts it on the note it was opened from. Main:
+  `main/ipc-tags.js` (`tags:color`, `tags:rename`, `tags:delete`): every note (the Bin too) and group, open windows told
+  (`pushLook`), not an edit.
+- **Locked notes** (`ipc-tags.js` `lockedHas`, `pinCheck`): when a note or group whose lock hides it has the tag (or a note
+  is still sealed, so its tags can't be read), renaming or deleting needs the PIN. The row asks for it; a wrong one waits
+  450 ms like every PIN check. With the right one the change reaches the locked notes too; they stay locked and sealed.
+  `tags:all` counts only what shows. A hidden note window gets no tags and changes none.
+- **Colours** (`src/tags.js` `COLORS`, `chipStyle`; `settings.tagColors`): 8 (Dark = the usual pill). On the note's rows,
+  the list's tag row, card pills (`cards.js`; a colour change builds the cards again: `tagLook` in their signature) and the
+  list's Tags pop-up. A coloured tag's name is in settings.json in plain text (only tags given a colour or made there).
+- **The list's tag row** (`list-base.css`, `cards.js` `paintTagRow`): a picked tag has a tick (a coloured one a ring too),
+  and while some are picked the others fade, so it's easy to tell what the list is filtered by (the owner's wish).
+- **Tests:** `tags.test.js` (tags:all, colour, rename + join, delete, the Bin and groups, the PIN with a locked note, sealed
+  after a restart), `note-ui-tags.test.js` (Tags under See-through, lit / greyed, Manage tags), `safety.test.js` (the new window kind), `list-ui-tags.test.js` (colours).
+  `note-ui-bar.test.js`: the rename pencil check sets `bar-hover` the way main does since 1.4.29 (the old mouse move
+  over the note no longer shows it, so that test failed).
+
+## 1.4.29 – 22 November 2026
+
+The rename pencil shows only while the mouse is over the top bar. It used to stay for about a second after the mouse left
+(the owner's wish).
+
+- **Cause:** the top bar is a drag area (`-webkit-app-region: drag`), and Windows doesn't tell a page about the mouse over
+  one. The pencil was tied to `body:hover`, which goes stale when the mouse leaves through the bar, so it faded out after
+  a 0.9 s delay as a workaround. Now `main/bar-hover.js` asks for the mouse itself (`screen.getCursorScreenPoint`, every
+  100 ms, started in `main.js`) and sends `note:bar-hover` to a note's window only when the mouse goes onto or off its
+  top 32 px. `src/note/top-bar.js` puts `bar-hover` on the body (`api.onBarHover` in `preload.js`) and `note-base.css`
+  shows `#btnRename` with it, no delay. The undo arrow still stays for its 8 s.
+- **Tests:** `windows.test.js` (onto the bar: told once; along it: nothing more; down into the note, beside it, above it:
+  off). Only a real Windows PC can confirm the mouse position over the drag area, and a note under another note's bar
+  counts as under the mouse too.
+
+## 1.4.28 – 22 November 2026
+
+A note pinned over apps is minimised while its apps are away, not hidden, so it stays in the taskbar. Settings: the
+version line is at the bottom of the sidebar, "New notes" is "Notes" and has click-through, and the picked button of a
+row and an off switch are easier to see on every theme (the owner's wishes).
+
+- **App pins** (`main/app-pin.js`, `main/note-window.js`): while none of a note's apps is open (closed or minimised),
+  the note is minimised (`minimise`: `setMinimizable(true)` + `minimize()`, like its own button) instead of
+  `win.hide()`, which took it off the taskbar as if closed. It fades out rising as before, is put back while it can't
+  be seen, then minimises. Coming back: `showInactive` restores it (no focus), clear, then it drops in. A click on it in
+  the taskbar brings it back on top (`restored`, from the window's `restore`), until the focus leaves while its apps are
+  still away. A note that opens while its apps are away starts minimised. The `minimize` handler leaves `appHidden`
+  ones minimised (pinned notes otherwise never minimise). Only a real Windows PC can confirm that `showInactive`
+  restores a minimised window without taking the focus.
+- **Settings** (`src/list.html`, `list-settings-fx.css`): "CosmoNotes 1.4.28 - Made with love." moved from About to the
+  bottom of the sidebar, under a thin line (small and centred on the narrow rail). The New notes section is **Notes**
+  (`data-sec="notes"`); Click-through moved there from General, after Colour and Font. Its lead says the colour and font
+  are for new notes.
+- **Clearer switches and rows** (`list-cards.css`, `note-toolbars.css`): the picked button of a row (`.seg`, e.g. Voice
+  to text's "Words appear", the fonts, card sizes) is filled with ink (`--ink` / `--pillfg`; in a note `--pop-pick`).
+  It was the panel's own colour, so it vanished on the panel and read as the one not picked. An off switch has a thin
+  rim (`--mute`), so its shape shows on light tints and dark panels.
+- **Tests:** `app-pins.test.js` (minimised, still in the taskbar; back from the taskbar until the focus leaves; opens
+  minimised), `list-ui-settings.test.js` (the sections, the version line, click-through under Notes, the picked button
+  stands out). `tests/fake-electron`: `show` / `showInactive` restore a minimised window and `isVisible` is false while
+  minimised, as in Electron on Windows.
+
+## 1.4.27 – 22 November 2026
+
+Other settings' second heading is "Other" (it said "Evening and panic"; the owner's wish).
+
+- `src/note.html` `#ckOwnH`. Evening colours still show only on light papers: dark papers have no evening shade, so on a
+  dark note only the panic switch is under it (and no heading at all while the panic button is off).
+
+## 1.4.26 – 22 November 2026
+
+The ⋯ menu is shorter: Tags are under Colour, and evening colours and the panic button moved with the checklist switches
+into one pop-up, Other settings…. A note can be renamed from its top bar: a pencil next to the title (the owner's idea).
+
+- **The ⋯ menu** (`src/note.html` `#menu`): Title, Colour, **Tags** (was above Colour), See-through, solid on hover,
+  Effects…, **Other settings…** (was Checklists…; `#miChecks`), Duplicate / Lock / Delete, the dates. Its value says
+  "N changed" when this note has its own choices, and nothing when all is as in Settings (it said "As in Settings").
+- **Other settings** (`#ckPop`, was the Checklists pop-up): Checklists (the three switches) and "Evening and panic"
+  (`#eveRow`, `#panicRow`, moved from the ⋯ menu; the heading hides when neither shows). Use Settings now puts back all
+  five (`setChecks(…, { evening: null, panic: null })`, `src/note/checklists.js`). Its window title is "Other settings".
+- **Rename from the bar** (`src/note/top-bar.js`, `note-base.css`): a pencil (`#btnRename`) right after the title shows
+  while the mouse is over the note (it fades late: Windows doesn't tell the page about the bar's drag area). It opens a
+  field (`#titleEdit`) in the title's place: Enter or a click away keeps it, Esc puts it back. It saves through the ⋯
+  menu's title field, so a title is saved one way. After a rename the pencil is an undo arrow for 8 seconds, kept in the
+  bar even when the new title is long. No title yet: "Add a title". Never while a locked note's words are hidden. The
+  title stays a drag area (dragging, double-click = maximise, snapping as before); the title is now as wide as its words
+  and `.barfill` takes the rest of the bar. On a small note the pencil goes into » after Maximise, Minimise, + and All
+  notes, as "Rename…".
+- **The feature list** (`src/about.js`): renaming from the bar; checklists, evening colours and the panic button for one
+  note in ⋯ → Other settings….
+- **Tests:** `note-ui-bar.test.js` (the pencil, the field, Enter / Esc / a click away, the undo arrow, » on a small note,
+  none while hidden), `note-ui.test.js` (Tags under Colour, Other settings with evening and panic, Use Settings).
+
+## 1.4.25 – 21 November 2026
+
+Settings is a sidebar of sections, one shown at a time, like Windows Settings (the owner's pick from a mock of three
+layouts). It replaces the 15 folded sections on one long page.
+
+- **The sections** (`src/list.html`): General · New notes · Look & effects · Writing · Reminders · Privacy · Your notes ·
+  About, in a sidebar (`#setNav`, each button's `data-sec` = its `.setsec`). General shows first; the section stays while
+  CosmoNotes runs. Up / Down in the sidebar go to the section above or below. Switching is instant (no animation).
+- **Wide or narrow** (`list-settings-fx.css`, CSS only): from 560 px wide, the sidebar shows the names with the search
+  above them; under it (the window opens at 420 px), a slim rail of icons with short names, the search over the section.
+- **What moved:** Click-through is in General; the panic button and locked notes in Privacy; backups, the notes folder
+  and "Notes with their own settings" (was in General) in Your notes. New notes and Reminders are split into two panels
+  each (Colour / Font and see-through; Sound / Setting a reminder); their how-to lines lead the section. A panel's name is
+  a small heading; the section's name is the big one. About's heading says "CosmoNotes".
+- **Search** (`findSettings`, `list/actions-locks.js`): shows the matching panels of every section, each under its
+  section's name (`#viewSettings.finding`); clearing it, Escape or a click in the sidebar shows the section again. The
+  folds and their code are gone (`setFold`, `.phead` / `.pbody` / `.pinner`).
+- **Updates:** a dot on About in the sidebar too; the tray's "Update to…" opens Settings at About (`showSection`).
+- **The feature list** (`src/about.js`): Settings' sections and search; Settings → Privacy, → Look & effects.
+- **Tests:** `list-ui-settings.test.js` (the sections, one at a time, Up / Down, wide and slim, search across sections),
+  `list-ui-crypt.test.js` (Privacy), the helper's `ui.section()`, `record-list-scenario.js` (the sidebar instead of folds).
+
+## 1.4.24 – 20 November 2026
+
+Clearer texts for reminders: the Reminders rows in Settings are in a better order and say what they do.
+
+- **Settings → Reminders** (`src/list.html`): "Hiding notes" is now "Let reminders hide notes", with the hint "Adds “Hide
+  the note until then” when you set a reminder." (was "Let a reminder hide its note until it goes off.": the switch only
+  lets the reminder panel offer it). It now comes before "Show hidden notes" ("Notes a reminder hides still show in this
+  list, faded."). Jump to the next box: "After you type two digits, the focus goes to the next box." (was "…go on to the
+  minutes", but it also goes on to the seconds).
+- **The reminder panel** (`src/remind-ui.js`): Hide the note until then's hint is "The list’s clock button shows it."
+  (was "Can be unhidden from Settings.": the clock button is the way back to a hidden note).
+- **Click-through** (`src/list.html`): "The note stays on top, and clicks go through it. A button in
+  its top bar turns it off." (was "It
+  pins the note. While it’s on, only its button works.").
+- **The recovery key** (`src/list/actions-locks.js`): "…this key is the only way to open them." (was "…only this key can
+  open them. Nobody else can.").
+- **The feature list** (`src/about.js`): names the setting by its new name.
+- **Tests:** `texts.test.js` (Let reminders hide notes comes before Show hidden notes).
+
+## 1.4.23 – 20 November 2026
+
+A ticked checklist line's strike goes through the middle of the small letters, and Settings → Reminders → Hiding notes
+says what it does more plainly.
+
+- **The strike** (`note-text.css` `::highlight(cn-done)`): the owner found it still a little high. A line-through sits
+  where each font says (Nunito's is above the middle of its small letters) and CSS can't move it, so the strike is now an
+  underline moved up: `text-underline-offset: calc(-0.5ex - 0.75px)` puts the 1.5 px line's middle half an ex above the
+  baseline, the ex of each run's own font and size (the note's `font-size-adjust` included), with no gaps at the letters
+  (`text-decoration-skip-ink: none`). Cards keep their runs' line-through (a run can have its own underline too).
+- **Hiding notes** (`src/list.html`): the hint is now "Let a reminder hide its note until it goes off." (was "A reminder
+  can hide its note until then."; the owner offered "Hide a note until a reminder goes off.": the switch only lets the
+  reminder panel offer it, so it says "let").
+- **Tests:** `note-ui.test.js` (the strike's offset is half of each run's ex, no skip-ink).
+
+## 1.4.22 – 20 November 2026
+
+The Add panel's pictures have their names under them again (the owner's wish: 1.4.21 had pictures only).
+
+- **The Add panel** (`#insert`, `src/note.html`, `note-toolbars.css`): still a row over the bottom bar at its right by +,
+  each tile now a picture with its name (`.tl`, 10.5 px) under it, 56 px wide. Nine don't fit on a 340 px note, so the
+  row wraps (two rows there; one row from about 540 px). The names are the tiles' words again (`addItems`, Add ▸'s lines),
+  not a `title`.
+- **Tests:** `note-ui.test.js` (the tile's name is its words).
+
 ## 1.4.21 – 20 November 2026
 
 Right-click in a note opens its menu at once, Add ▸ is first in it with the Add panel's pictures, the Add panel is a row

@@ -42,17 +42,17 @@ const app = require('./helpers/app');
   E.__perm(null, 'media', (v) => { perm = v; }, { mediaTypes: ['video'] }); assert.equal(perm, false, 'no camera');
   E.__perm(null, 'geolocation', (v) => { perm = v; }, {}); assert.equal(perm, false);
 
-  // ---- extra windows: a note may open its six toolbar / pop-up windows (1.4.18: » 's menu too), nothing else
+  // ---- extra windows: a note may open its toolbar / pop-up windows (1.4.18: » 's menu too; 1.4.30: Manage tags), nothing else
   const open = w.webContents.openHandler;
   assert.equal(open({ url: 'https://example.com', frameName: '' }).action, 'deny', 'other windows stay blocked');
   assert.equal(open({ url: 'about:blank', frameName: 'other' }).action, 'deny');
-  const bars = { cosmoInkBar: { focusable: false }, cosmoTextBar: { focusable: false, title: 'Text' }, cosmoMenuBar: { focusable: true, title: 'Note settings' }, cosmoFxBar: { focusable: false }, cosmoCkBar: { focusable: false, title: 'Checklists' }, cosmoMoreBar: { focusable: false, title: 'More buttons' } };
+  const bars = { cosmoInkBar: { focusable: false }, cosmoTextBar: { focusable: false, title: 'Text' }, cosmoMenuBar: { focusable: true, title: 'Note settings' }, cosmoFxBar: { focusable: false }, cosmoCkBar: { focusable: false, title: 'Checklists' }, cosmoTagBar: { focusable: true, title: 'Manage tags' }, cosmoMoreBar: { focusable: false, title: 'More buttons' } };
   for (const [frameName, want] of Object.entries(bars)) {
     const r = open({ url: 'about:blank', frameName });
     assert.equal(r.action, 'allow', `${frameName} may open`);
     const o = r.overrideBrowserWindowOptions;
     assert.equal(o.parent, w, `${frameName} belongs to its note`);
-    assert.equal(o.focusable, want.focusable, frameName === 'cosmoMenuBar' ? 'the ⋯ menu can take the keyboard' : `${frameName} never takes the focus`);
+    assert.equal(o.focusable, want.focusable, want.focusable ? `${frameName} can take the keyboard` : `${frameName} never takes the focus`);
     if (want.title) assert.equal(o.title, want.title);
   }
   assert.equal(open({ url: 'about:blank', frameName: 'cosmoInkBar' }).overrideBrowserWindowOptions.transparent, true);

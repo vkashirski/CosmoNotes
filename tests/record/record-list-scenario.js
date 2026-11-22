@@ -66,7 +66,7 @@ module.exports = async ({ page, step }) => {
   await step('ctrl+wheel up', async () => { await page.mouse.move(500, 400); await page.keyboard.down('Control'); await page.mouse.wheel(0, -120); await page.clock.runFor(500); await page.mouse.wheel(0, -120); await page.keyboard.up('Control'); });
   await step('ctrl+wheel down', async () => { await page.keyboard.down('Control'); await page.mouse.wheel(0, 120); await page.clock.runFor(500); await page.mouse.wheel(0, 120); await page.keyboard.up('Control'); });
   await step('pointer over an effect card', () => el('#cards .fxc').evaluate((cv) => { const x = cv.parentElement; const r = x.getBoundingClientRect(); for (let k = 0; k < 5; k++) x.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: r.left + 10 + k * 8, clientY: r.top + 20 })); x.dispatchEvent(new PointerEvent('pointerleave', {})); }));
-  await step('colour row arrows', async () => { await tab('settings'); await click('#viewSettings .phead >> nth=1'); await down('.swarr.r'); await click('.swarr.r'); await click('.swarr.l'); });
+  await step('colour row arrows', async () => { await tab('settings'); await click('#setNav [data-sec="notes"]'); await down('.swarr.r'); await click('.swarr.r'); await click('.swarr.l'); });
   await step('colour row wheel + drag', () => el('.swarr.r').evaluate((a) => {
     const v = a.parentElement.querySelector('.sws, .swview') || a.parentElement;
     v.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 120 }));
@@ -220,9 +220,10 @@ module.exports = async ({ page, step }) => {
 
   // ---- Settings
   await step('settings', () => tab('settings'));
-  for (let s = 0; s < 8; s++) await step(`fold ${s}`, () => click(`#viewSettings .phead >> nth=${s}`));
-  await step('fold by key', () => press('#viewSettings .phead >> nth=0', 'Enter'));
-  await step('fold mousedown', () => down('#viewSettings .phead >> nth=0'));
+  // 1.4.25: the sidebar's sections (they replaced the folds)
+  for (let s = 0; s < 8; s++) await step(`section ${s}`, () => click(`#setNav [data-sec] >> nth=${s}`));
+  await step('section by key', () => press('#setNav [data-sec] >> nth=0', 'ArrowDown'));
+  await step('section mousedown', () => down('#setNav [data-sec] >> nth=0'));
   for (const s of ['#sTheme button', '#sColors button', '#sFont button']) {
     for (let k = 0; k < 3; k++) await step(`settings ${s} ${k}`, () => click(`${s} >> nth=${k}`));
   }

@@ -851,12 +851,12 @@ const look = (page) => page.evaluate(() => {
     assert.ok(!/cn-done|highlight/.test(await page.evaluate(() => document.getElementById('editor').innerHTML)), 'nothing of it in the note');
     // boxes of one size: Big words get the note's own box, still beside them; the ⋯ menu's switch shows and changes it
     const sizes = (pg) => pg.evaluate(() => [...document.querySelectorAll('#editor li')].map((l) => parseFloat(getComputedStyle(l, '::before').width)));
-    page = await nu.open({ html: CL, settings: { appTheme: 'cream', checkDrag: true, checkFixed: false } });
+    page = await nu.open({ html: CL, settings: { appTheme: 'cream', checkDrag: true, checkFixed: false } }, 360, 560); // (1.4.26: tall enough to drag Other settings)
     let sz = await sizes(page);
     assert.ok(sz[1] > sz[0] * 1.5, `Settings off: Big words get a big box (${sz})`);
-    // ⋯ → Checklists… (1.3.21): one row in the menu, says whether the note follows Settings; its own pop-up has the switches
+    // ⋯ → Checklists… (1.3.21; 1.4.26: Other settings…): one row in the menu, says whether the note follows Settings; its own pop-up has the switches
     await page.click('#btnMenu');
-    assert.equal(await page.textContent('#miChecksVal'), 'As in Settings', 'the menu row: as in Settings');
+    assert.equal(await page.textContent('#miChecksVal'), '', 'the menu row: nothing while all is as in Settings (1.4.26)');
     assert.equal(await page.isVisible('#ckFixed + i'), false, 'the switches are not in the menu');
     await page.click('#miChecks');
     assert.ok(await page.isVisible('#ckPop'), 'Checklists… opens its pop-up');
@@ -881,8 +881,21 @@ const look = (page) => page.evaluate(() => {
     await page.click('#ckReset'); await page.waitForTimeout(300);
     ck = (await page.updates()).filter((u) => 'checklist' in u).map((u) => u.checklist);
     assert.deepEqual(ck[ck.length - 1], { drag: null, sink: null, fixed: null }, 'Use Settings: the note follows Settings again');
-    assert.equal(await page.textContent('#miChecksVal'), 'As in Settings');
+    assert.equal(await page.textContent('#miChecksVal'), '');
     assert.ok(await page.isChecked('#ckDrag') && !(await page.isChecked('#ckSink')) && await page.isDisabled('#ckReset'), 'the switches show Settings');
+    // 1.4.26 (the owner's wish): ⋯ → Other settings… holds evening colours and the panic button too; 1.4.30 (the owner's pick): Tags under See-through
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('#menu > h4')].map((h) => h.firstChild.textContent.trim()).join(',')), 'Title,Colour,See-through,Tags', 'the ⋯ menu: Tags under See-through');
+    assert.equal(await page.evaluate(() => !!document.querySelector('#menu #eveRow, #menu #panicRow')), false, 'evening and panic are not in the ⋯ menu');
+    assert.equal((await page.textContent('#miChecks > span')).trim(), 'Other settings…', 'the row is called Other settings…');
+    assert.ok(await page.isVisible('#ckPop #eveRow') && await page.isVisible('#ckOwnH'), 'evening colours are in Other settings, under their heading');
+    assert.ok(!(await page.isVisible('#ckPop #panicRow')), 'the panic switch only while the panic button is on');
+    await page.click('label:has(#eveSwitch)'); await page.waitForTimeout(300);
+    assert.equal(await page.textContent('#miChecksVal'), '1 changed', 'this note\'s evening colours count as changed');
+    assert.ok(await page.isVisible('#eveTag') && !(await page.isDisabled('#ckReset')), '"this note" on it; Use Settings can put it back');
+    await page.click('#ckReset'); await page.waitForTimeout(300);
+    const last = (await page.updates()).filter((u) => 'evening' in u).pop();
+    assert.ok(last && last.evening === null && last.panic === null, 'Use Settings: evening and panic follow Settings again too');
+    assert.equal(await page.textContent('#miChecksVal'), '');
     // dragging a pop-up by its grip (1.3.22): many moves in one frame move it once, to the last one
     const drag1 = await page.evaluate(() => new Promise((done) => {
       const pop = document.getElementById('ckPop'); const g = pop.querySelector('.igrip').getBoundingClientRect();
@@ -952,8 +965,8 @@ const look = (page) => page.evaluate(() => {
     const halfBg = await bg();
     assert.ok(halfBg !== eveBg && halfBg !== dayBg, `half way: in between (${halfBg})`);
     await page.evaluate(() => window.__evening(1));
-    // the ⋯ switch: off here (its own), then on again = as in Settings (null)
-    await press(page, '#btnMenu');
+    // the switch (1.4.26: in ⋯ → Other settings…): off here (its own), then on again = as in Settings (null)
+    await press(page, '#btnMenu'); await press(page, '#miChecks');
     assert.ok(await page.isChecked('#eveSwitch') && !(await page.isVisible('#eveTag')), 'on, as in Settings');
     await page.locator('#eveSwitch').evaluate((x) => x.click());
     assert.equal(await page.evaluate(() => document.body.style.getPropertyValue('--eve')), '0', 'off on this note: day colours');
@@ -966,7 +979,7 @@ const look = (page) => page.evaluate(() => {
     assert.ok((await page.getAttribute('#btnPanic', 'title')).includes('(Alt+Z)'), 'its tooltip names the shortcut');
     await press(page, '#btnPanic');
     assert.equal(await page.evaluate(() => window.__panics), 1, 'a click asks main to panic');
-    await press(page, '#btnMenu');
+    await press(page, '#btnMenu'); if (!(await page.isVisible('#ckPop'))) await press(page, '#miChecks');
     assert.ok(await page.isVisible('#panicRow') && await page.isChecked('#panicSwitch'), 'closes with the panic button (as in Settings)');
     await page.locator('#panicSwitch').evaluate((x) => x.click());
     assert.deepEqual((await page.updates()).filter((u) => 'panic' in u).pop(), { panic: false }, 'off: this note stays open');
@@ -975,9 +988,10 @@ const look = (page) => page.evaluate(() => {
     await page.close();
     // panic off, a dark paper: no button, no switches for them
     const dark = await nu.open({ html: '<div>x</div>', color: 'charcoal', settings: { ...S, panicOn: false } }, 360, 520);
-    await press(dark, '#btnMenu');
+    await press(dark, '#btnMenu'); await press(dark, '#miChecks');
     assert.ok(!(await dark.isVisible('#btnPanic')) && !(await dark.isVisible('#panicRow')), 'panic off: no button, no switch');
     assert.ok(!(await dark.isVisible('#eveRow')), 'a dark paper: no evening switch');
+    assert.ok(!(await dark.isVisible('#ckOwnH')), 'and no heading for the two (1.4.26)');
     await dark.close();
   }
   // ---- 1.3.34: click-through; 1.4.11: turned on in the pin's right-click menu, and its button (left of the pin) shows only while

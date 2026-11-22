@@ -19,6 +19,7 @@ const crypto = require('crypto');
 const EVENING = require('./src/evening'); // 1.3.27: the evening colours' times (the same file the windows load)
 const REMIND = require('./src/reminders'); // 1.4.1: reminders (the same rules as main and the windows)
 const TAGS = require('./src/tags'); // 1.4.10: tags on notes and groups (the same rules as main and the windows)
+const TAB_ICONS = require('./src/tab-icons'); // 1.4.33: the icons a tab (and a group) can wear
 
 // Paper colours. 1.1.15 added the colours of the list themes (cream, rose, sage = the Mint theme, mist = Sky,
 // lavender = Lilac, and the dark night, midnight, forest, plum). In this order everywhere colours are shown:
@@ -122,8 +123,36 @@ const DEFAULT_SETTINGS = {
   remindHide: false,
   // 1.4.10: the notes list's tag filter with several tags picked: false = notes with all of them, true = with any of them
   tagAny: false,
+  // 1.4.30: each tag's colour ({ tag: colour id of src/tags.js COLORS }); a tag here exists even on no note (Manage tags).
+  // Plain text, not secret: only tags the owner gave a colour or made there
+  tagColors: {},
+  // the notes list's tabs between Notes (always first) and Settings (always last), in order: { id: 'favs' | 'locks' | 'bin' }
+  // or { group: <id> } (a group pinned as a tab); only Locked can be { hidden: true }. null = the first order (cleanListTabs)
+  listTabs: null,
 };
 // 1.4.1: the reminders' sound in Settings (an id of src/reminders.js SOUNDS or 'none') and how loud (0 – 1, steps of 0.05)
+// the list's tabs (settings.listTabs), cleaned: each known tab once, groups that exist (hasGroup) once, the missing
+// built-in ones added at the end. Notes and Settings are never in it: they always show, first and last.
+const LIST_TABS = ['favs', 'locks', 'bin'];
+const HIDEABLE_TABS = ['locks'];
+// 1.4.33: how a tab shows: its icon and name (the first way), only the icon, or only the name. A group with no icon
+// shows its name whatever this says
+const TAB_SHOWS = ['both', 'icon', 'name'];
+function cleanListTabs(tabs, hasGroup = () => true) {
+  const out = []; const seen = new Set();
+  for (const t of Array.isArray(tabs) ? tabs : []) {
+    if (!t || typeof t !== 'object') continue;
+    const show = TAB_SHOWS.includes(t.show) && t.show !== 'both' ? { show: t.show } : {};
+    if (typeof t.group === 'string' && t.group && !seen.has('g:' + t.group) && hasGroup(t.group)) { seen.add('g:' + t.group); out.push({ group: t.group, ...show }); }
+    else if (LIST_TABS.includes(t.id) && !seen.has(t.id)) {
+      seen.add(t.id);
+      out.push({ id: t.id, ...(HIDEABLE_TABS.includes(t.id) && t.hidden ? { hidden: true } : {}), ...show });
+    }
+    if (out.length >= 60) break;
+  }
+  for (const id of LIST_TABS) if (!seen.has(id)) out.push({ id });
+  return out;
+}
 const cleanRemindSound = (v) => (v === 'none' || REMIND.SOUND_IDS.includes(v) ? v : REMIND.DEFAULT_SOUND);
 function cleanVolume(v) {
   const x = Number(v);
@@ -310,6 +339,7 @@ function normalizeGroup(x) {
     locked: !!x.locked,
     favorite: !!x.favorite, // starred in the notes list (1.1.13)
     tags: TAGS.cleanAll(x.tags), // 1.4.10: its tags count for everything inside it (src/tags.js); not secret, like its name
+    icon: TAB_ICONS.clean(x.icon), // 1.4.33: its icon (src/tab-icons.js) on its tab and its bar in the list; null = none
   };
 }
 
@@ -649,6 +679,7 @@ class Store {
     this.settings.remindSeconds = !!this.settings.remindSeconds;
     this.settings.remindAutoNext = this.settings.remindAutoNext !== false;
     this.settings.remindHide = !!this.settings.remindHide;
+    this.settings.tagColors = TAGS.cleanColors(this.settings.tagColors); // 1.4.30
     this.groups = new Map();
     const g = readJson(this.groupsFile) || readJson(this.groupsFile + '.bak') || {};
     for (const x of Array.isArray(g.groups) ? g.groups : []) {
@@ -660,6 +691,7 @@ class Store {
     }
     // groups made before 1.1.6 count too
     if (this.groups.size) this.settings.madeGroup = true;
+    this.settings.listTabs = cleanListTabs(this.settings.listTabs, (id) => this.groups.has(id)); // groups gone are dropped
     this.load();
   }
 
@@ -1128,4 +1160,4 @@ function backupDayName(name) {
   return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-module.exports = { cleanPinApps, cleanRemindSound, cleanVolume, FONTS, CHECK_OPTS, OVERRIDE_KEYS, overrideCounts, resetPatch, cleanChecklist, checklistMarks, cardRuns, CARD_TAGS, CARD_RUN_KEYS, CARD_SIZE, FONT_PX, dropDeadSizes, pictureWords, picturePlace, lineCount, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };
+module.exports = { cleanListTabs, LIST_TABS, HIDEABLE_TABS, TAB_SHOWS, cleanPinApps, cleanRemindSound, cleanVolume, FONTS, CHECK_OPTS, OVERRIDE_KEYS, overrideCounts, resetPatch, cleanChecklist, checklistMarks, cardRuns, CARD_TAGS, CARD_RUN_KEYS, CARD_SIZE, FONT_PX, dropDeadSizes, pictureWords, picturePlace, lineCount, backupDayName, normalizeInk, Store, COLORS, DARK_COLORS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFx, cleanFxOpacity, GROUP_STYLES, GROUP_COLORS, normalize, localDate, ATT_PREFIX };

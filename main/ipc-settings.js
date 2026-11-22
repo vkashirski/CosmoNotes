@@ -1,6 +1,6 @@
 'use strict';
 const { ipcMain, shell } = require('electron');
-const { FONTS, CHECK_OPTS, OVERRIDE_KEYS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity, resetPatch, cleanRemindSound, cleanVolume } = require('../store');
+const { cleanListTabs, FONTS, CHECK_OPTS, OVERRIDE_KEYS, cleanColors, FX_EFFECTS, FX_FOLLOWERS, FX_AMOUNTS, cleanFxOpacity, resetPatch, cleanRemindSound, cleanVolume } = require('../store');
 const EVENING = require('../src/evening');
 const { PAPER } = require('./constants');
 const { broadcastSettings, spellLanguages } = require('./settings');
@@ -76,6 +76,8 @@ function registerSettingsIpc() {
     if ('remindAutoNext' in patch) S.store.settings.remindAutoNext = !!patch.remindAutoNext; // 1.4.20: on to the next box
     if ('remindHide' in patch) S.store.settings.remindHide = !!patch.remindHide; // 1.4.20: the panel offers hiding
     if ('tagAny' in patch) S.store.settings.tagAny = !!patch.tagAny; // 1.4.10: the list's tag filter, All / Any
+    // the list's tabs: the order, the groups pinned as tabs, Locked shown or not (store.js cleanListTabs)
+    if (Array.isArray(patch.listTabs)) S.store.settings.listTabs = cleanListTabs(patch.listTabs, (id) => S.store.groups.has(id));
     if (patch.listSort && typeof patch.listSort === 'object') {
       const ls = { ...S.store.settings.listSort };
       if (['updated', 'created'].includes(patch.listSort.by)) ls.by = patch.listSort.by;
@@ -89,7 +91,7 @@ function registerSettingsIpc() {
     if (ctChanged) applyClickThroughAll();
     if ('spellCheck' in patch || 'spellCyrillic' in patch || 'listTheme' in patch || fxChanged || checkKeys.length || eveChanged || panicChanged || ctChanged || remindChanged) broadcastSettings();
     // The list already shows a new sort order itself; telling it again made it redraw twice.
-    const onlySort = Object.keys(patch).every((k) => k === 'listSort' || k === 'listSize' || k === 'listTheme' || k === 'tagAny');
+    const onlySort = Object.keys(patch).every((k) => k === 'listSort' || k === 'listSize' || k === 'listTheme' || k === 'tagAny' || k === 'listTabs');
     if (!onlySort) notifyList();
     return true;
   });

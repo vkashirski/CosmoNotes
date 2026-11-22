@@ -18,7 +18,11 @@ contextBridge.exposeInMainWorld('sticky', {
   panic: () => inv('panic:now'), // 1.3.27: the panic button in the top bar
   update: (patch) => inv('note:update', patch),
   tags: (change) => inv('note:tags', change), // 1.4.10: { add: [...], remove: [...] } from the ⋯ menu
-  tagsKnown: () => inv('note:tags-known'), // every tag in use, for its suggestions
+  // 1.4.30: every tag (main/ipc-tags.js): { tags: [{ tag, count, locked }], colors }, and Manage tags' changes
+  tagsAll: () => inv('tags:all'),
+  tagColor: (tag, color) => inv('tags:color', tag, color),
+  tagRename: (from, to, pw) => inv('tags:rename', from, to, pw),
+  tagDelete: (tag, pw) => inv('tags:delete', tag, pw),
   updateSync: (patch) => ipcRenderer.sendSync('note:update-sync', patch),
   newNote: () => inv('note:new'),
   duplicate: () => inv('note:duplicate'),
@@ -27,6 +31,7 @@ contextBridge.exposeInMainWorld('sticky', {
   minimize: () => inv('note:minimize'),
   maximize: () => inv('note:maximize'),
   onWinState: (cb) => ipcRenderer.on('note:win-state', (e, s) => cb(s)),
+  onBarHover: (cb) => ipcRenderer.on('note:bar-hover', (e, on) => cb(!!on)), // 1.4.29: the mouse is over the top bar (main/bar-hover.js)
   hover: (over) => ipcRenderer.send('note:hover', !!over),
   ctAwake: (on) => ipcRenderer.send('note:ct-awake', !!on), // 1.3.34: the mouse is on the click-through button
   pinApps: () => inv('pin:apps'), // 1.4.5: the pin's right-click list: the apps open now (main/app-pin.js)

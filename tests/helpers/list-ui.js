@@ -205,6 +205,8 @@ module.exports = async function openList(seedFn) {
     noteKey: (id) => `#cards [data-key="n:${id}"]`,
     groupKey: (id) => `#cards [data-key="g:${id}"]`,
     tab: (t) => ui.click(`.tab[data-tab="${t}"]`),
+    // 1.4.25: Settings → a section of its sidebar (general, notes, look, writing, reminders, privacy, yournotes, about)
+    section: async (sec) => { if (await page.isHidden('#viewSettings')) await ui.tab('settings'); await ui.click(`#setNav [data-sec="${sec}"]`); },
     async done() {
       await ui.settle();
       if (errors.length) throw new Error('errors in the page:\n' + errors.join('\n'));

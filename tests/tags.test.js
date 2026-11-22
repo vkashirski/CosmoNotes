@@ -3,12 +3,14 @@
 // is inside it), then main's side: list:tags on notes and groups (one or several, add and remove, not an edit, cleaned),
 // the note window's note:tags and the suggestions (note:tags-known), Duplicate, the setting All / Any, a locked note (its
 // tags secret: not on its card, not to its hidden window, no changes; sealed in its file and its backup) and, after a
-// restart, sealed until the PIN. (The list window's side: list-ui-tags.test.js; the ⋯ menu's: note-ui.test.js.)
+// restart, sealed until the PIN. 1.4.30: every tag from any note (main/ipc-tags.js): tags:all, a colour, renaming (and
+// joining two), deleting; in every note, the Bin and groups; with a locked note that has it: only with the PIN.
+// (The list window's side: list-ui-tags.test.js; the ⋯ menu's: note-ui-tags.test.js.)
 const assert = require('assert');
 const app = require('./helpers/app');
 const T = require('../src/tags');
 
-if (app.phase === 'main') app.phases(__filename, ['first', 'second']);
+if (app.phase === 'main') app.phases(__filename, ['first', 'second', 'third']);
 
 // ---- the rules
 if (app.phase === 'first') {
@@ -74,7 +76,8 @@ if (app.phase === 'first') {
     assert.equal((await card(a)).updatedAt, edited, 'still not an edit');
     await H['note:update'](ev(wa), { html: '<div>milk and eggs</div>', text: 'milk and eggs', tags: [] });
     assert.deepEqual((await card(a)).tags, ['ideas'], 'saving the words never changes the tags');
-    assert.deepEqual(await H['note:tags-known'](), ['ideas', 'work'], 'the suggestions: every tag in use, A to Z');
+    const all0 = await H['tags:all'](ev(wa));
+    assert.deepEqual(all0.tags.map((x) => [x.tag, x.count, x.locked]), [['ideas', 1, false], ['work', 1, false]], 'tags:all: every tag in use, A to Z, with its notes and groups');
 
     // ---- Duplicate copies them
     const copy = await H['list:duplicate'](null, a);
@@ -95,7 +98,7 @@ if (app.phase === 'first') {
     await H['list:lock-all']();
     assert.deepEqual((await card(b)).tags, [], 'not on its card while locked');
     assert.equal(await tags(b, { add: ['more'] }), 0, 'no changes while its lock hides it');
-    assert.ok(!(await H['note:tags-known']()).includes('bank'), 'not among the suggestions either');
+    assert.ok(!(await H['tags:all'](ev(app.listWin()))).tags.some((x) => x.tag === 'bank'), 'not in tags:all either');
     await H['list:open-note'](null, b);
     const wb = app.winOf(b);
     const v = await H['note:get'](ev(wb));
@@ -110,6 +113,65 @@ if (app.phase === 'first') {
     assert.ok((await H['list:unlock-all'](null, '2580')).ok);
     assert.deepEqual((await card(b)).tags, ['bank'], 'unlocked: back');
     await H['list:lock-all']();
+
+    // ---- 1.4.30: Manage tags (main/ipc-tags.js)
+    const tagAll = async () => (await H['tags:all'](ev(app.listWin()))).tags;
+    const one = async (t) => (await tagAll()).find((x) => x.tag === t);
+    const edited2 = (await card(a)).updatedAt;
+    assert.equal(await H['tags:all'](ev(wb)), null, 'a hidden window gets no tags');
+    assert.deepEqual(await H['tags:delete'](ev(wb), 'ideas'), { ok: false }, 'and changes none');
+    // a colour: no note changes, a new tag is made on no note
+    assert.deepEqual(await H['tags:color'](ev(app.listWin()), 'ideas', 'blue'), { ok: true });
+    assert.deepEqual(app.readJSON('settings.json').tagColors, { ideas: 'blue' }, 'saved in settings');
+    assert.equal((await app.list()).settings.tagColors.ideas, 'blue', 'the list gets it');
+    assert.equal(app.sent(wa, 'settings:changed').pop().tagColors.ideas, 'blue', 'the note windows too');
+    assert.deepEqual(await H['tags:color'](ev(app.listWin()), 'ideas', 'rainbow'), { ok: false }, 'only its colours');
+    assert.ok((await H['tags:color'](ev(app.listWin()), 'Later On', 'mint')).ok);
+    assert.deepEqual(await one('later-on'), { tag: 'later-on', count: 0, locked: false }, 'a tag made in Manage tags: on no note');
+    assert.equal((await card(a)).updatedAt, edited2, 'a colour is not an edit');
+    // rename: everywhere (the Bin and groups too), its colour goes along; a name already there joins them
+    const c2 = await app.newNote({ html: '<div>old</div>' });
+    await tags([a, c2, G], { add: ['todo'] });
+    await H['list:trash'](null, c2);
+    assert.ok((await H['tags:color'](ev(app.listWin()), 'todo', 'pink')).ok);
+    let r = await H['tags:rename'](ev(app.listWin()), 'todo', 'To Do');
+    assert.ok(r.ok && r.count === 3, `renamed in the note, the Bin and the group (${JSON.stringify(r)})`);
+    assert.ok((await card(a)).tags.includes('to-do') && S.store.get(c2).tags.includes('to-do') && (await app.group(G)).tags.includes('to-do'));
+    assert.deepEqual(app.lastLook(wa).tags, (await card(a)).tags, 'its open window hears it');
+    assert.equal(app.readJSON('settings.json').tagColors['to-do'], 'pink', 'the colour goes with the name');
+    assert.ok(!('todo' in app.readJSON('settings.json').tagColors));
+    await tags(a, { add: ['extra'] });
+    assert.ok((await H['tags:rename'](ev(app.listWin()), 'to-do', 'extra')).ok, 'into a name already there');
+    assert.deepEqual((await card(a)).tags.filter((t) => t === 'extra'), ['extra'], 'joined: once on each note');
+    assert.ok(S.store.get(c2).tags.includes('extra'));
+    assert.equal((await card(a)).updatedAt, edited2, 'renaming is not an edit');
+    // delete: from everything, the notes stay; its colour goes
+    assert.ok((await H['tags:color'](ev(app.listWin()), 'extra', 'green')).ok);
+    r = await H['tags:delete'](ev(app.listWin()), 'extra');
+    assert.ok(r.ok && r.count === 3, JSON.stringify(r));
+    assert.ok(![(await card(a)).tags, S.store.get(c2).tags, (await app.group(G)).tags].some((l) => l.includes('extra')), 'gone everywhere');
+    assert.ok(S.store.get(c2) && !('extra' in app.readJSON('settings.json').tagColors), 'the notes stay, the colour goes');
+    assert.deepEqual((await card(a)).tags, ['ideas'], 'the other tags stay');
+    // a locked note has it: only with the PIN (the owner's rule), and then it changes there too, still sealed
+    await tags(a, { add: ['shared'] });
+    assert.ok((await H['list:unlock-all'](null, '2580')).ok);
+    await tags(b, { add: ['shared'] });
+    await H['list:lock-all']();
+    assert.deepEqual(await one('shared'), { tag: 'shared', count: 1, locked: true }, 'counts only what shows; a locked note may have it');
+    assert.deepEqual(await H['tags:delete'](ev(app.listWin()), 'shared'), { ok: false, error: 'pin' }, 'no PIN: nothing');
+    const waits = app.waited.length;
+    assert.deepEqual(await H['tags:rename'](ev(app.listWin()), 'shared', 'common', '0000'), { ok: false, error: 'wrong' }, 'a wrong PIN: nothing');
+    assert.ok(app.waited.length > waits, 'the pause after a wrong PIN');
+    assert.ok((await card(a)).tags.includes('shared') && S.store.get(b).tags.includes('shared'), 'nothing changed');
+    assert.ok((await H['tags:rename'](ev(app.listWin()), 'shared', 'common', '2580')).ok, 'the right PIN');
+    assert.ok((await card(a)).tags.includes('common') && S.store.get(b).tags.includes('common'), 'in the locked note too');
+    assert.deepEqual((await card(b)).tags, [], 'still hidden on its card');
+    S.store.flush();
+    const sealedNow = app.read(`notes/${b}.json`);
+    assert.ok(JSON.parse(sealedNow).enc && !sealedNow.includes('common'), 'and still sealed in its file');
+    assert.ok((await H['tags:delete'](ev(app.listWin()), 'common', '2580')).ok);
+    assert.ok(!S.store.get(b).tags.includes('common') && S.store.get(b).tags.includes('bank'), 'deleted there, its other tags stay');
+    assert.ok((await H['tags:delete'](ev(app.listWin()), 'later-on')).ok, 'a tag no locked note has: no PIN');
     app.hand({ a, b, G });
     await app.quit();
   }
@@ -123,6 +185,15 @@ if (app.phase === 'first') {
     assert.ok((await H['list:unlock-all'](null, '2580')).ok);
     assert.deepEqual(S.store.get(b).tags, ['bank'], 'the PIN opens them');
     assert.deepEqual((await card(b)).tags, ['bank']);
+    await H['list:lock-all']();
+    await app.quit();
+  }
+  if (app.phase === 'third') {
+    // 1.4.30: after a restart the locked note is sealed: its tags can't be read, so renaming or deleting any tag needs the PIN
+    if (!app.listWin()) await H['list:show']();
+    assert.deepEqual(await H['tags:delete'](ev(app.listWin()), 'ideas'), { ok: false, error: 'pin' }, 'sealed: the PIN first');
+    assert.ok((await H['tags:delete'](ev(app.listWin()), 'ideas', '2580')).ok);
+    assert.deepEqual((await card(app.hand().a)).tags, [], 'then it goes');
     await app.quit();
   }
 })();

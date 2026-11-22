@@ -372,7 +372,7 @@
     const settings = opts.settings || {};
     const secs = () => !!settings.remindSeconds;
     const autoNext = () => settings.remindAutoNext !== false; // 1.4.20: Settings → Jump to the next box (on)
-    // 1.4.20: "Hide the note until then" shows when Settings → Hiding notes is on (off), or when one of the note's
+    // 1.4.20: "Hide the note until then" shows when Settings → Let reminders hide notes is on (off), or when one of the note's
     // reminders already hides it (so it can be turned off). Decided once: the panel keeps its size while open
     const showHide = !!settings.remindHide || list.some((r) => r.hide);
     const box = el('div', { class: 'rmd' });
@@ -560,7 +560,7 @@
       page.append(el('div', { class: 'rm-row' }, ico('music'), sound,
         el('button', { type: 'button', class: 'rm-ib', title: 'Play', html: ICON.play, onclick: () => play(sound.value || settings.remindSound || R.DEFAULT_SOUND, settings.remindVolume ?? 0.6) })));
       // hiding, and (a locked note) the PIN to dismiss
-      if (showHide) page.append(check('Hide the note until then', 'Can be unhidden from Settings.', F.hide, (on) => { F.hide = on; }, 'rm-hide'));
+      if (showHide) page.append(check('Hide the note until then', 'The list’s clock button shows it.', F.hide, (on) => { F.hide = on; }, 'rm-hide'));
       if (opts.locked) page.append(check('Unlock to dismiss', 'Snooze and Done need your PIN.', F.unlock, (on) => { F.unlock = on; }, 'rm-unlock'));
       // Set / Save, Cancel
       const save = el('button', { type: 'button', class: 'rm-save', html: editing ? `${ICON.save}Save` : `${ICON.bell}Set reminder`, onclick: submit });

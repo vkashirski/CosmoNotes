@@ -27,11 +27,15 @@
   <span class="drag-space"></span>
 </header>
 
-<nav class="tabs">
+<nav class="tabs" id="tabs">
   <button class="tab on" data-tab="notes">Notes <span class="count" id="cNotes">0</span></button>
-  <button class="tab" data-tab="favs" title="Your starred notes and groups"><svg class="tstar" viewBox="0 0 24 24"><path d="M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9L3.4 9.4l6-.7z"/></svg>Favourites <span class="count" id="cFavs">0</span></button>
-  <button class="tab" data-tab="locks" title="Your locked notes and groups"><svg class="tlock" viewBox="0 0 24 24"><path d="M8 11V7a4 4 0 0 1 8 0v4"/><rect x="4" y="11" width="16" height="10" rx="2.5"/></svg>Locked <span class="count" id="cLocks">0</span></button>
-  <button class="tab" data-tab="bin">Bin <span class="count" id="cBin">0</span></button>
+  <button class="tab" data-tab="favs" title="Your starred notes and groups"><svg class="tstar" viewBox="0 0 24 24"><path d="M12 3.2l2.6 5.5 6 .7-4.4 4.1 1.2 5.9L12 16.5l-5.4 2.9 1.2-5.9L3.4 9.4l6-.7z"/></svg><span class="tlabel">Favourites</span> <span class="count" id="cFavs">0</span></button>
+  <button class="tab" data-tab="locks" title="Your locked notes and groups"><svg class="tlock" viewBox="0 0 24 24"><path d="M8 11V7a4 4 0 0 1 8 0v4"/><rect x="4" y="11" width="16" height="10" rx="2.5"/></svg><span class="tlabel">Locked</span> <span class="count" id="cLocks">0</span></button>
+  <button class="tab" data-tab="bin" title="Deleted notes"><svg class="tbin" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg><span class="tlabel">Bin</span> <span class="count" id="cBin">0</span></button>
+  <!-- groups pinned as tabs (.gtab) go here, in the order of settings.listTabs (list/events.js paintTabs) -->
+  <button class="tabplus" id="tabAddGroup" title="Pin a group as a tab" hidden>+ Group</button>
+  <button class="tabmore" id="tabMore" title="More tabs" hidden>»</button>
+  <button class="tabedit" id="btnTabsEdit" title="Edit tabs" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg><span>Done</span></button>
   <button class="fxpause" id="btnFxPause" title="Pause all effects" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 3c.6 3.6 2.4 5.4 6 6-3.6.6-5.4 2.4-6 6-.6-3.6-2.4-5.4-6-6 3.6-.6 5.4-2.4 6-6z"/><path d="M18.5 15c.3 1.6 1 2.3 2.5 2.5-1.5.3-2.2 1-2.5 2.5-.3-1.5-1-2.2-2.5-2.5 1.5-.2 2.2-.9 2.5-2.5z"/><path class="slash" d="M4 20 20 4"/></svg></button>
   <button class="tab" data-tab="settings" title="Settings (click again to go back)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
 </nav>
@@ -117,6 +121,8 @@
       </div>
     </div>
   </div>
+  <!-- 1.4.31: shown while the notes are filtered by a tag (list/cards.js filterSoon) -->
+  <div class="filterspin" id="filterSpin" aria-hidden="true"><i></i></div>
   <div class="cards" id="cards"></div>
   <p class="tip" id="tip"></p>
 </section>
@@ -135,271 +141,324 @@
 </section>
 
 <section id="viewSettings" class="view settings" hidden>
-  <!-- 1.3.35: search in Settings (findSettings in list/actions-locks.js). 1.3.36: each section's data-find lists more words
-       that find it (other names for what it does, e.g. "dark mode" → General). A new section needs one too. -->
-  <div class="searchrow">
+  <!-- 1.4.25 (the owner's pick): sections in a sidebar, one shown at a time (showSection in list/actions-locks.js).
+       Wide window: the names, the search above them; narrow (under 560 px): a slim rail of icons with short names.
+       1.3.35: search in Settings (findSettings) shows the matching panels of every section. 1.3.36: each panel's
+       data-find lists more words that find it (other names for what it does, e.g. "dark mode" → Start and theme).
+       A new panel needs one too, and a new section a nav button (same data-sec) and an icon. -->
+  <div class="searchrow setsearch">
     <label class="search">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="sq" placeholder="Search settings" autocomplete="off" spellcheck="false">
       <button type="button" class="qclear" id="sqClear" title="Clear search" hidden><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </label>
   </div>
+  <nav class="setnav" id="setNav" aria-label="Settings sections">
+    <button type="button" data-sec="general" class="on" aria-current="true" title="General"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg><span class="lw">General</span><span class="ls">General</span></button>
+    <button type="button" data-sec="notes" title="Notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v12l-6 6H5z"/><path d="M13 21v-6h6"/></svg><span class="lw">Notes</span><span class="ls">Notes</span></button>
+    <button type="button" data-sec="look" title="Look & effects"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span class="lw">Look &amp; effects</span><span class="ls">Look</span></button>
+    <button type="button" data-sec="writing" title="Writing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg><span class="lw">Writing</span><span class="ls">Writing</span></button>
+    <button type="button" data-sec="reminders" title="Reminders"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg><span class="lw">Reminders</span><span class="ls">Reminders</span></button>
+    <button type="button" data-sec="privacy" title="Privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11V7a4 4 0 0 1 8 0v4"/><rect x="4" y="11" width="16" height="10" rx="2.5"/></svg><span class="lw">Privacy</span><span class="ls">Privacy</span></button>
+    <button type="button" data-sec="yournotes" title="Your notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="lw">Your notes</span><span class="ls">Your notes</span></button>
+    <button type="button" data-sec="about" title="About"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/></svg><span class="lw">About</span><span class="ls">About</span></button>
+    <!-- 1.4.28 (the owner's wish): the version line sits at the bottom of the sidebar, under the sections -->
+    <p class="version" id="version"></p>
+  </nav>
+  <div class="setpane">
   <p class="snone" id="sqNone" hidden>No settings match.</p>
-  <div data-find="dark mode light mode night mode theme themes appearance look color window background startup boot login autostart launch defaults" class="panel">
-    <h3>General</h3>
-    <label class="row toggle">
-      <span><b>Start with Windows</b></span>
-      <input type="checkbox" id="sStartup"><i></i>
-    </label>
-    <div class="row col">
-      <span><b>Colour Theme</b></span>
-      <div class="themes" id="sTheme"></div>
-    </div>
-    <!-- 1.3.27: every setting below that a note can change for itself gets "Use on all notes" when some note has its own
-         (.reapply rows, painted by paintReapply in list/settings-menus.js); this does several at once -->
-    <div class="row">
-      <span><b>Notes with their own settings</b><small id="sOwnNow"></small></span>
-      <button class="pill ghost small" id="sResetNotes">Reset notes…</button>
-    </div>
-  </div>
-
-  <div data-find="default color paper typeface handwriting transparent transparency opacity translucent random hover" class="panel">
-    <h3>For new notes</h3>
-    <p class="muted">New notes start like this. Your other notes keep their look.</p>
-    <div class="row col">
-      <span class="oprow"><b>Colour</b><em id="sColorsCount"></em></span>
-      <div class="swstrip wide"><div class="swatches" id="sColors"></div></div>
-      <small class="shint" id="sColorsHint"></small>
-      <div class="pickbtns">
-        <button class="pill ghost small" id="sPickAll">Pick all</button>
-        <button class="pill ghost small" id="sPickLight">Light only</button>
-        <button class="pill ghost small" id="sPickDark">Dark only</button>
-        <button class="pill ghost small" id="sPickOne">Just one</button>
+  <div class="setsec on" data-sec="general">
+    <h2 class="sectitle">General</h2>
+    <div data-find="dark mode light mode night mode theme themes appearance look color window background startup boot login autostart launch" class="panel">
+      <h3>Start and theme</h3>
+      <label class="row toggle">
+        <span><b>Start with Windows</b></span>
+        <input type="checkbox" id="sStartup"><i></i>
+      </label>
+      <div class="row col">
+        <span><b>Colour Theme</b></span>
+        <div class="themes" id="sTheme"></div>
       </div>
     </div>
-    <label class="row toggle">
-      <span><b>Never the same colour twice in a row</b><small>Only when you pick more than one colour.</small></span>
-      <input type="checkbox" id="sNoRepeat"><i></i>
-    </label>
-    <div class="row col">
-      <span><b>Font</b></span>
-      <div class="seg" id="sFont">
-        <button data-font="hand" class="hand">Handwritten</button>
-        <button data-font="round">Rounded</button>
-        <button data-font="medieval" class="med">Medieval</button>
+  </div>
+
+  <!-- 1.4.28: "New notes" became "Notes" (the owner's wish): how new notes look, then click-through (from General) -->
+  <div class="setsec" data-sec="notes">
+    <h2 class="sectitle">Notes</h2>
+    <p class="seclead">Colour and font are for new notes. Your other notes keep theirs.</p>
+    <div data-find="default color colors paper random" class="panel">
+      <h3>Colour</h3>
+      <div class="row col">
+        <span class="oprow"><b>Colour</b><em id="sColorsCount"></em></span>
+        <div class="swstrip wide"><div class="swatches" id="sColors"></div></div>
+        <small class="shint" id="sColorsHint"></small>
+        <div class="pickbtns">
+          <button class="pill ghost small" id="sPickAll">Pick all</button>
+          <button class="pill ghost small" id="sPickLight">Light only</button>
+          <button class="pill ghost small" id="sPickDark">Dark only</button>
+          <button class="pill ghost small" id="sPickOne">Just one</button>
+        </div>
+      </div>
+      <label class="row toggle">
+        <span><b>Never the same colour twice in a row</b><small>Only when you pick more than one colour.</small></span>
+        <input type="checkbox" id="sNoRepeat"><i></i>
+      </label>
+    </div>
+
+    <div data-find="default typeface handwriting transparent transparency opacity translucent hover" class="panel">
+      <h3>Font and see-through</h3>
+      <div class="row col">
+        <span><b>Font</b></span>
+        <div class="seg" id="sFont">
+          <button data-font="hand" class="hand">Handwritten</button>
+          <button data-font="round">Rounded</button>
+          <button data-font="medieval" class="med">Medieval</button>
+        </div>
+      </div>
+      <div class="reapply" data-o="font" hidden></div>
+      <div class="row col">
+        <span class="oprow"><b>See-through</b><em id="sOpVal">100%</em></span>
+        <input type="range" class="srange" id="sOpacity" min="25" max="100" step="5" value="100">
+      </div>
+      <div class="reapply" data-o="opacity" hidden></div>
+      <label class="row toggle">
+        <span><b>Turn solid when my mouse is over it</b><small>See-through notes turn solid while you point at them. Each note can change this in its ⋯ menu.</small></span>
+        <input type="checkbox" id="sSolidHover"><i></i>
+      </label>
+      <div class="reapply" data-o="solidOnHover" hidden></div>
+    </div>
+
+    <!-- 1.3.34: click-through (main/note-state.js); 1.4.11: in the pin's right-click menu, no longer a top-bar button -->
+    <div data-find="ignore mouse pass through transparent overlay game games video watch" class="panel">
+      <h3>Click-through</h3>
+      <p class="muted">Read a note over a video or a game, and click what’s under it.</p>
+      <label class="row toggle">
+        <span><b>Click-through</b><small>Right-click a note’s pin to turn it on. The note stays on top, and clicks go through it. A button in its top bar turns it off.</small></span>
+        <input type="checkbox" id="sClickThrough"><i></i>
+      </label>
+    </div>
+  </div>
+
+  <div class="setsec" data-sec="look">
+    <h2 class="sectitle">Look &amp; effects</h2>
+    <!-- 1.3.27: evening colours (src/evening.js; main/evening.js keeps the clock) -->
+    <div data-find="night shift dim dimmer blue light eye strain warm sunset schedule time glare colors" class="panel">
+      <h3>Evening colours</h3>
+      <p class="muted">Light notes turn a softer shade in the evening, so they don’t glare. Dark notes stay as they are.</p>
+      <label class="row toggle">
+        <span><b>Softer colours in the evening</b><small>Each note can change this in its ⋯ menu.</small></span>
+        <input type="checkbox" id="sEve"><i></i>
+      </label>
+      <div class="row evetimes">
+        <label><b>Evening from</b><input type="time" class="minput" id="sEveFrom" required></label>
+        <label><b>Day from</b><input type="time" class="minput" id="sEveTo" required></label>
+      </div>
+      <small class="shint">The colours change slowly, over half an hour.</small>
+      <div class="evestrip" id="sEveStrip" aria-hidden="true"></div>
+      <div class="reapply" data-o="evening" hidden></div>
+    </div>
+
+    <!-- 1.1.16 -->
+    <div data-find="animation animations animated moving background backgrounds particles sparkles snow stars cursor trail motion" class="panel">
+      <h3>Effects</h3>
+      <p class="muted">Moving pictures behind your notes, and a trail behind your mouse. Each note can pick its own in ⋯ → Effects…</p>
+      <div class="row">
+        <span><b>For all notes</b><small id="sFxNow"></small></span>
+        <button class="pill ghost small" id="sFxChoose">Choose…</button>
+      </div>
+      <div class="reapply" data-o="effect" hidden></div>
+      <div class="reapply" data-o="follower" hidden></div>
+      <label class="row toggle">
+        <span><b>Pause all effects</b><small>Also with the sparkle button, or the CosmoNotes icon.</small></span>
+        <input type="checkbox" id="sFxPause"><i></i>
+      </label>
+      <div class="reapply" data-o="fxPause" hidden></div>
+    </div>
+  </div>
+
+  <div class="setsec" data-sec="writing">
+    <h2 class="sectitle">Writing</h2>
+    <div data-find="spellcheck spell check grammar typos dictionary language underline red lines russian macedonian" class="panel">
+      <h3>Spelling</h3>
+      <label class="row toggle">
+        <span><b>Check spelling</b><small>Each note can still turn it on or off.</small></span>
+        <input type="checkbox" id="sSpell"><i></i>
+      </label>
+      <div class="reapply" data-o="spell" hidden></div>
+      <label class="row toggle">
+        <span><b>Check Cyrillic words too</b><small>When off, Cyrillic words are never underlined.</small></span>
+        <input type="checkbox" id="sCyr"><i></i>
+      </label>
+    </div>
+
+    <!-- 1.3.19: checklists in every note (each note can change them in its ⋯ menu: src/note/checklists.js) -->
+    <div data-find="todo to-do tick ticks checkbox checkboxes tasks done items reorder bullets" class="panel">
+      <h3>Checklists</h3>
+      <p class="muted">For all notes. Each note can change these in its ⋯ menu.</p>
+      <label class="row toggle">
+        <span><b>Reorder by dragging the box</b><small>Drag a checkbox to move its item. A click still ticks it.</small></span>
+        <input type="checkbox" id="sCheckDrag"><i></i>
+      </label>
+      <div class="reapply" data-o="checkDrag" hidden></div>
+      <label class="row toggle">
+        <span><b>Move ticked items to the bottom</b><small>A ticked item moves below the unticked ones. Unticking leaves it in place.</small></span>
+        <input type="checkbox" id="sCheckSink"><i></i>
+      </label>
+      <div class="reapply" data-o="checkSink" hidden></div>
+      <label class="row toggle">
+        <span><b>Keep boxes the same size</b><small>Boxes keep their size when the text is bigger or smaller.</small></span>
+        <input type="checkbox" id="sCheckFixed"><i></i>
+      </label>
+      <div class="reapply" data-o="checkFixed" hidden></div>
+    </div>
+
+    <!-- 1.3.1: voice to text (painted by paintVoice in list/settings-menus.js) -->
+    <div data-find="speech dictation dictate microphone mic transcribe transcription speak talk whisper model download offline audio" class="panel" id="sttPanel">
+      <h3>Voice to text</h3>
+      <p class="muted sttintro" id="sttIntro">In a note, open + Add and pick Voice to text, or right-click a voice recording and pick Transcribe.</p>
+      <div id="sttModels"></div>
+      <p class="muted sttsub" id="sttSource"></p>
+      <div class="row col">
+        <span><b>Words appear</b><small id="sttWhenInfo"></small></span>
+        <div class="seg" id="sttWhen"><button data-v="live">While you talk</button><button data-v="stop">When you stop</button></div>
+      </div>
+      <p class="muted sttfoot" id="sttTipWindows">Windows 11 has voice typing too. Press Win + H in any app.</p>
+    </div>
+  </div>
+
+  <div class="setsec" data-sec="reminders">
+    <h2 class="sectitle">Reminders</h2>
+    <p class="seclead">Add one in a note (Add → Reminder), or right-click a note here.</p>
+    <!-- 1.4.1: reminders (main/reminders.js; a note's own are in Add → Reminder, or right-click → Reminders… here) -->
+    <div data-find="alarm alarms remind reminder reminders notification notify sound sounds chime volume" class="panel">
+      <h3>Sound</h3>
+      <div class="row">
+        <span><b>Sound</b><small>Each reminder can pick its own.</small></span>
+        <span class="rsound"><select id="sRemSound" aria-label="Reminder sound"></select><button class="pill ghost small" id="sRemPlay">Play</button></span>
+      </div>
+      <div class="row col">
+        <span class="oprow"><b>Volume</b><em id="sRemVolVal">60%</em></span>
+        <input type="range" class="srange" id="sRemVol" min="0" max="100" step="5" value="60">
       </div>
     </div>
-    <div class="reapply" data-o="font" hidden></div>
-    <div class="row col">
-      <span class="oprow"><b>See-through</b><em id="sOpVal">100%</em></span>
-      <input type="range" class="srange" id="sOpacity" min="25" max="100" step="5" value="100">
+
+    <div data-find="alarm alarms remind reminder reminders timer schedule snooze due hidden seconds second next box hide hiding" class="panel">
+      <h3>Setting a reminder</h3>
+      <label class="row toggle">
+        <span><b>Show seconds</b><small>Set a reminder to the second.</small></span>
+        <input type="checkbox" id="sRemSec"><i></i>
+      </label>
+      <label class="row toggle">
+        <span><b>Jump to the next box</b><small>After you type two digits, the focus goes to the next box.</small></span>
+        <input type="checkbox" id="sRemNext"><i></i>
+      </label>
+      <label class="row toggle">
+        <span><b>Let reminders hide notes</b><small>Adds “Hide the note until then” when you set a reminder.</small></span>
+        <input type="checkbox" id="sRemHide"><i></i>
+      </label>
+      <label class="row toggle">
+        <span><b>Show hidden notes</b><small>Notes a reminder hides still show in this list, faded.</small></span>
+        <input type="checkbox" id="sRemShow"><i></i>
+      </label>
     </div>
-    <div class="reapply" data-o="opacity" hidden></div>
-    <label class="row toggle">
-      <span><b>Turn solid when my mouse is over it</b><small>See-through notes turn solid while you point at them. Each note can change this in its ⋯ menu.</small></span>
-      <input type="checkbox" id="sSolidHover"><i></i>
-    </label>
-    <div class="reapply" data-o="solidOnHover" hidden></div>
   </div>
 
-  <!-- 1.3.27: evening colours (src/evening.js; main/evening.js keeps the clock) -->
-  <div data-find="night shift dim dimmer blue light eye strain warm sunset schedule time glare colors" class="panel">
-    <h3>Evening colours</h3>
-    <p class="muted">Light notes turn a softer shade in the evening, so they don’t glare. Dark notes stay as they are.</p>
-    <label class="row toggle">
-      <span><b>Softer colours in the evening</b><small>Each note can change this in its ⋯ menu.</small></span>
-      <input type="checkbox" id="sEve"><i></i>
-    </label>
-    <div class="row evetimes">
-      <label><b>Evening from</b><input type="time" class="minput" id="sEveFrom" required></label>
-      <label><b>Day from</b><input type="time" class="minput" id="sEveTo" required></label>
-    </div>
-    <small class="shint">The colours change slowly, over half an hour.</small>
-    <div class="evestrip" id="sEveStrip" aria-hidden="true"></div>
-    <div class="reapply" data-o="evening" hidden></div>
-  </div>
-
-  <!-- 1.1.16 -->
-  <div data-find="animation animations animated moving background backgrounds particles sparkles snow stars cursor trail motion" class="panel">
-    <h3>Effects</h3>
-    <p class="muted">Moving pictures behind your notes, and a trail behind your mouse. Each note can pick its own in ⋯ → Effects…</p>
-    <div class="row">
-      <span><b>For all notes</b><small id="sFxNow"></small></span>
-      <button class="pill ghost small" id="sFxChoose">Choose…</button>
-    </div>
-    <div class="reapply" data-o="effect" hidden></div>
-    <div class="reapply" data-o="follower" hidden></div>
-    <label class="row toggle">
-      <span><b>Pause all effects</b><small>Also with the sparkle button, or the CosmoNotes icon.</small></span>
-      <input type="checkbox" id="sFxPause"><i></i>
-    </label>
-    <div class="reapply" data-o="fxPause" hidden></div>
-  </div>
-
-  <div data-find="spellcheck spell check grammar typos dictionary language underline red lines russian macedonian" class="panel">
-    <h3>Spelling</h3>
-    <label class="row toggle">
-      <span><b>Check spelling</b><small>Each note can still turn it on or off.</small></span>
-      <input type="checkbox" id="sSpell"><i></i>
-    </label>
-    <div class="reapply" data-o="spell" hidden></div>
-    <label class="row toggle">
-      <span><b>Check Cyrillic words too</b><small>When off, Cyrillic words are never underlined.</small></span>
-      <input type="checkbox" id="sCyr"><i></i>
-    </label>
-  </div>
-
-  <!-- 1.3.19: checklists in every note (each note can change them in its ⋯ menu: src/note/checklists.js) -->
-  <div data-find="todo to-do tick ticks checkbox checkboxes tasks done items reorder bullets" class="panel">
-    <h3>Checklists</h3>
-    <p class="muted">For all notes. Each note can change these in its ⋯ menu.</p>
-    <label class="row toggle">
-      <span><b>Reorder by dragging the box</b><small>Drag a checkbox to move its item. A click still ticks it.</small></span>
-      <input type="checkbox" id="sCheckDrag"><i></i>
-    </label>
-    <div class="reapply" data-o="checkDrag" hidden></div>
-    <label class="row toggle">
-      <span><b>Move ticked items to the bottom</b><small>A ticked item moves below the unticked ones. Unticking leaves it in place.</small></span>
-      <input type="checkbox" id="sCheckSink"><i></i>
-    </label>
-    <div class="reapply" data-o="checkSink" hidden></div>
-    <label class="row toggle">
-      <span><b>Keep boxes the same size</b><small>Boxes keep their size when the text is bigger or smaller.</small></span>
-      <input type="checkbox" id="sCheckFixed"><i></i>
-    </label>
-    <div class="reapply" data-o="checkFixed" hidden></div>
-  </div>
-
-  <!-- 1.3.1: voice to text (painted by paintVoice in list/settings-menus.js) -->
-  <div data-find="speech dictation dictate microphone mic transcribe transcription speak talk whisper model download offline audio" class="panel" id="sttPanel">
-    <h3>Voice to text</h3>
-    <p class="muted sttintro" id="sttIntro">In a note, open + Add and pick Voice to text, or right-click a voice recording and pick Transcribe.</p>
-    <div id="sttModels"></div>
-    <p class="muted sttsub" id="sttSource"></p>
-    <div class="row col">
-      <span><b>Words appear</b><small id="sttWhenInfo"></small></span>
-      <div class="seg" id="sttWhen"><button data-v="live">While you talk</button><button data-v="stop">When you stop</button></div>
-    </div>
-    <p class="muted sttfoot" id="sttTipWindows">Windows 11 has voice typing too. Press Win + H in any app.</p>
-  </div>
-
-  <!-- 1.3.27: the panic button (main/panic.js) -->
-  <div data-find="boss key hide all quickly emergency privacy hotkey keyboard tray stealth" class="panel">
-    <h3>Panic button</h3>
-    <p class="muted">One click closes your notes, locks them again and hides CosmoNotes in the tray. Open CosmoNotes again to bring the notes back.</p>
-    <label class="row toggle">
-      <span><b>Panic button</b><small>In each note’s top bar and in the tray menu.</small></span>
-      <input type="checkbox" id="sPanic"><i></i>
-    </label>
-    <div class="row col" id="sPanicKeyRow">
-      <span class="oprow"><b>Shortcut</b><em id="sPanicKeyNow">None</em></span>
-      <div class="pickbtns">
-        <button class="pill ghost small keyfield" id="sPanicKey">Set a shortcut…</button>
-        <button class="pill ghost small" data-key="Alt+Z">Alt+Z</button>
-        <button class="pill ghost small" data-key="F8">F8</button>
-        <button class="pill ghost small" id="sPanicClear">No shortcut</button>
+  <div class="setsec" data-sec="privacy">
+    <h2 class="sectitle">Privacy</h2>
+    <div data-find="password pin lock unlock privacy private secret security encrypt encryption recovery protect" class="panel">
+      <h3>Locked notes</h3>
+      <p class="muted" id="lockInfo"></p>
+      <div class="btnrow"><button class="pill" id="pwSave"></button></div>
+      <!-- 1.1.30: encryption of locked notes (painted by paintCrypt in list/actions-locks.js) -->
+      <div class="cryptbox" id="cryptBox" hidden>
+        <p class="muted cryptinfo" id="cryptInfo"></p>
+        <p class="muted pinwarn" id="pinWarn" hidden></p>
+        <div class="btnrow">
+          <button class="pill ghost" id="cryptNow" hidden>Encrypt now</button>
+          <button class="pill ghost" id="cryptKey"></button>
+          <button class="pill ghost" id="cryptForgot">Forgot it? Use the recovery key</button>
+          <button class="pill danger" id="cryptToggle"></button>
+        </div>
       </div>
-      <small class="shint" id="sPanicHint"></small>
     </div>
-    <div class="reapply" data-o="panic" hidden></div>
+
+    <!-- 1.3.27: the panic button (main/panic.js) -->
+    <div data-find="boss key hide all quickly emergency privacy hotkey keyboard tray stealth" class="panel">
+      <h3>Panic button</h3>
+      <p class="muted">One click closes your notes, locks them again and hides CosmoNotes in the tray. Open CosmoNotes again to bring the notes back.</p>
+      <label class="row toggle">
+        <span><b>Panic button</b><small>In each note’s top bar and in the tray menu.</small></span>
+        <input type="checkbox" id="sPanic"><i></i>
+      </label>
+      <div class="row col" id="sPanicKeyRow">
+        <span class="oprow"><b>Shortcut</b><em id="sPanicKeyNow">None</em></span>
+        <div class="pickbtns">
+          <button class="pill ghost small keyfield" id="sPanicKey">Set a shortcut…</button>
+          <button class="pill ghost small" data-key="Alt+Z">Alt+Z</button>
+          <button class="pill ghost small" data-key="F8">F8</button>
+          <button class="pill ghost small" id="sPanicClear">No shortcut</button>
+        </div>
+        <small class="shint" id="sPanicHint"></small>
+      </div>
+      <div class="reapply" data-o="panic" hidden></div>
+    </div>
   </div>
 
-  <!-- 1.4.1: reminders (main/reminders.js; a note's own are in Add → Reminder, or right-click → Reminders… here) -->
-  <div data-find="alarm alarms remind remember notification notify timer schedule sound sounds chime snooze due hidden volume seconds second next box hide hiding" class="panel">
-    <h3>Reminders</h3>
-    <p class="muted">Add one in a note (Add → Reminder), or right-click a note here.</p>
-    <div class="row">
-      <span><b>Sound</b><small>Each reminder can pick its own.</small></span>
-      <span class="rsound"><select id="sRemSound" aria-label="Reminder sound"></select><button class="pill ghost small" id="sRemPlay">Play</button></span>
-    </div>
-    <div class="row col">
-      <span class="oprow"><b>Volume</b><em id="sRemVolVal">60%</em></span>
-      <input type="range" class="srange" id="sRemVol" min="0" max="100" step="5" value="60">
-    </div>
-    <label class="row toggle">
-      <span><b>Show hidden notes</b><small>Notes a reminder hides still show here, faded.</small></span>
-      <input type="checkbox" id="sRemShow"><i></i>
-    </label>
-    <label class="row toggle">
-      <span><b>Show seconds</b><small>Set a reminder to the second.</small></span>
-      <input type="checkbox" id="sRemSec"><i></i>
-    </label>
-    <label class="row toggle">
-      <span><b>Jump to the next box</b><small>After two digits, go on to the minutes.</small></span>
-      <input type="checkbox" id="sRemNext"><i></i>
-    </label>
-    <label class="row toggle">
-      <span><b>Hiding notes</b><small>Let a reminder hide its note until it goes off.</small></span>
-      <input type="checkbox" id="sRemHide"><i></i>
-    </label>
-  </div>
-
-  <!-- 1.3.34: click-through (main/note-state.js); 1.4.11: in the pin's right-click menu, no longer a top-bar button -->
-  <div data-find="ignore mouse pass through transparent overlay game games video watch" class="panel">
-    <h3>Click-through</h3>
-    <p class="muted">Read a note over a video or a game, and click what’s under it.</p>
-    <label class="row toggle">
-      <span><b>Click-through</b><small>Right-click a note’s pin to turn it on. It pins the note. While it’s on, only its button works.</small></span>
-      <input type="checkbox" id="sClickThrough"><i></i>
-    </label>
-  </div>
-
-  <div data-find="password pin lock unlock privacy private secret security encrypt encryption recovery protect" class="panel">
-    <h3>Locked notes</h3>
-    <p class="muted" id="lockInfo"></p>
-    <div class="btnrow"><button class="pill" id="pwSave"></button></div>
-    <!-- 1.1.30: encryption of locked notes (painted by paintCrypt in list/actions-locks.js) -->
-    <div class="cryptbox" id="cryptBox" hidden>
-      <p class="muted cryptinfo" id="cryptInfo"></p>
-      <p class="muted pinwarn" id="pinWarn" hidden></p>
+  <div class="setsec" data-sec="yournotes">
+    <h2 class="sectitle">Your notes</h2>
+    <div data-find="backup restore lost recover recovery history copy" class="panel">
+      <h3>Backups</h3>
+      <p class="muted">All your notes are backed up once a day. The last 30 days are kept. Restoring adds the notes in a new group and replaces nothing.</p>
+      <p class="bklast" id="backups"></p>
       <div class="btnrow">
-        <button class="pill ghost" id="cryptNow" hidden>Encrypt now</button>
-        <button class="pill ghost" id="cryptKey"></button>
-        <button class="pill ghost" id="cryptForgot">Forgot it? Use the recovery key</button>
-        <button class="pill danger" id="cryptToggle"></button>
+        <button class="pill" id="btnRestorePick">Restore from a backup…</button>
+        <button class="pill ghost" id="btnBackupNow">Back up now</button>
+        <button class="pill ghost" id="btnBackupFolder">Open backups folder</button>
+      </div>
+    </div>
+
+    <div data-find="data folder location path storage files disk local saved appdata" class="panel">
+      <h3>Where your notes live</h3>
+      <p class="muted">Only on this device. Nothing goes to the cloud.</p>
+      <code id="dataPath"></code>
+      <div class="btnrow"><button class="pill ghost" id="btnDataFolder">Open notes folder</button></div>
+    </div>
+
+    <!-- 1.3.27: every setting that a note can change for itself gets "Use on all notes" when some note has its own
+         (.reapply rows, painted by paintReapply in list/settings-menus.js); this does several at once -->
+    <div data-find="defaults reset override overrides own differ" class="panel">
+      <h3>Notes’ own settings</h3>
+      <div class="row">
+        <span><b>Notes with their own settings</b><small id="sOwnNow"></small></span>
+        <button class="pill ghost small" id="sResetNotes">Reset notes…</button>
       </div>
     </div>
   </div>
 
-  <div data-find="backup restore lost recover recovery history copy" class="panel">
-    <h3>Backups</h3>
-    <p class="muted">All your notes are backed up once a day. The last 30 days are kept. Restoring adds the notes in a new group and replaces nothing.</p>
-    <p class="bklast" id="backups"></p>
-    <div class="btnrow">
-      <button class="pill" id="btnRestorePick">Restore from a backup…</button>
-      <button class="pill ghost" id="btnBackupNow">Back up now</button>
-      <button class="pill ghost" id="btnBackupFolder">Open backups folder</button>
+  <div class="setsec" data-sec="about">
+    <h2 class="sectitle">About</h2>
+    <div data-find="version update updates upgrade new version download install help info credits changelog github" class="panel about">
+      <div class="abouthead">
+        <svg class="aboutlogo" viewBox="0 0 32 32"><rect x="5" y="7" width="22" height="21" rx="2.5" fill="#FFE45C" transform="rotate(-6 16 17)"/><path d="M22 26.5l4.4-4.6-4.2.4z" fill="#E6C232" transform="rotate(-6 16 17)"/><circle cx="16" cy="8" r="4" fill="#E5484D"/><circle cx="14.7" cy="6.8" r="1.2" fill="#fff" opacity=".7"/><path d="M27 3.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="#8E7BEF"/></svg>
+        <span><h3>CosmoNotes</h3><small id="aboutLine"></small></span>
+      </div>
+      <!-- 1.4.0: updates (painted by paintUpdate in list/settings-menus.js; main/ipc-update.js) -->
+      <div class="row upd" id="updRow">
+        <span><b>Updates</b><small id="updLine"></small></span>
+        <div class="pickbtns" id="updBtns"></div>
+        <div class="sttbar" id="updBar" hidden><i></i></div>
+      </div>
+      <label class="row toggle">
+        <span><b>Check for updates</b><small>When CosmoNotes starts, and once a day.</small></span>
+        <input type="checkbox" id="sUpdateCheck"><i></i>
+      </label>
+      <details class="fold" id="foldFeatures">
+        <summary>Everything CosmoNotes can do</summary>
+        <div id="features"></div>
+      </details>
     </div>
   </div>
-
-  <div data-find="data folder location path storage files disk local saved appdata" class="panel">
-    <h3>Where your notes live</h3>
-    <p class="muted">Only on this device. Nothing goes to the cloud.</p>
-    <code id="dataPath"></code>
-    <div class="btnrow"><button class="pill ghost" id="btnDataFolder">Open notes folder</button></div>
   </div>
-  <div data-find="version update updates upgrade new version download install help info credits changelog github" class="panel about">
-    <div class="abouthead">
-      <svg class="aboutlogo" viewBox="0 0 32 32"><rect x="5" y="7" width="22" height="21" rx="2.5" fill="#FFE45C" transform="rotate(-6 16 17)"/><path d="M22 26.5l4.4-4.6-4.2.4z" fill="#E6C232" transform="rotate(-6 16 17)"/><circle cx="16" cy="8" r="4" fill="#E5484D"/><circle cx="14.7" cy="6.8" r="1.2" fill="#fff" opacity=".7"/><path d="M27 3.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="#8E7BEF"/></svg>
-      <span><h3>About CosmoNotes</h3><small id="aboutLine"></small></span>
-    </div>
-    <!-- 1.4.0: updates (painted by paintUpdate in list/settings-menus.js; main/ipc-update.js) -->
-    <div class="row upd" id="updRow">
-      <span><b>Updates</b><small id="updLine"></small></span>
-      <div class="pickbtns" id="updBtns"></div>
-      <div class="sttbar" id="updBar" hidden><i></i></div>
-    </div>
-    <label class="row toggle">
-      <span><b>Check for updates</b><small>When CosmoNotes starts, and once a day.</small></span>
-      <input type="checkbox" id="sUpdateCheck"><i></i>
-    </label>
-    <details class="fold" id="foldFeatures">
-      <summary>Everything CosmoNotes can do</summary>
-      <div id="features"></div>
-    </details>
-  </div>
-
-  <p class="version" id="version"></p>
 </section>
 
 <!-- app-styled right-click menu and pop-ups -->
@@ -505,6 +564,14 @@
 </div>
 <div class="toast" id="toast" hidden></div>
 
+<!-- 1.4.33: a tab's icon and how it shows (list/events.js openIconPop): a group picks one of the 40 (or none) -->
+<div class="sortpop iconpop" id="iconPop" hidden>
+  <p class="pophead" id="iconHead"></p>
+  <div class="icongrid" id="iconGrid"></div>
+  <h4 id="iconShowHead">Show</h4>
+  <div class="seg" id="iconShow"><button data-v="icon">Icon</button><button data-v="both">Icon + name</button><button data-v="name">Name</button></div>
+</div>
+
 <script src="about.js"></script>
 <!-- the effects (1.1.24: split into src/fx/, in this order; see ai-context/effects.md) -->
 <script src="fx/kit.js"></script>
@@ -519,6 +586,7 @@
 <script src="reminders.js"></script>
 <script src="remind-ui.js"></script>
 <script src="tags.js"></script>
+<script src="tab-icons.js"></script>
 <!-- this window's own code (1.1.28: list.js split into src/list/, in this order; see ai-context/splitting-code.md) -->
 <script src="list/base.js"></script>
 <script src="list/cards.js"></script>

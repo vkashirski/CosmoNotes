@@ -12,6 +12,8 @@
 // - 1.4.21: the menu's window is made once and kept (only hidden when the menu shuts), and made ahead of time while the note
 //   doesn't have the focus: a right-click opens no new window (that made the menu slow).
 // - a press in the note brings it up (touch '').
+// - 1.4.26: rename from the bar: the pencil after the title (shown with the mouse over the note), the field in the title's
+//   place (Enter / a click away keep it, Esc puts it back), the undo arrow, Rename… in » on a small note, none while hidden.
 // - right-click in the text → Add ▸ (main/web.js): the window gives main the Add panel's items once (addItems); the one
 //   main sends back (onAdd) runs as from the panel; not while the note's words are hidden.
 const assert = require('assert');
@@ -68,7 +70,7 @@ const assert = require('assert');
     return false;
   };
   const mainSaw = (page) => page.evaluate(() => window.__main.splice(0));
-  const ALL = ['btnList', 'btnNew', 'title', 'btnPin', 'btnRoll', 'btnMenu', 'hsep', 'btnMin', 'btnMax', 'btnClose'];
+  const ALL = ['btnList', 'btnNew', 'title', 'btnRename', 'barfill', 'btnPin', 'btnRoll', 'btnMenu', 'hsep', 'btnMin', 'btnMax', 'btnClose'];
 
   // ---- no title, wide enough: every button, no »
   let page = await openNote({ html: '<p>milk</p>' }, 360, 320, catchMain);
@@ -115,7 +117,7 @@ const assert = require('assert');
   await page.setViewportSize({ width: 200, height: 320 });
   await settle(page);
   now = await inBar(page);
-  assert.deepEqual(now, ['title', 'btnMore', 'btnClose'], 'a small note: the title, », Close');
+  assert.deepEqual(now, ['title', 'barfill', 'btnMore', 'btnClose'], 'a small note: the title, », Close (1.4.26: the pencil went first)');
   assert.ok(await titleW(page) >= 194 - 2 * 26, `the title has the rest (${await titleW(page)})`);
   assert.ok(await fits(page));
   pop = await openMore(page);
@@ -249,6 +251,78 @@ const assert = require('assert');
   await page.evaluate(() => window.__onAdd('divider'));
   await settle(page);
   assert.equal(await page.evaluate(() => document.querySelectorAll('#editor hr').length), 0, 'hidden: nothing is added');
+  await page.close();
+
+  // ---- 1.4.26 (the owner's idea): rename from the bar. The pencil after the title opens a field in its place; Enter or a click
+  // away keeps it, Esc puts it back; then the pencil is an undo arrow for a few seconds. The title stays a drag area.
+  page = await openNote({ title: 'Shopping', html: '<p>milk</p>' }, 360, 320, catchMain);
+  await settle(page);
+  const titles = async () => (await page.updates()).filter((u) => 'title' in u).map((u) => u.title);
+  const renState = () => page.evaluate(() => ({ renaming: document.body.classList.contains('renaming'), field: !document.querySelector('#titleEdit').hidden,
+    value: document.querySelector('#titleEdit').value, focused: document.activeElement === document.querySelector('#titleEdit'),
+    title: document.querySelector('#title').textContent, undo: document.querySelector('#btnRename').classList.contains('undo'),
+    tip: document.querySelector('#btnRename').title, op: getComputedStyle(document.querySelector('#btnRename')).opacity }));
+  const before26 = await inBar(page);
+  assert.ok(before26.indexOf('btnRename') === before26.indexOf('title') + 1, `the pencil is right after the title (${before26})`);
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#title')).webkitAppRegion || getComputedStyle(document.querySelector('#bar')).webkitAppRegion), 'drag', 'the title is still a drag area');
+  // 1.4.29: main tells the window when the mouse is on its top bar (main/bar-hover.js → body.bar-hover)
+  await page.evaluate(() => document.body.classList.add('bar-hover')); await page.waitForTimeout(300);
+  let st = await renState();
+  assert.ok(Number(st.op) > 0.5 && st.tip === 'Rename', `with the mouse on the top bar it shows (${st.op}, ${st.tip})`);
+  await page.click('#btnRename'); await settle(page);
+  st = await renState();
+  assert.ok(st.renaming && st.field && st.focused && st.value === 'Shopping', `a click: the field, with the title, focused (${JSON.stringify(st)})`);
+  assert.ok(!(await page.isVisible('#title')) && !(await page.isVisible('#btnRename')), 'in the title\'s place');
+  const during = await inBar(page);
+  assert.deepEqual(during.filter((x) => x !== 'titleEdit'), before26.filter((x) => !['title', 'btnRename', 'barfill'].includes(x)), 'the other buttons stay where they were');
+  assert.ok(await fits(page), 'the bar never runs over');
+  await page.fill('#titleEdit', 'Groceries for the long weekend away'); await page.keyboard.press('Enter');
+  await page.waitForTimeout(400);
+  st = await renState();
+  assert.ok(!st.renaming && !st.field && st.title === 'Groceries for the long weekend away', 'Enter: the new title');
+  assert.equal((await titles()).pop(), 'Groceries for the long weekend away', 'saved');
+  assert.equal(await page.inputValue('#titleInput'), 'Groceries for the long weekend away', 'the ⋯ menu\'s title field too');
+  assert.ok(st.undo && st.tip === 'Undo rename' && Number(st.op) > 0.5, 'the pencil is an undo arrow now');
+  assert.ok((await inBar(page)).includes('btnRename'), 'in the bar, even when the new title is long');
+  await page.click('#btnRename'); await page.waitForTimeout(400);
+  st = await renState();
+  assert.ok(st.title === 'Shopping' && !st.undo && !st.renaming, 'undo: the old title is back');
+  assert.equal((await titles()).pop(), 'Shopping', 'and saved');
+  // Esc puts it back; nothing changed: no undo arrow
+  await page.click('#btnRename'); await page.fill('#titleEdit', 'Oops'); await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  st = await renState();
+  assert.ok(st.title === 'Shopping' && !st.renaming && !st.undo, 'Esc: the title as it was');
+  assert.ok(!(await titles()).includes('Oops'), 'nothing saved');
+  await page.click('#btnRename'); await page.keyboard.press('Enter'); await settle(page);
+  assert.ok(!(await renState()).undo, 'the same title: no undo arrow');
+  // a click away keeps it
+  await page.click('#btnRename'); await page.fill('#titleEdit', 'Lists'); await page.click('#editor');
+  await page.waitForTimeout(400);
+  assert.equal((await renState()).title, 'Lists', 'a click in the note keeps the new title');
+  // a small note: the pencil goes into » too (after Maximise, Minimise, + and All notes), as Rename…
+  assert.ok((await inBar(page)).includes('btnRename'), 'the undo arrow after it');
+  await page.evaluate(() => document.querySelector('#btnRename').classList.remove('undo')); // (as after its few seconds)
+  await page.setViewportSize({ width: 200, height: 320 }); await settle(page);
+  assert.ok(!(await inBar(page)).includes('btnRename'), 'a small note: no pencil in the bar');
+  pop = await openMore(page);
+  menu = await lines(pop);
+  assert.ok(menu.some((i) => i.id === 'btnRename' && /Undo rename|Rename…/.test(i.label) && i.pic), `in »'s menu (${menu.map((i) => i.label)})`);
+  await pickLine(pop, 'btnRename'); await settle(page);
+  assert.ok((await renState()).renaming, 'Rename… there opens the field');
+  await page.keyboard.press('Escape');
+  await page.close();
+  // no title: "Add a title"; a hidden locked note: no pencil
+  page = await openNote({ html: '<p>milk</p>' }, 360, 320, catchMain);
+  await settle(page);
+  assert.equal(await page.getAttribute('#btnRename', 'title'), 'Add a title', 'no title yet: Add a title');
+  await page.close();
+  page = await openNote({ title: 'Bank', html: '', locked: true, lockedBy: 'self', hidden: true }, 360, 320, catchMain);
+  await settle(page);
+  assert.ok(!(await inBar(page)).includes('btnRename'), 'hidden: no pencil');
+  await page.evaluate(() => document.querySelector('#btnRename').click());
+  await settle(page);
+  assert.ok(!(await renState()).renaming, 'and no renaming');
   await page.close();
 
   await nu.done();

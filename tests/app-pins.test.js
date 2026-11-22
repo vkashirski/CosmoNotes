@@ -1,8 +1,8 @@
 'use strict';
 // App pins (1.4.5, main/app-pin.js): a note pinned over some apps mirrors its app: on top while one of them is in front,
-// on screen just above its app while another app is in front, hidden while it is closed or minimised. Here: reading window titles (app + workspace / file, browsers get no parts), store.js cleaning pinApps
+// on screen just above its app while another app is in front, minimised (in the taskbar) while it is closed or minimised. Here: reading window titles (app + workspace / file, browsers get no parts), store.js cleaning pinApps
 // (unpinning forgets them, a whole app covers its parts, not an edit), the watch (only while such a note is open; our own
-// windows are skipped; front = the first window left), hide / show (the window stays open), a peek (opened from the list,
+// windows are skipped; front = the first window left), minimise / show (the window stays open; a click on it in the taskbar brings it back until the focus leaves), a peek (opened from the list,
 // Bring notes to front, until another window comes in front), a ringing reminder and a focused note show, a list that
 // can't be read shows every note, the animation (fades in dropping into place, out rising; the saved place never changes), enforcePinned leaves a hidden one hidden, the list's card, a hidden locked note, pin:apps.
 // main/app-pin.js check() is called by hand, so nothing waits for its clock. The note window's list: note-ui-pins.test.js.
@@ -67,9 +67,9 @@ const app = require('./helpers/app');
   E.app.emit('browser-window-blur', {}, w); await tick(5);
   assert.ok(P.ticking() && E.desktopCapturer.calls > calls, 'the focus went to another app: a check at once, and the clock again');
   // it mirrors its app: in front = on top; open behind another app = on screen, just above its app; closed or
-  // minimised (not in the list) = hidden, back when it opens again
-  const top = () => w.visible && w.top && !w.appBehind;
-  const under = (src) => w.visible && !w.top && w.appBehind && w.above === src.id;
+  // minimised (not in the list) = minimised too (1.4.28: in the taskbar, not hidden), back when it opens again
+  const top = () => w.isVisible() && w.top && !w.appBehind;
+  const under = (src) => w.isVisible() && !w.top && w.appBehind && w.above === src.id;
   await front({ id: `window:${hw(w)}:0`, name: 'SQL tips' }, VS, CHROME);
   assert.ok(top(), 'VS Code with ShopWebsite in front (our own note skipped): on top');
   await front(CHROME, VS);
@@ -79,10 +79,18 @@ const app = require('./helpers/app');
   await front(VS, CHROME);
   assert.ok(top(), 'VS Code in front again: on top');
   await front(CHROME);
-  assert.ok(!w.visible && w.appHidden && !w.destroyed, 'VS Code closed or minimised: hidden, not closed');
+  const away = () => w.minimized && w.appHidden && !w.destroyed;
+  assert.ok(away(), 'VS Code closed or minimised: minimised, not closed');
+  assert.ok(w.visible, 'in the taskbar (minimised, not hidden: hidden looked closed)');
   assert.ok(S.store.get(id).open, 'still open');
   await front(VS2);
-  assert.ok(!w.visible, 'only another VS Code folder open: still hidden');
+  assert.ok(away(), 'only another VS Code folder open: still minimised');
+  // ---- a click on it in the taskbar while its app is away: back, on top, until the focus leaves
+  w.restore(); w.focused = true;
+  assert.ok(top() && !w.appHidden, 'brought back from the taskbar: on screen, on top');
+  assert.ok(!w.minimizable, 'and not minimisable again (only its own button and app pins minimise it)');
+  w.focused = false; E.app.emit('browser-window-blur', {}, w); await tick(5); await P.check();
+  assert.ok(away(), 'the focus left and its app is still away: minimised again');
   await front(CHROME, VS);
   assert.ok(under(VS), 'ShopWebsite opens again (behind Chrome): back, just above it');
   await front(VS);
@@ -92,17 +100,17 @@ const app = require('./helpers/app');
   const home = { ...w.bounds };
   const saved = JSON.stringify(S.store.get(id).bounds);
   await front(CHROME);
-  assert.ok(w.visible && w.appHidden, 'going: still on screen while it fades');
+  assert.ok(w.isVisible() && w.appHidden, 'going: still on screen while it fades');
   await wait(70);
   assert.ok(w.opacity > 0 && w.opacity < 1 && w.bounds.y < home.y && w.bounds.y >= home.y - 10, `half-way: fading and rising (${w.opacity}, ${w.bounds.y})`);
   await wait(150);
-  assert.ok(!w.visible && w.opacity === 1 && w.bounds.y === home.y, 'gone: hidden, put back in its place, its see-through back');
+  assert.ok(away() && w.opacity === 1 && w.bounds.y === home.y, 'gone: minimised, put back in its place, its see-through back');
   await front(VS);
-  assert.ok(w.visible && w.opacity < 0.5 && w.bounds.y <= home.y - 5, 'coming: on screen at once, clear and a little higher');
+  assert.ok(w.isVisible() && !w.minimized && w.opacity < 0.5 && w.bounds.y <= home.y - 5, 'coming: on screen at once (restored), clear and a little higher');
   await wait(260);
-  assert.ok(w.visible && w.opacity === 1 && w.bounds.y === home.y && w.bounds.x === home.x, 'in its place');
+  assert.ok(w.isVisible() && w.opacity === 1 && w.bounds.y === home.y && w.bounds.x === home.x, 'in its place');
   await front(CHROME); await wait(50); await front(VS); await wait(260);
-  assert.ok(w.visible && w.opacity === 1 && w.bounds.y === home.y, 'turned back half-way: it comes back from where it was');
+  assert.ok(w.isVisible() && w.opacity === 1 && w.bounds.y === home.y, 'turned back half-way: it comes back from where it was');
   await wait(400);
   assert.equal(JSON.stringify(S.store.get(id).bounds), saved, 'its saved place never changed');
   P.ANIM.in = P.ANIM.out = 0;
@@ -113,7 +121,7 @@ const app = require('./helpers/app');
   // ---- enforcePinned (every 2.5 s) leaves a hidden one hidden, and one behind its app behind
   await front(CHROME);
   require('../main/note-window').enforcePinned();
-  assert.ok(!w.visible, 'enforcePinned doesn’t bring it back');
+  assert.ok(!w.isVisible(), 'enforcePinned doesn’t bring it back');
   await front(CHROME, VS);
   require('../main/note-window').enforcePinned();
   assert.ok(under(VS), 'nor on top');
@@ -126,31 +134,31 @@ const app = require('./helpers/app');
   await front(VS2); assert.ok(top(), 'any VS Code window');
   await front(XL); assert.ok(top(), 'or Excel');
   await front(CHROME, XL, VS); assert.ok(under(XL), 'both behind Chrome: just above the nearer one');
-  await front(CHROME); assert.ok(!w.visible, 'neither open: hidden');
-  await front(); assert.ok(!w.visible, 'nothing open: hidden');
+  await front(CHROME); assert.ok(!w.isVisible(), 'neither open: hidden');
+  await front(); assert.ok(!w.isVisible(), 'nothing open: hidden');
 
   // ---- shows anyway: its window has the focus (ticking its list), a reminder rings, the list can't be read
   await front(VS); w.focused = true;
   await front(CHROME); assert.ok(top(), 'the focused note never hides'); w.focused = false;
-  await front(CHROME); assert.ok(!w.visible);
+  await front(CHROME); assert.ok(!w.isVisible());
   S.store.get(id).reminders = [{ id: 'r1', start: Date.now(), at: Date.now(), repeat: null, firing: true, count: 1, target: 'note' }];
   await front(CHROME); assert.ok(top(), 'a reminder rings: it shows, on top');
   S.store.get(id).reminders = [];
-  await front(CHROME); assert.ok(!w.visible);
+  await front(CHROME); assert.ok(!w.isVisible());
   E.__sourcesFail = true; await P.check();
-  assert.ok(w.visible, 'the list can’t be read: every note shows (a broken check never hides notes)');
-  E.__sourcesFail = false; await front(CHROME); assert.ok(!w.visible, 'and hides again once it can');
+  assert.ok(w.isVisible(), 'the list can’t be read: every note shows (a broken check never hides notes)');
+  E.__sourcesFail = false; await front(CHROME); assert.ok(!w.isVisible(), 'and hides again once it can');
 
   // ---- a peek: opened from the list it shows over whatever is in front, until another window comes in front
   await H['list:open-note']({}, id);
-  assert.ok(w.visible && w.peek, 'opened from the list: it shows');
-  await front(CHROME); assert.ok(w.visible, 'Chrome still in front: it stays');
-  await front(XL); assert.ok(w.visible && !w.peek, 'Excel came in front (one of its apps): the peek is over, it stays');
-  await front(CHROME); assert.ok(!w.visible, 'Chrome: hidden again');
+  assert.ok(w.isVisible() && w.peek, 'opened from the list: it shows');
+  await front(CHROME); assert.ok(w.isVisible(), 'Chrome still in front: it stays');
+  await front(XL); assert.ok(w.isVisible() && !w.peek, 'Excel came in front (one of its apps): the peek is over, it stays');
+  await front(CHROME); assert.ok(!w.isVisible(), 'Chrome: hidden again');
   await H['list:bring-front']();
-  assert.ok(w.visible, 'Bring notes to front: it comes up too');
-  await front(CHROME); assert.ok(w.visible, 'until another window comes in front');
-  await front({ id: 'window:444:0', name: 'Spotify' }); assert.ok(!w.visible);
+  assert.ok(w.isVisible(), 'Bring notes to front: it comes up too');
+  await front(CHROME); assert.ok(w.isVisible(), 'until another window comes in front');
+  await front({ id: 'window:444:0', name: 'Spotify' }); assert.ok(!w.isVisible());
   await front(CHROME, XL); assert.ok(under(XL));
   await H['list:open-note']({}, id);
   assert.ok(top(), 'opened from the list while behind its app: on top at once');
@@ -158,11 +166,11 @@ const app = require('./helpers/app');
 
   // ---- unpinning: the apps are forgotten, it shows again; the watch stops
   v = await H['note:update'](ev(w), { pinned: false, clickThrough: false });
-  assert.ok(!v.pinned && v.pinApps.length === 0 && w.visible && !w.top && !w.appBehind, 'unpinned: back, apps forgotten');
+  assert.ok(!v.pinned && v.pinApps.length === 0 && w.isVisible() && !w.top && !w.appBehind, 'unpinned: back, apps forgotten');
   assert.ok(!P.watching(), 'the watch stopped');
   v = await H['note:update'](ev(w), { pinned: true });
   assert.ok(v.pinned && v.pinApps.length === 0, 'a normal pin again: on top everywhere');
-  await front(CHROME); assert.ok(w.visible);
+  await front(CHROME); assert.ok(w.isVisible());
 
   // ---- a note that opens pinned over apps waits for the first check (no flash), and the watch stops when it closes
   await H['note:update'](ev(w), { pinApps: [{ app: 'Excel', part: null }] });
@@ -173,12 +181,12 @@ const app = require('./helpers/app');
   await H['list:open-note']({}, id); // opened from the list: a peek
   await tick(5);
   const w2 = app.winOf(id);
-  assert.ok(w2.visible, 'from the list it shows at once');
+  assert.ok(w2.isVisible(), 'from the list it shows at once');
   await front(CHROME); await front(XL); await front(CHROME);
-  assert.ok(!w2.visible, 'then follows Excel');
+  assert.ok(!w2.isVisible(), 'then follows Excel');
   S.store.get(id).open = true;
   E.app.emit('second-instance'); // (not a list open: brings notes up = a peek)
-  assert.ok(w2.visible);
+  assert.ok(w2.isVisible());
   // opened some other way (a start of CosmoNotes) while Excel is open behind Chrome: on screen just above Excel, not on
   // top (shown once the watch's first check knows; the check runs as the window is made)
   await H['list:close-note']({}, id);
@@ -188,15 +196,27 @@ const app = require('./helpers/app');
   await tick(5);
   const w3 = app.winOf(id);
   await P.check();
-  assert.ok(w3.visible && !w3.top && w3.above === XL.id, 'just above Excel, not on top');
+  assert.ok(w3.isVisible() && !w3.top && w3.above === XL.id, 'just above Excel, not on top');
+  // opened that way while none of its apps is open: it starts minimised (in the taskbar), and shows when Excel opens
+  await H['list:close-note']({}, id);
+  await tick(5);
+  E.__sources = [CHROME];
+  require('../main/note-window').openNoteWindow(S.store.get(id));
+  await tick(5);
+  const w4 = app.winOf(id);
+  await P.check(); await tick(5);
+  assert.ok(w4.minimized && w4.visible && w4.appHidden, 'Excel not open: it starts minimised');
+  await front(XL);
+  assert.ok(w4.isVisible() && w4.top && !w4.appHidden, 'Excel in front: it shows');
+  await front(CHROME, XL);
   S.store.get(id).open = true;
 
   // ---- pin:apps: the open apps once each, A to Z, with their parts (none for a browser); our windows left out
-  E.__sources = [{ id: `window:${hw(w3)}:0`, name: 'SQL tips' }, VS2, XL, CHROME, VS, { id: 'window:555:0', name: 'b.xlsx - excel' }];
-  const apps = await H['pin:apps'](ev(w3));
+  E.__sources = [{ id: `window:${hw(w4)}:0`, name: 'SQL tips' }, VS2, XL, CHROME, VS, { id: 'window:555:0', name: 'b.xlsx - excel' }];
+  const apps = await H['pin:apps'](ev(w4));
   assert.deepEqual(apps, [{ app: 'Excel', parts: ['b.xlsx', 'Budget.xlsx'] }, { app: 'Google Chrome', parts: [] }, { app: 'Visual Studio Code', parts: ['Other', 'ShopWebsite'] }]);
   E.__sourcesFail = true;
-  assert.equal(await H['pin:apps'](ev(w3)), null, 'can’t be read: null (the note says so)');
+  assert.equal(await H['pin:apps'](ev(w4)), null, 'can’t be read: null (the note says so)');
   E.__sourcesFail = false;
   assert.equal(await H['pin:apps']({ sender: {} }), null, 'only a note window asks');
 
@@ -204,8 +224,8 @@ const app = require('./helpers/app');
   await H['lock:set'](null, { current: '', next: '1234', kind: 'pin' });
   await H['list:set-locked'](null, id, true, '1234');
   await tick(20);
-  await H['note:relock'](ev(w3)); // (what its window does on note:lock-now)
-  v = await H['note:update'](ev(w3), { pinApps: [{ app: 'Notepad', part: 'secret plan.txt' }], html: '<p>no</p>' });
+  await H['note:relock'](ev(w4)); // (what its window does on note:lock-now)
+  v = await H['note:update'](ev(w4), { pinApps: [{ app: 'Notepad', part: 'secret plan.txt' }], html: '<p>no</p>' });
   assert.deepEqual(S.store.get(id).pinApps, [{ app: 'Notepad', part: 'secret plan.txt' }], 'pinned over an app while hidden');
   assert.ok(!S.store.get(id).html.includes('no'), 'nothing else changes');
   const lc = await app.card(id);

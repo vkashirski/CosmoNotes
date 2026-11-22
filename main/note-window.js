@@ -75,7 +75,8 @@ function openNoteWindow(n, { focus = false } = {}) {
     settle();
     win.loaded = true; // 1.4.5: from now on app pins may show it (main/app-pin.js)
     applyState(win, S.store.get(n.id) || n);
-    if (!appPin.mayShow(win)) return; // pinned over apps and none of them is in front: it shows when one is
+    // pinned over apps and none of them is in front: it starts minimised, in the taskbar (1.4.28), and shows when one is
+    if (!appPin.mayShow(win)) { appPin.minimise(win); return; }
     if (focus) { win.show(); win.focus(); } else win.showInactive();
     appPin.shown(win); // its app open behind another: just above that app
   };
@@ -104,15 +105,16 @@ function openNoteWindow(n, { focus = false } = {}) {
   win.on('resize', rememberBounds);
   win.on('focus', () => raised(win)); // 1.4.2: clicked: on top of the other pinned notes (enforcePinned)
 
-  // A pinned note never minimises by itself (e.g. "Show desktop"), only with its own minimise button (win.userMin).
+  // A pinned note never minimises by itself (e.g. "Show desktop"), only with its own minimise button (win.userMin),
+  // or by app pins while its app is away (win.appHidden, main/app-pin.js).
   win.on('minimize', () => {
     const cur = S.store.get(win.noteId);
-    if (cur && cur.pinned && !win.userMin) setTimeout(() => { if (!win.isDestroyed()) win.restore(); }, 30);
+    if (cur && cur.pinned && !win.userMin && !win.appHidden) setTimeout(() => { if (!win.isDestroyed() && !win.appHidden) win.restore(); }, 30);
   });
   win.on('restore', () => {
-    if (!win.userMin) return;
+    win.setMinimizable(false); // (only its own button and app pins make it minimisable, for the moment it minimises)
     win.userMin = false;
-    win.setMinimizable(false);
+    appPin.restored(win); // 1.4.28: app pins had it minimised (its app is away): back on screen, on top
   });
   // 1.1.13: maximise (button or double-click on the top bar). A rolled-up note unrolls first.
   const sendWinState = () => { if (!win.isDestroyed()) win.webContents.send('note:win-state', { maximized: win.isMaximized() }); };

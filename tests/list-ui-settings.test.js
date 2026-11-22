@@ -1,5 +1,6 @@
 'use strict';
-// Settings and Edit design in the notes list, in a real browser (tests/helpers/list-ui.js): sections fold, the window colour,
+// Settings and Edit design in the notes list, in a real browser (tests/helpers/list-ui.js): 1.4.25: the sidebar of sections
+// (one at a time, wide / slim, Up / Down), search across them, the window colour,
 // new notes' colours (several = one at random, never none), font, see-through and switches, effects for all notes and the
 // pause button, changing the password; right-click → Edit design… (title as you type, colour, see-through, its own
 // effect; three tabs), Enter / Escape / outside click close it, and a change made elsewhere shows in it. About: the version
@@ -21,55 +22,110 @@ const assert = require('assert');
   const settings = async () => (await ui.get()).settings;
   const note = async (id) => (await ui.get()).notes.find((n) => n.id === id);
 
-  // ---- Settings: every section starts closed and opens by its title
+  // ---- Settings (1.4.25, the owner's pick): a sidebar of sections, one shown at a time; General first
   await ui.tab('settings');
-  const heads = await ui.count('#viewSettings .phead');
-  assert.ok(heads >= 5, 'several sections');
-  assert.equal(await ui.count('#viewSettings .panel.open'), 0, 'all closed at first');
-  for (let k = 0; k < heads; k++) await ui.click(`#viewSettings .phead >> nth=${k}`);
-  assert.equal(await ui.count('#viewSettings .panel.open'), heads, 'a click on the title opens each');
-  await page.locator('#viewSettings .phead >> nth=0').dispatchEvent('keydown', { key: 'Enter' }); await ui.settle();
-  assert.equal(await page.getAttribute('#viewSettings .phead >> nth=0', 'aria-expanded'), 'false', 'Enter closes it again (keyboard)');
+  const navs = await page.$$eval('#setNav [data-sec]', (bs) => bs.map((b) => b.dataset.sec));
+  assert.deepEqual(navs, ['general', 'notes', 'look', 'writing', 'reminders', 'privacy', 'yournotes', 'about'], `the sections (${navs})`);
+  const secs = await page.$$eval('#viewSettings .setsec', (xs) => xs.map((x) => x.dataset.sec));
+  assert.deepEqual(secs, navs, 'one section for each sidebar button, in the same order');
+  assert.equal(await ui.count('#viewSettings .panel:not(.setsec > .panel)'), 0, 'every panel is in a section');
+  const secShown = () => page.$$eval('#viewSettings .setsec', (xs) => xs.filter((x) => getComputedStyle(x).display !== 'none').map((x) => x.dataset.sec));
+  assert.deepEqual(await secShown(), ['general'], 'General shows first, alone');
+  assert.equal(await page.getAttribute('#setNav [data-sec="general"]', 'aria-current'), 'true', 'and is the current one');
+  assert.ok(await ui.visible('#sStartup') && !(await ui.visible('#sSpell')), 'its rows only');
+  await ui.section('writing');
+  assert.deepEqual(await secShown(), ['writing'], 'a click shows that section instead');
+  assert.ok(await ui.visible('#sSpell') && !(await ui.visible('#sStartup')), 'with its rows');
+  // 1.4.28 ("make toggles more clear"): a row's picked button is filled with ink, never the panel's own colour (Voice
+  // to text's "Words appear" read as the other one picked), and an off switch has a rim
+  const look = await page.evaluate(() => {
+    const on = document.querySelector('#sttWhen button.on') || document.querySelector('#sttWhen button');
+    on.classList.add('on');
+    const bg = (x) => getComputedStyle(x).backgroundColor;
+    const i = document.querySelector('#sSpell + i');
+    return { on: bg(on), panel: bg(on.closest('.panel')), rim: getComputedStyle(i).boxShadow };
+  });
+  assert.notEqual(look.on, look.panel, `the picked button stands out from its panel (${look.on})`);
+  assert.ok(/inset/.test(look.rim) || (await page.isChecked('#sSpell')), `an off switch has a rim (${look.rim})`);
+  assert.equal(await ui.count('#setNav [aria-current]'), 1, 'one current section');
+  // 1.4.28 (the owner's wish): the version line sits at the bottom of the sidebar, under the sections, on every one
+  assert.ok(await ui.visible('#setNav > .version:last-child') && /Made with love/.test(await ui.text('#version')), 'the version line under the sections');
+  assert.equal(await ui.count('.setsec #version'), 0, 'not in About any more');
+  // 1.4.28: "New notes" is "Notes", and click-through moved there from General
+  assert.equal((await ui.text('#setNav [data-sec="notes"] .lw')).trim(), 'Notes', 'the section is called Notes');
+  assert.equal(await ui.count('.setsec[data-sec="notes"] #sClickThrough'), 1, 'click-through is under Notes');
+  assert.equal(await ui.count('.setsec[data-sec="general"] #sClickThrough'), 0, 'not under General');
+  await page.focus('#setNav [data-sec="writing"]'); await ui.key('ArrowDown');
+  assert.deepEqual(await secShown(), ['reminders'], 'Down in the sidebar: the next section');
+  await ui.key('ArrowUp'); await ui.key('ArrowUp');
+  assert.deepEqual(await secShown(), ['look'], 'Up: the one above');
+  await ui.tab('notes'); await ui.tab('settings');
+  assert.deepEqual(await secShown(), ['look'], 'coming back to Settings keeps the section');
+  // wide window: the names, the search above them; narrow (under 560 px): a slim rail with short names
+  const navW = () => page.$eval('#setNav', (n) => n.getBoundingClientRect().width);
+  assert.ok(await navW() > 150, 'wide: the sidebar has room for the names');
+  assert.ok(await ui.visible('#setNav [data-sec="look"] .lw') && !(await ui.visible('#setNav [data-sec="look"] .ls')), 'the long name');
+  const above = await page.evaluate(() => document.querySelector('.setsearch').getBoundingClientRect().bottom <= document.querySelector('#setNav').getBoundingClientRect().top + 1);
+  assert.ok(above, 'the search is above the sidebar');
+  await page.setViewportSize({ width: 420, height: 640 }); await ui.settle();
+  assert.ok(await navW() < 80, `narrow: a slim rail (${await navW()} px)`);
+  assert.ok(await ui.visible('#setNav [data-sec="look"] .ls') && !(await ui.visible('#setNav [data-sec="look"] .lw')), 'with short names');
+  const beside = await page.evaluate(() => document.querySelector('.setsearch').getBoundingClientRect().left >= document.querySelector('#setNav').getBoundingClientRect().right);
+  assert.ok(beside, 'and the search beside it, over the section');
+  const fits = await page.evaluate(() => document.querySelector('#viewSettings').scrollWidth <= document.querySelector('#viewSettings').clientWidth);
+  assert.ok(fits, 'nothing runs over sideways at 420 px');
+  await page.setViewportSize({ width: 1100, height: 800 }); await ui.settle();
 
-  // ---- search in Settings (1.3.35): only the sections that match show, open; clearing puts the folds back as they were
-  const shown = () => page.evaluate(() => [...document.querySelectorAll('#viewSettings .panel:not(.unfound) > .phead')].map((h) => (h.querySelector('h3') || h).textContent.trim()));
-  const openNow = () => page.evaluate(() => [...document.querySelectorAll('#viewSettings .panel')].map((p) => p.classList.contains('open')));
-  const foldsAtStart = await openNow();
+  // ---- search in Settings (1.3.35): the matching panels of every section, under their section's name
+  const shown = () => page.evaluate(() => [...document.querySelectorAll('#viewSettings .panel:not(.unfound) h3')].filter((h) => h.offsetParent).map((h) => h.textContent.trim()));
   await ui.type('#sq', 'evening');
   assert.deepEqual(await shown(), ['Evening colours'], '“evening” shows only Evening colours');
-  assert.ok(await ui.visible('#viewSettings .panel.open #sEve'), 'and opens it');
+  assert.ok(await ui.visible('#sEve'), 'its rows show');
   assert.ok(await ui.visible('#sqClear') && !(await ui.visible('#sqNone')), 'a clear button, no “nothing found”');
+  assert.deepEqual(await secShown(), ['look'], 'with its section’s name');
+  assert.equal(await ui.count('#viewSettings.finding'), 1, 'no section is the current one while searching');
   await ui.type('#sq', 'EVENING  Colours');
   assert.deepEqual(await shown(), ['Evening colours'], 'any case, every word must match');
   await ui.type('#sq', 'ever');
-  assert.ok(!(await shown()).includes('For new notes'), 'a word must start with it (“never” is no match)');
+  assert.ok(!(await shown()).includes('Colour'), 'a word must start with it (“never” is no match)');
   await ui.type('#sq', 'spell');
   assert.deepEqual(await shown(), ['Spelling'], 'the start of a word is enough');
-  // 1.3.36: other names for a section find it too (data-find), and every section has some
-  assert.equal(await ui.count('#viewSettings .panel:not([data-find])'), 0, 'every section has search words');
-  for (const [q, want] of [['dark mode', 'General'], ['startup', 'General'], ['dictation', 'Voice to text'], ['boss key', 'Panic button'],
-    ['password', 'Locked notes'], ['todo', 'Checklists'], ['grammar', 'Spelling'], ['appdata', 'Where your notes live'], ['version', 'About CosmoNotes']]) {
+  // 1.3.36: other names for a panel find it too (data-find), and every panel has some
+  assert.equal(await ui.count('#viewSettings .panel:not([data-find])'), 0, 'every panel has search words');
+  for (const [q, want] of [['dark mode', 'Start and theme'], ['startup', 'Start and theme'], ['dictation', 'Voice to text'], ['boss key', 'Panic button'],
+    ['password', 'Locked notes'], ['todo', 'Checklists'], ['grammar', 'Spelling'], ['appdata', 'Where your notes live'], ['version', 'CosmoNotes'],
+    ['volume', 'Sound'], ['snooze', 'Setting a reminder'], ['reset', 'Notes’ own settings']]) {
     await ui.type('#sq', q);
     assert.deepEqual(await shown(), [want], `“${q}” finds ${want}`);
   }
   await ui.type('#sq', 'transparent');
-  assert.deepEqual(await shown(), ['For new notes', 'Click-through'], 'a word can find more than one section');
+  assert.deepEqual(await shown(), ['Font and see-through', 'Click-through'], 'both under Notes (1.4.28: click-through moved there from General)');
+  assert.deepEqual(await secShown(), ['notes'], 'under Notes');
+  await ui.type('#sq', 'color');
+  assert.deepEqual(await shown(), ['Start and theme', 'Colour', 'Evening colours'], 'a word can find panels in more than one section');
+  assert.deepEqual(await secShown(), ['general', 'notes', 'look'], 'each under its section');
   await ui.type('#sq', 'everything');
   assert.deepEqual(await shown(), [], 'About’s feature list is not searched');
   assert.ok(await ui.visible('#sqNone'), '“No settings match.”');
+  assert.deepEqual(await secShown(), [], 'and no section shows');
   await ui.click('#sqClear');
   assert.equal(await page.inputValue('#sq'), '', 'the clear button empties it');
-  assert.equal(await ui.count('#viewSettings .panel.unfound'), 0, 'every section shows again');
-  assert.deepEqual(await openNow(), foldsAtStart, 'each open or closed as before the search');
+  assert.equal(await ui.count('#viewSettings .panel.unfound, #viewSettings.finding'), 0, 'the search is gone');
+  assert.deepEqual(await secShown(), ['look'], 'and the section shows again');
   await ui.type('#sq', 'backups');
   assert.deepEqual(await shown(), ['Backups'], 'Backups');
   await page.keyboard.press('Escape'); await ui.settle();
   assert.equal(await page.inputValue('#sq'), '', 'Escape clears it');
-  assert.deepEqual(await openNow(), foldsAtStart, 'and puts the folds back');
+  assert.deepEqual(await secShown(), ['look'], 'and puts the section back');
+  await ui.type('#sq', 'backups');
+  await ui.section('privacy');
+  assert.equal(await page.inputValue('#sq'), '', 'a click in the sidebar ends the search');
+  assert.deepEqual(await secShown(), ['privacy'], 'and shows that section');
   await page.keyboard.press('Control+f'); await ui.settle();
   assert.ok(await page.evaluate(() => document.activeElement.id === 'sq' && !document.getElementById('viewSettings').hidden), 'Ctrl+F in Settings goes to its search');
 
   // ---- Voice to text (1.3.4): one model, named, with its download; no choice, no Test my computer
+  await ui.section('writing');
   const vt = await ui.text('#sttModels');
   assert.ok(vt.includes('Uses Whisper small.en') && vt.includes('Not downloaded'), `says which model and that it isn't here (${vt})`);
   assert.equal(await ui.count('#sttModels button:has-text("Download")'), 1, 'a Download button');
@@ -89,15 +145,17 @@ const assert = require('assert');
   assert.equal(await page.getAttribute('#sttSource a', 'href'), 'https://huggingface.co/onnx-community/whisper-small.en', 'a link to it');
   assert.ok((await ui.text('#sttTipWindows')).includes('Win + H'), 'Windows 11 voice typing and its keys');
   // the order (1.3.7): how to use it (and Transcribe) at the top, where it comes from under the model, Windows 11 last
-  const order = await page.evaluate(() => [...document.querySelectorAll('#sttPanel .pinner > *')].map((e) => e.id || e.className));
+  const order = await page.evaluate(() => [...document.querySelectorAll('#sttPanel > *')].map((e) => e.id || e.className));
   assert.deepEqual(order.slice(order.indexOf('sttIntro')), ['sttIntro', 'sttModels', 'sttSource', 'row col', 'sttTipWindows'], `the order (${order})`);
 
   // ---- the window's colour
+  await ui.section('general');
   await ui.click('#sTheme [data-theme="night"], #sTheme button:has-text("Night")');
   assert.equal((await settings()).listTheme, 'night', 'saved');
   assert.equal(await page.getAttribute('body', 'data-theme'), 'night', 'and the window changes colour');
 
   // ---- new notes' colours
+  await ui.section('notes');
   await ui.click('#sPickOne');
   const first = (await settings()).defaultColors;
   assert.equal(first.length, 1);
@@ -143,6 +201,7 @@ const assert = require('assert');
   }
 
   // ---- effects for all notes, and the pause button
+  await ui.section('look');
   await ui.click('#sFxChoose');
   assert.ok(await ui.visible('#fxSheet'));
   const fx = await page.getAttribute('#fxAllEffects button >> nth=2', 'data-v');
@@ -162,6 +221,7 @@ const assert = require('assert');
   assert.equal((await settings()).fxPaused, false, 'and plays them again');
 
   // ---- changing the password: the current one first, the rules, then saved
+  await ui.section('privacy');
   await ui.click('#pwSave');
   assert.equal(await ui.modalTitle(), 'Change your password');
   assert.equal(await ui.count('#mInputs input'), 3, 'current, new, new again');
@@ -206,6 +266,7 @@ const assert = require('assert');
   await ui.menu(ui.noteKey(A), 'Note design…'); await ui.click('#editOpen');
   assert.ok((await note(A)).open && !(await ui.visible('#editSheet')), '“Open note” opens it on the desktop');
   // ---- About: the version and the date, the feature list, no version history (1.1.41)
+  await ui.section('about');
   await ui.tab('settings');
   const line = await ui.text('#aboutLine');
   assert.ok(/^Version [\d.]+ · Last updated /.test(line), `About says the version and the date (${line})`);
@@ -231,6 +292,7 @@ const assert = require('assert');
   assert.equal(await ui.text('#updBtns'), 'Install');
   assert.equal(await ui.count('.tab[data-tab="settings"].hasupd'), 1, 'a dot on the Settings tab');
   assert.equal(await ui.count('.abouthead h3.hasupd'), 1, 'and on About');
+  assert.equal(await ui.count('#setNav [data-sec="about"].hasupd'), 1, 'and on About in the sidebar (1.4.25)');
   await ui.click('#updBtns button');
   assert.equal(await ui.modalTitle(), 'Install the update?', 'Install asks first');
   await ui.modalCancel();
@@ -238,19 +300,19 @@ const assert = require('assert');
   await ui.click('#updBtns button'); await ui.modalOk();
   assert.match(await ui.text('#toast'), /installed app/, 'npm start: it says updates are for the installed app');
   // the tray's "Update to …": the list goes to Settings, at the updates
-  if (await ui.count('#viewSettings .panel.about.open')) await ui.click('#viewSettings .panel.about .phead');
+  await ui.section('general');
+  await ui.type('#sq', 'spell');
   await ui.tab('notes');
   require('../main/ipc-update').showUpdate();
   await ui.settle(100);
   assert.ok(await ui.visible('#updRow'), 'Settings is open at About’s updates');
-  assert.equal(await ui.count('#viewSettings .panel.about.open'), 1, 'About is unfolded');
+  assert.equal(await page.getAttribute('#setNav [data-sec="about"]', 'aria-current'), 'true', 'About is the section shown (1.4.25)');
+  assert.equal(await page.inputValue('#sq'), '', 'a search left in Settings is cleared');
   server.close();
   await ui.tab('notes');
 
   // ---- 1.3.27: Evening colours
-  await ui.tab('settings');
-  await page.evaluate(() => document.querySelectorAll('#viewSettings .phead[aria-expanded="false"]').forEach((h) => h.click()));
-  await ui.settle();
+  await ui.section('look');
   assert.deepEqual([await page.inputValue('#sEveFrom'), await page.inputValue('#sEveTo')], ['19:00', '07:00'], '19:00 to 07:00');
   await ui.check('#sEve');
   assert.equal((await settings()).eveOn, true, 'turned on');
@@ -260,6 +322,7 @@ const assert = require('assert');
   await ui.check('#sEve');
 
   // ---- 1.3.27: the panic button and its shortcut (no shortcut until one is set)
+  await ui.section('privacy');
   const GS = ui.E.globalShortcut;
   assert.ok(!(await ui.visible('#sPanicKeyRow')), 'no shortcut row while it is off');
   await ui.check('#sPanic');
@@ -286,6 +349,7 @@ const assert = require('assert');
   assert.deepEqual(Object.keys(GS.reg), []);
 
   // ---- 1.3.34: click-through: the switch, and right-click → Turn off click-through on a card (only while it is on)
+  await ui.section('general');
   const { S } = require('../main/state');
   assert.ok(!(await page.isChecked('#sClickThrough')), 'click-through starts off');
   await ui.check('#sClickThrough');
@@ -336,8 +400,9 @@ const assert = require('assert');
   const bg = await page.evaluate(() => { const s = getComputedStyle(document.querySelector('#viewSettings')); return [s.backgroundColor, s.backgroundAttachment]; });
   assert.ok(/^rgb\(/.test(bg[0]), `Settings has a solid background colour (${bg[0]})`);
   assert.equal(bg[1], 'local, local', 'which scrolls with the page');
-  // open every section and the feature list, then scroll
-  await page.evaluate(() => { document.querySelectorAll('#viewSettings .phead[aria-expanded="false"]').forEach((h) => h.click()); document.querySelector('#foldFeatures').open = true; });
+  // About with its feature list open is long enough to scroll
+  await ui.section('about');
+  await page.evaluate(() => { document.querySelector('#foldFeatures').open = true; });
   await ui.settle();
   const seen = await page.evaluate(() => new Promise((res) => {
     const v = document.querySelector('#viewSettings');
@@ -349,7 +414,7 @@ const assert = require('assert');
     v.scrollTop = 600;
     setTimeout(() => res({ timedOut: true }), 3000);
   }));
-  assert.ok(!seen.timedOut, 'Settings scrolls (open sections make it long enough)');
+  assert.ok(!seen.timedOut, 'Settings scrolls (About with its feature list is long enough)');
   assert.ok(seen.during, 'Settings gets .scrolling while it scrolls');
   assert.ok(seen.hitView, 'and the mouse then reaches the view, not what is in it');
   assert.ok(!seen.after, '.scrolling goes away once it stops');

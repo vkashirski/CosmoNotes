@@ -16,7 +16,7 @@ function spellLanguages() {
 
 function noteSettings() {
   // appTheme (1.1.16): the notes list's colours; a note's pop-ups and toolbars use them too
-  return { spellCheck: !!S.store.settings.spellCheck, hasPassword: !!S.store.settings.lock, ...lockInfo(), ...fxSettings(), ...checkSettings(), ...eveningAndPanic(), ...remindSettings(), appTheme: S.store.settings.listTheme || 'cream' };
+  return { spellCheck: !!S.store.settings.spellCheck, hasPassword: !!S.store.settings.lock, ...lockInfo(), ...fxSettings(), ...checkSettings(), ...eveningAndPanic(), ...remindSettings(), tagColors: { ...(S.store.settings.tagColors || {}) }, appTheme: S.store.settings.listTheme || 'cream' };
 }
 // 1.4.1: the sound a reminder plays (unless it has its own) and how loud: the note window plays it (src/note/remind.js);
 // 1.4.19: and whether the reminder panel's time box has seconds; 1.4.20: whether it goes on to the next box by itself, and

@@ -196,7 +196,7 @@ function registerGroupIpc() {
   ipcMain.handle('groups:update', (e, groupId, patch = {}) => {
     if (groupShut(groupId)) return;
     const clean = {};
-    for (const k of ['name', 'style', 'color', 'titleFont']) if (k in patch) clean[k] = patch[k]; // store.js normalizeGroup checks each
+    for (const k of ['name', 'style', 'color', 'titleFont', 'icon']) if (k in patch) clean[k] = patch[k]; // store.js normalizeGroup checks each
     S.store.updateGroup(groupId, clean);
     notifyList();
   });

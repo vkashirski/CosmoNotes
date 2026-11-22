@@ -249,9 +249,10 @@
 .switches > .row.toggle > i { justify-self: start; }
 .row + .switches > .row:first-child, .switches + .row, .switches + .switches > .row:first-child { border-top: 1px solid var(--soft); }
 .toggle input { position: absolute; opacity: 0; pointer-events: none; }
-.toggle i { position: relative; flex: none; width: 42px; height: 24px; border-radius: 999px; background: var(--soft2); transition: background .15s; }
+/* 1.4.28: an off switch has a rim, so its shape shows on every theme (its pale track was lost on light tints and dark panels) */
+.toggle i { position: relative; flex: none; width: 42px; height: 24px; border-radius: 999px; background: var(--soft2); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--mute) 60%, transparent); transition: background .15s, box-shadow .15s; }
 .toggle i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s; }
-.toggle input:checked + i { background: #3DAA5C; }
+.toggle input:checked + i { background: #3DAA5C; box-shadow: none; }
 .toggle input:checked + i::after { transform: translateX(18px); }
 .toggle input:focus-visible + i { box-shadow: 0 0 0 3px rgba(61,170,92,.3); }
 .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -260,7 +261,9 @@
 .sw.on { outline: 2.5px solid var(--ink); outline-offset: 2px; }
 .seg { display: flex; gap: 3px; padding: 3px; border-radius: 11px; background: var(--soft); }
 .seg button { flex: 1; padding: 6px 4px; border: 0; border-radius: 8px; background: transparent; color: var(--ink2); font: 800 12.5px var(--ui); cursor: pointer; }
-.seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+/* 1.4.28: the picked one is filled with ink (the owner: "make toggles more clear"). A card-coloured one vanished on a
+   card-coloured panel (Voice to text's "Words appear"), and read as the one not picked. */
+.seg button.on { background: var(--ink); color: var(--pillfg); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
 .seg button.hand { font: 700 18px var(--hand); padding: 2px 4px; }
 .seg button.med { font: 400 16px var(--med); padding: 2px 4px; }
 .btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -305,6 +308,7 @@ code { display: block; padding: 8px 10px; margin-bottom: 10px; border-radius: 9p
   font: 800 10.5px/17px var(--ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
 }
 .ctag:hover { background: color-mix(in oklab, var(--accent, var(--ink3)) 24%, transparent); }
+.ctag.tc:hover { filter: brightness(.95); } /* 1.4.30: a tag with a colour (set on the pill) keeps it */
 .cards.size-s .ctag { font-size: 9.5px; height: 15px; line-height: 15px; padding: 0 5px; }
 /* the Tags pop-up (list/actions-locks.js openTagSheet; the editor is src/tags.js) */
 .mbox.tbox { width: 360px; }

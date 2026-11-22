@@ -127,6 +127,53 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .tab svg { width: 15px; height: 15px; }
 .count { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--soft2); font-size: 11px; line-height: 17px; text-align: center; }
 .tab.on .count { background: #FFE45C; color: #3B3226; }
+/* groups pinned as tabs, and editing the tabs (list/events.js paintTabs). The bar never wraps: tabs that don't fit go
+   into » (#tabMore); while editing it wraps, so every tab can be moved */
+.tabs { align-items: center; min-width: 0; }
+.tabs > .tab, .tabs > button { flex: none; }
+.gtab .gtname { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab.ovf { display: none; }
+/* 1.4.33: how a tab shows (settings.listTabs show): icon and name, the icon only (no count either: the name is in its
+   tooltip), or the name only. A group with no icon has only its name */
+.tab > svg, .tab .ticon svg { flex: none; }
+.tab.t-icon { padding: 6px 10px; }
+.tab.t-icon .tlabel, .tab.t-icon .gtname, .tab.t-icon .count { display: none; }
+.tab.t-name > svg { display: none; }
+.iconpop { position: fixed; right: auto; width: 312px; z-index: 30; }
+.iconpop .pophead { margin: 6px 2px 8px; font: 800 12.5px var(--ui); color: var(--ink); }
+.icongrid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+.icongrid[hidden], .iconpop [hidden] { display: none; }
+.icongrid button { display: flex; align-items: center; justify-content: center; height: 32px; border: 0; border-radius: 9px; background: transparent; color: var(--ink3); cursor: pointer; }
+.icongrid button:hover { background: var(--soft); color: var(--ink); }
+.icongrid button.on { background: #FFE45C; color: #3B3226; }
+.icongrid button svg { width: 18px; height: 18px; }
+.icongrid .noicon { grid-column: span 3; font: 800 12px var(--ui); }
+/* the group bar wears its group's icon (else its look's: list/cards.js renderGroupHeader) */
+.gicon.own svg { width: 22px; height: 22px; fill: none; stroke: var(--ink2); stroke-width: 1.8; }
+.tabplus, .tabmore, .tabedit {
+  display: flex; align-items: center; gap: 4px; padding: 6px 10px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--ink3); font: 800 13px var(--ui); cursor: pointer;
+}
+.tabplus:hover, .tabmore:hover, .tabedit:hover { background: var(--soft); color: var(--ink); }
+.tabplus[hidden], .tabmore[hidden] { display: none; }
+.tabedit svg { width: 15px; height: 15px; }
+.tabedit span { display: none; }
+.tabs.editing { flex-wrap: wrap; row-gap: 4px; }
+.tabs.editing .tabedit { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(80,60,20,.15); }
+.tabs.editing .tabedit svg { display: none; }
+.tabs.editing .tabedit span { display: inline; }
+.tabs.editing .tabplus { color: var(--ink); }
+.tabs.editing .tab.movable { cursor: grab; box-shadow: inset 0 0 0 1.5px var(--soft2); }
+.tabs.editing .tab.movable::before { content: '⋮⋮'; letter-spacing: -3px; margin-right: 2px; color: var(--mute); font-size: 11px; }
+.tabs.editing .tab.off { opacity: .5; }
+.tab.tdrag { opacity: .4; }
+.tab.drop-before { box-shadow: inset 3px 0 0 var(--ink3); }
+.tab.drop-after { box-shadow: inset -3px 0 0 var(--ink3); }
+.tabs.drop-on { background: var(--soft); border-radius: 14px; }
+.tab .tx, .tab .teye { display: none; width: 18px; height: 18px; margin: -2px -6px -2px 0; border-radius: 50%; align-items: center; justify-content: center; color: var(--ink3); }
+.tabs.editing .tab .tx, .tabs.editing .tab .teye { display: flex; }
+.tab .tx:hover, .tab .teye:hover { background: var(--soft2); color: var(--ink); }
+.tab .tx svg, .tab .teye svg { width: 12px; height: 12px; stroke-width: 2.4; }
 
 .view { flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 16px; }
 /* 1.1.43: smooth scrolling. A scrolling area needs a solid background of its own: with a see-through one, Windows
@@ -202,9 +249,27 @@ body.dark { --searchShade: rgba(0,0,0,.7); }
 .tagchip:hover { color: var(--ink); background: var(--card2); }
 .tagchip.on { background: var(--ink); color: var(--bg); box-shadow: none; }
 .tagchip.on small { color: inherit; opacity: .7; }
+/* 1.4.30: a tag with a colour keeps it (set on the chip: src/tags.js COLORS). Picked (the owner's wish: easy to tell): a
+   tick, and a coloured one a ring; while some are picked, the others fade (.picking, list/cards.js paintTagRow).
+   1.4.31: the ring is inside the chip (an outer one was cut off by the row, which scrolls sideways) */
+.tagchip.tc small { color: inherit; opacity: .75; }
+.tagchip.tc:hover { filter: brightness(.96); }
+.tagchip.on::before { content: '✓'; font-weight: 900; }
+.tagchip.tc.on { box-shadow: inset 0 0 0 2px currentColor; }
+.tagrow.picking .tagchip:not(.on) { opacity: .45; filter: grayscale(.8); }
+.tagrow.picking .tagchip:not(.on):hover { opacity: .85; filter: none; }
 .tagmode { flex: none; padding: 2px; border-radius: 10px; }
 .tagmode button { flex: none; padding: 3px 9px; font-size: 11.5px; }
 .tagclear { margin-right: 0; }
+/* 1.4.31: filtering by a tag (list/cards.js filterSoon): the cards fade and a spinner turns over them until they are
+   painted again; it fades out, so a quick filter doesn't flash */
+.filterspin { position: sticky; top: 130px; z-index: 6; height: 0; display: flex; justify-content: center; pointer-events: none; opacity: 0; transition: opacity .18s; }
+.filterspin.on { opacity: 1; transition: none; }
+.filterspin i { width: 30px; height: 30px; margin-top: 70px; box-shadow: 0 0 0 6px var(--bg); border-radius: 50%; border: 3px solid var(--soft2); border-top-color: var(--ink2); animation: newSpin .7s linear infinite; }
+.filterspin:not(.on) i { animation-play-state: paused; }
+#cards.filtering { opacity: .35; pointer-events: none; }
+#cards { transition: opacity .15s; }
+@media (prefers-reduced-motion: reduce) { .filterspin i { animation-duration: 2s; } }
 
 /* ---------- sort menu ---------- */
 .view { position: relative; }
@@ -313,6 +378,7 @@ body.dark { --searchShade: rgba(0,0,0,.7); }
   transition: transform .12s, box-shadow .12s;
 }
 .backbtn:hover { background: var(--card2); }
+.backbtn[hidden] { display: none; }
 .backbtn svg { width: 18px; height: 18px; }
 .gname {
   flex: 1; min-width: 0;
