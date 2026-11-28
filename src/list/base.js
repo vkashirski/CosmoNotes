@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes "All notes" window, part 1 of 7: colours, themes, sizes, icons, the DOM helper, the colour row, data (load)
+// CosmoNotes "All notes" window, part 1 of 8: colours, themes, sizes, icons, the DOM helper, the colour row, data (load)
 // (src/list.js until 1.1.28; the parts load in order from list.html. How they share names: ai-context/splitting-code.md)
 (() => {
   // K: the names the parts share. V: variables more than one part changes (V.tab etc.). K.later('f'): a function a later part

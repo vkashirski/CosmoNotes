@@ -10,7 +10,11 @@
 // refused; quick picks; another app has it; none), "Use on all notes" under a setting and "Reset notes…" (General).
 // 1.3.34: the click-through switch, and right-click → Turn off click-through on a card.
 // 1.4.0: About → updates: Check, the dot, Install asks first, the switch, the tray's line opens it.
+// 1.4.34: Feedback ("Ground control" in the code, above About): the two choices first, then a locked form (Cancel asks), the draft kept, a pasted picture, Send's words and its countdown.
 const assert = require('assert');
+const fs = require('fs');
+const http = require('http');
+const path = require('path');
 
 (async () => {
   let A;
@@ -25,7 +29,7 @@ const assert = require('assert');
   // ---- Settings (1.4.25, the owner's pick): a sidebar of sections, one shown at a time; General first
   await ui.tab('settings');
   const navs = await page.$$eval('#setNav [data-sec]', (bs) => bs.map((b) => b.dataset.sec));
-  assert.deepEqual(navs, ['general', 'notes', 'look', 'writing', 'reminders', 'privacy', 'yournotes', 'about'], `the sections (${navs})`);
+  assert.deepEqual(navs, ['general', 'notes', 'look', 'writing', 'reminders', 'privacy', 'yournotes', 'ground', 'about'], `the sections (${navs})`);
   const secs = await page.$$eval('#viewSettings .setsec', (xs) => xs.map((x) => x.dataset.sec));
   assert.deepEqual(secs, navs, 'one section for each sidebar button, in the same order');
   assert.equal(await ui.count('#viewSettings .panel:not(.setsec > .panel)'), 0, 'every panel is in a section');
@@ -427,6 +431,107 @@ const assert = require('assert');
   const box = await page.locator('.tabs').boundingBox();
   await page.mouse.move(box.x + 20, box.y + box.height / 2); await page.keyboard.down('Control'); await page.mouse.wheel(0, -120); await page.keyboard.up('Control'); await ui.settle(300);
   assert.notEqual((await ui.get()).settings.listSize, size, 'Ctrl + wheel over the tabs still changes the card size');
+
+  // ---- 1.4.34: Ground control, with a stand-in relay (bits 0: any nonce solves it). Main sends; this checks the form.
+  let relayAnswer = 503;
+  let relayDelay = 0;
+  const posts = [];
+  const relay = http.createServer(async (req, res) => {
+    let raw = ''; for await (const c of req) raw += c;
+    if (req.method === 'POST') posts.push(JSON.parse(raw));
+    if (relayDelay) await new Promise((ok) => setTimeout(ok, relayDelay));
+    res.writeHead(relayAnswer, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(relayAnswer !== 200 ? { error: 'closed' } : req.url === '/challenge' ? { challenge: 'c', bits: 0 } : { ok: true, number: 1 }));
+  });
+  await new Promise((ok) => relay.listen(0, '127.0.0.1', ok));
+  require('../main/feedback').setRelay(`http://127.0.0.1:${relay.address().port}`);
+  await ui.tab('settings');
+  await ui.section('ground');
+  assert.equal(await ui.text('#viewSettings .setsec.on .sectitle'), 'Feedback');
+  assert.equal(await ui.text('#setNav [data-sec="ground"] .lw'), 'Feedback');
+  // first only the two choices; picking one opens its form, with no way to switch inside it
+  assert.equal(await ui.count('#gcPick .gcchoice'), 2);
+  assert.ok(await ui.visible('#gcPick') && !(await ui.visible('#gcForm')), 'first only the two choices, no fields');
+  await ui.click('#gcPick [data-kind="feature"]');
+  assert.ok(!(await ui.visible('#gcPick')) && await ui.visible('#gcForm'), 'a choice opens its form');
+  assert.equal(await ui.text('#gcKindName'), 'Request a feature');
+  assert.equal(await ui.text('#gcTextName'), 'Your idea');
+  assert.ok(!(await ui.visible('#gcExpectRow')), 'a feature request: no "What did you expect?"');
+  assert.equal(await ui.count('#gcForm [data-kind]'), 0, 'no switching to the other kind inside the form');
+  await ui.click('#gcCancel'); // nothing typed: straight back
+  assert.ok(await ui.visible('#gcPick') && !(await ui.visible('#gcForm')), 'Cancel with nothing typed goes back');
+  await ui.click('#gcPick [data-kind="bug"]');
+  assert.equal(await ui.text('#gcKindName'), 'Report a bug');
+  assert.ok(await ui.visible('#gcExpectRow'), 'a bug report asks what they expected');
+  assert.equal(await ui.text('#gcTextName'), 'What happened?');
+  await ui.type('#gcTitle', 'Throwaway');
+  await ui.click('#gcCancel');
+  assert.equal(await ui.modalTitle(), 'Discard this report?', 'Cancel asks once something is typed');
+  await ui.modalCancel();
+  assert.equal(await page.inputValue('#gcTitle'), 'Throwaway', 'kept when not discarded');
+  await ui.click('#gcCancel');
+  await ui.modalOk();
+  assert.ok(await ui.visible('#gcPick'), 'discarded: back to the choices');
+  await ui.click('#gcPick [data-kind="bug"]');
+  assert.equal(await page.inputValue('#gcTitle'), '', 'the discarded words are gone');
+  assert.match(await ui.text('#gcDetails'), /^CosmoNotes .+ · Windows /, 'the app details that would go');
+  await ui.click('#gcSend');
+  assert.equal(await ui.text('#gcLine'), 'Add a title and a few words.');
+  await ui.type('#gcTitle', 'Pin falls off');
+  await ui.type('#gcText', 'The pin falls off after sleep.');
+  // a picture pasted while Ground control shows (a PNG's header: the fake Electron reads its size from it)
+  await page.evaluate(() => {
+    const b = new Uint8Array(33); b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); b.set([0, 0, 1, 0x90, 0, 0, 1, 0x2c], 16); // 400 × 300
+    const dt = new DataTransfer(); dt.items.add(new File([b], 'shot.png', { type: 'image/png' }));
+    document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await ui.settle(300);
+  assert.equal(await ui.count('#gcPics .gcpic img'), 1, 'a pasted picture shows');
+  await ui.settle(800); // the draft is saved half a second after typing stops
+  const draft = JSON.parse(fs.readFileSync(path.join(require('./helpers/app').DATA, 'feedback-draft.json'), 'utf8'));
+  assert.deepEqual([draft.bug.title, draft.bug.images.length, draft.feature], ['Pin falls off', 1, null], 'the bug’s draft is on disk while it is typed');
+  // ← Back by the title, or Feedback in the sidebar again: back to the choices, the words kept, the card says "Draft"
+  assert.ok(await ui.visible('#gcBack'), 'Back shows next to the title while a form is open');
+  await ui.click('#gcBack');
+  assert.ok(await ui.visible('#gcPick') && !(await ui.visible('#gcBack')), 'Back: the two choices, no Back button');
+  assert.ok(await ui.visible('#gcPick [data-kind="bug"] .gcdraft') && !(await ui.visible('#gcPick [data-kind="feature"] .gcdraft')), 'only the bug card says Draft');
+  await ui.click('#gcPick [data-kind="feature"]');
+  assert.equal(await page.inputValue('#gcTitle'), '', 'the other kind starts empty');
+  await ui.type('#gcTitle', 'Dark paper');
+  await ui.click('#setNav [data-sec="ground"]');
+  assert.ok(await ui.visible('#gcPick'), 'Feedback in the sidebar again goes back too');
+  assert.equal(await ui.count('#gcPick .gcdraft:not([hidden])'), 2, 'both kinds can have a draft');
+  await ui.click('#gcPick [data-kind="bug"]');
+  assert.equal(await page.inputValue('#gcTitle'), 'Pin falls off', 'the bug’s words are back');
+  assert.equal(await ui.count('#gcPics .gcpic img'), 1, 'and its picture');
+  await ui.click('#gcSend');
+  await ui.settle(300);
+  assert.equal(await ui.text('#gcLine'), 'Feedback is closed for now.');
+  assert.equal(await page.inputValue('#gcTitle'), 'Pin falls off', 'the words stay');
+  relayAnswer = 200;
+  relayDelay = 800;
+  await page.evaluate(() => document.querySelector('#gcSend').click()); // not ui.click: it would wait for the answer
+  await page.waitForTimeout(200);
+  assert.equal(await ui.text('#gcSend'), 'Submit', 'while it sends: Submit keeps its word');
+  assert.ok(await page.$eval('#gcSend', (b) => b.classList.contains('busy') && b.disabled), 'spins, and can’t be pressed');
+  assert.equal(await ui.text('#gcLine'), 'Sending…', '"Sending…" is beside it');
+  await ui.settle(1200);
+  relayDelay = 0;
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].report.title, 'Pin falls off');
+  assert.equal(posts[0].images.length, 1, 'the picture went too');
+  assert.ok(await ui.visible('#gcPick') && await ui.visible('#gcDone'), 'sent: back to the choices, with "Sent. Thank you!"');
+  assert.ok(!(await ui.visible('#gcPick [data-kind="bug"] .gcdraft')), 'the sent report’s draft is gone');
+  assert.ok(await ui.visible('#gcPick [data-kind="feature"] .gcdraft'), 'the other one stays');
+  assert.equal(await ui.text('#gcDone'), 'Sent. Thank you!');
+  await ui.click('#gcPick [data-kind="bug"]');
+  assert.ok(!(await ui.visible('#gcDone')), 'the thank-you goes once a new report starts');
+  assert.equal(await page.inputValue('#gcTitle'), '', 'the form is empty again');
+  assert.equal(await ui.count('#gcPics .gcpic'), 0);
+  assert.match(await ui.text('#gcSend'), /^Submit \((1:00|0:[45]\d)\)$/, 'Submit still counts down');
+  assert.ok(!(await page.$eval('#gcSend', (b) => b.classList.contains('busy'))), 'no spinner once it is sent');
+  assert.ok(await page.isDisabled('#gcSend'));
+  relay.close();
   await ui.done();
   console.log('ok');
   process.exit(0);

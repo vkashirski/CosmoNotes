@@ -10,6 +10,7 @@ const { registerSttIpc } = require('./ipc-stt');
 const { registerUpdateIpc } = require('./ipc-update');
 const { registerRemindIpc } = require('./reminders');
 const { registerTagIpc } = require('./ipc-tags');
+const { registerFeedbackIpc } = require('./feedback');
 
 function registerIpc() {
   registerNoteIpc();
@@ -23,6 +24,7 @@ function registerIpc() {
   registerUpdateIpc(); // 1.4.0: updates
   registerRemindIpc(); // 1.4.1: reminders
   registerTagIpc(); // 1.4.30: every tag from any note
+  registerFeedbackIpc(); // 1.4.34: Ground control
 }
 
 module.exports = { registerIpc };

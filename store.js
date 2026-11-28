@@ -867,6 +867,17 @@ class Store {
     writeFileSafe(this.settingsFile, JSON.stringify(this.settings, null, 1));
   }
 
+  // 1.4.34: Feedback's drafts (main/feedback.js): { feature, bug }, what is typed in Settings → Feedback, on disk while it
+  // is written and after a Send that failed. Gone after a Send that worked. Not a note: no backups, no Bin.
+  feedbackDraft() {
+    try { const d = JSON.parse(fs.readFileSync(path.join(this.root, 'feedback-draft.json'), 'utf8')); return d && typeof d === 'object' ? d : null; } catch { return null; }
+  }
+  saveFeedbackDraft(d) {
+    const file = path.join(this.root, 'feedback-draft.json');
+    if (d) { writeFileSafe(file, JSON.stringify(d)); return; }
+    for (const f of [file, file + '.bak']) { try { fs.unlinkSync(f); } catch { /* not there */ } }
+  }
+
   // ---------- groups (a folder tree: a note has groupId, a group has parentId) ----------
   saveGroups() {
     writeFileSafe(this.groupsFile, JSON.stringify({ groups: [...this.groups.values()] }, null, 1));

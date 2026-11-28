@@ -18,6 +18,10 @@ groups.json            { groups: [{ id, name, createdAt, parentId, style, color,
                        (default hand). icon (1.4.33): one of src/tab-icons.js's 40 ids, or null (none: its tab shows only
                        its name); on its tab and its bar in the list, not on its card
 settings.json          see below
+feedback-draft.json    (1.4.34) Settings → Feedback's drafts, one per kind, while typed and after a Send that failed:
+                       { feature, bug }, each null or { kind, title, text, expected, email, withDetails, images: [{ type,
+                       data (base64), w, h }] }. A kind's draft goes when its Send works or Cancel discards it; no drafts
+                       left = no file. (An older single draft { kind, … } is still read.) Not a note: not in backups, no Bin.
 ```
 
 **Saving is atomic** (`writeFileSafe` in store.js): write a .tmp file → fsync → copy the current file to .bak → rename. On

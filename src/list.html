@@ -161,6 +161,7 @@
     <button type="button" data-sec="reminders" title="Reminders"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg><span class="lw">Reminders</span><span class="ls">Reminders</span></button>
     <button type="button" data-sec="privacy" title="Privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 11V7a4 4 0 0 1 8 0v4"/><rect x="4" y="11" width="16" height="10" rx="2.5"/></svg><span class="lw">Privacy</span><span class="ls">Privacy</span></button>
     <button type="button" data-sec="yournotes" title="Your notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="lw">Your notes</span><span class="ls">Your notes</span></button>
+    <button type="button" data-sec="ground" title="Feedback"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M8 9h8M8 12.5h5"/></svg><span class="lw">Feedback</span><span class="ls">Feedback</span></button>
     <button type="button" data-sec="about" title="About"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/></svg><span class="lw">About</span><span class="ls">About</span></button>
     <!-- 1.4.28 (the owner's wish): the version line sits at the bottom of the sidebar, under the sections -->
     <p class="version" id="version"></p>
@@ -435,6 +436,54 @@
     </div>
   </div>
 
+  <!-- 1.4.34: Feedback ("Ground control" in the code: list/ground-control.js; main/feedback.js sends it to feedback-worker/, the owner's relay) -->
+  <div class="setsec" data-sec="ground">
+    <div class="gctitle"><h2 class="sectitle">Feedback</h2><button type="button" class="pill ghost small gcback" id="gcBack" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Back</button></div>
+    <p class="seclead">Request a feature or report a bug.</p>
+    <div data-find="bug bugs report feature request idea ideas suggestion wish problem issue broken crash contact support send screenshot picture email developer ground control" class="panel gc" id="gcPanel">
+      <!-- first the choice, then the form for it (the owner's wish: picking is a real step, no switching inside the form) -->
+      <div class="gcpick" id="gcPick">
+        <button type="button" class="gcchoice" data-kind="feature"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg><b>Request a feature<i class="gcdraft" hidden>Draft</i></b><small>Something you’d like CosmoNotes to do.</small></button>
+        <button type="button" class="gcchoice" data-kind="bug"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="7" width="8" height="13" rx="4"/><path d="M9.5 7.5 8 5M14.5 7.5 16 5M8 11H4M20 11h-4M8 16H5M19 16h-3M12 11v9"/></svg><b>Report a bug<i class="gcdraft" hidden>Draft</i></b><small>Something that doesn’t work right.</small></button>
+      </div>
+      <p class="gcline ok" id="gcDone" hidden>Sent. Thank you!</p>
+      <div class="gcform" id="gcForm" hidden>
+      <div class="gchead"><b id="gcKindName"></b></div>
+      <label class="row col">
+        <span class="oprow"><b>Title</b><em id="gcTitleLeft"></em></span>
+        <input class="tinput" id="gcTitle" maxlength="120" autocomplete="off">
+      </label>
+      <label class="row col">
+        <span class="oprow"><b id="gcTextName">Your idea</b><em id="gcTextLeft"></em></span>
+        <textarea class="tinput gcbox" id="gcText" maxlength="4000" rows="5"></textarea>
+      </label>
+      <label class="row col" id="gcExpectRow" hidden>
+        <span class="oprow"><b>What did you expect?</b><em id="gcExpectLeft"></em></span>
+        <textarea class="tinput gcbox" id="gcExpect" maxlength="2000" rows="3"></textarea>
+      </label>
+      <div class="row col">
+        <span><b>Pictures</b><small>Paste, drop or add up to 3. Big ones are made smaller.</small></span>
+        <div class="gcpics" id="gcPics"></div>
+        <div class="pickbtns"><button type="button" class="pill ghost small" id="gcAddPic">Add a picture…</button></div>
+      </div>
+      <label class="row toggle">
+        <span><b>Add app details</b><small id="gcDetails"></small></span>
+        <input type="checkbox" id="gcWithDetails" checked><i></i>
+      </label>
+      <label class="row col">
+        <span><b>Email</b><small>Only if you want a reply.</small></span>
+        <input class="tinput" id="gcEmail" type="email" maxlength="200" autocomplete="off" spellcheck="false">
+      </label>
+      <p class="muted">Only this form is sent. Your notes stay on your PC.</p>
+      <div class="btnrow gcsend">
+        <button type="button" class="pill" id="gcSend">Submit</button>
+        <button type="button" class="pill ghost" id="gcCancel">Cancel</button>
+      </div>
+      <p class="gcline" id="gcLine"></p>
+      </div>
+    </div>
+  </div>
+
   <div class="setsec" data-sec="about">
     <h2 class="sectitle">About</h2>
     <div data-find="version update updates upgrade new version download install help info credits changelog github" class="panel about">
@@ -564,9 +613,12 @@
 </div>
 <div class="toast" id="toast" hidden></div>
 
-<!-- 1.4.33: a tab's icon and how it shows (list/events.js openIconPop): a group picks one of the 40 (or none) -->
+<!-- Edit title (list/events.js openIconPop): a tab's name, its icon (one of the 40, or none) and how it shows.
+     Favourites, Locked and the Bin keep their name and icon (greyed out) -->
 <div class="sortpop iconpop" id="iconPop" hidden>
-  <p class="pophead" id="iconHead"></p>
+  <p class="pophead">Edit title</p>
+  <input class="tinput" id="iconName" maxlength="120" autocomplete="off" spellcheck="false" aria-label="Name">
+  <h4>Icon</h4>
   <div class="icongrid" id="iconGrid"></div>
   <h4 id="iconShowHead">Show</h4>
   <div class="seg" id="iconShow"><button data-v="icon">Icon</button><button data-v="both">Icon + name</button><button data-v="name">Name</button></div>
@@ -594,6 +646,7 @@
 <script src="list/settings-menus.js"></script>
 <script src="list/effects-design.js"></script>
 <script src="list/actions-locks.js"></script>
+<script src="list/ground-control.js"></script>
 <script src="list/events.js"></script>
 </body>
 </html>

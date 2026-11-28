@@ -325,5 +325,34 @@ Settings), `main/stt-models.js` (the list), `main/stt-download.js` (the download
 - `app.commandLine.appendSwitch('disable-features','WinUseBrowserSpellChecker')` forces Chromium's Hunspell
   spellchecker so that with only `en-US` loaded, Cyrillic words are skipped. When spelling is first turned
   on, Electron downloads the dictionary once from Google's CDN. That, the voice-to-text model's download (only
-  when you press Download) and the update check (GitHub; Settings → About can turn the daily one off) are the
-  only network uses.
+  when you press Download) and the update check (GitHub; Settings → About can turn the daily one off) and Settings →
+  Feedback's Submit (only when pressed, only to `RELAY`) are the only network uses.
+
+## Ground control (Settings → Feedback)
+
+Settings → Feedback (1.4.34; "Ground control" in the code, `gc:*`): a feature request or a bug report goes to the owner's relay,
+`feedback-worker/worker.mjs` (a Cloudflare Worker), which opens an issue in the private repo `CosmoNotesFeedback`.
+Setup and the relay's settings: `feedback-worker/README.md`.
+
+- **What is sent is what the form shows:** the words, the pictures added, the app details if ticked (version, Windows,
+  Electron, arch), the email if given. Nothing from a note, and the list part never reads one.
+- **Only the list window** may use `gc:*` (`fromList` in `main/feedback.js`). **Only main goes online**, only on Send,
+  only to `RELAY` (a test points it elsewhere with `setRelay`).
+- **Pictures are made smaller in main, never refused** (`shrink`, Electron's `nativeImage`): the longest side at most
+  1600 px, PNG if it is at most 600 KB, else JPEG, then smaller sides until it fits. Re-encoding drops a photo's extra
+  data (place, camera). Up to 3 pictures (`LIMITS`, the same as the relay's).
+- **The puzzle:** `GET /challenge` gives a signed challenge and `bits`; main hashes `challenge:nonce:sha256(words)`
+  (`wordsOf`: every text field, in order) until it starts with `bits` zero bits, in steps of 5,000 so main never stalls
+  (more than 24 bits is refused). The relay checks it with one hash; a challenge is good for 15 minutes and used once.
+- **The relay's other guards:** `OPEN` (off switch: the app says "closed for now"), body and field limits, 5 a day per
+  IP (kept as a hash) and 50 a day in all (KV), `@names` / `#numbers` tamed. A report GitHub refused isn't counted. Its
+  GitHub token is a Cloudflare secret; it never is in the app.
+- **Choose first:** the section opens on two choices; picking one opens its form, with no switching inside it (the
+  owner's wish). ← Back by the title, or Feedback in the sidebar again (a capture listener: it runs before
+  `showSection`), goes back and keeps the words; a card with a draft says "Draft". Cancel (by Submit) discards, after
+  asking.
+- **Drafts, one per kind** (`gc:draft(kind, d)`; main `readDrafts` / `saveDraft`; store.js `feedbackDraft` /
+  `saveFeedbackDraft`): on disk half a second after typing stops and on Back, kept after a failed Send. A Send that worked
+  clears only its kind's draft.
+- **Send rests** after a report went out (`WAIT`, 60 s), or until the relay's limit ends (`retryAfter`). The list counts
+  it down on Submit. While it sends, Submit spins and "Sending…" shows beside it (`#gcLine`).

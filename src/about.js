@@ -8,7 +8,7 @@
  * Keep each item short: one or two plain sentences.
  */
 window.COSMO_ABOUT = {
-  LAST_UPDATED: '2026-11-23',
+  LAST_UPDATED: '2026-11-28',
 
   FEATURES: [
     {
@@ -160,8 +160,8 @@ window.COSMO_ABOUT = {
         'The Locked tab shows every locked note. “Unlock all” lets you read and search them.',
         'Favourites: click the star on a card. The Favourites tab shows them all.',
         'Pin a group as a tab: right-click it → Pin as tab, or drag it onto the tabs.',
-        'The pencil by the tabs edits them. Drag to move them, add groups, hide Locked.',
-        'Right-click a tab to show it as an icon, a name, or both. Groups can pick one of 40 icons.',
+        'The pencil by the tabs edits them. Drag a tab to move it, add groups, hide Locked.',
+        'Right-click a tab → Edit title. Pick its name, its icon, or both. Groups have 40 icons.',
         'Ctrl+click picks several cards. A bar then opens, stars, groups, locks or bins them at once.',
         'Group look in that bar changes the picked groups themselves: look, colour and name font.',
         'Move picked cards out of a group, or cut (Ctrl+X) or copy (Ctrl+C) them and paste in another group (Ctrl+V).',
@@ -194,6 +194,16 @@ window.COSMO_ABOUT = {
         'A new version shows a dot on Settings and a line in the tray menu.',
         'Install saves your notes, updates, and opens CosmoNotes again with your notes where they were.',
         'The download is checked before it runs. A wrong or broken file is never started.',
+      ],
+    },
+    {
+      title: 'Feedback',
+      items: [
+        'Request a feature or report a bug in Settings → Feedback. No account needed.',
+        'Pick Request a feature or Report a bug, then fill in the form for it.',
+        'Add up to 3 pictures: paste, drop or pick them. Big ones are made smaller.',
+        'Only what the form shows is sent. Nothing from your notes.',
+        'What you type is kept until it is sent, even if CosmoNotes closes.',
       ],
     },
   ],

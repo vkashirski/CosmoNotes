@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes "All notes" window, part 6 of 7: actions (Bin, delete), passwords and locks, the Locked tab, the group panel, sections and search in Settings, back / forward
+// CosmoNotes "All notes" window, part 6 of 8: actions (Bin, delete), passwords and locks, the Locked tab, the group panel, sections and search in Settings, back / forward
 // (src/list.js until 1.1.28; the parts load in order from list.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_LIST_KIT;

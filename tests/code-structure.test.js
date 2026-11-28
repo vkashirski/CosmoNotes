@@ -132,7 +132,7 @@ const base = { setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, cle
   assert.ok(/\$\('#btnRelock'\)\.addEventListener\('click', relock\)/.test(parts[2].code) && parts[2].later.includes('relock') && parts[2].later.includes('toggleLock'), 'relock / toggleLock from the lock part');
 }
 {
-  const { K } = checkKit('list', 'list', ['base', 'cards', 'picking', 'settings-menus', 'effects-design', 'actions-locks', 'events'], 'COSMO_LIST_KIT', false,
+  const { K } = checkKit('list', 'list', ['base', 'cards', 'picking', 'settings-menus', 'effects-design', 'actions-locks', 'ground-control', 'events'], 'COSMO_LIST_KIT', false,
     { ...base, document: doc(), window: { sticky: fake('sticky'), COSMO_FX: fake('COSMO_FX'), COSMO_ABOUT: { FEATURES: [] }, addEventListener() {}, matchMedia: () => ({ matches: true }) }, innerWidth: 1000, innerHeight: 700 },
     ['state', 'tab', 'openGroup', 'query', 'drag']);
   assert.equal(K.V.tab, 'notes', 'the shared variables start as before');

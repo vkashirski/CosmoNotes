@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes "All notes" window, part 2 of 7: rendering, drag & drop, note and group cards, the group header
+// CosmoNotes "All notes" window, part 2 of 8: rendering, drag & drop, note and group cards, the group header
 // (src/list.js until 1.1.28; the parts load in order from list.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_LIST_KIT;

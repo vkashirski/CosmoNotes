@@ -16,6 +16,11 @@ class BrowserWindow extends EventEmitter {
   getNativeWindowHandle(){ const b=Buffer.alloc(8); b.writeBigUInt64LE(BigInt(5000+this.id)); return b } // 1.4.5: HWND = 5000 + id
   static fromWebContents(wc){ return wc.win } static getAllWindows(){ return all.filter(w=>!w.destroyed) }
 }
+function fakeImage(w, h, bytes, empty) {
+  const fill = (head, n) => Buffer.concat([Buffer.from(head), Buffer.alloc(Math.max(0, Math.round(n) - head.length))]);
+  return { bytes, isEmpty: () => empty, getSize: () => ({ width: w, height: h }), resize: (o) => fakeImage(o.width, o.height, [], false),
+    toPNG: () => fill([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], w * h), toJPEG: (q) => fill([0xff, 0xd8, 0xff, 0xe0], (w * h * q) / 400) };
+}
 const display = { workArea: { x: 0, y: 0, width: 1920, height: 1040 } };
 // 1.4.1: a test can add monitors (E.__displays) and move the mouse (E.__cursor): getDisplayNearestPoint finds its monitor
 const shows = () => module.exports.__displays || [display];
@@ -34,7 +39,9 @@ module.exports = {
   Tray: class extends EventEmitter { constructor(){ super(); module.exports.__tray = this; } setToolTip(){} setContextMenu(m){ this.menu=m } },
   // 1.4.11: every menu shown (popup), with its template and options: __popups (the text's right-click menu, a note's » menu)
   Menu: { buildFromTemplate:(t)=>({ t, popup(o){ module.exports.__popups.push({ t, o }) } }), setApplicationMenu(){} },
-  nativeImage: { createFromPath:()=>({}), createFromBuffer:(b)=>({ bytes: [...b], isEmpty:()=>!(b.length > 4 && b[0] === 0x89 && b[1] === 0x50) }) }, // 1.4.3: only a PNG decodes
+  // 1.4.3: only a PNG decodes. 1.4.34 (Ground control's pictures): its size is read from the PNG's header; a picture's
+  // PNG is 1 byte per pixel and its JPEG quality / 400 bytes per pixel, so a test can tell how small it was made
+  nativeImage: { createFromPath:()=>({}), createFromBuffer:(b)=>{ const png = b.length > 4 && b[0] === 0x89 && b[1] === 0x50; const big = png && b.length >= 24; return fakeImage(big ? b.readUInt32BE(16) : +png, big ? b.readUInt32BE(20) : +png, [...b], !png); } },
   clipboard: { writeImage(i){ module.exports.__clip = i } }, // 1.4.3: Copy image
   shell: { openExternal(u){ module.exports.__opened = u }, openPath(){} },
   // 1.3.27: the panic button's shortcut. reg = what is registered (accelerator -> function); a test puts an accelerator in

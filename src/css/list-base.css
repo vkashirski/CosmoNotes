@@ -129,7 +129,7 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .tab.on .count { background: #FFE45C; color: #3B3226; }
 /* groups pinned as tabs, and editing the tabs (list/events.js paintTabs). The bar never wraps: tabs that don't fit go
    into » (#tabMore); while editing it wraps, so every tab can be moved */
-.tabs { align-items: center; min-width: 0; }
+.tabs { align-items: center; min-width: 0; position: relative; }
 .tabs > .tab, .tabs > button { flex: none; }
 .gtab .gtname { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tab.ovf { display: none; }
@@ -141,6 +141,10 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .tab.t-name > svg { display: none; }
 .iconpop { position: fixed; right: auto; width: 312px; z-index: 30; }
 .iconpop .pophead { margin: 6px 2px 8px; font: 800 12.5px var(--ui); color: var(--ink); }
+.iconpop .tinput { width: 100%; box-sizing: border-box; }
+.iconpop .tinput:disabled, .icongrid.off button, .iconpop .seg button:disabled { opacity: .45; cursor: default; }
+.icongrid.off button:hover { background: transparent; color: var(--ink3); }
+.icongrid.off button.on, .icongrid.off button.on:hover { background: #FFE45C; color: #3B3226; }
 .icongrid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
 .icongrid[hidden], .iconpop [hidden] { display: none; }
 .icongrid button { display: flex; align-items: center; justify-content: center; height: 32px; border: 0; border-radius: 9px; background: transparent; color: var(--ink3); cursor: pointer; }
@@ -163,12 +167,12 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .tabs.editing .tabedit svg { display: none; }
 .tabs.editing .tabedit span { display: inline; }
 .tabs.editing .tabplus { color: var(--ink); }
-.tabs.editing .tab.movable { cursor: grab; box-shadow: inset 0 0 0 1.5px var(--soft2); }
+.tabs.editing .tab.movable { cursor: grab; box-shadow: inset 0 0 0 1.5px var(--soft2); touch-action: none; user-select: none; transition: transform .15s ease; }
 .tabs.editing .tab.movable::before { content: '⋮⋮'; letter-spacing: -3px; margin-right: 2px; color: var(--mute); font-size: 11px; }
 .tabs.editing .tab.off { opacity: .5; }
-.tab.tdrag { opacity: .4; }
-.tab.drop-before { box-shadow: inset 3px 0 0 var(--ink3); }
-.tab.drop-after { box-shadow: inset -3px 0 0 var(--ink3); }
+/* the tab being moved follows the mouse, lifted over the others, which slide aside (events.js followTab) */
+.tabs.editing .tab.movable.tdrag { position: relative; z-index: 2; transition: none; cursor: grabbing; background: var(--card); color: var(--ink); box-shadow: 0 6px 16px rgba(80,60,20,.25), inset 0 0 0 1.5px var(--ink3); }
+.tabs.tabsmoving, .tabs.tabsmoving .tab { cursor: grabbing; }
 .tabs.drop-on { background: var(--soft); border-radius: 14px; }
 .tab .tx, .tab .teye { display: none; width: 18px; height: 18px; margin: -2px -6px -2px 0; border-radius: 50%; align-items: center; justify-content: center; color: var(--ink3); }
 .tabs.editing .tab .tx, .tabs.editing .tab .teye { display: flex; }

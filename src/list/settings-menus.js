@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes "All notes" window, part 4 of 7: Settings (new-note colours, About, backups), app-styled pop-ups, the right-click menu
+// CosmoNotes "All notes" window, part 4 of 8: Settings (new-note colours, About, backups), app-styled pop-ups, the right-click menu
 // (src/list.js until 1.1.28; the parts load in order from list.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_LIST_KIT;
@@ -605,7 +605,7 @@
     showCtx(e, [
       { label: 'Open group', icon: ICON.folder, run: () => openGroupView(g) },
       tab,
-      { label: 'Icon…', icon: ICON.pin, run: () => openGroupIcon(g, e) }, // 1.4.33: on its tab and its bar
+      { label: 'Edit title…', icon: ICON.pin, run: () => openGroupIcon(g, e) }, // its name and icon (on its tab and its bar)
       { label: 'Group settings…', icon: ICON.palette, run: async () => { await openGroupView(g); openPanel(); } },
       { label: 'Tags…', icon: ICON.tag, run: () => openTagSheet([{ kind: 'group', group: g }]) }, // 1.4.10
       g.favorite

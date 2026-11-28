@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes "All notes" window, part 5 of 7: effects on the cards, Settings → Effects, Edit design
+// CosmoNotes "All notes" window, part 5 of 8: effects on the cards, Settings → Effects, Edit design
 // (src/list.js until 1.1.28; the parts load in order from list.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_LIST_KIT;

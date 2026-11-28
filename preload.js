@@ -168,4 +168,12 @@ contextBridge.exposeInMainWorld('sticky', {
     onChanged: (cb) => ipcRenderer.on('update:changed', (e, s) => cb(s)),
     onShow: (cb) => ipcRenderer.on('update:show', () => cb()),
   },
+  // 1.4.34: Settings → Ground control (main/feedback.js): a feature request or a bug report
+  gc: {
+    info: () => inv('gc:info'),
+    draft: (kind, d) => inv('gc:draft', kind, d), // one draft per kind; d = null clears it
+    image: (bytes) => inv('gc:image', bytes),
+    pick: () => inv('gc:pick'),
+    send: (d) => inv('gc:send', d),
+  },
 });

@@ -1,5 +1,5 @@
 'use strict';
-// CosmoNotes "All notes" window, part 3 of 7: favourites, picking cards, the lock animation, the bar for the picked cards
+// CosmoNotes "All notes" window, part 3 of 8: favourites, picking cards, the lock animation, the bar for the picked cards
 // (src/list.js until 1.1.28; the parts load in order from list.html. How they share names: ai-context/splitting-code.md)
 (() => {
   const K = window.COSMO_LIST_KIT;

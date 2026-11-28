@@ -1,0 +1,16 @@
+# Only needed if you deploy with the wrangler command line (README.md, "With the command line").
+name = "cosmonotes-feedback"
+main = "worker.mjs"
+compatibility_date = "2026-11-01"
+
+[vars]
+REPO = "vkashirski/CosmoNotesFeedback"
+OPEN = "yes"
+PER_IP_DAY = "5"
+PER_DAY = "50"
+BITS = "18"
+
+# `npx wrangler kv namespace create LIMITS` prints the id to put here
+[[kv_namespaces]]
+binding = "LIMITS"
+id = "PUT-THE-KV-ID-HERE"

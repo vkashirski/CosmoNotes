@@ -1,6 +1,6 @@
 # CosmoNotes – context for AI assistants and developers
 
-**Last updated: 23 November 2026 · App version 1.4.33**
+**Last updated: 28 November 2026 · App version 1.4.35**
 
 `CLAUDE.md` comes first (rules, commands, the areas' rules, which topic file to open, the release checklist). This file
 is the map: what the app is and where each piece of code lives. Keep the "Last updated" line above current on every
@@ -56,10 +56,12 @@ main/              (grep a function name here; files only require() files below 
   reminders        the reminders' one clock, popping a note up, hiding, remind:* / list:remind-* IPC
   app-pin          notes pinned over some apps: which app is in front (desktopCapturer titles), hide / show
   bar-hover        the mouse over a note's top bar (a drag area the page can't see): polled, sent as note:bar-hover
+  feedback         Settings → Feedback (1.4.34; "Ground control" in the code): gc:* for the list only, pictures made smaller, the draft, the puzzle, Send
+                   to the relay (RELAY)
   ipc + ipc-*      registerIpc calls ipc-common (senderNote, applyPatch) · ipc-notes · ipc-ink · ipc-files (+ rec:*) ·
                    ipc-groups (list:get, groups:*) · ipc-list-actions (list locks, open/close/trash/edit/apply, Bin) ·
                    ipc-settings (settings:set, backups) · ipc-crypt · ipc-stt · ipc-update · ipc-tags (tags:*: every
-                   tag from any note, 1.4.30), and reminders' registerRemindIpc
+                   tag from any note, 1.4.30), feedback's registerFeedbackIpc, and reminders' registerRemindIpc
 store.js           All disk storage (notes, groups, settings, attachments, backups). No Electron imports.
 preload.js         Safe bridge: exposes window.sticky.* to both windows (contextIsolation + sandbox)
 
@@ -87,7 +89,7 @@ src/css/note-*.css The note's styles, in this order: note-base (colours, base, t
                    recording, drawing, toast) · note-effects-lock (effects, lock animation, small notes) ·
                    note-popups-find (pop-ups in the app's colours, Ctrl+F)
 
-src/list.html      The "All notes" window: Notes / Bin / Settings tabs, groups, sorting. Its code is src/list/*.js, 7 parts
+src/list.html      The "All notes" window: Notes / Bin / Settings tabs, groups, sorting. Its code is src/list/*.js, 8 parts
                    in this order, sharing names through window.COSMO_LIST_KIT (K) and its V:
   base             colours, themes, sizes, ICON, h(), colour row, data (load / live / groups / sorting), isShut, tag filter
   cards            render, drag & drop, note / group cards, card cache (refreshCard), group header, tag row
@@ -95,6 +97,7 @@ src/list.html      The "All notes" window: Notes / Bin / Settings tabs, groups, 
   settings-menus   Settings: new-note colours, About, backups, OWN; modal(), toast(); right-click menus
   effects-design   effects on cards, Settings → Effects, Edit design
   actions-locks    Bin / delete, passwords, lock / unlock, Locked tab, group panel, Settings sections and search, back / forward
+  ground-control   Settings → Feedback (1.4.34): the form, pictures (paste / drop / pick), Submit's spinner and countdown
   events           the tab bar (groups pinned as tabs, edit mode, »), search, sort, sizes, settings inputs, keys, first load
 src/css/list-*.css The list's styles, in this order: list-base (themes, title bar, tabs, search, group view, drag) ·
                    list-cards (cards, buttons, settings) · list-groups-menus (about, group looks, menus, pop-up, toast,
@@ -122,6 +125,8 @@ build.bat          one click: (private Node if needed) + npm install + electron-
 release.bat        sends package.json's version to everyone: pushes main and the tag v<ver> (checks first)
 .github/           workflows/release.yml: a tag v<ver> → tests on Linux, build + Smart App Control check on Windows,
                    publish to GitHub Releases
+feedback-worker/   Feedback's relay (1.4.34): worker.mjs, a Cloudflare Worker that turns a report into an issue in
+                   the private repo CosmoNotesFeedback; README.md (setup), wrangler.toml. Not packed, not part of the app
 .gitattributes     each file's line endings (the list CLAUDE.md points to)
 test-run.bat       runs CosmoNotes from this folder with Electron's original exe (no build needed)
 HOW TO INSTALL.txt plain-language guide for the owner (install, data folder, forgot password, tips)
